@@ -12,815 +12,471 @@ body {
 }
 
 body {
-    background: #050709;
-    color: #e8e8e8;
     font-family: Tahoma, Arial, sans-serif;
+    background: #080b10;
+    color: #eee;
     direction: rtl;
 }
 
-/* =========================================
-   عمومی
-========================================= */
+button {
+    font-family: inherit;
+    border: none;
+    cursor: pointer;
+}
 
 .hidden {
     display: none !important;
 }
 
-.page {
-    display: none;
-    position: absolute;
-    inset: 0;
-    padding: 20px;
-    padding-bottom: 95px;
+.screen {
+    width: 100%;
+    height: 100vh;
+    min-height: 100vh;
+    position: relative;
+    background:
+        radial-gradient(circle at top, #18202b 0%, #0b0f15 45%, #06080c 100%);
+}
+
+
+/* ==================== انتخاب کشور ==================== */
+
+.country-screen {
     overflow-y: auto;
+    padding: 35px 18px 30px;
 }
 
-/* =========================================
-   صفحه انتخاب کشور
-========================================= */
-
-.country-page {
-    position: fixed;
-    inset: 0;
-    overflow: hidden;
-    background:
-        radial-gradient(
-            circle at 50% 45%,
-            rgba(50, 65, 70, 0.20),
-            transparent 38%
-        ),
-        #050709;
-}
-
-/* =========================================
-   نوار بالایی
-========================================= */
-
-.top-bar {
-    position: absolute;
-    top: 18px;
-    left: 18px;
-    right: 18px;
-    height: 58px;
-
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    z-index: 50;
-}
-
-.game-title {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    direction: ltr;
-}
-
-.title-small {
-    color: #777;
-    font-size: 9px;
-    letter-spacing: 3px;
-}
-
-.title-main {
-    color: #c9c9c9;
-    font-size: 18px;
-    font-weight: bold;
-}
-
-/* =========================================
-   پرچم کشور انتخاب شده
-========================================= */
-
-.selected-country-badge {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-
-    direction: rtl;
-
-    padding: 5px 7px 5px 12px;
-
-    border: 1px solid rgba(255,255,255,0.10);
-    background: rgba(15,18,20,0.88);
-
-    border-radius: 30px;
-
-    backdrop-filter: blur(10px);
-}
-
-.selected-flag {
-    width: 38px;
-    height: 38px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border-radius: 50%;
-
-    background: #202529;
-
-    font-size: 21px;
-
-    border: 2px solid #d88722;
-
-    overflow: hidden;
-}
-
-.selected-country-info {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-
-.selected-country-info span {
-    font-size: 9px;
-    color: #777;
-}
-
-.selected-country-info strong {
-    font-size: 12px;
-    color: #ddd;
-}
-
-/* =========================================
-   متن بالای کره
-========================================= */
-
-.country-intro {
-    position: absolute;
-
-    top: 82px;
-    left: 20px;
-    right: 20px;
-
+.country-header {
     text-align: center;
-
-    z-index: 20;
+    margin-bottom: 25px;
 }
 
-.country-intro h1 {
-    font-size: 21px;
-    color: #e5e5e5;
-    margin-bottom: 7px;
+.country-header h1 {
+    font-size: 28px;
+    margin-bottom: 8px;
 }
 
-.country-intro p {
-    color: #777;
-    font-size: 11px;
-    line-height: 1.8;
+.country-header p {
+    color: #8d96a3;
+    font-size: 13px;
 }
 
-.country-intro span {
-    display: block;
-
-    margin-top: 5px;
-
-    color: #b27830;
-    font-size: 10px;
-}
-
-/* =========================================
-   کره زمین
-========================================= */
-
-#globe-container {
-    position: absolute;
-
-    top: 145px;
-    left: 50%;
-
-    width: min(92vw, 560px);
-    height: min(92vw, 560px);
-
-    transform: translateX(-50%);
-
-    z-index: 5;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    touch-action: none;
-}
-
-#globe {
-    width: 100%;
-    height: 100%;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border-radius: 50%;
-
-    overflow: hidden;
-
-    filter:
-        drop-shadow(0 0 25px rgba(0,0,0,0.9))
-        drop-shadow(0 0 55px rgba(37,61,70,0.15));
-
-    cursor: grab;
-}
-
-#globe:active {
-    cursor: grabbing;
-}
-
-#globe svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-/* =========================================
-   نور کره
-========================================= */
-
-.globe-light {
-    position: absolute;
-
-    width: 100%;
-    height: 100%;
-
-    border-radius: 50%;
-
-    pointer-events: none;
-
-    background:
-        radial-gradient(
-            circle at 35% 28%,
-            rgba(255,255,255,0.10),
-            transparent 25%
-        ),
-        radial-gradient(
-            circle at 70% 75%,
-            rgba(0,0,0,0.55),
-            transparent 55%
-        );
-
-    z-index: 10;
-}
-
-/* =========================================
-   حلقه ظریف دور کره
-========================================= */
-
-.globe-ring {
-    position: absolute;
-
-    width: 101%;
-    height: 101%;
-
-    border-radius: 50%;
-
-    border: 1px solid rgba(255,255,255,0.08);
-
-    pointer-events: none;
-
-    z-index: 15;
-}
-
-/* =========================================
-   پیام انتخاب کشور
-========================================= */
-
-#country-message {
-    position: absolute;
-
-    bottom: 188px;
-
-    left: 20px;
-    right: 20px;
-
-    min-height: 20px;
-
+.country-message {
     text-align: center;
-
-    color: #d88722;
-
-    font-size: 11px;
-
-    z-index: 30;
-
-    pointer-events: none;
+    color: #e8a83e;
+    font-size: 13px;
+    min-height: 22px;
+    margin-bottom: 10px;
 }
 
-/* =========================================
-   کارت کشورهای پایین
-========================================= */
-
-.available-countries {
-    position: absolute;
-
-    left: 15px;
-    right: 15px;
-    bottom: 18px;
-
+.country-grid {
+    width: min(900px, 100%);
+    margin: auto;
     display: grid;
-
-    grid-template-columns: repeat(2, 1fr);
-
-    gap: 7px;
-
-    z-index: 40;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
 }
 
 .country-card {
-    height: 48px;
-
+    min-height: 145px;
+    padding: 18px;
+    border-radius: 18px;
+    background: linear-gradient(145deg, #171d26, #10151c);
+    border: 1px solid #28313d;
+    color: white;
     display: flex;
     align-items: center;
-
-    gap: 9px;
-
-    padding: 5px 9px;
-
-    border-radius: 9px;
-
-    background: rgba(18,21,23,0.92);
-
-    border: 1px solid rgba(255,255,255,0.08);
-
-    cursor: pointer;
-
-    transition:
-        background 0.2s ease,
-        border-color 0.2s ease,
-        transform 0.2s ease;
+    gap: 15px;
+    text-align: right;
+    transition: .2s;
 }
 
 .country-card:hover {
-    background: #202427;
-    border-color: rgba(216,135,34,0.5);
+    border-color: #d98a25;
+    transform: translateY(-2px);
 }
 
 .country-card:active {
-    transform: scale(0.97);
+    transform: scale(.98);
+}
+
+.country-card.taken {
+    opacity: .35;
+    filter: grayscale(1);
 }
 
 .country-flag {
-    width: 31px;
-    height: 31px;
-
+    width: 58px;
+    height: 58px;
     flex-shrink: 0;
-
+    border-radius: 50%;
+    background: #222a34;
     display: flex;
     align-items: center;
     justify-content: center;
-
-    border-radius: 50%;
-
-    background: #292d30;
-
-    font-size: 18px;
+    font-size: 32px;
 }
 
-.country-card-info {
+.country-info h2 {
+    font-size: 19px;
+    margin-bottom: 3px;
+}
+
+.country-info > span {
+    color: #707b89;
+    font-size: 11px;
+}
+
+.country-stats {
+    display: flex;
+    gap: 15px;
+    margin-top: 13px;
+}
+
+.country-stats div {
     display: flex;
     flex-direction: column;
-
-    overflow: hidden;
+    gap: 2px;
 }
 
-.country-card-info strong {
-    font-size: 11px;
-    color: #ddd;
+.country-stats small {
+    color: #727c89;
+    font-size: 9px;
 }
 
-.country-card-info span {
-    margin-top: 2px;
-
-    direction: ltr;
-    text-align: right;
-
-    font-size: 8px;
-
-    color: #666;
+.country-stats strong {
+    font-size: 13px;
 }
 
-/* کشور گرفته شده */
 
-.country-card.country-taken {
-    opacity: 0.35;
+/* ==================== هدر ==================== */
 
-    filter: grayscale(100%);
-
-    cursor: not-allowed;
-
-    border-color: #242424;
-}
-
-.country-card.country-taken:hover {
-    background: rgba(18,21,23,0.92);
-
-    border-color: #242424;
-}
-
-.country-card.country-taken .country-flag {
-    filter: grayscale(100%);
-}
-
-/* =========================================
-   هدر صفحات داخلی
-========================================= */
-
-.page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    padding: 12px 2px 20px;
-
-    border-bottom: 1px solid #202427;
-
-    margin-bottom: 18px;
-}
-
-.page-label {
-    display: block;
-
-    color: #8a6a3c;
-
-    font-size: 8px;
-
-    letter-spacing: 2px;
-
-    direction: ltr;
-
-    margin-bottom: 5px;
-}
-
-.page-header h1 {
-    font-size: 22px;
-}
-
-.header-flag {
-    width: 45px;
-    height: 45px;
-
-    border-radius: 50%;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    background: #202427;
-
-    border: 1px solid #555;
-
-    font-size: 22px;
-}
-
-/* =========================================
-   خانه
-========================================= */
-
-.country-overview {
-    background: #101416;
-
-    border: 1px solid #24292c;
-
-    border-radius: 14px;
-
-    padding: 18px;
-
-    margin-bottom: 15px;
-}
-
-.overview-title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    margin-bottom: 20px;
-}
-
-.overview-title span {
-    color: #777;
-    font-size: 11px;
-}
-
-.overview-title strong {
-    color: #d88722;
-    font-size: 17px;
-}
-
-.overview-stats {
+.game-header {
+    height: 65px;
+    width: 100%;
     display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 0 14px;
+    background: rgba(10, 14, 20, .92);
+    border-bottom: 1px solid #222a34;
+    position: relative;
+    z-index: 20;
+}
 
-    grid-template-columns: repeat(3, 1fr);
+.header-right {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+}
 
+.header-left {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
     gap: 8px;
 }
 
-.overview-stats > div {
+.header-center {
     text-align: center;
-
-    background: #181c1e;
-
-    border-radius: 9px;
-
-    padding: 12px 5px;
 }
 
-.overview-stats span {
-    display: block;
-
-    color: #666;
-
-    font-size: 9px;
-
-    margin-bottom: 6px;
+.game-title {
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: #e4e7eb;
 }
 
-.overview-stats strong {
-    color: #ddd;
-
-    font-size: 15px;
-}
-
-/* =========================================
-   نقشه داخل بازی
-========================================= */
-
-#game-globe-container {
-    width: 100%;
-    height: calc(100vh - 180px);
-
+.selected-country-flag {
+    width: 39px;
+    height: 39px;
+    border-radius: 50%;
+    background: #1d2530;
+    border: 1px solid #37414e;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 22px;
 }
 
-#game-globe {
-    width: min(90vw, 600px);
-    height: min(90vw, 600px);
-
+.header-button {
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
+    background: #151b23;
+    color: #ddd;
+    font-size: 17px;
+    border: 1px solid #29323d;
+}
 
+.header-button:active {
+    transform: scale(.92);
+}
+
+
+/* ==================== پیش نمایش ==================== */
+
+.preview-content {
+    height: calc(100vh - 65px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 15px 30px;
+}
+
+.preview-title {
+    text-align: center;
+}
+
+.preview-title span {
+    color: #737d89;
+    font-size: 12px;
+}
+
+.preview-title h1 {
+    font-size: 28px;
+    margin: 5px 0;
+}
+
+.preview-title p {
+    color: #8993a0;
+    font-size: 12px;
+}
+
+.globe-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#preview-globe-container {
+    width: min(430px, 88vw);
+    height: min(430px, 55vh);
+    margin: 5px auto;
+}
+
+#preview-globe {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.primary-game-button {
+    width: min(360px, 90%);
+    height: 54px;
+    border-radius: 14px;
+    background: #d88a28;
+    color: #111;
+    font-size: 16px;
+    font-weight: bold;
+    box-shadow: 0 8px 30px rgba(216, 138, 40, .18);
+}
+
+.primary-game-button:active {
+    transform: scale(.97);
+}
+
+
+/* ==================== بازی ==================== */
+
+.game-screen {
     overflow: hidden;
 }
 
-/* =========================================
-   اخبار
-========================================= */
+.game-page {
+    height: calc(100vh - 65px - 70px);
+    overflow-y: auto;
+    padding: 20px 15px 90px;
+}
+
+.page-title {
+    margin-bottom: 15px;
+}
+
+.page-title span {
+    color: #737e8c;
+    font-size: 11px;
+}
+
+.page-title h1 {
+    font-size: 25px;
+    margin-top: 4px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.stat-card {
+    padding: 16px;
+    background: #111720;
+    border: 1px solid #252e39;
+    border-radius: 15px;
+}
+
+.stat-card span {
+    display: block;
+    color: #798391;
+    font-size: 11px;
+    margin-bottom: 7px;
+}
+
+.stat-card strong {
+    font-size: 21px;
+}
+
+#globe-container {
+    width: min(600px, 100%);
+    height: 48vh;
+    margin: 15px auto 0;
+}
+
+#globe,
+#map-globe {
+    width: 100%;
+    height: 100%;
+}
+
+
+/* ==================== اخبار ==================== */
+
+.news-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
 
 .news-item {
-    background: #101416;
-
-    border: 1px solid #24292c;
-
-    border-radius: 12px;
-
+    background: #111720;
+    border: 1px solid #252e39;
+    border-radius: 14px;
     padding: 15px;
-
-    margin-bottom: 10px;
 }
 
 .news-item h3 {
     font-size: 14px;
-
     margin-bottom: 7px;
 }
 
 .news-item p {
-    color: #777;
-
-    font-size: 11px;
-
-    line-height: 1.9;
-}
-
-.news-empty {
-    color: #555;
-
-    text-align: center;
-
-    margin-top: 70px;
-
+    color: #8a94a1;
     font-size: 12px;
-}
-
-/* =========================================
-   ارتباطات
-========================================= */
-
-.communication-card {
-    display: flex;
-
-    align-items: center;
-
-    gap: 14px;
-
-    background: #101416;
-
-    border: 1px solid #24292c;
-
-    border-radius: 13px;
-
-    padding: 18px;
-}
-
-.communication-icon {
-    width: 45px;
-    height: 45px;
-
-    border-radius: 50%;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    background: #1c2022;
-
-    color: #d88722;
-
-    font-size: 20px;
-}
-
-.communication-card strong {
-    font-size: 13px;
-}
-
-.communication-card p {
-    margin-top: 6px;
-
-    color: #666;
-
-    font-size: 10px;
-
     line-height: 1.8;
 }
 
-/* =========================================
-   اشتراک
-========================================= */
 
+/* ==================== صفحات ==================== */
+
+.empty-page,
 .subscription-card {
-    background: #101416;
-
-    border: 1px solid #2c2923;
-
-    border-radius: 14px;
-
-    padding: 25px;
-
+    background: #111720;
+    border: 1px solid #252e39;
+    border-radius: 15px;
+    padding: 20px;
+    color: #8993a0;
     text-align: center;
 }
 
 .subscription-card h2 {
-    font-size: 18px;
-
-    color: #d88722;
-
-    margin-bottom: 10px;
+    color: white;
+    margin-bottom: 8px;
 }
 
-.subscription-card p {
-    color: #777;
 
-    font-size: 11px;
-
-    line-height: 1.8;
-}
-
-.premium-button {
-    width: 100%;
-
-    margin-top: 20px;
-
-    padding: 12px;
-
-    border: 1px solid #765522;
-
-    border-radius: 9px;
-
-    background: #211b12;
-
-    color: #d88722;
-}
-
-/* =========================================
-   منوی پایین
-========================================= */
+/* ==================== نوار پایین ==================== */
 
 .bottom-nav {
     position: fixed;
-
     bottom: 0;
-    left: 0;
     right: 0;
-
-    height: 66px;
-
-    display: none;
-
-    align-items: center;
-    justify-content: space-around;
-
-    background: rgba(10,12,13,0.96);
-
-    border-top: 1px solid #25292b;
-
-    z-index: 100;
-
-    backdrop-filter: blur(15px);
+    left: 0;
+    height: 70px;
+    background: rgba(9, 12, 17, .96);
+    border-top: 1px solid #222a34;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    z-index: 30;
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
 .nav-item {
-    width: 25%;
-    height: 100%;
-
+    background: transparent;
+    color: #626d7b;
     display: flex;
-
     flex-direction: column;
-
     align-items: center;
     justify-content: center;
-
     gap: 4px;
-
-    background: transparent;
-
-    border: none;
-
-    color: #555;
-
-    font-family: inherit;
-
-    font-size: 9px;
-
-    cursor: pointer;
+    font-size: 10px;
 }
 
-.nav-icon {
-    font-size: 18px;
-
-    line-height: 1;
+.nav-item span {
+    font-size: 20px;
 }
 
 .nav-item.active {
-    color: #d88722;
+    color: #e19a43;
 }
 
-.nav-item:hover {
-    color: #aaa;
-}
 
-.nav-item.active:hover {
-    color: #d88722;
-}
-
-/* =========================================
-   موبایل
-========================================= */
+/* ==================== موبایل ==================== */
 
 @media (max-width: 600px) {
 
-    #globe-container {
-        top: 145px;
-
-        width: 92vw;
-        height: 92vw;
+    .country-screen {
+        padding-top: 25px;
     }
 
-    .country-intro h1 {
-        font-size: 19px;
+    .country-header h1 {
+        font-size: 24px;
     }
 
-    .country-intro p {
-        font-size: 10px;
-    }
-
-    .available-countries {
-        bottom: 16px;
-    }
-}
-
-/* =========================================
-   موبایل کوچک
-========================================= */
-
-@media (max-height: 700px) {
-
-    .country-intro {
-        top: 72px;
-    }
-
-    #globe-container {
-        top: 125px;
-        width: 65vh;
-        height: 65vh;
-    }
-
-    #country-message {
-        bottom: 175px;
+    .country-grid {
+        gap: 10px;
     }
 
     .country-card {
-        height: 43px;
+        min-height: 135px;
+        padding: 13px;
+        gap: 9px;
+    }
+
+    .country-flag {
+        width: 45px;
+        height: 45px;
+        font-size: 25px;
+    }
+
+    .country-info h2 {
+        font-size: 15px;
+    }
+
+    .country-info > span {
+        font-size: 9px;
+    }
+
+    .country-stats {
+        gap: 8px;
+        margin-top: 9px;
+    }
+
+    .country-stats strong {
+        font-size: 11px;
+    }
+
+    .country-stats small {
+        font-size: 8px;
+    }
+
+    .game-title {
+        font-size: 11px;
+        letter-spacing: 1px;
+    }
+
+    #preview-globe-container {
+        height: 48vh;
     }
 }
