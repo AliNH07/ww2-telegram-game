@@ -104,7 +104,7 @@
 </section>
 
 
-<!-- ==================== پیش نمایش کشور ==================== -->
+<!-- ==================== پیش نمایش کشور (هنوز برای کاربر ثبت نشده) ==================== -->
 
 <section id="country-preview" class="screen hidden">
 
@@ -185,30 +185,71 @@
 
         <div class="stats-grid">
 
-            <div class="stat-card">
-                <span>اقتصاد</span>
-                <strong id="home-economy">0</strong>
+            <div class="stat-card wide">
+                <span>پول</span>
+                <strong id="home-money">$۰</strong>
             </div>
 
             <div class="stat-card">
-                <span>ارتش</span>
+                <span>قدرت نظامی</span>
                 <strong id="home-army">0</strong>
             </div>
 
             <div class="stat-card">
-                <span>جمعیت</span>
-                <strong id="home-population">0</strong>
+                <span>برق کشور</span>
+                <strong id="home-power">0</strong>
             </div>
 
             <div class="stat-card">
-                <span>سال</span>
-                <strong id="home-year">1939</strong>
+                <span>فصل</span>
+                <strong id="home-season">بهار</strong>
+            </div>
+
+            <div class="stat-card">
+                <span>روز بازی</span>
+                <strong id="home-day">1 / 31</strong>
             </div>
 
         </div>
 
-        <div id="globe-container" class="globe-container">
-            <svg id="globe"></svg>
+        <div class="action-grid">
+
+            <button class="action-card" data-section="war">
+                <span class="action-icon">⚔️</span>
+                <h3>جنگ</h3>
+                <p>آغاز و مدیریت عملیات نظامی علیه کشورهای دیگر</p>
+            </button>
+
+            <button class="action-card" data-section="army">
+                <span class="action-icon">🪖</span>
+                <h3>ارتش</h3>
+                <p>استخدام نیرو و افزایش قدرت نظامی کشور</p>
+            </button>
+
+            <button class="action-card" data-section="diplomacy">
+                <span class="action-icon">🤝</span>
+                <h3>دیپلماسی</h3>
+                <p>عقد پیمان، اتحاد یا مذاکره با سایر کشورها</p>
+            </button>
+
+            <button class="action-card" data-section="economy">
+                <span class="action-icon">💰</span>
+                <h3>اقتصاد</h3>
+                <p>مدیریت منابع مالی و افزایش درآمد کشور</p>
+            </button>
+
+            <button class="action-card" data-section="infrastructure">
+                <span class="action-icon">🏗️</span>
+                <h3>زیرساخت</h3>
+                <p>ساخت نیروگاه برق، جاده و تأسیسات کشور</p>
+            </button>
+
+            <button class="action-card" data-section="market">
+                <span class="action-icon">🌐</span>
+                <h3>بازار جهانی</h3>
+                <p>خرید و فروش منابع در بازار بین‌المللی</p>
+            </button>
+
         </div>
 
     </main>
