@@ -274,6 +274,7 @@ button {
     display: flex;
     justify-content: center;
     align-items: center;
+    touch-action: none;
 }
 
 #preview-globe-container {
@@ -330,10 +331,14 @@ button {
     margin-top: 4px;
 }
 
+
+/* ==================== آمار خانه ==================== */
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
+    margin-bottom: 20px;
 }
 
 .stat-card {
@@ -341,6 +346,10 @@ button {
     background: #111720;
     border: 1px solid #252e39;
     border-radius: 15px;
+}
+
+.stat-card.wide {
+    grid-column: 1 / -1;
 }
 
 .stat-card span {
@@ -354,13 +363,64 @@ button {
     font-size: 21px;
 }
 
-#globe-container {
+.stat-card.wide strong {
+    font-size: 28px;
+    color: #e8b355;
+}
+
+
+/* ==================== باکس‌های اقدام (جنگ/ارتش/...) ==================== */
+
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.action-card {
+    background: linear-gradient(145deg, #131922, #0d131b);
+    border: 1px solid #252e39;
+    border-radius: 18px;
+    padding: 18px 14px;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 130px;
+    transition: .2s;
+}
+
+.action-card:hover {
+    border-color: #d98a25;
+    transform: translateY(-2px);
+}
+
+.action-card:active {
+    transform: scale(.97);
+}
+
+.action-icon {
+    font-size: 26px;
+}
+
+.action-card h3 {
+    font-size: 15px;
+    color: #eee;
+}
+
+.action-card p {
+    font-size: 11px;
+    color: #8a94a1;
+    line-height: 1.7;
+}
+
+
+#map-globe-container {
     width: min(600px, 100%);
-    height: 48vh;
+    height: 55vh;
     margin: 15px auto 0;
 }
 
-#globe,
 #map-globe {
     width: 100%;
     height: 100%;
@@ -580,5 +640,22 @@ button {
 
     #preview-globe-container {
         height: 48vh;
+    }
+
+    .action-card {
+        min-height: 115px;
+        padding: 14px 12px;
+    }
+
+    .action-icon {
+        font-size: 22px;
+    }
+
+    .action-card h3 {
+        font-size: 13px;
+    }
+
+    .action-card p {
+        font-size: 10px;
     }
 }
