@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types
@@ -83,7 +83,7 @@ COUNTRIES = {
 
 
 # =========================================================
-# تنظیمات بازی (پول / زمان)
+# تنظیمات بازی (پول / زمان / فصل)
 # =========================================================
 
 STARTING_MONEY = 10_000_000
@@ -98,6 +98,9 @@ SEASONS = [
     "زمستان",
 ]
 
+# ضریب تبدیل «اقتصاد کشور» به «درآمد روزانه» نمایشی
+INCOME_MULTIPLIER = 500
+
 
 def get_game_time(player):
 
@@ -107,27 +110,96 @@ def get_game_time(player):
 
         return {
             "day": 1,
-            "season": SEASONS[0]
+            "season": SEASONS[0],
+            "season_days_left": DAYS_PER_SEASON,
+            "season_hours_left": 0,
+            "next_season": SEASONS[1],
         }
 
     started = datetime.fromisoformat(started_at)
 
-    elapsed_days = (
-        (datetime.utcnow() - started).days + 1
+    now = datetime.utcnow()
+
+    elapsed = now - started
+
+    elapsed_days_float = max(
+        0,
+        elapsed.total_seconds() / 86400
     )
 
-    day = max(
-        1,
-        min(elapsed_days, GAME_TOTAL_DAYS)
+    day = min(
+        GAME_TOTAL_DAYS,
+        int(elapsed_days_float) + 1
     )
 
     season_index = (
         ((day - 1) // DAYS_PER_SEASON) % len(SEASONS)
     )
 
+    season_end = (
+        started +
+        timedelta(
+            days=(season_index + 1) * DAYS_PER_SEASON
+        )
+    )
+
+    game_end = (
+        started +
+        timedelta(days=GAME_TOTAL_DAYS)
+    )
+
+    season_end = min(season_end, game_end)
+
+    remaining = season_end - now
+
+    if remaining.total_seconds() < 0:
+        remaining = timedelta(0)
+
+    season_days_left = remaining.days
+
+    season_hours_left = remaining.seconds // 3600
+
+    next_season = (
+        SEASONS[(season_index + 1) % len(SEASONS)]
+    )
+
     return {
         "day": day,
-        "season": SEASONS[season_index]
+        "season": SEASONS[season_index],
+        "season_days_left": season_days_left,
+        "season_hours_left": season_hours_left,
+        "next_season": next_season,
+    }
+
+
+def get_economy(player):
+
+    country_id = player.get("country")
+
+    day = get_game_time(player)["day"]
+
+    if not country_id:
+
+        return {
+            "daily_income": 0,
+            "money": player.get("money", STARTING_MONEY),
+        }
+
+    daily_income = (
+        COUNTRIES[country_id]["economy"] *
+        INCOME_MULTIPLIER
+    )
+
+    accrued = daily_income * (day - 1)
+
+    money = (
+        player.get("money", STARTING_MONEY) +
+        accrued
+    )
+
+    return {
+        "daily_income": daily_income,
+        "money": money,
     }
 
 
@@ -137,6 +209,10 @@ def serialize_player(player):
 
     data.update(
         get_game_time(player)
+    )
+
+    data.update(
+        get_economy(player)
     )
 
     return data
@@ -157,6 +233,7 @@ def create_player(user_id):
         "money": STARTING_MONEY,
         "army": 0,
         "power": 0,
+        "power_capacity": 0,
         "year": 1939,
         "started_at": None,
     }
