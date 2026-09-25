@@ -12,6 +12,7 @@ const userId =
 let player = null;
 let countries = {};
 let selectedCountry = null;
+let previousScreen = null;
 
 const COUNTRY_FLAGS = {
     germany: "🇩🇪",
@@ -177,10 +178,6 @@ function updateCountryCards() {
 
         if (country.taken) {
 
-            /*
-             * اگر کشور متعلق به خود کاربر است،
-             * نباید خاکستری شود.
-             */
             if (player?.country === countryId) {
                 card.classList.remove("taken");
             } else {
@@ -368,6 +365,9 @@ function showGame() {
     updateGameHeader();
     updateHomeStats();
 
+    // تنظیم صفحه پیش‌فرض روی خانه
+    switchPage("home");
+
     createGlobe(
         "globe-container",
         "globe",
@@ -441,7 +441,78 @@ function formatPopulation(value) {
 
 
 /* =========================================================
-   نوار پایین
+   تغییر صفحه (توسط فوتر یا دکمه‌ها)
+========================================================= */
+
+function switchPage(page) {
+
+    // مخفی کردن همه صفحات بازی
+    document.querySelectorAll(".game-page").forEach(
+        element => {
+            element.classList.add("hidden");
+        }
+    );
+
+    // نمایش صفحه مقصد
+    const target =
+        document.getElementById(page);
+
+    if (target) {
+        target.classList.remove("hidden");
+    }
+
+    // به‌روزرسانی وضعیت فوتر
+    document.querySelectorAll(".nav-item").forEach(
+        nav => {
+            nav.classList.remove("active");
+        }
+    );
+
+    const activeNav =
+        document.querySelector(`.nav-item[data-page="${page}"]`);
+
+    if (activeNav) {
+        activeNav.classList.add("active");
+    }
+
+    // اگر صفحه خانه بود، کره را دوباره بساز
+    if (page === "home") {
+
+        setTimeout(() => {
+
+            createGlobe(
+                "globe-container",
+                "globe",
+                selectedCountry
+            );
+
+        }, 50);
+    }
+
+    // اگر صفحه نقشه جهانی بود، کره نقشه را بساز
+    if (page === "map") {
+
+        setTimeout(() => {
+
+            createGlobe(
+                "map-globe-container",
+                "map-globe",
+                selectedCountry
+            );
+
+        }, 50);
+    }
+
+    // اگر صفحه اخبار بود، اخبار را بارگذاری کن
+    if (page === "news") {
+
+        loadNews();
+    }
+}
+
+
+/* =========================================================
+   فوتر (نوار پایین)
 ========================================================= */
 
 document.querySelectorAll(".nav-item").forEach(item => {
@@ -450,41 +521,131 @@ document.querySelectorAll(".nav-item").forEach(item => {
 
         const page = item.dataset.page;
 
-        document.querySelectorAll(".game-page").forEach(
-            element => {
-                element.classList.add("hidden");
-            }
-        );
-
-        const target =
-            document.getElementById(page);
-
-        if (target) {
-            target.classList.remove("hidden");
-        }
-
-        document.querySelectorAll(".nav-item").forEach(
-            nav => {
-                nav.classList.remove("active");
-            }
-        );
-
-        item.classList.add("active");
-
-        if (page === "home") {
-
-            setTimeout(() => {
-
-                createGlobe(
-                    "globe-container",
-                    "globe",
-                    selectedCountry
-                );
-
-            }, 50);
-        }
+        switchPage(page);
     });
 });
+
+
+/* =========================================================
+   دکمه بازگشت
+========================================================= */
+
+document
+    .getElementById("back-button")
+    ?.addEventListener("click", () => {
+
+        // اگر در صفحه ارتباطات هستیم
+        if (!document.getElementById("communications").classList.contains("hidden")) {
+
+            // اگر زیرصفحه باز است، ببند
+            if (!document.getElementById("communications-sub").classList.contains("hidden")) {
+
+                document.getElementById("communications-sub").classList.add("hidden");
+                document.getElementById("communications-main").classList.remove("hidden");
+
+                updatePageTitle("ارتباطات", "روابط بین کشورها");
+
+                return;
+            }
+        }
+
+        // اگر در صفحه نقشه هستیم
+        if (!document.getElementById("map").classList.contains("hidden")) {
+
+            switchPage("home");
+            return;
+        }
+
+        // اگر در صفحه اخبار هستیم
+        if (!document.getElementById("news").classList.contains("hidden")) {
+
+            switchPage("home");
+            return;
+        }
+
+        // اگر در صفحه اشتراک هستیم
+        if (!document.getElementById("subscription").classList.contains("hidden")) {
+
+            switchPage("home");
+            return;
+        }
+    });
+
+
+function updatePageTitle(title, subtitle) {
+
+    const titleElement =
+        document.querySelector("#communications-main .page-title h1");
+
+    const subtitleElement =
+        document.querySelector("#communications-main .page-title span");
+
+    if (titleElement) {
+        titleElement.textContent = title;
+    }
+
+    if (subtitleElement) {
+        subtitleElement.textContent = subtitle;
+    }
+}
+
+
+/* =========================================================
+   ارتباطات - زیرصفحه‌ها
+========================================================= */
+
+// دکمه اخبار در ارتباطات
+document
+    .getElementById("comm-news-button")
+    ?.addEventListener("click", () => {
+
+        switchPage("news");
+    });
+
+
+// دکمه پیام به کشورها در ارتباطات
+document
+    .getElementById("comm-message-button")
+    ?.addEventListener("click", () => {
+
+        document.getElementById("communications-main").classList.add("hidden");
+        document.getElementById("communications-sub").classList.remove("hidden");
+    });
+
+
+// دکمه بازگشت از زیرصفحه ارتباطات
+document
+    .getElementById("comm-back-button")
+    ?.addEventListener("click", () => {
+
+        document.getElementById("communications-sub").classList.add("hidden");
+        document.getElementById("communications-main").classList.remove("hidden");
+    });
+
+
+// دکمه ارسال پیام
+document
+    .getElementById("send-message-button")
+    ?.addEventListener("click", () => {
+
+        const targetCountry =
+            document.getElementById("message-target")?.value;
+
+        const messageText =
+            document.getElementById("message-text")?.value;
+
+        if (!targetCountry || !messageText) {
+
+            alert("لطفاً کشور هدف و متن پیام را وارد کنید.");
+            return;
+        }
+
+        alert(`پیام به ${COUNTRY_NAMES[targetCountry] || targetCountry} ارسال شد.`);
+
+        // پاک کردن فرم
+        document.getElementById("message-target").value = "";
+        document.getElementById("message-text").value = "";
+    });
 
 
 /* =========================================================
