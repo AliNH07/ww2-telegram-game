@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime
 
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types
@@ -82,6 +83,66 @@ COUNTRIES = {
 
 
 # =========================================================
+# تنظیمات بازی (پول / زمان)
+# =========================================================
+
+STARTING_MONEY = 10_000_000
+
+GAME_TOTAL_DAYS = 31
+DAYS_PER_SEASON = 2
+
+SEASONS = [
+    "بهار",
+    "تابستان",
+    "پاییز",
+    "زمستان",
+]
+
+
+def get_game_time(player):
+
+    started_at = player.get("started_at")
+
+    if not started_at:
+
+        return {
+            "day": 1,
+            "season": SEASONS[0]
+        }
+
+    started = datetime.fromisoformat(started_at)
+
+    elapsed_days = (
+        (datetime.utcnow() - started).days + 1
+    )
+
+    day = max(
+        1,
+        min(elapsed_days, GAME_TOTAL_DAYS)
+    )
+
+    season_index = (
+        ((day - 1) // DAYS_PER_SEASON) % len(SEASONS)
+    )
+
+    return {
+        "day": day,
+        "season": SEASONS[season_index]
+    }
+
+
+def serialize_player(player):
+
+    data = dict(player)
+
+    data.update(
+        get_game_time(player)
+    )
+
+    return data
+
+
+# =========================================================
 # بازیکنان
 # =========================================================
 
@@ -93,9 +154,11 @@ def create_player(user_id):
     return {
         "user_id": user_id,
         "country": None,
-        "money": 1000,
-        "army": 500,
+        "money": STARTING_MONEY,
+        "army": 0,
+        "power": 0,
         "year": 1939,
+        "started_at": None,
     }
 
 
@@ -199,7 +262,9 @@ async def get_player(request):
 
 
     return web.json_response(
-        players[user_id]
+        serialize_player(
+            players[user_id]
+        )
     )
 
 
@@ -244,7 +309,7 @@ async def get_countries(request):
 
 
 # =========================================================
-# API - Select Country
+# API - Select Country (فقط بعد از "ورود به بازی" صدا زده می‌شود)
 # =========================================================
 
 async def select_country(request):
@@ -312,7 +377,7 @@ async def select_country(request):
             return web.json_response(
                 {
                     "success": True,
-                    "player": player
+                    "player": serialize_player(player)
                 }
             )
 
@@ -361,17 +426,20 @@ async def select_country(request):
 
 
     # -----------------------------------------------------
-    # انتخاب کشور
+    # انتخاب کشور (نهایی، فقط اینجا برای کاربر ثبت می‌شود)
     # -----------------------------------------------------
 
     player["country"] = country_id
 
-    player["money"] = COUNTRIES[country_id]["economy"]
-    player["army"] = COUNTRIES[country_id]["army"]
+    if not player.get("started_at"):
+
+        player["started_at"] = (
+            datetime.utcnow().isoformat()
+        )
 
 
     logging.info(
-        "PLAYER SELECTED COUNTRY | "
+        "PLAYER ENTERED GAME | "
         "user_id=%s | country=%s | country_name=%s",
         user_id,
         country_id,
@@ -382,7 +450,7 @@ async def select_country(request):
     return web.json_response(
         {
             "success": True,
-            "player": player
+            "player": serialize_player(player)
         }
     )
 
