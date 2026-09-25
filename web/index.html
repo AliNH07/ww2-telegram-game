@@ -12,389 +12,517 @@
 
     <link rel="stylesheet" href="/style.css">
 
-    <!-- D3 برای ساخت کره زمین -->
+    <!-- D3 + TopoJSON برای کره -->
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-
-    <!-- تبدیل داده‌های جغرافیایی -->
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 
-    <!-- Telegram Web App -->
+    <!-- Telegram Mini App -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 
 <body>
 
-<!-- =====================================================
-     صفحه انتخاب کشور
-===================================================== -->
+    <!-- ========================================================= -->
+    <!-- صفحه انتخاب کشور -->
+    <!-- ========================================================= -->
 
-<section id="country" class="country-page">
+    <section id="country" class="screen country-screen">
 
-    <!-- بالا -->
-    <div class="top-bar">
+        <div class="country-header">
+            <h1>انتخاب کشور</h1>
 
-        <div class="game-title">
-            <span class="title-small">WORLD WAR II</span>
-            <span class="title-main">1939</span>
-        </div>
-
-        <!-- کشور انتخاب شده -->
-        <div id="selected-country-badge" class="selected-country-badge hidden">
-
-            <div class="selected-flag" id="selected-country-flag">
-                🌍
-            </div>
-
-            <div class="selected-country-info">
-                <span>کشور شما</span>
-                <strong id="selected-country-name">---</strong>
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <!-- متن ورود -->
-    <div class="country-intro">
-
-        <h1>کشور خود را انتخاب کنید</h1>
-
-        <p>
-            شما فرمانده یکی از قدرت‌های جهان در آستانه جنگ جهانی دوم هستید.
-        </p>
-
-        <span>
-            یک کشور را روی نقشه انتخاب کنید
-        </span>
-
-    </div>
-
-
-    <!-- کره زمین -->
-    <div id="globe-container">
-
-        <div id="globe"></div>
-
-        <!-- نور روی کره -->
-        <div class="globe-light"></div>
-
-        <!-- حلقه دور کره -->
-        <div class="globe-ring"></div>
-
-    </div>
-
-
-    <!-- پیام -->
-    <div id="country-message"></div>
-
-
-    <!-- کشورهای انتخابی -->
-    <div class="available-countries">
-
-        <div class="country-card"
-             data-country-card="germany"
-             data-country="germany">
-
-            <div class="country-flag">🇩🇪</div>
-
-            <div class="country-card-info">
-                <strong>آلمان</strong>
-                <span>Germany</span>
-            </div>
-
-        </div>
-
-
-        <div class="country-card"
-             data-country-card="britain"
-             data-country="britain">
-
-            <div class="country-flag">🇬🇧</div>
-
-            <div class="country-card-info">
-                <strong>بریتانیا</strong>
-                <span>Britain</span>
-            </div>
-
-        </div>
-
-
-        <div class="country-card"
-             data-country-card="ussr"
-             data-country="ussr">
-
-            <div class="country-flag">🇷🇺</div>
-
-            <div class="country-card-info">
-                <strong>شوروی</strong>
-                <span>USSR</span>
-            </div>
-
-        </div>
-
-
-        <div class="country-card"
-             data-country-card="usa"
-             data-country="usa">
-
-            <div class="country-flag">🇺🇸</div>
-
-            <div class="country-card-info">
-                <strong>آمریکا</strong>
-                <span>USA</span>
-            </div>
-
-        </div>
-
-
-        <div class="country-card"
-             data-country-card="france"
-             data-country="france">
-
-            <div class="country-flag">🇫🇷</div>
-
-            <div class="country-card-info">
-                <strong>فرانسه</strong>
-                <span>France</span>
-            </div>
-
-        </div>
-
-
-        <div class="country-card"
-             data-country-card="italy"
-             data-country="italy">
-
-            <div class="country-flag">🇮🇹</div>
-
-            <div class="country-card-info">
-                <strong>ایتالیا</strong>
-                <span>Italy</span>
-            </div>
-
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =====================================================
-     صفحه خانه
-===================================================== -->
-
-<section id="home" class="page">
-
-    <div class="page-header">
-
-        <div>
-            <span class="page-label">1939</span>
-            <h1>فرماندهی</h1>
-        </div>
-
-        <div id="home-country-flag" class="header-flag">
-            🌍
-        </div>
-
-    </div>
-
-
-    <div class="country-overview">
-
-        <div class="overview-title">
-            <span>کشور شما</span>
-            <strong id="home-country-name">---</strong>
-        </div>
-
-        <div class="overview-stats">
-
-            <div>
-                <span>خزانه</span>
-                <strong id="money-value">1000</strong>
-            </div>
-
-            <div>
-                <span>ارتش</span>
-                <strong id="army-value">500</strong>
-            </div>
-
-            <div>
-                <span>سال</span>
-                <strong id="year-value">1939</strong>
-            </div>
-
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =====================================================
-     صفحه نقشه
-===================================================== -->
-
-<section id="map" class="page">
-
-    <div class="page-header">
-
-        <div>
-            <span class="page-label">WORLD MAP</span>
-            <h1>نقشه جهان</h1>
-        </div>
-
-    </div>
-
-    <div id="game-globe-container">
-
-        <div id="game-globe"></div>
-
-    </div>
-
-</section>
-
-
-<!-- =====================================================
-     صفحه اخبار
-===================================================== -->
-
-<section id="news" class="page">
-
-    <div class="page-header">
-
-        <div>
-            <span class="page-label">NEWS</span>
-            <h1>اخبار</h1>
-        </div>
-
-    </div>
-
-    <div id="news-list">
-
-        <div class="news-empty">
-            هنوز خبری ثبت نشده است.
-        </div>
-
-    </div>
-
-</section>
-
-
-<!-- =====================================================
-     صفحه ارتباطات
-===================================================== -->
-
-<section id="communications" class="page">
-
-    <div class="page-header">
-
-        <div>
-            <span class="page-label">COMMUNICATIONS</span>
-            <h1>ارتباطات</h1>
-        </div>
-
-    </div>
-
-    <div class="communication-card">
-
-        <div class="communication-icon">
-            ✉
-        </div>
-
-        <div>
-            <strong>ارتباطات دیپلماتیک</strong>
             <p>
-                پیام‌ها و روابط شما با دیگر کشورها در این بخش نمایش داده می‌شود.
+                کشور خود را انتخاب کنید تا بازی را آغاز کنید
             </p>
         </div>
 
-    </div>
+        <div id="country-message" class="country-message"></div>
 
-</section>
+        <!-- فقط کارت‌های کشور -->
+        <div class="country-grid">
+
+            <button
+                class="country-card"
+                data-country-card
+                data-country="germany"
+            >
+                <div class="country-flag">🇩🇪</div>
+
+                <div class="country-info">
+                    <h2>آلمان</h2>
+                    <span>Germany</span>
+
+                    <div class="country-stats">
+                        <div>
+                            <small>اقتصاد</small>
+                            <strong>850</strong>
+                        </div>
+
+                        <div>
+                            <small>ارتش</small>
+                            <strong>900</strong>
+                        </div>
+                    </div>
+                </div>
+            </button>
 
 
-<!-- =====================================================
-     صفحه اشتراک
-===================================================== -->
+            <button
+                class="country-card"
+                data-country-card
+                data-country="britain"
+            >
+                <div class="country-flag">🇬🇧</div>
 
-<section id="subscription" class="page">
+                <div class="country-info">
+                    <h2>بریتانیا</h2>
+                    <span>Britain</span>
 
-    <div class="page-header">
+                    <div class="country-stats">
+                        <div>
+                            <small>اقتصاد</small>
+                            <strong>800</strong>
+                        </div>
 
-        <div>
-            <span class="page-label">PREMIUM</span>
-            <h1>اشتراک</h1>
+                        <div>
+                            <small>ارتش</small>
+                            <strong>700</strong>
+                        </div>
+                    </div>
+                </div>
+            </button>
+
+
+            <button
+                class="country-card"
+                data-country-card
+                data-country="ussr"
+            >
+                <div class="country-flag">☭</div>
+
+                <div class="country-info">
+                    <h2>شوروی</h2>
+                    <span>USSR</span>
+
+                    <div class="country-stats">
+                        <div>
+                            <small>اقتصاد</small>
+                            <strong>750</strong>
+                        </div>
+
+                        <div>
+                            <small>ارتش</small>
+                            <strong>950</strong>
+                        </div>
+                    </div>
+                </div>
+            </button>
+
+
+            <button
+                class="country-card"
+                data-country-card
+                data-country="usa"
+            >
+                <div class="country-flag">🇺🇸</div>
+
+                <div class="country-info">
+                    <h2>آمریکا</h2>
+                    <span>USA</span>
+
+                    <div class="country-stats">
+                        <div>
+                            <small>اقتصاد</small>
+                            <strong>1000</strong>
+                        </div>
+
+                        <div>
+                            <small>ارتش</small>
+                            <strong>600</strong>
+                        </div>
+                    </div>
+                </div>
+            </button>
+
+
+            <button
+                class="country-card"
+                data-country-card
+                data-country="france"
+            >
+                <div class="country-flag">🇫🇷</div>
+
+                <div class="country-info">
+                    <h2>فرانسه</h2>
+                    <span>France</span>
+
+                    <div class="country-stats">
+                        <div>
+                            <small>اقتصاد</small>
+                            <strong>700</strong>
+                        </div>
+
+                        <div>
+                            <small>ارتش</small>
+                            <strong>650</strong>
+                        </div>
+                    </div>
+                </div>
+            </button>
+
+
+            <button
+                class="country-card"
+                data-country-card
+                data-country="italy"
+            >
+                <div class="country-flag">🇮🇹</div>
+
+                <div class="country-info">
+                    <h2>ایتالیا</h2>
+                    <span>Italy</span>
+
+                    <div class="country-stats">
+                        <div>
+                            <small>اقتصاد</small>
+                            <strong>600</strong>
+                        </div>
+
+                        <div>
+                            <small>ارتش</small>
+                            <strong>500</strong>
+                        </div>
+                    </div>
+                </div>
+            </button>
+
         </div>
 
-    </div>
-
-    <div class="subscription-card">
-
-        <h2>اشتراک فرماندهی</h2>
-
-        <p>
-            امکانات ویژه بازی در این بخش قرار خواهد گرفت.
-        </p>
-
-        <button class="premium-button">
-            بزودی
-        </button>
-
-    </div>
-
-</section>
+    </section>
 
 
-<!-- =====================================================
-     منوی پایین
-===================================================== -->
+    <!-- ========================================================= -->
+    <!-- صفحه معرفی کشور انتخاب شده -->
+    <!-- ========================================================= -->
 
-<nav id="bottom-nav" class="bottom-nav">
+    <section id="country-preview" class="screen country-preview-screen hidden">
 
-    <button
-        class="nav-item"
-        data-page="news"
-        type="button"
-    >
-        <span class="nav-icon">📰</span>
-        <span>اخبار</span>
-    </button>
+        <!-- هدر ساده -->
+        <header class="game-header">
 
+            <div class="header-right">
 
-    <button
-        class="nav-item active"
-        data-page="home"
-        type="button"
-    >
-        <span class="nav-icon">⌂</span>
-        <span>خانه</span>
-    </button>
+                <div
+                    id="selected-country-flag"
+                    class="selected-country-flag"
+                >
+                    🇩🇪
+                </div>
+
+            </div>
 
 
-    <button
-        class="nav-item"
-        data-page="communications"
-        type="button"
-    >
-        <span class="nav-icon">✉</span>
-        <span>ارتباطات</span>
-    </button>
+            <div class="header-center">
+
+                <div class="game-title">
+                    WW2 STRATEGY
+                </div>
+
+            </div>
 
 
-    <button
-        class="nav-item"
-        data-page="subscription"
-        type="button"
-    >
-        <span class="nav-icon">♜</span>
-        <span>اشتراک</span>
-    </button>
+            <div class="header-left">
 
-</nav>
+                <button
+                    id="notification-button"
+                    class="header-button"
+                    aria-label="اعلان‌ها"
+                >
+                    🔔
+                </button>
+
+                <button
+                    id="menu-button"
+                    class="header-button"
+                    aria-label="منو"
+                >
+                    ☰
+                </button>
+
+            </div>
+
+        </header>
 
 
-<script src="/app.js"></script>
+        <div class="preview-content">
+
+            <div class="preview-title">
+
+                <span>کشور انتخاب شده</span>
+
+                <h1 id="preview-country-name">
+                    آلمان
+                </h1>
+
+                <p id="preview-country-description">
+                    موقعیت کشور شما روی نقشه جهان
+                </p>
+
+            </div>
+
+
+            <!-- کره فقط اینجا نمایش داده می‌شود -->
+            <div
+                id="preview-globe-container"
+                class="globe-container"
+            >
+                <svg id="preview-globe"></svg>
+            </div>
+
+
+            <button
+                id="enter-game-button"
+                class="primary-game-button"
+            >
+                ورود به بازی
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- ========================================================= -->
+    <!-- محیط اصلی بازی -->
+    <!-- ========================================================= -->
+
+    <section id="game" class="screen game-screen hidden">
+
+        <!-- هدر اصلی بازی -->
+
+        <header class="game-header">
+
+            <div class="header-right">
+
+                <!-- پرچم سمت راست -->
+                <div
+                    id="game-country-flag"
+                    class="selected-country-flag"
+                >
+                    🇩🇪
+                </div>
+
+            </div>
+
+
+            <div class="header-center">
+
+                <div class="game-title">
+                    WW2 STRATEGY
+                </div>
+
+            </div>
+
+
+            <div class="header-left">
+
+                <button
+                    id="game-notification-button"
+                    class="header-button"
+                    aria-label="اعلان‌ها"
+                >
+                    🔔
+                </button>
+
+                <button
+                    id="game-menu-button"
+                    class="header-button"
+                    aria-label="منو"
+                >
+                    ☰
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- ===================================================== -->
+        <!-- خانه -->
+        <!-- ===================================================== -->
+
+        <main id="home" class="game-page">
+
+            <div class="page-title">
+                <span>فرماندهی</span>
+                <h1>خانه</h1>
+            </div>
+
+
+            <div class="stats-grid">
+
+                <div class="stat-card">
+                    <span>اقتصاد</span>
+                    <strong id="home-economy">0</strong>
+                </div>
+
+                <div class="stat-card">
+                    <span>ارتش</span>
+                    <strong id="home-army">0</strong>
+                </div>
+
+                <div class="stat-card">
+                    <span>جمعیت</span>
+                    <strong id="home-population">0</strong>
+                </div>
+
+                <div class="stat-card">
+                    <span>سال</span>
+                    <strong id="home-year">1939</strong>
+                </div>
+
+            </div>
+
+
+            <!-- نقشه اصلی بازی -->
+            <div
+                id="globe-container"
+                class="globe-container main-globe"
+            >
+                <svg id="globe"></svg>
+            </div>
+
+        </main>
+
+
+        <!-- ===================================================== -->
+        <!-- نقشه -->
+        <!-- ===================================================== -->
+
+        <main id="map" class="game-page hidden">
+
+            <div class="page-title">
+                <span>جبهه‌های جنگ</span>
+                <h1>نقشه جهان</h1>
+            </div>
+
+            <div
+                id="map-globe-container"
+                class="globe-container"
+            >
+                <svg id="map-globe"></svg>
+            </div>
+
+        </main>
+
+
+        <!-- ===================================================== -->
+        <!-- اخبار -->
+        <!-- ===================================================== -->
+
+        <main id="news" class="game-page hidden">
+
+            <div class="page-title">
+                <span>آخرین رویدادها</span>
+                <h1>اخبار</h1>
+            </div>
+
+            <div id="news-list" class="news-list">
+                <!-- اخبار توسط JS -->
+            </div>
+
+        </main>
+
+
+        <!-- ===================================================== -->
+        <!-- ارتباطات -->
+        <!-- ===================================================== -->
+
+        <main id="communications" class="game-page hidden">
+
+            <div class="page-title">
+                <span>روابط بین کشورها</span>
+                <h1>ارتباطات</h1>
+            </div>
+
+            <div class="empty-page">
+                ارتباطات دیپلماتیک در این بخش قرار می‌گیرد.
+            </div>
+
+        </main>
+
+
+        <!-- ===================================================== -->
+        <!-- اشتراک -->
+        <!-- ===================================================== -->
+
+        <main id="subscription" class="game-page hidden">
+
+            <div class="page-title">
+                <span>امکانات ویژه</span>
+                <h1>اشتراک</h1>
+            </div>
+
+            <div class="subscription-card">
+
+                <h2>Premium</h2>
+
+                <p>
+                    امکانات ویژه بازی به‌زودی فعال می‌شوند.
+                </p>
+
+            </div>
+
+        </main>
+
+
+        <!-- ===================================================== -->
+        <!-- نوار پایین -->
+        <!-- ===================================================== -->
+
+        <nav class="bottom-nav">
+
+            <button
+                class="nav-item"
+                data-page="news"
+            >
+                <span class="nav-icon">📰</span>
+                <span>اخبار</span>
+            </button>
+
+
+            <button
+                class="nav-item active"
+                data-page="home"
+            >
+                <span class="nav-icon">⌂</span>
+                <span>خانه</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-page="communications"
+            >
+                <span class="nav-icon">💬</span>
+                <span>ارتباطات</span>
+            </button>
+
+
+            <button
+                class="nav-item"
+                data-page="subscription"
+            >
+                <span class="nav-icon">♛</span>
+                <span>اشتراک</span>
+            </button>
+
+        </nav>
+
+    </section>
+
+
+    <script src="/app.js"></script>
 
 </body>
 </html>
