@@ -104,7 +104,7 @@
 </section>
 
 
-<!-- ==================== پیش نمایش کشور (هنوز برای کاربر ثبت نشده) ==================== -->
+<!-- ==================== پیش نمایش کشور ==================== -->
 
 <section id="country-preview" class="screen hidden">
 
@@ -178,76 +178,106 @@
 
     <main id="home" class="game-page">
 
-        <div class="page-title">
-            <span>فرماندهی</span>
-            <h1>خانه</h1>
-        </div>
+        <div class="home-card">
 
-        <div class="stats-grid">
-
-            <div class="stat-card wide">
-                <span>پول</span>
-                <strong id="home-money">$۰</strong>
+            <div class="home-card-top">
+                <span class="world-chip">🌐 World 27</span>
+                <span class="home-country-chip">
+                    <span id="home-country-name">—</span>
+                    <span id="home-country-flag" class="home-country-flag">🏳️</span>
+                </span>
             </div>
 
-            <div class="stat-card">
-                <span>قدرت نظامی</span>
-                <strong id="home-army">0</strong>
-            </div>
+            <div class="home-card-photo" id="home-card-photo"></div>
 
-            <div class="stat-card">
-                <span>برق کشور</span>
-                <strong id="home-power">0</strong>
-            </div>
+            <div class="home-card-body">
 
-            <div class="stat-card">
-                <span>فصل</span>
-                <strong id="home-season">بهار</strong>
-            </div>
+                <div class="treasury-row">
+                    <span class="treasury-label">🪙 موجودی خزانه</span>
+                    <strong id="home-money" class="treasury-value">$0</strong>
+                    <span class="income-label">درآمد روزانه: <span id="home-income">$0</span></span>
+                </div>
 
-            <div class="stat-card">
-                <span>روز بازی</span>
-                <strong id="home-day">1 / 31</strong>
+                <div class="power-army-row">
+
+                    <div class="power-block">
+                        <span class="mini-label">⚡ برق</span>
+                        <strong id="home-power" class="mini-value">0</strong>
+                        <span class="mini-sub" id="home-power-sub">0 از 0</span>
+                    </div>
+
+                    <div class="army-block">
+                        <span class="mini-label">قدرت نظامی ⚔️</span>
+                        <strong id="home-army" class="mini-value">0</strong>
+                    </div>
+
+                </div>
+
+                <div class="season-end-row">
+                    <span id="home-season-end">پایان فصل تا ۲ روز و ۰ ساعت</span>
+                </div>
+
+                <div class="season-current-row">
+                    <span class="season-tag">🕐 <span id="home-season">بهار</span></span>
+                    <span class="no-effect-tag">بدون اثر بر اقتصاد</span>
+                </div>
+
+                <button class="next-season-button" id="next-season-button">
+                    <span id="home-next-season">تابستان</span> تا <span id="home-next-season-time">۰ ساعت</span> →
+                </button>
+
             </div>
 
         </div>
 
         <div class="action-grid">
 
-            <button class="action-card" data-section="war">
-                <span class="action-icon">⚔️</span>
-                <h3>جنگ</h3>
-                <p>آغاز و مدیریت عملیات نظامی علیه کشورهای دیگر</p>
+            <button class="action-card action-army" data-section="army">
+                <div class="action-overlay">
+                    <span class="action-icon">🛡️</span>
+                    <h3>ارتش</h3>
+                    <p>ساخت، تحقیق و جای یگان‌ها</p>
+                </div>
             </button>
 
-            <button class="action-card" data-section="army">
-                <span class="action-icon">🪖</span>
-                <h3>ارتش</h3>
-                <p>استخدام نیرو و افزایش قدرت نظامی کشور</p>
+            <button class="action-card action-war" data-section="war">
+                <div class="action-overlay">
+                    <span class="action-icon">⚔️</span>
+                    <h3>جنگ</h3>
+                    <p>حمله، عملیات هوایی، نیروی دریایی و آبی‌خاکی</p>
+                </div>
             </button>
 
-            <button class="action-card" data-section="diplomacy">
-                <span class="action-icon">🤝</span>
-                <h3>دیپلماسی</h3>
-                <p>عقد پیمان، اتحاد یا مذاکره با سایر کشورها</p>
+            <button class="action-card action-diplomacy" data-section="diplomacy">
+                <div class="action-overlay">
+                    <span class="action-icon">🤝</span>
+                    <h3>دیپلماسی</h3>
+                    <p>عقد پیمان، اتحاد یا مذاکره با سایر کشورها</p>
+                </div>
             </button>
 
-            <button class="action-card" data-section="economy">
-                <span class="action-icon">💰</span>
-                <h3>اقتصاد</h3>
-                <p>مدیریت منابع مالی و افزایش درآمد کشور</p>
+            <button class="action-card action-economy" data-section="economy">
+                <div class="action-overlay">
+                    <span class="action-icon">💰</span>
+                    <h3>اقتصاد</h3>
+                    <p>مدیریت منابع مالی و افزایش درآمد کشور</p>
+                </div>
             </button>
 
-            <button class="action-card" data-section="infrastructure">
-                <span class="action-icon">🏗️</span>
-                <h3>زیرساخت</h3>
-                <p>ساخت نیروگاه برق، جاده و تأسیسات کشور</p>
+            <button class="action-card action-infrastructure" data-section="infrastructure">
+                <div class="action-overlay">
+                    <span class="action-icon">🏗️</span>
+                    <h3>زیرساخت</h3>
+                    <p>ساخت نیروگاه برق، جاده و تأسیسات کشور</p>
+                </div>
             </button>
 
-            <button class="action-card" data-section="market">
-                <span class="action-icon">🌐</span>
-                <h3>بازار جهانی</h3>
-                <p>خرید و فروش منابع در بازار بین‌المللی</p>
+            <button class="action-card action-market" data-section="market">
+                <div class="action-overlay">
+                    <span class="action-icon">🌐</span>
+                    <h3>بازار جهانی</h3>
+                    <p>خرید و فروش منابع در بازار بین‌المللی</p>
+                </div>
             </button>
 
         </div>
@@ -257,15 +287,46 @@
 
     <!-- نقشه -->
 
-    <main id="map" class="game-page hidden">
+    <main id="map" class="game-page">
 
-        <div class="page-title">
-            <span>جبهه‌های جنگ</span>
-            <h1>نقشه جهان</h1>
+        <div class="map-top-bar">
+            <span id="map-money" class="map-money">$0</span>
+            <span class="map-title">نقشه جهان 🌐</span>
         </div>
 
-        <div id="map-globe-container" class="globe-container">
+        <div class="map-box">
+
             <svg id="map-globe"></svg>
+
+            <div class="map-controls">
+                <button id="map-zoom-in" class="map-control-btn">+</button>
+                <button id="map-zoom-out" class="map-control-btn">−</button>
+                <button id="map-reset" class="map-control-btn map-reset-btn">⟳</button>
+            </div>
+
+        </div>
+
+        <div class="map-legend">
+            <div><span class="dot dot-own"></span> کشور خودی</div>
+            <div><span class="dot dot-own-occupied"></span> تحت تصرفِ خودی</div>
+            <div><span class="dot dot-other"></span> کشور دیگر</div>
+            <div><span class="dot dot-other-occupied"></span> تحت تصرف دیگری</div>
+            <div><span class="dot dot-unowned"></span> بی‌صاحب</div>
+        </div>
+
+        <div id="map-info-panel" class="map-info-panel hidden">
+
+            <button id="map-info-close" class="map-info-close">×</button>
+
+            <div class="map-info-header">
+                <span id="map-info-flag" class="map-info-flag"></span>
+                <span id="map-info-name" class="map-info-name"></span>
+            </div>
+
+            <div id="map-info-status" class="map-info-status"></div>
+
+            <div id="map-info-desc" class="map-info-desc"></div>
+
         </div>
 
     </main>
