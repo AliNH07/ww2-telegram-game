@@ -2,6 +2,7 @@
 <html lang="fa" dir="rtl">
 
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -9,216 +10,386 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>World War II</title>
+    <title>WORLD WAR II</title>
 
-    <link rel="stylesheet" href="style.css">
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
 </head>
+
 
 <body>
 
-<div class="game">
 
-    <header>
+    <!-- ================================= -->
+    <!-- انتخاب کشور -->
+    <!-- ================================= -->
 
-        <div>
-            <h1>🌍 WORLD WAR II</h1>
-            <p>سال 1939</p>
-        </div>
+    <section
+        id="country"
+        class="page"
+    >
 
-        <div class="player-money">
-            💰 <span id="money">1000</span>
-        </div>
+        <div class="country-selection">
 
-    </header>
+            <h1>
+                🌍 انتخاب کشور
+            </h1>
 
-
-    <main id="content">
-
-        <!-- خانه -->
-
-        <section id="home" class="page active">
-
-            <h2>🏠 خانه</h2>
-
-            <div class="country-card">
-
-                <div
-                    id="countryName"
-                    class="country-name"
-                >
-                    کشور انتخاب نشده
-                </div>
-
-                <div class="stats">
-
-                    <div>
-                        💰 اقتصاد
-                        <strong id="economy">
-                            1000
-                        </strong>
-                    </div>
-
-                    <div>
-                        ⚔️ ارتش
-                        <strong id="army">
-                            500
-                        </strong>
-                    </div>
-
-                    <div>
-                        📅 سال
-                        <strong id="year">
-                            1939
-                        </strong>
-                    </div>
-
-                </div>
-
-            </div>
-
-            <button
-                class="main-button"
-                onclick="showPage('country')"
-            >
-                🏳️ انتخاب کشور
-            </button>
-
-        </section>
-
-
-        <!-- نقشه -->
-
-        <section id="map" class="page">
-
-            <h2>🗺️ نقشه جهان</h2>
-
-            <div class="world-map">
-
-                <div class="map-title">
-                    🌍 WORLD MAP
-                </div>
-
-                <div class="continents">
-
-                    <div>🇪🇺 اروپا</div>
-                    <div>🇦🇸 آسیا</div>
-                    <div>🌎 آمریکا</div>
-                    <div>🌍 آفریقا</div>
-
-                </div>
-
-            </div>
-
-            <p class="info">
-                نقشه کامل جنگ در نسخه‌های بعدی اضافه خواهد شد.
+            <p>
+                برای شروع بازی باید یک کشور انتخاب کنید.
             </p>
 
-        </section>
+            <p class="country-warning">
+                ⚠️ هر کشور فقط یک بازیکن دارد.
+            </p>
 
 
-        <!-- اشتراک -->
+            <!-- نقشه -->
 
-        <section id="subscription" class="page">
+            <div
+                id="world-map"
+                class="world-map"
+            >
 
-            <h2>⭐ اشتراک</h2>
+                <!-- آلمان -->
 
-            <div class="subscription-card">
+                <button
+                    class="map-country germany"
+                    data-country="germany"
+                    type="button"
+                >
+                    🇩🇪
+                    <span>آلمان</span>
+                </button>
 
-                <h3>VIP</h3>
 
-                <p>
-                    امکانات ویژه بازی
-                </p>
+                <!-- بریتانیا -->
 
-                <ul>
+                <button
+                    class="map-country britain"
+                    data-country="britain"
+                    type="button"
+                >
+                    🇬🇧
+                    <span>بریتانیا</span>
+                </button>
 
-                    <li>🚀 امکانات بیشتر</li>
-                    <li>📊 آمار پیشرفته</li>
-                    <li>📰 گزارش‌های ویژه</li>
-                    <li>🎖️ امکانات مدیریتی</li>
 
-                </ul>
+                <!-- شوروی -->
 
-                <button class="main-button">
-                    فعال‌سازی VIP
+                <button
+                    class="map-country ussr"
+                    data-country="ussr"
+                    type="button"
+                >
+                    🇷🇺
+                    <span>شوروی</span>
+                </button>
+
+
+                <!-- آمریکا -->
+
+                <button
+                    class="map-country usa"
+                    data-country="usa"
+                    type="button"
+                >
+                    🇺🇸
+                    <span>آمریکا</span>
+                </button>
+
+
+                <!-- فرانسه -->
+
+                <button
+                    class="map-country france"
+                    data-country="france"
+                    type="button"
+                >
+                    🇫🇷
+                    <span>فرانسه</span>
+                </button>
+
+
+                <!-- ایتالیا -->
+
+                <button
+                    class="map-country italy"
+                    data-country="italy"
+                    type="button"
+                >
+                    🇮🇹
+                    <span>ایتالیا</span>
                 </button>
 
             </div>
 
-        </section>
 
+            <!-- پیام -->
 
-        <!-- اخبار -->
-
-        <section id="news" class="page">
-
-            <h2>📰 اخبار</h2>
-
-            <div id="newsList">
-                در حال دریافت اخبار...
+            <div
+                id="country-message"
+                class="country-message"
+            >
+                یک کشور آزاد را انتخاب کنید.
             </div>
 
-        </section>
+        </div>
+
+    </section>
 
 
-        <!-- کشور -->
 
-        <section id="country" class="page">
+    <!-- ================================= -->
+    <!-- صفحه اصلی -->
+    <!-- ================================= -->
 
-            <h2>🏳️ کشور</h2>
+    <section
+        id="home"
+        class="page"
+    >
 
-            <p>
-                کشور مورد نظر خود را انتخاب کنید:
-            </p>
+        <h1>
+            🌍 WORLD WAR II
+        </h1>
 
-            <div id="countriesList">
-                در حال دریافت کشورها...
+        <div class="player-info">
+
+            <div>
+                💰 پول:
+                <span data-money>
+                    1000
+                </span>
             </div>
 
-        </section>
+            <div>
+                ⚔️ ارتش:
+                <span data-army>
+                    500
+                </span>
+            </div>
 
-    </main>
+            <div>
+                📅 سال:
+                <span>
+                    1939
+                </span>
+            </div>
+
+        </div>
+
+    </section>
 
 
+
+    <!-- ================================= -->
+    <!-- صفحه نقشه -->
+    <!-- ================================= -->
+
+    <section
+        id="map"
+        class="page"
+        style="display:none;"
+    >
+
+        <h2>
+            🗺️ نقشه جهان
+        </h2>
+
+        <div class="map-container">
+
+            <div
+                class="map-country germany"
+                data-country="germany"
+            >
+                🇩🇪 آلمان
+            </div>
+
+            <div
+                class="map-country britain"
+                data-country="britain"
+            >
+                🇬🇧 بریتانیا
+            </div>
+
+            <div
+                class="map-country ussr"
+                data-country="ussr"
+            >
+                🇷🇺 شوروی
+            </div>
+
+            <div
+                class="map-country usa"
+                data-country="usa"
+            >
+                🇺🇸 آمریکا
+            </div>
+
+            <div
+                class="map-country france"
+                data-country="france"
+            >
+                🇫🇷 فرانسه
+            </div>
+
+            <div
+                class="map-country italy"
+                data-country="italy"
+            >
+                🇮🇹 ایتالیا
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ================================= -->
+    <!-- اشتراک -->
+    <!-- ================================= -->
+
+    <section
+        id="subscription"
+        class="page"
+        style="display:none;"
+    >
+
+        <h2>
+            💎 اشتراک
+        </h2>
+
+        <p>
+            امکانات ویژه بازی
+        </p>
+
+    </section>
+
+
+
+    <!-- ================================= -->
+    <!-- اخبار -->
+    <!-- ================================= -->
+
+    <section
+        id="news"
+        class="page"
+        style="display:none;"
+    >
+
+        <h2>
+            📰 اخبار
+        </h2>
+
+        <div id="news-list"></div>
+
+    </section>
+
+
+
+    <!-- ================================= -->
+    <!-- کشور من -->
+    <!-- ================================= -->
+
+    <section
+        id="my-country"
+        class="page"
+        style="display:none;"
+    >
+
+        <h2>
+            🏳️ کشور من
+        </h2>
+
+        <div class="player-info">
+
+            <div>
+                💰 اقتصاد:
+                <span data-money>
+                    1000
+                </span>
+            </div>
+
+            <div>
+                ⚔️ ارتش:
+                <span data-army>
+                    500
+                </span>
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ================================= -->
     <!-- منوی پایین -->
+    <!-- ================================= -->
 
-    <nav class="bottom-nav">
+    <nav
+        class="bottom-nav"
+        style="display:none;"
+    >
 
-        <button onclick="showPage('home')">
+        <button
+            type="button"
+            onclick="showPage('home')"
+        >
             🏠
             <span>خانه</span>
         </button>
 
-        <button onclick="showPage('map')">
+
+        <button
+            type="button"
+            onclick="showPage('map')"
+        >
             🗺️
             <span>نقشه</span>
         </button>
 
-        <button onclick="showPage('subscription')">
-            ⭐
+
+        <button
+            type="button"
+            onclick="showPage('subscription')"
+        >
+            💎
             <span>اشتراک</span>
         </button>
 
-        <button onclick="showPage('news')">
+
+        <button
+            type="button"
+            onclick="showPage('news')"
+        >
             📰
             <span>اخبار</span>
         </button>
 
-        <button onclick="showPage('country')">
+
+        <button
+            type="button"
+            onclick="showPage('my-country')"
+        >
             🏳️
-            <span>کشور</span>
+            <span>کشور من</span>
         </button>
 
     </nav>
 
-</div>
 
 
-<!-- کتابخانه تلگرام -->
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- JavaScript -->
 
-<!-- کد بازی -->
-<script src="app.js"></script>
+    <script src="app.js"></script>
 
 </body>
+
 </html>
