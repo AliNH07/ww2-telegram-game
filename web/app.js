@@ -1,20 +1,22 @@
-const tg = window.Telegram.WebApp;
+const tg = window.Telegram?.WebApp;
 
-tg.ready();
-tg.expand();
+if (tg) {
+    tg.ready();
+    tg.expand();
+}
 
 const userId =
-    tg.initDataUnsafe?.user?.id || null;
+    tg?.initDataUnsafe?.user?.id ||
+    null;
 
-
-/* =========================================
-   اطلاعات کشورها
-========================================= */
+let player = null;
+let countries = {};
+let selectedCountry = null;
 
 const COUNTRY_FLAGS = {
     germany: "🇩🇪",
     britain: "🇬🇧",
-    ussr: "🇷🇺",
+    ussr: "☭",
     usa: "🇺🇸",
     france: "🇫🇷",
     italy: "🇮🇹"
@@ -29,10 +31,6 @@ const COUNTRY_NAMES = {
     italy: "ایتالیا"
 };
 
-
-/*
-    نام کشورها در فایل World Atlas
-*/
 const COUNTRY_IDS = {
     germany: 276,
     britain: 826,
@@ -43,52 +41,192 @@ const COUNTRY_IDS = {
 };
 
 
-/* =========================================
-   متغیرهای اصلی
-========================================= */
+/* =========================================================
+   ابزارهای عمومی
+========================================================= */
 
-let player = null;
-let countries = [];
+function showOnly(id) {
 
-let globeSvg = null;
-let globeProjection = null;
-let globePath = null;
+    document.querySelectorAll(".screen").forEach(screen => {
+        screen.classList.add("hidden");
+    });
 
-let worldFeatures = [];
+    const target = document.getElementById(id);
 
-let rotation = [0, -10];
-let scale = 1;
-
-let isDragging = false;
-let startMouse = null;
-let startRotation = null;
-
-let autoRotate = true;
+    if (target) {
+        target.classList.remove("hidden");
+    }
+}
 
 
-/* =========================================
-   شروع برنامه
-========================================= */
+function getApiUrl(path, params = {}) {
 
-document.addEventListener("DOMContentLoaded", async () => {
+    const url = new URL(path, window.location.origin);
 
-    setupNavigation();
+    Object.entries(params).forEach(([key, value]) => {
+        url.searchParams.set(key, value);
+    });
 
-    await loadPlayer();
+    return url.toString();
+}
 
-});
 
-
-/* =========================================
-   دریافت اطلاعات بازیکن
-========================================= */
+/* =========================================================
+   دریافت بازیکن
+========================================================= */
 
 async function loadPlayer() {
 
     if (!userId) {
+        console.warn("Telegram user ID not found.");
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            getApiUrl("/api/player", {
+                user_id: userId
+            })
+        );
+
+        if (!response.ok) {
+            throw new Error("Player API error");
+        }
+
+        player = await response.json();
+
+        if (player.country) {
+
+            selectedCountry = player.country;
+
+            showCountryPreview();
+
+        } else {
+
+            showCountrySelection();
+        }
+
+    } catch (error) {
+
+        console.error(error);
+
+        showCountrySelection();
+    }
+}
+
+
+/* =========================================================
+   دریافت کشورها
+========================================================= */
+
+async function loadCountries() {
+
+    try {
+
+        const response = await fetch("/api/countries");
+
+        if (!response.ok) {
+            throw new Error("Countries API error");
+        }
+
+        const data = await response.json();
+
+        countries = {};
+
+        data.forEach(country => {
+            countries[country.id] = country;
+        });
+
+        updateCountryCards();
+
+    } catch (error) {
+
+        console.error("Countries:", error);
+    }
+}
+
+
+/* =========================================================
+   نمایش صفحه انتخاب
+========================================================= */
+
+function showCountrySelection() {
+
+    showOnly("country");
+
+    updateCountryCards();
+}
+
+
+/* =========================================================
+   وضعیت کشورها
+========================================================= */
+
+function updateCountryCards() {
+
+    document.querySelectorAll("[data-country-card]").forEach(card => {
+
+        const countryId = card.dataset.country;
+
+        const country = countries[countryId];
+
+        if (!country) {
+            return;
+        }
+
+        if (country.taken) {
+
+            /*
+             * اگر کشور متعلق به خود کاربر است،
+             * نباید خاکستری شود.
+             */
+            if (player?.country === countryId) {
+                card.classList.remove("taken");
+            } else {
+                card.classList.add("taken");
+            }
+
+        } else {
+
+            card.classList.remove("taken");
+        }
+    });
+}
+
+
+/* =========================================================
+   انتخاب کشور
+========================================================= */
+
+document.querySelectorAll("[data-country-card]").forEach(card => {
+
+    card.addEventListener("click", async () => {
+
+        const countryId = card.dataset.country;
+
+        const country = countries[countryId];
+
+        if (country?.taken && player?.country !== countryId) {
+
+            showMessage(
+                "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."
+            );
+
+            return;
+        }
+
+        await selectCountry(countryId);
+    });
+});
+
+
+async function selectCountry(countryId) {
+
+    if (!userId) {
 
         showMessage(
-            "شناسه کاربر تلگرام دریافت نشد."
+            "برای اجرای بازی باید از داخل تلگرام وارد شوید."
         );
 
         return;
@@ -97,724 +235,359 @@ async function loadPlayer() {
     try {
 
         const response = await fetch(
-            `/api/player?user_id=${userId}`
+            getApiUrl("/api/select-country", {
+                user_id: userId,
+                country: countryId
+            })
         );
+
+        const data = await response.json();
 
         if (!response.ok) {
-            throw new Error("Player request failed");
-        }
 
-        player = await response.json();
+            if (data.error === "country_taken") {
 
-        console.log("PLAYER:", player);
-
-
-        /*
-            اگر هنوز کشور انتخاب نشده
-        */
-
-        if (!player.country) {
-
-            showCountrySelection();
-
-            await loadCountries();
-
-            return;
-        }
-
-
-        /*
-            اگر کشور قبلاً انتخاب شده
-        */
-
-        showGame();
-
-        await loadCountries();
-
-    } catch (error) {
-
-        console.error(error);
-
-        showMessage(
-            "خطا در دریافت اطلاعات بازیکن."
-        );
-
-    }
-}
-
-
-/* =========================================
-   نمایش صفحه انتخاب کشور
-========================================= */
-
-function showCountrySelection() {
-
-    const countryPage =
-        document.getElementById("country");
-
-    countryPage.style.display = "block";
-
-
-    document.querySelectorAll(".page")
-        .forEach(page => {
-
-            page.style.display = "none";
-
-        });
-
-
-    const nav =
-        document.getElementById("bottom-nav");
-
-    if (nav) {
-        nav.style.display = "none";
-    }
-
-
-    updateSelectedCountryBadge(null);
-
-    loadGlobe(
-        "globe"
-    );
-}
-
-
-/* =========================================
-   نمایش بازی
-========================================= */
-
-function showGame() {
-
-    const countryPage =
-        document.getElementById("country");
-
-    if (countryPage) {
-        countryPage.style.display = "none";
-    }
-
-
-    const nav =
-        document.getElementById("bottom-nav");
-
-    if (nav) {
-        nav.style.display = "flex";
-    }
-
-
-    showPage("home");
-
-
-    updateSelectedCountryBadge(
-        player.country
-    );
-
-
-    updateHomeInfo();
-}
-
-
-/* =========================================
-   اطلاعات کشورها از سرور
-========================================= */
-
-async function loadCountries() {
-
-    try {
-
-        const response =
-            await fetch("/api/countries");
-
-        if (!response.ok) {
-            throw new Error(
-                "Countries request failed"
-            );
-        }
-
-        countries =
-            await response.json();
-
-        console.log(
-            "COUNTRIES:",
-            countries
-        );
-
-
-        updateCountryCards();
-
-        updateGlobeColors();
-
-
-    } catch (error) {
-
-        console.error(error);
-
-        showMessage(
-            "خطا در دریافت اطلاعات کشورها."
-        );
-    }
-}
-
-
-/* =========================================
-   کارت‌های پایین
-========================================= */
-
-function updateCountryCards() {
-
-    document
-        .querySelectorAll("[data-country-card]")
-        .forEach(card => {
-
-            const countryId =
-                card.dataset.countryCard;
-
-            const country =
-                countries.find(
-                    item =>
-                        item.id === countryId
+                showMessage(
+                    "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."
                 );
 
-            if (!country) {
+                await loadCountries();
+
                 return;
             }
 
+            if (data.error === "already_has_country") {
 
-            card.classList.remove(
-                "country-taken"
-            );
-
-
-            /*
-                کشور خود بازیکن
-            */
-
-            if (
-                player &&
-                player.country === countryId
-            ) {
-
-                card.classList.remove(
-                    "country-taken"
+                showMessage(
+                    "شما قبلاً یک کشور انتخاب کرده‌اید."
                 );
 
                 return;
             }
 
-
-            /*
-                کشور بازیکن دیگر
-            */
-
-            if (country.taken) {
-
-                card.classList.add(
-                    "country-taken"
-                );
-
-            }
-
-
-            card.onclick = () => {
-
-                if (country.taken) {
-
-                    showMessage(
-                        "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."
-                    );
-
-                    return;
-                }
-
-
-                selectCountry(
-                    countryId
-                );
-
-            };
-
-        });
-}
-
-
-/* =========================================
-   انتخاب کشور
-========================================= */
-
-async function selectCountry(countryId) {
-
-    if (!userId) {
-        return;
-    }
-
-
-    /*
-        اگر قبلاً انتخاب شده
-    */
-
-    if (
-        player &&
-        player.country &&
-        player.country !== countryId
-    ) {
-
-        showMessage(
-            "شما قبلاً یک کشور انتخاب کرده‌اید."
-        );
-
-        return;
-    }
-
-
-    showMessage(
-        "در حال انتخاب کشور..."
-    );
-
-
-    try {
-
-        const response =
-            await fetch(
-                `/api/select-country?user_id=${userId}&country=${countryId}`
-            );
-
-
-        const data =
-            await response.json();
-
-
-        /*
-            کشور توسط شخص دیگری گرفته شده
-        */
-
-        if (
-            response.status === 409 &&
-            data.error === "country_taken"
-        ) {
-
-            showMessage(
-                "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."
-            );
-
-            await loadCountries();
-
-            return;
-        }
-
-
-        /*
-            بازیکن قبلاً کشور دارد
-        */
-
-        if (
-            response.status === 409 &&
-            data.error === "already_has_country"
-        ) {
-
-            showMessage(
-                "شما قبلاً کشور خود را انتخاب کرده‌اید."
-            );
-
-            return;
-        }
-
-
-        if (!response.ok) {
-
             throw new Error(
-                "Country selection failed"
+                data.error || "Country selection failed"
             );
         }
 
+        player = data;
 
-        /*
-            موفقیت
-        */
-
-        player =
-            data.player;
-
-
-        updateSelectedCountryBadge(
-            player.country
-        );
-
+        selectedCountry = countryId;
 
         await loadCountries();
 
-
-        /*
-            ورود به بازی
-        */
-
-        setTimeout(() => {
-
-            showGame();
-
-        }, 500);
-
+        showCountryPreview();
 
     } catch (error) {
 
         console.error(error);
 
         showMessage(
-            "خطا در انتخاب کشور."
+            "خطا در انتخاب کشور. دوباره امتحان کنید."
         );
     }
 }
 
 
-/* =========================================
-   پرچم کشور انتخاب شده
-========================================= */
-
-function updateSelectedCountryBadge(
-    countryId
-) {
-
-    const badge =
-        document.getElementById(
-            "selected-country-badge"
-        );
-
-    const flag =
-        document.getElementById(
-            "selected-country-flag"
-        );
-
-    const name =
-        document.getElementById(
-            "selected-country-name"
-        );
-
-
-    if (!badge) {
-        return;
-    }
-
-
-    if (!countryId) {
-
-        badge.classList.add(
-            "hidden"
-        );
-
-        return;
-    }
-
-
-    badge.classList.remove(
-        "hidden"
-    );
-
-
-    if (flag) {
-
-        flag.textContent =
-            COUNTRY_FLAGS[countryId] ||
-            "🌍";
-    }
-
-
-    if (name) {
-
-        name.textContent =
-            COUNTRY_NAMES[countryId] ||
-            countryId;
-    }
-
-
-    /*
-        اطلاعات صفحه خانه
-    */
-
-    const homeFlag =
-        document.getElementById(
-            "home-country-flag"
-        );
-
-    const homeName =
-        document.getElementById(
-            "home-country-name"
-        );
-
-
-    if (homeFlag) {
-
-        homeFlag.textContent =
-            COUNTRY_FLAGS[countryId] ||
-            "🌍";
-    }
-
-
-    if (homeName) {
-
-        homeName.textContent =
-            COUNTRY_NAMES[countryId] ||
-            countryId;
-    }
-}
-
-
-/* =========================================
-   اطلاعات خانه
-========================================= */
-
-function updateHomeInfo() {
-
-    if (!player) {
-        return;
-    }
-
-
-    const money =
-        document.getElementById(
-            "money-value"
-        );
-
-    const army =
-        document.getElementById(
-            "army-value"
-        );
-
-    const year =
-        document.getElementById(
-            "year-value"
-        );
-
-
-    if (money) {
-        money.textContent =
-            player.money ?? 0;
-    }
-
-    if (army) {
-        army.textContent =
-            player.army ?? 0;
-    }
-
-    if (year) {
-        year.textContent =
-            player.year ?? 1939;
-    }
-}
-
-
-/* =========================================
+/* =========================================================
    پیام
-========================================= */
+========================================================= */
 
 function showMessage(message) {
 
     const element =
-        document.getElementById(
-            "country-message"
-        );
+        document.getElementById("country-message");
 
     if (!element) {
         return;
     }
 
+    element.textContent = message;
 
-    element.textContent =
-        message;
+    setTimeout(() => {
+
+        if (element.textContent === message) {
+            element.textContent = "";
+        }
+
+    }, 4000);
+}
 
 
-    clearTimeout(
-        window.messageTimer
+/* =========================================================
+   صفحه نمایش کشور
+========================================================= */
+
+function showCountryPreview() {
+
+    if (!selectedCountry) {
+        showCountrySelection();
+        return;
+    }
+
+    showOnly("country-preview");
+
+    const flag =
+        COUNTRY_FLAGS[selectedCountry] || "🌍";
+
+    const name =
+        COUNTRY_NAMES[selectedCountry] || selectedCountry;
+
+    document.getElementById(
+        "selected-country-flag"
+    ).textContent = flag;
+
+    document.getElementById(
+        "preview-country-name"
+    ).textContent = name;
+
+    createGlobe(
+        "preview-globe-container",
+        "preview-globe",
+        selectedCountry
+    );
+}
+
+
+/* =========================================================
+   ورود به بازی
+========================================================= */
+
+document
+    .getElementById("enter-game-button")
+    .addEventListener("click", () => {
+
+        showGame();
+    });
+
+
+function showGame() {
+
+    showOnly("game");
+
+    updateGameHeader();
+    updateHomeStats();
+
+    createGlobe(
+        "globe-container",
+        "globe",
+        selectedCountry
     );
 
-
-    window.messageTimer =
-        setTimeout(() => {
-
-            element.textContent = "";
-
-        }, 3500);
+    loadNews();
 }
 
 
-/* =========================================
-   منوی پایین
-========================================= */
+/* =========================================================
+   هدر بازی
+========================================================= */
 
-function setupNavigation() {
+function updateGameHeader() {
 
-    document
-        .querySelectorAll(".nav-item")
-        .forEach(button => {
+    const flag =
+        COUNTRY_FLAGS[selectedCountry] || "🌍";
 
-            button.addEventListener(
-                "click",
-                () => {
-
-                    const page =
-                        button.dataset.page;
-
-                    showPage(page);
-
-                }
-            );
-
-        });
+    document.getElementById(
+        "game-country-flag"
+    ).textContent = flag;
 }
 
 
-function showPage(pageName) {
+/* =========================================================
+   آمار خانه
+========================================================= */
 
-    document
-        .querySelectorAll(".page")
-        .forEach(page => {
+function updateHomeStats() {
 
-            page.style.display =
-                "none";
-
-        });
-
-
-    const selectedPage =
-        document.getElementById(
-            pageName
-        );
-
-
-    if (selectedPage) {
-
-        selectedPage.style.display =
-            "block";
+    if (!player) {
+        return;
     }
 
+    document.getElementById(
+        "home-economy"
+    ).textContent =
+        player.money ?? 0;
 
-    document
-        .querySelectorAll(".nav-item")
-        .forEach(button => {
+    document.getElementById(
+        "home-army"
+    ).textContent =
+        player.army ?? 0;
 
-            button.classList.remove(
-                "active"
-            );
+    const country =
+        countries[selectedCountry];
 
-            if (
-                button.dataset.page ===
-                pageName
-            ) {
+    document.getElementById(
+        "home-population"
+    ).textContent =
+        country?.population
+            ? formatPopulation(country.population)
+            : "0";
 
-                button.classList.add(
-                    "active"
+    document.getElementById(
+        "home-year"
+    ).textContent =
+        player.year ?? 1939;
+}
+
+
+function formatPopulation(value) {
+
+    if (value >= 1000000) {
+        return Math.round(value / 1000000) + "M";
+    }
+
+    return value;
+}
+
+
+/* =========================================================
+   نوار پایین
+========================================================= */
+
+document.querySelectorAll(".nav-item").forEach(item => {
+
+    item.addEventListener("click", () => {
+
+        const page = item.dataset.page;
+
+        document.querySelectorAll(".game-page").forEach(
+            element => {
+                element.classList.add("hidden");
+            }
+        );
+
+        const target =
+            document.getElementById(page);
+
+        if (target) {
+            target.classList.remove("hidden");
+        }
+
+        document.querySelectorAll(".nav-item").forEach(
+            nav => {
+                nav.classList.remove("active");
+            }
+        );
+
+        item.classList.add("active");
+
+        if (page === "home") {
+
+            setTimeout(() => {
+
+                createGlobe(
+                    "globe-container",
+                    "globe",
+                    selectedCountry
                 );
 
-            }
-
-        });
-
-
-    /*
-        وقتی وارد نقشه می‌شویم
-    */
-
-    if (pageName === "map") {
-
-        setTimeout(() => {
-
-            loadGlobe(
-                "game-globe"
-            );
-
-        }, 50);
-
-    }
+            }, 50);
+        }
+    });
+});
 
 
-    /*
-        اخبار
-    */
+/* =========================================================
+   اخبار
+========================================================= */
 
-    if (pageName === "news") {
-
-        loadNews();
-
-    }
-}
-
-
-/* =========================================
-   ساخت کره زمین
-========================================= */
-
-async function loadGlobe(
-    containerId
-) {
+async function loadNews() {
 
     const container =
-        document.getElementById(
-            containerId
-        );
+        document.getElementById("news-list");
 
     if (!container) {
         return;
     }
 
+    try {
 
-    /*
-        اگر قبلاً ساخته شده
-    */
+        const response =
+            await fetch("/api/news");
 
-    container.innerHTML = "";
+        if (!response.ok) {
+            throw new Error("News API error");
+        }
 
+        const news =
+            await response.json();
+
+        container.innerHTML = "";
+
+        news.forEach(item => {
+
+            const article =
+                document.createElement("div");
+
+            article.className = "news-item";
+
+            article.innerHTML = `
+                <h3>${item.title || ""}</h3>
+                <p>${item.text || ""}</p>
+            `;
+
+            container.appendChild(article);
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        container.innerHTML = `
+            <div class="news-item">
+                <h3>اخبار</h3>
+                <p>فعلاً خبری برای نمایش وجود ندارد.</p>
+            </div>
+        `;
+    }
+}
+
+
+/* =========================================================
+   کره جهان
+========================================================= */
+
+async function createGlobe(
+    containerId,
+    svgId,
+    selected
+) {
+
+    const container =
+        document.getElementById(containerId);
+
+    const svgElement =
+        document.getElementById(svgId);
+
+    if (!container || !svgElement) {
+        return;
+    }
 
     const width =
-        container.clientWidth || 500;
+        container.clientWidth || 400;
 
     const height =
-        container.clientHeight || 500;
-
+        container.clientHeight || 400;
 
     const size =
-        Math.min(
-            width,
-            height
-        );
+        Math.min(width, height) * 0.42;
 
+    d3.select(svgElement).selectAll("*").remove();
 
-    /*
-        SVG
-    */
+    const svg =
+        d3.select(svgElement)
+            .attr("viewBox", `0 0 ${width} ${height}`);
 
-    globeSvg =
-        d3.select(
-            `#${containerId}`
-        )
-        .append("svg")
-        .attr("width", size)
-        .attr("height", size)
-        .attr(
-            "viewBox",
-            `0 0 ${size} ${size}`
-        );
-
-
-    /*
-        Projection
-    */
-
-    globeProjection =
+    const projection =
         d3.geoOrthographic()
-            .scale(size * 0.46)
-            .translate(
-                [size / 2, size / 2]
-            )
+            .scale(size)
+            .translate([width / 2, height / 2])
             .clipAngle(90);
 
+    const path =
+        d3.geoPath(projection);
 
-    globePath =
-        d3.geoPath()
-            .projection(
-                globeProjection
-            );
-
-
-    /*
-        گرفتن نقشه جهان
-    */
+    let world;
 
     try {
 
@@ -823,733 +596,299 @@ async function loadGlobe(
                 "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
             );
 
-
-        const world =
-            await response.json();
-
-
-        worldFeatures =
-            topojson.feature(
-                world,
-                world.objects.countries
-            ).features;
-
-
-        drawGlobe();
-
-        setupGlobeControls(
-            container
-        );
-
-        startGlobeRotation();
-
+        world = await response.json();
 
     } catch (error) {
 
         console.error(
-            "WORLD MAP ERROR:",
+            "World map loading failed:",
             error
         );
 
-        showMessage(
-            "خطا در بارگذاری نقشه جهان."
-        );
-    }
-}
-
-
-/* =========================================
-   رسم کره
-========================================= */
-
-function drawGlobe() {
-
-    if (!globeSvg) {
         return;
     }
 
-
-    globeSvg.selectAll("*")
-        .remove();
-
-
-    /*
-        آب
-    */
-
-    globeSvg
-        .append("circle")
-        .attr(
-            "cx",
-            globeProjection.translate()[0]
-        )
-        .attr(
-            "cy",
-            globeProjection.translate()[1]
-        )
-        .attr(
-            "r",
-            globeProjection.scale()
-        )
-        .attr(
-            "fill",
-            "#101d24"
+    const land =
+        topojson.feature(
+            world,
+            world.objects.countries
         );
 
+    const sphere =
+        { type: "Sphere" };
 
-    /*
-        کشورها
-    */
 
-    globeSvg
-        .selectAll(".country")
-        .data(worldFeatures)
+    /* کره */
+
+    svg.append("path")
+        .datum(sphere)
+        .attr("class", "globe-water")
+        .attr("d", path);
+
+
+    /* کشورها */
+
+    svg.selectAll(".country-shape")
+        .data(land.features)
         .enter()
         .append("path")
-        .attr(
-            "class",
-            "country"
-        )
-        .attr(
-            "d",
-            globePath
-        )
-        .attr(
-            "fill",
-            d => getCountryColor(d)
-        )
-        .attr(
-            "stroke",
-            d => getCountryStroke(d)
-        )
-        .attr(
-            "stroke-width",
-            d => getCountryStrokeWidth(d)
-        )
-        .style(
-            "cursor",
-            d => {
-
-                const id =
-                    getCountryGameId(d);
-
-                return id ?
-                    "pointer" :
-                    "default";
-            }
-        )
-        .on(
-            "click",
-            function(event, d) {
-
-                const id =
-                    getCountryGameId(d);
-
-                if (!id) {
-                    return;
-                }
-
-                handleGlobeCountryClick(
-                    id
-                );
-
-            }
-        );
-
-
-    /*
-        خطوط طول و عرض
-        بسیار ظریف
-    */
-
-    const graticule =
-        d3.geoGraticule();
-
-
-    globeSvg
-        .append("path")
-        .datum(graticule())
-        .attr(
-            "class",
-            "graticule"
-        )
-        .attr(
-            "d",
-            globePath
-        )
-        .attr(
-            "fill",
-            "none"
-        )
-        .attr(
-            "stroke",
-            "rgba(255,255,255,0.035)"
-        )
-        .attr(
-            "stroke-width",
-            0.5
-        )
-        .style(
-            "pointer-events",
-            "none"
-        );
-
-
-    /*
-        مرز ظریف فقط کشورهای داخل بازی
-    */
-
-    countries.forEach(
-        country => {
-
-            const feature =
-                worldFeatures.find(
-                    f =>
-                        Number(f.id) ===
-                        COUNTRY_IDS[country.id]
-                );
-
-            if (!feature) {
-                return;
-            }
-
-        }
-    );
-}
-
-
-/* =========================================
-   رنگ کشورها
-========================================= */
-
-function getCountryColor(feature) {
-
-    const gameId =
-        getCountryGameId(feature);
-
-
-    /*
-        کشور خارج از بازی
-        فقط خشکی طبیعی
-    */
-
-    if (!gameId) {
-
-        return "#202629";
-    }
-
-
-    /*
-        کشور خود بازیکن
-        نارنجی
-    */
-
-    if (
-        player &&
-        player.country === gameId
-    ) {
-
-        return "#d8781d";
-    }
-
-
-    /*
-        کشور گرفته شده توسط بازیکن دیگر
-        آبی
-    */
-
-    const country =
-        countries.find(
-            c =>
-                c.id === gameId
-        );
-
-
-    if (
-        country &&
-        country.taken
-    ) {
-
-        return "#245a88";
-    }
-
-
-    /*
-        کشور آزاد
-        مشکی
-    */
-
-    return "#080b0d";
-}
-
-
-/* =========================================
-   مرز کشور
-========================================= */
-
-function getCountryStroke(feature) {
-
-    const gameId =
-        getCountryGameId(feature);
-
-
-    /*
-        کشورهای خارج از بازی
-        بدون مرز
-    */
-
-    if (!gameId) {
-
-        return "none";
-    }
-
-
-    return "rgba(255,255,255,0.22)";
-}
-
-
-function getCountryStrokeWidth(feature) {
-
-    const gameId =
-        getCountryGameId(feature);
-
-
-    if (!gameId) {
-        return 0;
-    }
-
-
-    return 0.7;
-}
-
-
-/* =========================================
-   تشخیص کشور بازی
-========================================= */
-
-function getCountryGameId(feature) {
-
-    const numericId =
-        Number(feature.id);
-
-
-    for (
-        const [gameId, numericIdValue]
-        of Object.entries(COUNTRY_IDS)
-    ) {
-
-        if (
-            numericId ===
-            numericIdValue
-        ) {
-
-            return gameId;
-        }
-
-    }
-
-
-    return null;
-}
-
-
-/* =========================================
-   بروزرسانی رنگ‌ها
-========================================= */
-
-function updateGlobeColors() {
-
-    if (!globeSvg) {
-        return;
-    }
-
-
-    globeSvg
-        .selectAll(".country")
-        .attr(
-            "fill",
-            d =>
-                getCountryColor(d)
-        )
-        .attr(
-            "stroke",
-            d =>
-                getCountryStroke(d)
-        )
-        .attr(
-            "stroke-width",
-            d =>
-                getCountryStrokeWidth(d)
-        );
-}
-
-
-/* =========================================
-   کلیک روی کشور کره
-========================================= */
-
-function handleGlobeCountryClick(
-    countryId
-) {
-
-    /*
-        اگر کشور خودمان است
-    */
-
-    if (
-        player &&
-        player.country === countryId
-    ) {
-
-        showMessage(
-            `کشور شما: ${COUNTRY_NAMES[countryId]}`
-        );
-
-        return;
-    }
-
-
-    /*
-        پیدا کردن کشور
-    */
-
-    const country =
-        countries.find(
-            c =>
-                c.id === countryId
-        );
-
-
-    /*
-        اگر قبلاً گرفته شده
-    */
-
-    if (
-        country &&
-        country.taken
-    ) {
-
-        showMessage(
-            "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."
-        );
-
-        return;
-    }
-
-
-    /*
-        انتخاب
-    */
-
-    selectCountry(
-        countryId
-    );
-}
-
-
-/* =========================================
-   کنترل کره
-========================================= */
-
-function setupGlobeControls(
-    container
-) {
-
-    container.onmousedown =
-        event => {
-
-            isDragging = true;
-
-            autoRotate = false;
-
-            startMouse = [
-                event.clientX,
-                event.clientY
-            ];
-
-            startRotation =
-                [...rotation];
-
-        };
-
-
-    window.onmousemove =
-        event => {
-
-            if (!isDragging) {
-                return;
-            }
-
-
-            const dx =
-                event.clientX -
-                startMouse[0];
-
-            const dy =
-                event.clientY -
-                startMouse[1];
-
-
-            rotation = [
-
-                startRotation[0] +
-                    dx * 0.35,
-
-                startRotation[1] -
-                    dy * 0.25
-
-            ];
-
-
-            updateProjection();
-
-        };
-
-
-    window.onmouseup =
-        () => {
-
-            isDragging = false;
-
-        };
-
-
-    /*
-        موبایل
-    */
-
-    container.ontouchstart =
-        event => {
+        .attr("class", "country-shape")
+        .attr("d", path)
+        .attr("data-country-id", d => d.id)
+        .attr("fill", d => {
+
+            const countryId =
+                Number(d.id);
 
             if (
-                event.touches.length !== 1
+                selected &&
+                COUNTRY_IDS[selected] === countryId
             ) {
-                return;
+                return "#d98a25";
             }
 
-
-            isDragging = true;
-
-            autoRotate = false;
-
-            startMouse = [
-
-                event.touches[0].clientX,
-
-                event.touches[0].clientY
-
-            ];
-
-            startRotation =
-                [...rotation];
-
-        };
-
-
-    container.ontouchmove =
-        event => {
-
-            if (
-                !isDragging ||
-                event.touches.length !== 1
-            ) {
-                return;
-            }
-
-
-            event.preventDefault();
-
-
-            const dx =
-                event.touches[0].clientX -
-                startMouse[0];
-
-            const dy =
-                event.touches[0].clientY -
-                startMouse[1];
-
-
-            rotation = [
-
-                startRotation[0] +
-                    dx * 0.35,
-
-                startRotation[1] -
-                    dy * 0.25
-
-            ];
-
-
-            updateProjection();
-
-        };
-
-
-    container.ontouchend =
-        () => {
-
-            isDragging = false;
-
-        };
-
-
-    /*
-        Zoom
-    */
-
-    container.onwheel =
-        event => {
-
-            event.preventDefault();
-
-
-            scale +=
-                event.deltaY > 0 ?
-                -0.08 :
-                0.08;
-
-
-            scale =
-                Math.max(
-                    0.75,
-                    Math.min(
-                        scale,
-                        1.7
-                    )
+            const isTaken =
+                Object.values(countries).some(
+                    country =>
+                        country.taken &&
+                        COUNTRY_IDS[country.id] === countryId
                 );
 
+            if (isTaken) {
+                return "#3978b7";
+            }
 
-            updateProjection();
+            const isGameCountry =
+                Object.values(COUNTRY_IDS)
+                    .includes(countryId);
 
-        };
+            if (isGameCountry) {
+                return "#111820";
+            }
 
-}
+            return "#151b21";
+        })
+        .attr("stroke", d => {
+
+            const countryId =
+                Number(d.id);
+
+            const isGameCountry =
+                Object.values(COUNTRY_IDS)
+                    .includes(countryId);
+
+            return isGameCountry
+                ? "#26313c"
+                : "none";
+        })
+        .attr("stroke-width", .6);
 
 
-/* =========================================
-   بروزرسانی Projection
-========================================= */
+    /* چرخش */
 
-function updateProjection() {
+    let rotation = projection.rotate();
 
-    if (!globeProjection) {
-        return;
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+
+
+    function redraw() {
+
+        svg.selectAll("path")
+            .attr("d", path);
     }
 
-
-    globeProjection
-        .rotate(rotation)
-        .scale(
-            Math.min(
-                window.innerWidth,
-                window.innerHeight
-            ) *
-            0.46 *
-            scale
-        );
-
-
-    drawGlobe();
-
-}
-
-
-/* =========================================
-   چرخش خودکار
-========================================= */
-
-function startGlobeRotation() {
 
     function rotate() {
 
-        if (
-            autoRotate &&
-            globeProjection
-        ) {
+        if (!dragging) {
 
             rotation[0] += 0.08;
 
-            updateProjection();
+            projection.rotate(rotation);
 
+            redraw();
         }
 
-
-        requestAnimationFrame(
-            rotate
-        );
+        requestAnimationFrame(rotate);
     }
 
-
-    rotate();
-}
+    requestAnimationFrame(rotate);
 
 
-/* =========================================
-   اخبار
-========================================= */
+    /* موس */
 
-async function loadNews() {
+    svgElement.addEventListener(
+        "mousedown",
+        event => {
 
-    const list =
-        document.getElementById(
-            "news-list"
-        );
+            dragging = true;
 
-
-    if (!list) {
-        return;
-    }
+            lastX = event.clientX;
+            lastY = event.clientY;
+        }
+    );
 
 
-    try {
+    window.addEventListener(
+        "mouseup",
+        () => {
 
-        const response =
-            await fetch("/api/news");
+            dragging = false;
+        }
+    );
 
 
-        if (!response.ok) {
-            throw new Error(
-                "News API unavailable"
+    window.addEventListener(
+        "mousemove",
+        event => {
+
+            if (!dragging) {
+                return;
+            }
+
+            const dx =
+                event.clientX - lastX;
+
+            const dy =
+                event.clientY - lastY;
+
+            rotation[0] += dx * 0.5;
+            rotation[1] -= dy * 0.5;
+
+            rotation[1] =
+                Math.max(
+                    -90,
+                    Math.min(90, rotation[1])
+                );
+
+            projection.rotate(rotation);
+
+            redraw();
+
+            lastX = event.clientX;
+            lastY = event.clientY;
+        }
+    );
+
+
+    /* لمس موبایل */
+
+    svgElement.addEventListener(
+        "touchstart",
+        event => {
+
+            if (!event.touches.length) {
+                return;
+            }
+
+            dragging = true;
+
+            lastX =
+                event.touches[0].clientX;
+
+            lastY =
+                event.touches[0].clientY;
+        },
+        { passive: true }
+    );
+
+
+    svgElement.addEventListener(
+        "touchend",
+        () => {
+
+            dragging = false;
+        },
+        { passive: true }
+    );
+
+
+    svgElement.addEventListener(
+        "touchmove",
+        event => {
+
+            if (
+                !dragging ||
+                !event.touches.length
+            ) {
+                return;
+            }
+
+            const dx =
+                event.touches[0].clientX - lastX;
+
+            const dy =
+                event.touches[0].clientY - lastY;
+
+            rotation[0] += dx * 0.5;
+            rotation[1] -= dy * 0.5;
+
+            rotation[1] =
+                Math.max(
+                    -90,
+                    Math.min(90, rotation[1])
+                );
+
+            projection.rotate(rotation);
+
+            redraw();
+
+            lastX =
+                event.touches[0].clientX;
+
+            lastY =
+                event.touches[0].clientY;
+
+            event.preventDefault();
+
+        },
+        { passive: false }
+    );
+
+
+    /* زوم */
+
+    svgElement.addEventListener(
+        "wheel",
+        event => {
+
+            event.preventDefault();
+
+            const current =
+                projection.scale();
+
+            const next =
+                current *
+                (event.deltaY > 0 ? 0.9 : 1.1);
+
+            projection.scale(
+                Math.max(
+                    120,
+                    Math.min(
+                        size * 1.7,
+                        next
+                    )
+                )
             );
-        }
 
+            redraw();
 
-        const news =
-            await response.json();
-
-
-        if (
-            !news ||
-            news.length === 0
-        ) {
-
-            list.innerHTML =
-                `<div class="news-empty">
-                    هنوز خبری ثبت نشده است.
-                </div>`;
-
-            return;
-        }
-
-
-        list.innerHTML =
-            news.map(item => `
-                <div class="news-item">
-                    <h3>${item.title}</h3>
-                    <p>${item.text}</p>
-                </div>
-            `).join("");
-
-
-    } catch (error) {
-
-        console.log(
-            "News endpoint not ready."
-        );
-
-        list.innerHTML =
-            `<div class="news-empty">
-                هنوز خبری ثبت نشده است.
-            </div>`;
-    }
+        },
+        { passive: false }
+    );
 }
+
+
+/* =========================================================
+   شروع
+========================================================= */
+
+(async function init() {
+
+    await loadCountries();
+
+    await loadPlayer();
+
+})();
