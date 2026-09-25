@@ -1,132 +1,97 @@
-import asyncio
-import logging
 import os
+import logging
 
 from aiohttp import web
-
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart
-from aiogram.types import (
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    WebAppInfo,
+from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from dotenv import load_dotenv
+
+
+# =========================================================
+# تنظیمات
+# =========================================================
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+WEB_APP_URL = "https://ww2-telegram-game.onrender.com"
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
-from config import BOT_TOKEN
 
-
-# ---------------------------------------
-# تنظیمات
-# ---------------------------------------
-
-logging.basicConfig(level=logging.INFO)
-
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
-
-
-# ---------------------------------------
-# بازیکنان
-# ---------------------------------------
-
-players = {}
-
-
-# ---------------------------------------
-# کشورهای بازی
-# ---------------------------------------
+# =========================================================
+# کشورها
+# =========================================================
 
 COUNTRIES = {
 
     "germany": {
-        "name": "🇩🇪 آلمان",
+        "name": "آلمان",
+        "flag": "🇩🇪",
         "economy": 850,
         "army": 900,
-        "population": 80000000,
+        "population": 80_000_000,
     },
 
     "britain": {
-        "name": "🇬🇧 بریتانیا",
+        "name": "بریتانیا",
+        "flag": "🇬🇧",
         "economy": 800,
         "army": 700,
-        "population": 47000000,
+        "population": 47_000_000,
     },
 
     "ussr": {
-        "name": "🇷🇺 شوروی",
+        "name": "شوروی",
+        "flag": "🇷🇺",
         "economy": 750,
         "army": 950,
-        "population": 170000000,
+        "population": 170_000_000,
     },
 
     "usa": {
-        "name": "🇺🇸 آمریکا",
+        "name": "آمریکا",
+        "flag": "🇺🇸",
         "economy": 1000,
         "army": 600,
-        "population": 130000000,
+        "population": 130_000_000,
     },
 
     "france": {
-        "name": "🇫🇷 فرانسه",
+        "name": "فرانسه",
+        "flag": "🇫🇷",
         "economy": 700,
         "army": 650,
-        "population": 42000000,
+        "population": 42_000_000,
     },
 
     "italy": {
-        "name": "🇮🇹 ایتالیا",
+        "name": "ایتالیا",
+        "flag": "🇮🇹",
         "economy": 600,
         "army": 500,
-        "population": 44000000,
+        "population": 44_000_000,
     },
 }
 
 
-# ---------------------------------------
-# اخبار اولیه
-# ---------------------------------------
+# =========================================================
+# بازیکنان
+# =========================================================
 
-NEWS = [
-
-    {
-        "country": "🌍 جهان",
-        "title": "آغاز دوره جدید تنش در اروپا",
-        "text": "کشورهای اروپایی در حال افزایش آمادگی نظامی خود هستند.",
-    },
-
-    {
-        "country": "🇩🇪 آلمان",
-        "title": "افزایش تولید نظامی",
-        "text": "کارخانه‌های نظامی آلمان فعالیت خود را افزایش داده‌اند.",
-    },
-
-    {
-        "country": "🇬🇧 بریتانیا",
-        "title": "افزایش آمادگی دفاعی",
-        "text": "بریتانیا نیروهای خود را در وضعیت آماده‌باش قرار داده است.",
-    },
-
-    {
-        "country": "🇷🇺 شوروی",
-        "title": "گسترش نیروهای ارتش",
-        "text": "واحدهای جدید ارتش شوروی در حال سازماندهی هستند.",
-    },
-
-    {
-        "country": "🇺🇸 آمریکا",
-        "title": "رشد تولید صنعتی",
-        "text": "ظرفیت صنعتی آمریکا در حال افزایش است.",
-    },
-]
+players = {}
 
 
-# ---------------------------------------
-# ساخت بازیکن
-# ---------------------------------------
-
-def create_player():
+def create_player(user_id):
 
     return {
+        "user_id": user_id,
         "country": None,
         "money": 1000,
         "army": 500,
@@ -134,345 +99,504 @@ def create_player():
     }
 
 
-# ---------------------------------------
-# صفحه اصلی Bot
-# ---------------------------------------
+# =========================================================
+# Bot
+# =========================================================
 
-@dp.message(CommandStart())
-async def start(message: types.Message):
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
+
+
+# =========================================================
+# /start
+# =========================================================
+
+@dp.message(Command("start"))
+async def start_command(message: types.Message):
 
     user_id = message.from_user.id
 
+    logging.info(
+        "USER STARTED BOT | user_id=%s | username=%s",
+        user_id,
+        message.from_user.username
+    )
+
     if user_id not in players:
 
-        players[user_id] = create_player()
+        players[user_id] = create_player(
+            user_id
+        )
+
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="🎮 ورود به بازی",
+                    text="🌍 ورود به بازی",
                     web_app=WebAppInfo(
-                        url="https://ww2-telegram-game.onrender.com"
-                    ),
+                        url=WEB_APP_URL
+                    )
                 )
             ]
         ]
     )
 
+
+    if players[user_id]["country"]:
+
+        text = (
+            "⚔️ به جنگ جهانی دوم خوش آمدید.\n\n"
+            f"کشور شما: "
+            f"{COUNTRIES[players[user_id]['country']]['flag']} "
+            f"{COUNTRIES[players[user_id]['country']]['name']}\n\n"
+            "برای ورود به فرماندهی روی دکمه زیر بزنید."
+        )
+
+    else:
+
+        text = (
+            "⚔️ به جنگ جهانی دوم خوش آمدید.\n\n"
+            "سال ۱۹۳۹ است.\n"
+            "سرنوشت کشورها در دستان فرماندهان است.\n\n"
+            "ابتدا وارد بازی شوید و کشور خود را انتخاب کنید."
+        )
+
+
     await message.answer(
-
-        "🌍 <b>WORLD WAR II</b>\n\n"
-
-        "به بازی استراتژیک جنگ جهانی دوم خوش آمدید.\n\n"
-
-        "ابتدا باید کشور خود را انتخاب کنید.\n"
-        "هر کشور فقط می‌تواند توسط یک بازیکن انتخاب شود.\n\n"
-
-        "برای شروع روی دکمه زیر بزنید 👇",
-
-        reply_markup=keyboard,
-        parse_mode="HTML",
+        text,
+        reply_markup=keyboard
     )
 
 
-# ---------------------------------------
-# API بازیکن
-# ---------------------------------------
+# =========================================================
+# API - Player
+# =========================================================
 
-async def player_api(request):
-
-    user_id = request.query.get("user_id")
-
-    if not user_id:
-
-        return web.json_response(
-            {"error": "user_id missing"},
-            status=400,
-        )
+async def get_player(request):
 
     try:
 
-        user_id = int(user_id)
+        user_id = int(
+            request.query.get("user_id")
+        )
 
-    except ValueError:
+    except (TypeError, ValueError):
 
         return web.json_response(
-            {"error": "invalid user_id"},
-            status=400,
+            {
+                "error": "invalid_user_id"
+            },
+            status=400
         )
+
 
     if user_id not in players:
 
-        players[user_id] = create_player()
+        players[user_id] = create_player(
+            user_id
+        )
+
 
     return web.json_response(
         players[user_id]
     )
 
 
-# ---------------------------------------
-# API کشورها
-# ---------------------------------------
+# =========================================================
+# API - Countries
+# =========================================================
 
-async def countries_api(request):
+async def get_countries(request):
 
-    # کشورهایی که قبلاً انتخاب شده‌اند
-    taken_countries = {}
-
-    for user_id, player in players.items():
-
-        country = player.get("country")
-
-        if country:
-
-            taken_countries[country] = user_id
-
-    result = {}
-
-    for country_id, country_data in COUNTRIES.items():
-
-        result[country_id] = {
-            **country_data,
-            "taken": country_id in taken_countries,
-        }
-
-    return web.json_response(result)
+    result = []
 
 
-# ---------------------------------------
-# API اخبار
-# ---------------------------------------
+    for country_id, country in COUNTRIES.items():
 
-async def news_api(request):
-
-    return web.json_response(NEWS)
+        owner_id = None
 
 
-# ---------------------------------------
-# API انتخاب کشور
-# ---------------------------------------
+        for user_id, player in players.items():
+
+            if player.get("country") == country_id:
+
+                owner_id = user_id
+                break
+
+
+        result.append(
+            {
+                "id": country_id,
+                "name": country["name"],
+                "flag": country["flag"],
+                "economy": country["economy"],
+                "army": country["army"],
+                "population": country["population"],
+                "taken": owner_id is not None,
+            }
+        )
+
+
+    return web.json_response(
+        result
+    )
+
+
+# =========================================================
+# API - Select Country
+# =========================================================
 
 async def select_country(request):
 
-    user_id = request.query.get("user_id")
-    country_id = request.query.get("country")
-
-    if not user_id or not country_id:
-
-        return web.json_response(
-            {
-                "success": False,
-                "error": "missing data",
-            },
-            status=400,
-        )
-
     try:
 
-        user_id = int(user_id)
+        user_id = int(
+            request.query.get("user_id")
+        )
 
-    except ValueError:
+    except (TypeError, ValueError):
 
         return web.json_response(
             {
                 "success": False,
-                "error": "invalid user",
+                "error": "invalid_user_id"
             },
-            status=400,
+            status=400
         )
 
+
+    country_id = request.query.get(
+        "country"
+    )
+
+
+    # -----------------------------------------------------
     # بررسی کشور
+    # -----------------------------------------------------
+
     if country_id not in COUNTRIES:
 
         return web.json_response(
             {
                 "success": False,
-                "error": "country not found",
+                "error": "invalid_country",
+                "message": "کشور انتخاب شده معتبر نیست."
             },
-            status=404,
+            status=400
         )
 
-    # ساخت بازیکن در صورت نیاز
+
+    # -----------------------------------------------------
+    # ساخت بازیکن در صورت نبودن
+    # -----------------------------------------------------
+
     if user_id not in players:
 
-        players[user_id] = create_player()
+        players[user_id] = create_player(
+            user_id
+        )
 
-    # -----------------------------------
-    # بررسی اینکه کشور قبلاً گرفته شده
-    # -----------------------------------
 
-    for other_user_id, other_player in players.items():
+    player = players[user_id]
 
-        if (
-            other_user_id != user_id
-            and other_player.get("country") == country_id
-        ):
+
+    # -----------------------------------------------------
+    # اگر بازیکن قبلاً کشور دارد
+    # -----------------------------------------------------
+
+    if player["country"]:
+
+        if player["country"] == country_id:
 
             return web.json_response(
                 {
-                    "success": False,
-                    "error": "country_taken",
-                    "message": "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است.",
-                },
-                status=409,
+                    "success": True,
+                    "player": player
+                }
             )
 
-    # -----------------------------------
-    # اگر بازیکن قبلاً کشور داشته
-    # -----------------------------------
-
-    current_country = players[user_id].get("country")
-
-    if current_country:
 
         return web.json_response(
             {
                 "success": False,
                 "error": "already_has_country",
-                "message": "شما قبلاً یک کشور انتخاب کرده‌اید.",
-                "player": players[user_id],
+                "message": "شما قبلاً یک کشور انتخاب کرده‌اید."
             },
-            status=409,
+            status=409
         )
 
-    # -----------------------------------
+
+    # -----------------------------------------------------
+    # بررسی مالکیت کشور
+    # -----------------------------------------------------
+
+    for other_user_id, other_player in players.items():
+
+        if other_user_id == user_id:
+            continue
+
+
+        if other_player.get("country") == country_id:
+
+            logging.warning(
+                "COUNTRY ALREADY TAKEN | "
+                "country=%s | owner=%s | requester=%s",
+                country_id,
+                other_user_id,
+                user_id
+            )
+
+            return web.json_response(
+                {
+                    "success": False,
+                    "error": "country_taken",
+                    "message": (
+                        "این کشور قبلاً توسط بازیکن دیگری "
+                        "انتخاب شده است."
+                    )
+                },
+                status=409
+            )
+
+
+    # -----------------------------------------------------
     # انتخاب کشور
-    # -----------------------------------
+    # -----------------------------------------------------
 
-    players[user_id]["country"] = country_id
+    player["country"] = country_id
 
-    players[user_id]["money"] = COUNTRIES[country_id]["economy"]
+    player["money"] = COUNTRIES[country_id]["economy"]
+    player["army"] = COUNTRIES[country_id]["army"]
 
-    players[user_id]["army"] = COUNTRIES[country_id]["army"]
 
-    print(
-        f"PLAYER {user_id} SELECTED COUNTRY: {country_id}"
+    logging.info(
+        "PLAYER SELECTED COUNTRY | "
+        "user_id=%s | country=%s | country_name=%s",
+        user_id,
+        country_id,
+        COUNTRIES[country_id]["name"]
     )
+
 
     return web.json_response(
         {
             "success": True,
-            "player": players[user_id],
+            "player": player
         }
     )
 
 
-# ---------------------------------------
-# Health Check برای Render
-# ---------------------------------------
+# =========================================================
+# API - News
+# =========================================================
+
+async def get_news(request):
+
+    news = [
+
+        {
+            "title": "سال ۱۹۳۹",
+            "text": (
+                "اروپا در آستانه یک بحران بزرگ قرار دارد. "
+                "تصمیمات فرماندهان سرنوشت جهان را تغییر خواهد داد."
+            )
+        },
+
+        {
+            "title": "فرماندهی آغاز شد",
+            "text": (
+                "کشور خود را انتخاب کنید و برای توسعه اقتصاد، "
+                "ارتش و روابط خارجی آماده شوید."
+            )
+        }
+
+    ]
+
+
+    return web.json_response(
+        news
+    )
+
+
+# =========================================================
+# Health Check
+# =========================================================
 
 async def health(request):
 
-    return web.Response(
-        text="WW2 Game is running!"
+    return web.json_response(
+        {
+            "status": "ok"
+        }
     )
 
 
-# ---------------------------------------
-# Web Server
-# ---------------------------------------
+# =========================================================
+# فایل‌های Web App
+# =========================================================
 
-async def start_web_server():
+async def index(request):
+
+    path = os.path.join(
+        "web",
+        "index.html"
+    )
+
+    return web.FileResponse(
+        path
+    )
+
+
+async def style(request):
+
+    path = os.path.join(
+        "web",
+        "style.css"
+    )
+
+    return web.FileResponse(
+        path
+    )
+
+
+async def app_js(request):
+
+    path = os.path.join(
+        "web",
+        "app.js"
+    )
+
+    return web.FileResponse(
+        path
+    )
+
+
+# =========================================================
+# ساخت Web Server
+# =========================================================
+
+async def create_web_app():
 
     app = web.Application()
 
-    # صفحه اصلی
+
+    # صفحات
     app.router.add_get(
         "/",
-        lambda request: web.FileResponse(
-            "web/index.html"
-        ),
+        index
     )
 
-    # CSS
     app.router.add_get(
         "/style.css",
-        lambda request: web.FileResponse(
-            "web/style.css"
-        ),
+        style
     )
 
-    # JavaScript
     app.router.add_get(
         "/app.js",
-        lambda request: web.FileResponse(
-            "web/app.js"
-        ),
+        app_js
     )
 
-    # API بازیکن
+
+    # API
     app.router.add_get(
         "/api/player",
-        player_api,
+        get_player
     )
 
-    # API کشورها
     app.router.add_get(
         "/api/countries",
-        countries_api,
+        get_countries
     )
 
-    # API اخبار
-    app.router.add_get(
-        "/api/news",
-        news_api,
-    )
-
-    # API انتخاب کشور
     app.router.add_get(
         "/api/select-country",
-        select_country,
+        select_country
     )
+
+    app.router.add_get(
+        "/api/news",
+        get_news
+    )
+
 
     # Health
     app.router.add_get(
         "/health",
-        health,
+        health
     )
 
-    runner = web.AppRunner(app)
+
+    return app
+
+
+# =========================================================
+# اجرای سرور
+# =========================================================
+
+async def start_web_server():
+
+    app = await create_web_app()
+
+    runner = web.AppRunner(
+        app
+    )
 
     await runner.setup()
 
-    # پورت Render
+
     port = int(
-        os.environ.get(
+        os.getenv(
             "PORT",
-            8080,
+            "10000"
         )
     )
+
 
     site = web.TCPSite(
         runner,
         "0.0.0.0",
-        port,
+        port
     )
+
 
     await site.start()
 
-    print(
-        f"Web server started on port {port}"
+
+    logging.info(
+        "WEB SERVER STARTED | port=%s",
+        port
     )
 
 
-# ---------------------------------------
-# اجرای برنامه
-# ---------------------------------------
+# =========================================================
+# Main
+# =========================================================
 
 async def main():
 
+    logging.info(
+        "WW2 TELEGRAM GAME STARTING..."
+    )
+
+
     await start_web_server()
 
-    print("Bot is running...")
 
-    await dp.start_polling(bot)
+    logging.info(
+        "BOT POLLING STARTED"
+    )
 
 
-# ---------------------------------------
-# Start
-# ---------------------------------------
+    await dp.start_polling(
+        bot
+    )
+
 
 if __name__ == "__main__":
 
-    asyncio.run(main())
+    import asyncio
+
+    asyncio.run(
+        main()
+    )
