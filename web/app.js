@@ -12,6 +12,8 @@ const userId =
 let player = null;
 let countries = {};
 let selectedCountry = null;
+let worldData = null;
+let statsInterval = null;
 
 const COUNTRY_FLAGS = {
     germany: "🇩🇪",
@@ -49,6 +51,31 @@ const SECTION_NAMES = {
     market: "بازار جهانی"
 };
 
+/* اقیانوس‌ها - [lon, lat, نام] */
+
+const OCEAN_LABELS = [
+    [-40, 25, "اقیانوس اطلس"],
+    [-150, 0, "اقیانوس آرام"],
+    [75, -20, "اقیانوس هند"],
+    [90, 55, "اقیانوس منجمد شمالی"],
+    [20, -60, "اقیانوس منجمد جنوبی"]
+];
+
+/* تنگه‌های مهم دنیا - [lon, lat, نام, توضیح کوتاه] */
+
+const STRAITS = [
+    { lon: -5.6, lat: 35.9, name: "تنگه جبل‌الطارق", desc: "اتصال دریای مدیترانه به اقیانوس اطلس؛ یکی از پرتردد‌ترین آبراه‌های نظامی و تجاری دنیا." },
+    { lon: 29.0, lat: 41.1, name: "تنگه بسفر", desc: "تنها راه دریایی دریای سیاه به مدیترانه؛ کنترل آن یعنی کنترل دسترسی شرق اروپا به آب‌های آزاد." },
+    { lon: 56.3, lat: 26.6, name: "تنگه هرمز", desc: "مسیر اصلی صادرات نفت خلیج فارس؛ حیاتی‌ترین تنگه انرژی جهان." },
+    { lon: 43.3, lat: 12.6, name: "تنگه باب‌المندب", desc: "دروازه ورودی دریای سرخ و کانال سوئز؛ مسیر کوتاه اروپا به آسیا." },
+    { lon: 32.3, lat: 30.6, name: "کانال سوئز", desc: "کوتاه‌ترین مسیر دریایی اروپا به آسیا بدون دور زدن آفریقا." },
+    { lon: 1.4, lat: 50.9, name: "تنگه دوور", desc: "باریک‌ترین نقطه کانال مانش بین بریتانیا و فرانسه." },
+    { lon: -79.6, lat: 9.1, name: "کانال پاناما", desc: "اتصال اقیانوس اطلس و آرام؛ حذف مسیر طولانی دور آمریکای جنوبی." },
+    { lon: 103.8, lat: 1.3, name: "تنگه مالاکا", desc: "شریان اصلی تجارت دریایی میان اقیانوس هند و آرام." },
+    { lon: -5.9, lat: 43.4, name: "خلیج بیسکای", desc: "مسیر دریایی مهم غرب اروپا در اقیانوس اطلس." },
+    { lon: 121.0, lat: 24.0, name: "تنگه تایوان", desc: "آبراه راهبردی میان دریای چین شرقی و جنوبی." }
+];
+
 
 /* =========================================================
    ابزارهای عمومی
@@ -82,7 +109,23 @@ function getApiUrl(path, params = {}) {
 
 function formatMoney(value) {
 
-    return "$" + Number(value ?? 0).toLocaleString("en-US");
+    return "$" + Math.round(Number(value ?? 0)).toLocaleString("en-US");
+}
+
+
+async function loadWorldAtlas() {
+
+    if (worldData) {
+        return worldData;
+    }
+
+    const response = await fetch(
+        "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
+    );
+
+    worldData = await response.json();
+
+    return worldData;
 }
 
 
@@ -113,14 +156,9 @@ async function loadPlayer() {
 
         if (player.country) {
 
-            /*
-             * بازیکنی که قبلاً واقعاً وارد بازی شده
-             * (کشورش در بک‌اند ثبت شده است).
-             */
-
             selectedCountry = player.country;
 
-            showCountryPreview();
+            showGame();
 
         } else {
 
@@ -132,6 +170,56 @@ async function loadPlayer() {
         console.error(error);
 
         showCountrySelection();
+    }
+}
+
+
+async function refreshPlayer() {
+
+    if (!userId) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            getApiUrl("/api/player", {
+                user_id: userId
+            })
+        );
+
+        if (!response.ok) {
+            return;
+        }
+
+        player = await response.json();
+
+        updateHomeStats();
+
+    } catch (error) {
+
+        console.error(error);
+    }
+}
+
+
+function startStatsPolling() {
+
+    stopStatsPolling();
+
+    statsInterval = setInterval(() => {
+        refreshPlayer();
+    }, 30000);
+}
+
+
+function stopStatsPolling() {
+
+    if (statsInterval) {
+
+        clearInterval(statsInterval);
+
+        statsInterval = null;
     }
 }
 
@@ -197,10 +285,6 @@ function updateCountryCards() {
 
         if (country.taken) {
 
-            /*
-             * اگر کشور متعلق به خود کاربر است،
-             * نباید خاکستری شود.
-             */
             if (player?.country === countryId) {
                 card.classList.remove("taken");
             } else {
@@ -295,7 +379,7 @@ function showCountryPreview() {
         "preview-country-name"
     ).textContent = name;
 
-    createGlobe(
+    createPreviewGlobe(
         "preview-globe-container",
         "preview-globe",
         selectedCountry
@@ -304,7 +388,7 @@ function showCountryPreview() {
 
 
 /* =========================================================
-   دکمه بازگشت (فقط تغییر انتخاب محلی، چیزی در بک‌اند تغییر نمی‌کند)
+   دکمه بازگشت
 ========================================================= */
 
 document
@@ -318,7 +402,7 @@ document
 
 
 /* =========================================================
-   ورود به بازی -> اینجاست که کشور واقعاً برای کاربر ثبت می‌شود
+   ورود به بازی -> اینجا کشور واقعاً برای کاربر ثبت می‌شود
 ========================================================= */
 
 document
@@ -340,20 +424,12 @@ async function confirmCountrySelection() {
         return;
     }
 
-
-    /*
-     * اگر این بازیکن قبلاً همین کشور را
-     * در بک‌اند ثبت کرده (مثلاً بعد از رفرش صفحه)،
-     * نیازی به فراخوانی دوباره API نیست.
-     */
-
     if (player?.country === selectedCountry) {
 
         showGame();
 
         return;
     }
-
 
     try {
 
@@ -422,6 +498,8 @@ function showGame() {
 
     updateGameHeader();
     updateHomeStats();
+
+    startStatsPolling();
 }
 
 
@@ -450,31 +528,57 @@ function updateHomeStats() {
         return;
     }
 
-    document.getElementById(
-        "home-money"
-    ).textContent =
+    const flag =
+        COUNTRY_FLAGS[selectedCountry] || "🌍";
+
+    const name =
+        COUNTRY_NAMES[selectedCountry] || selectedCountry;
+
+    document.getElementById("home-country-flag").textContent = flag;
+    document.getElementById("home-country-name").textContent = name;
+
+    document.getElementById("home-money").textContent =
         formatMoney(player.money);
 
-    document.getElementById(
-        "home-army"
-    ).textContent =
-        player.army ?? 0;
+    document.getElementById("home-income").textContent =
+        formatMoney(player.daily_income) + " / روز";
 
-    document.getElementById(
-        "home-power"
-    ).textContent =
+    document.getElementById("home-power").textContent =
         player.power ?? 0;
 
-    document.getElementById(
-        "home-season"
-    ).textContent =
+    document.getElementById("home-power-sub").textContent =
+        `${player.power ?? 0} از ${player.power_capacity ?? 0}`;
+
+    document.getElementById("home-army").textContent =
+        player.army ?? 0;
+
+    document.getElementById("home-season").textContent =
         player.season ?? "بهار";
 
-    document.getElementById(
-        "home-day"
-    ).textContent =
-        `${player.day ?? 1} / 31`;
+    document.getElementById("home-season-end").textContent =
+        `پایان فصل تا ${player.season_days_left ?? 0} روز و ${player.season_hours_left ?? 0} ساعت`;
+
+    document.getElementById("home-next-season").textContent =
+        player.next_season ?? "تابستان";
+
+    document.getElementById("home-next-season-time").textContent =
+        `${player.season_days_left ?? 0} روز و ${player.season_hours_left ?? 0} ساعت`;
+
+    const mapMoney =
+        document.getElementById("map-money");
+
+    if (mapMoney) {
+        mapMoney.textContent = formatMoney(player.money);
+    }
 }
+
+
+document
+    .getElementById("next-season-button")
+    .addEventListener("click", () => {
+
+        alert("فصل‌ها به‌صورت خودکار و بر اساس زمان واقعی تغییر می‌کنند.");
+    });
 
 
 /* =========================================================
@@ -534,14 +638,8 @@ document.querySelectorAll(".nav-item").forEach(item => {
         if (page === "map") {
 
             setTimeout(() => {
-
-                createGlobe(
-                    "map-globe-container",
-                    "map-globe",
-                    selectedCountry
-                );
-
-            }, 50);
+                initWorldMap();
+            }, 30);
         }
 
         if (page === "communications") {
@@ -716,22 +814,19 @@ async function loadNews() {
 
 
 /* =========================================================
-   کره جهان
+   کره جهان (صفحه پیش‌نمایش کشور - چرخان)
 ========================================================= */
 
 function getTouchDistance(touches) {
 
-    const dx =
-        touches[0].clientX - touches[1].clientX;
-
-    const dy =
-        touches[0].clientY - touches[1].clientY;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
 
     return Math.hypot(dx, dy);
 }
 
 
-async function createGlobe(
+async function createPreviewGlobe(
     containerId,
     svgId,
     selected
@@ -747,19 +842,10 @@ async function createGlobe(
         return;
     }
 
-    const width =
-        container.clientWidth || 400;
+    const width = container.clientWidth || 400;
+    const height = container.clientHeight || 400;
 
-    const height =
-        container.clientHeight || 400;
-
-    /*
-     * نزدیک‌تر از قبل شروع می‌شود
-     * (قبلاً 0.42 بود)
-     */
-
-    const size =
-        Math.min(width, height) * 0.62;
+    const size = Math.min(width, height) * 0.62;
 
     const minScale = size * 0.5;
     const maxScale = size * 3;
@@ -776,49 +862,26 @@ async function createGlobe(
             .translate([width / 2, height / 2])
             .clipAngle(90);
 
-    const path =
-        d3.geoPath(projection);
+    const path = d3.geoPath(projection);
 
     let world;
 
     try {
-
-        const response =
-            await fetch(
-                "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
-            );
-
-        world = await response.json();
-
+        world = await loadWorldAtlas();
     } catch (error) {
-
-        console.error(
-            "World map loading failed:",
-            error
-        );
-
+        console.error("World map loading failed:", error);
         return;
     }
 
     const land =
-        topojson.feature(
-            world,
-            world.objects.countries
-        );
+        topojson.feature(world, world.objects.countries);
 
-    const sphere =
-        { type: "Sphere" };
-
-
-    /* کره */
+    const sphere = { type: "Sphere" };
 
     svg.append("path")
         .datum(sphere)
         .attr("class", "globe-water")
         .attr("d", path);
-
-
-    /* کشورها */
 
     svg.selectAll(".country-shape")
         .data(land.features)
@@ -826,16 +889,11 @@ async function createGlobe(
         .append("path")
         .attr("class", "country-shape")
         .attr("d", path)
-        .attr("data-country-id", d => d.id)
         .attr("fill", d => {
 
-            const countryId =
-                Number(d.id);
+            const countryId = Number(d.id);
 
-            if (
-                selected &&
-                COUNTRY_IDS[selected] === countryId
-            ) {
+            if (selected && COUNTRY_IDS[selected] === countryId) {
                 return "#d98a25";
             }
 
@@ -851,32 +909,20 @@ async function createGlobe(
             }
 
             const isGameCountry =
-                Object.values(COUNTRY_IDS)
-                    .includes(countryId);
+                Object.values(COUNTRY_IDS).includes(countryId);
 
-            if (isGameCountry) {
-                return "#111820";
-            }
-
-            return "#151b21";
+            return isGameCountry ? "#111820" : "#151b21";
         })
         .attr("stroke", d => {
 
-            const countryId =
-                Number(d.id);
+            const countryId = Number(d.id);
 
             const isGameCountry =
-                Object.values(COUNTRY_IDS)
-                    .includes(countryId);
+                Object.values(COUNTRY_IDS).includes(countryId);
 
-            return isGameCountry
-                ? "#26313c"
-                : "none";
+            return isGameCountry ? "#26313c" : "none";
         })
         .attr("stroke-width", .6);
-
-
-    /* چرخش */
 
     let rotation = projection.rotate();
 
@@ -889,13 +935,9 @@ async function createGlobe(
     let pinchStartDistance = 0;
     let pinchStartScale = size;
 
-
     function redraw() {
-
-        svg.selectAll("path")
-            .attr("d", path);
+        svg.selectAll("path").attr("d", path);
     }
-
 
     function rotate() {
 
@@ -913,208 +955,418 @@ async function createGlobe(
 
     requestAnimationFrame(rotate);
 
+    svgElement.addEventListener("mousedown", event => {
+        dragging = true;
+        lastX = event.clientX;
+        lastY = event.clientY;
+    });
 
-    /* موس - چرخش */
+    window.addEventListener("mouseup", () => {
+        dragging = false;
+    });
 
-    svgElement.addEventListener(
-        "mousedown",
-        event => {
+    window.addEventListener("mousemove", event => {
 
-            dragging = true;
+        if (!dragging) return;
 
-            lastX = event.clientX;
-            lastY = event.clientY;
-        }
-    );
+        const dx = event.clientX - lastX;
+        const dy = event.clientY - lastY;
 
+        rotation[0] += dx * 0.5;
+        rotation[1] -= dy * 0.5;
+        rotation[1] = Math.max(-90, Math.min(90, rotation[1]));
 
-    window.addEventListener(
-        "mouseup",
-        () => {
+        projection.rotate(rotation);
+        redraw();
 
+        lastX = event.clientX;
+        lastY = event.clientY;
+    });
+
+    svgElement.addEventListener("wheel", event => {
+
+        event.preventDefault();
+
+        const current = projection.scale();
+        const next = current * (event.deltaY > 0 ? 0.9 : 1.1);
+
+        projection.scale(
+            Math.max(minScale, Math.min(maxScale, next))
+        );
+
+        redraw();
+
+    }, { passive: false });
+
+    svgElement.addEventListener("touchstart", event => {
+
+        if (event.touches.length === 2) {
+            pinching = true;
             dragging = false;
+            pinchStartDistance = getTouchDistance(event.touches);
+            pinchStartScale = projection.scale();
+            return;
         }
-    );
 
+        if (!event.touches.length) return;
 
-    window.addEventListener(
-        "mousemove",
-        event => {
+        dragging = true;
+        lastX = event.touches[0].clientX;
+        lastY = event.touches[0].clientY;
 
-            if (!dragging) {
-                return;
-            }
+    }, { passive: true });
 
-            const dx =
-                event.clientX - lastX;
+    svgElement.addEventListener("touchend", event => {
 
-            const dy =
-                event.clientY - lastY;
+        dragging = false;
 
-            rotation[0] += dx * 0.5;
-            rotation[1] -= dy * 0.5;
-
-            rotation[1] =
-                Math.max(
-                    -90,
-                    Math.min(90, rotation[1])
-                );
-
-            projection.rotate(rotation);
-
-            redraw();
-
-            lastX = event.clientX;
-            lastY = event.clientY;
+        if (event.touches.length < 2) {
+            pinching = false;
         }
-    );
 
+    }, { passive: true });
 
-    /* موس - زوم با چرخ */
+    svgElement.addEventListener("touchmove", event => {
 
-    svgElement.addEventListener(
-        "wheel",
-        event => {
+        if (pinching && event.touches.length === 2) {
 
             event.preventDefault();
 
-            const current =
-                projection.scale();
-
-            const next =
-                current *
-                (event.deltaY > 0 ? 0.9 : 1.1);
+            const distance = getTouchDistance(event.touches);
+            const ratio = distance / pinchStartDistance;
+            const next = pinchStartScale * ratio;
 
             projection.scale(
-                Math.max(
-                    minScale,
-                    Math.min(maxScale, next)
-                )
+                Math.max(minScale, Math.min(maxScale, next))
             );
 
             redraw();
 
-        },
-        { passive: false }
-    );
+            return;
+        }
+
+        if (!dragging || !event.touches.length) return;
+
+        const dx = event.touches[0].clientX - lastX;
+        const dy = event.touches[0].clientY - lastY;
+
+        rotation[0] += dx * 0.5;
+        rotation[1] -= dy * 0.5;
+        rotation[1] = Math.max(-90, Math.min(90, rotation[1]));
+
+        projection.rotate(rotation);
+        redraw();
+
+        lastX = event.touches[0].clientX;
+        lastY = event.touches[0].clientY;
+
+        event.preventDefault();
+
+    }, { passive: false });
+}
 
 
-    /* لمس موبایل - چرخش با یک انگشت / زوم با دو انگشت */
+/* =========================================================
+   نقشه جهان (تخت، داخل کادر، با زوم +/-/⟳)
+========================================================= */
 
-    svgElement.addEventListener(
-        "touchstart",
-        event => {
-
-            if (event.touches.length === 2) {
-
-                pinching = true;
-                dragging = false;
-
-                pinchStartDistance =
-                    getTouchDistance(event.touches);
-
-                pinchStartScale =
-                    projection.scale();
-
-                return;
-            }
-
-            if (!event.touches.length) {
-                return;
-            }
-
-            dragging = true;
-
-            lastX =
-                event.touches[0].clientX;
-
-            lastY =
-                event.touches[0].clientY;
-        },
-        { passive: true }
-    );
+let mapInitialized = false;
+let mapZoomBehavior = null;
+let mapSvg = null;
+let mapContentGroup = null;
+let mapDefaultTransform = null;
 
 
-    svgElement.addEventListener(
-        "touchend",
-        event => {
+async function initWorldMap() {
 
-            dragging = false;
+    const box =
+        document.querySelector(".map-box");
 
-            if (event.touches.length < 2) {
-                pinching = false;
-            }
-        },
-        { passive: true }
-    );
+    const svgElement =
+        document.getElementById("map-globe");
 
+    if (!box || !svgElement) {
+        return;
+    }
 
-    svgElement.addEventListener(
-        "touchmove",
-        event => {
+    if (mapInitialized) {
+        updateMapColors();
+        return;
+    }
 
-            if (pinching && event.touches.length === 2) {
+    const width = box.clientWidth || 320;
+    const height = box.clientHeight || 300;
 
-                event.preventDefault();
+    let world;
 
-                const distance =
-                    getTouchDistance(event.touches);
+    try {
+        world = await loadWorldAtlas();
+    } catch (error) {
+        console.error("World map loading failed:", error);
+        return;
+    }
 
-                const ratio =
-                    distance / pinchStartDistance;
+    const land =
+        topojson.feature(world, world.objects.countries);
 
-                const next =
-                    pinchStartScale * ratio;
+    const projection =
+        d3.geoMercator()
+            .scale(width / 6.3)
+            .translate([width / 2, height / 1.5]);
 
-                projection.scale(
-                    Math.max(
-                        minScale,
-                        Math.min(maxScale, next)
-                    )
+    const path = d3.geoPath(projection);
+
+    mapSvg =
+        d3.select(svgElement)
+            .attr("viewBox", `0 0 ${width} ${height}`);
+
+    mapSvg.selectAll("*").remove();
+
+    mapContentGroup =
+        mapSvg.append("g")
+            .attr("class", "map-content");
+
+    /* کشورها */
+
+    mapContentGroup.selectAll(".map-country")
+        .data(land.features)
+        .enter()
+        .append("path")
+        .attr("class", "map-country")
+        .attr("d", path)
+        .attr("data-country-id", d => d.id)
+        .on("click", (event, d) => {
+
+            event.stopPropagation();
+
+            showCountryInfo(d);
+        });
+
+    updateMapColors();
+
+    /* اسم کشورهای قابل بازی */
+
+    mapContentGroup.selectAll(".map-country-label")
+        .data(
+            land.features.filter(d =>
+                Object.values(COUNTRY_IDS).includes(Number(d.id))
+            )
+        )
+        .enter()
+        .append("text")
+        .attr("class", "map-country-label")
+        .attr("text-anchor", "middle")
+        .attr("x", d => path.centroid(d)[0])
+        .attr("y", d => path.centroid(d)[1])
+        .text(d => {
+
+            const entry =
+                Object.entries(COUNTRY_IDS).find(
+                    ([, id]) => id === Number(d.id)
                 );
 
-                redraw();
+            return entry ? COUNTRY_NAMES[entry[0]] : "";
+        });
 
-                return;
-            }
+    /* اسم اقیانوس‌ها */
 
-            if (
-                !dragging ||
-                !event.touches.length
-            ) {
-                return;
-            }
+    mapContentGroup.selectAll(".map-ocean-label")
+        .data(OCEAN_LABELS)
+        .enter()
+        .append("text")
+        .attr("class", "map-ocean-label")
+        .attr("text-anchor", "middle")
+        .attr("x", d => (projection([d[0], d[1]]) || [0, 0])[0])
+        .attr("y", d => (projection([d[0], d[1]]) || [0, 0])[1])
+        .text(d => d[2]);
 
-            const dx =
-                event.touches[0].clientX - lastX;
+    /* تنگه‌ها */
 
-            const dy =
-                event.touches[0].clientY - lastY;
+    mapContentGroup.selectAll(".map-strait-dot")
+        .data(STRAITS)
+        .enter()
+        .append("circle")
+        .attr("class", "map-strait-dot")
+        .attr("r", 4)
+        .attr("cx", d => (projection([d.lon, d.lat]) || [0, 0])[0])
+        .attr("cy", d => (projection([d.lon, d.lat]) || [0, 0])[1])
+        .on("click", (event, d) => {
 
-            rotation[0] += dx * 0.5;
-            rotation[1] -= dy * 0.5;
+            event.stopPropagation();
 
-            rotation[1] =
-                Math.max(
-                    -90,
-                    Math.min(90, rotation[1])
+            showStraitInfo(d);
+        });
+
+    /* زوم و پن */
+
+    mapZoomBehavior =
+        d3.zoom()
+            .scaleExtent([1, 8])
+            .translateExtent([
+                [-width * 0.5, -height * 0.5],
+                [width * 1.5, height * 1.5]
+            ])
+            .on("zoom", event => {
+                mapContentGroup.attr(
+                    "transform",
+                    event.transform
+                );
+            });
+
+    mapSvg.call(mapZoomBehavior);
+
+    mapDefaultTransform = d3.zoomIdentity;
+
+    document.getElementById("map-zoom-in")
+        .addEventListener("click", () => {
+
+            mapSvg.transition()
+                .duration(200)
+                .call(mapZoomBehavior.scaleBy, 1.4);
+        });
+
+    document.getElementById("map-zoom-out")
+        .addEventListener("click", () => {
+
+            mapSvg.transition()
+                .duration(200)
+                .call(mapZoomBehavior.scaleBy, 1 / 1.4);
+        });
+
+    document.getElementById("map-reset")
+        .addEventListener("click", () => {
+
+            mapSvg.transition()
+                .duration(250)
+                .call(mapZoomBehavior.transform, mapDefaultTransform);
+        });
+
+    document.getElementById("map-info-close")
+        .addEventListener("click", () => {
+
+            document.getElementById("map-info-panel")
+                .classList.add("hidden");
+        });
+
+    mapInitialized = true;
+}
+
+
+function updateMapColors() {
+
+    if (!mapContentGroup) {
+        return;
+    }
+
+    mapContentGroup.selectAll(".map-country")
+        .attr("fill", d => {
+
+            const countryId = Number(d.id);
+
+            const gameEntry =
+                Object.entries(COUNTRY_IDS).find(
+                    ([, id]) => id === countryId
                 );
 
-            projection.rotate(rotation);
+            if (!gameEntry) {
+                return "#151b21";
+            }
 
-            redraw();
+            const [countryKey] = gameEntry;
 
-            lastX =
-                event.touches[0].clientX;
+            if (countryKey === selectedCountry) {
+                return "#d98a25";
+            }
 
-            lastY =
-                event.touches[0].clientY;
+            const info = countries[countryKey];
 
-            event.preventDefault();
+            if (info?.taken) {
+                return "#3978b7";
+            }
 
-        },
-        { passive: false }
-    );
+            return "#1c2733";
+        })
+        .attr("stroke", d => {
+
+            const countryId = Number(d.id);
+
+            const isGameCountry =
+                Object.values(COUNTRY_IDS).includes(countryId);
+
+            return isGameCountry ? "#2d3a48" : "#141c25";
+        })
+        .attr("stroke-width", .6);
+}
+
+
+function showCountryInfo(feature) {
+
+    const countryId = Number(feature.id);
+
+    const gameEntry =
+        Object.entries(COUNTRY_IDS).find(
+            ([, id]) => id === countryId
+        );
+
+    const panel = document.getElementById("map-info-panel");
+    const flagEl = document.getElementById("map-info-flag");
+    const nameEl = document.getElementById("map-info-name");
+    const statusEl = document.getElementById("map-info-status");
+    const descEl = document.getElementById("map-info-desc");
+
+    if (!gameEntry) {
+
+        flagEl.textContent = "🏳️";
+        nameEl.textContent = "منطقه غیرقابل‌بازی";
+        statusEl.textContent = "بی‌صاحب";
+        descEl.textContent =
+            "این منطقه در حال حاضر توسط هیچ بازیکنی کنترل نمی‌شود.";
+
+        panel.classList.remove("hidden");
+
+        return;
+    }
+
+    const [countryKey] = gameEntry;
+    const info = countries[countryKey];
+
+    flagEl.textContent = COUNTRY_FLAGS[countryKey];
+    nameEl.textContent = COUNTRY_NAMES[countryKey];
+
+    if (countryKey === selectedCountry) {
+
+        statusEl.textContent = "کشور شما";
+        descEl.textContent = "این کشور تحت فرماندهی شماست.";
+
+    } else if (info?.taken) {
+
+        statusEl.textContent = "در اختیار بازیکن دیگر";
+        descEl.textContent = "این کشور توسط بازیکن دیگری انتخاب شده است.";
+
+    } else {
+
+        statusEl.textContent = "بی‌صاحب";
+        descEl.textContent = "هنوز هیچ بازیکنی این کشور را انتخاب نکرده است.";
+    }
+
+    panel.classList.remove("hidden");
+}
+
+
+function showStraitInfo(strait) {
+
+    const panel = document.getElementById("map-info-panel");
+    const flagEl = document.getElementById("map-info-flag");
+    const nameEl = document.getElementById("map-info-name");
+    const statusEl = document.getElementById("map-info-status");
+    const descEl = document.getElementById("map-info-desc");
+
+    flagEl.textContent = "⚓";
+    nameEl.textContent = strait.name;
+    statusEl.textContent = "تحت کنترل هیچ‌کس نیست";
+    descEl.textContent = strait.desc;
+
+    panel.classList.remove("hidden");
 }
 
 
