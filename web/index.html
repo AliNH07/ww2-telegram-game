@@ -125,12 +125,6 @@
 
     </header>
 
-    <div class="back-bar">
-        <button id="preview-back-button" class="back-button">
-            → بازگشت به انتخاب کشور
-        </button>
-    </div>
-
     <div class="preview-content">
 
         <div class="preview-title">
@@ -173,6 +167,11 @@
 
     </header>
 
+    <!-- ردیف دکمه بازگشت -->
+    <div class="back-row">
+        <button id="back-button" class="back-button">⬅ بازگشت</button>
+    </div>
+
 
     <!-- خانه -->
 
@@ -214,13 +213,13 @@
     </main>
 
 
-    <!-- نقشه -->
+    <!-- نقشه جهانی -->
 
     <main id="map" class="game-page hidden">
 
         <div class="page-title">
             <span>جبهه‌های جنگ</span>
-            <h1>نقشه جهان</h1>
+            <h1>نقشه جهانی</h1>
         </div>
 
         <div id="map-globe-container" class="globe-container">
@@ -230,26 +229,90 @@
     </main>
 
 
+    <!-- اخبار -->
+
+    <main id="news" class="game-page hidden">
+
+        <div class="page-title">
+            <span>آخرین رویدادها</span>
+            <h1>اخبار</h1>
+        </div>
+
+        <div id="news-list"></div>
+
+    </main>
+
+
     <!-- ارتباطات -->
 
     <main id="communications" class="game-page hidden">
 
-        <div class="page-title">
-            <span>روابط بین کشورها</span>
-            <h1>ارتباطات</h1>
+        <!-- بخش اصلی ارتباطات -->
+        <div id="communications-main">
+
+            <div class="page-title">
+                <span>روابط بین کشورها</span>
+                <h1>ارتباطات</h1>
+            </div>
+
+            <div class="comm-buttons">
+
+                <button id="comm-news-button" class="comm-button">
+                    <span>📰</span>
+                    <div>
+                        <h3>اخبار</h3>
+                        <p>آخرین رویدادهای جهان</p>
+                    </div>
+                </button>
+
+                <button id="comm-message-button" class="comm-button">
+                    <span>✉️</span>
+                    <div>
+                        <h3>ارسال پیام به کشورها</h3>
+                        <p>مذاکره و دیپلماسی</p>
+                    </div>
+                </button>
+
+            </div>
+
         </div>
 
-        <div class="comm-tabs">
-            <button class="comm-tab active" data-tab="comm-news">اخبار</button>
-            <button class="comm-tab" data-tab="comm-contacts">پیام به کشورها</button>
-        </div>
+        <!-- زیرصفحه ارسال پیام -->
+        <div id="communications-sub" class="hidden">
 
-        <div id="comm-news" class="comm-panel">
-            <div id="news-list" class="news-list"></div>
-        </div>
+            <div class="page-title">
+                <span>دیپلماسی</span>
+                <h1>ارسال پیام</h1>
+            </div>
 
-        <div id="comm-contacts" class="comm-panel hidden">
-            <div id="contact-list" class="contact-list"></div>
+            <div class="message-form">
+
+                <label for="message-target">کشور هدف</label>
+
+                <select id="message-target">
+                    <option value="">انتخاب کنید...</option>
+                    <option value="germany">🇩🇪 آلمان</option>
+                    <option value="britain">🇬🇧 بریتانیا</option>
+                    <option value="ussr">☭ شوروی</option>
+                    <option value="usa">🇺🇸 آمریکا</option>
+                    <option value="france">🇫🇷 فرانسه</option>
+                    <option value="italy">🇮🇹 ایتالیا</option>
+                </select>
+
+                <label for="message-text">متن پیام</label>
+
+                <textarea id="message-text" rows="5" placeholder="پیام خود را بنویسید..."></textarea>
+
+                <button id="send-message-button" class="primary-game-button">
+                    ارسال پیام
+                </button>
+
+                <button id="comm-back-button" class="secondary-button">
+                    بازگشت
+                </button>
+
+            </div>
+
         </div>
 
     </main>
@@ -272,7 +335,8 @@
     </main>
 
 
-    <!-- منوی پایین -->
+    <!-- منوی پایین (فوتر) -->
+    <!-- ترتیب از راست به چپ: اشتراک | نقشه جهانی | خانه | ارتباطات -->
 
     <nav class="bottom-nav">
 
@@ -283,7 +347,7 @@
 
         <button class="nav-item" data-page="map">
             <span>🗺️</span>
-            <small>نقشه</small>
+            <small>نقشه جهانی</small>
         </button>
 
         <button class="nav-item active" data-page="home">
