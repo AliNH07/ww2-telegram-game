@@ -1,3 +1,7 @@
+// ---------------------------------------
+// اطلاعات بازیکن
+// ---------------------------------------
+
 let player = {
     country: null,
     money: 1000,
@@ -7,7 +11,7 @@ let player = {
 
 
 // ---------------------------------------
-// Telegram
+// Telegram WebApp
 // ---------------------------------------
 
 const tg = window.Telegram
@@ -25,11 +29,8 @@ if (tg) {
         tg.initDataUnsafe &&
         tg.initDataUnsafe.user
     ) {
-
         userId = tg.initDataUnsafe.user.id;
-
     }
-
 }
 
 
@@ -39,39 +40,17 @@ if (tg) {
 
 function showPage(pageName) {
 
-    const pages =
-        document.querySelectorAll(".page");
+    const pages = document.querySelectorAll(".page");
 
     pages.forEach(page => {
-
-        page.classList.remove("active");
-
+        page.style.display = "none";
     });
 
+    const target = document.getElementById(pageName);
 
-    const selected =
-        document.getElementById(pageName);
-
-    if (selected) {
-
-        selected.classList.add("active");
-
+    if (target) {
+        target.style.display = "block";
     }
-
-
-    if (pageName === "news") {
-
-        loadNews();
-
-    }
-
-
-    if (pageName === "country") {
-
-        loadCountries();
-
-    }
-
 }
 
 
@@ -82,37 +61,40 @@ function showPage(pageName) {
 async function loadPlayer() {
 
     if (!userId) {
-
-        updatePlayerUI();
-
+        console.log("Telegram user ID پیدا نشد.");
         return;
-
     }
-
 
     try {
 
-        const response =
-            await fetch(
-                `/api/player?user_id=${userId}`
-            );
+        const response = await fetch(
+            `/api/player?user_id=${userId}`
+        );
 
-        player =
-            await response.json();
+        const data = await response.json();
+
+        player = data;
 
         updatePlayerUI();
 
-    }
+        // اگر کشور انتخاب نشده
+        if (!player.country) {
 
-    catch (error) {
+            showCountrySelection();
+
+        } else {
+
+            showGame();
+
+        }
+
+    } catch (error) {
 
         console.error(
-            "Player error:",
+            "خطا در دریافت بازیکن:",
             error
         );
-
     }
-
 }
 
 
@@ -122,56 +104,101 @@ async function loadPlayer() {
 
 function updatePlayerUI() {
 
-    const money =
-        document.getElementById("money");
-
-    const army =
-        document.getElementById("army");
-
-    const year =
-        document.getElementById("year");
-
-
-    if (money) {
-
-        money.textContent =
-            player.money ?? 1000;
-
-    }
-
-
-    if (army) {
-
-        army.textContent =
-            player.army ?? 500;
-
-    }
-
-
-    if (year) {
-
-        year.textContent =
-            player.year ?? 1939;
-
-    }
-
-
-    if (player.country) {
-
-        loadCountryName(
-            player.country
+    const moneyElements =
+        document.querySelectorAll(
+            "[data-money]"
         );
 
-    }
+    moneyElements.forEach(element => {
 
+        element.textContent =
+            player.money;
+    });
+
+
+    const armyElements =
+        document.querySelectorAll(
+            "[data-army]"
+        );
+
+    armyElements.forEach(element => {
+
+        element.textContent =
+            player.army;
+    });
 }
 
 
 // ---------------------------------------
-// نمایش اسم کشور
+// نمایش صفحه انتخاب کشور
 // ---------------------------------------
 
-async function loadCountryName(id) {
+function showCountrySelection() {
+
+    console.log(
+        "بازیکن هنوز کشور انتخاب نکرده است."
+    );
+
+    // بخش انتخاب کشور را نشان بده
+    const countryPage =
+        document.getElementById("country");
+
+    if (countryPage) {
+        countryPage.style.display = "block";
+    }
+
+    // بقیه صفحات را مخفی کن
+    const pages =
+        document.querySelectorAll(".page");
+
+    pages.forEach(page => {
+
+        if (page.id !== "country") {
+            page.style.display = "none";
+        }
+
+    });
+
+    // منوی پایین را مخفی کن
+    const nav =
+        document.querySelector(".bottom-nav");
+
+    if (nav) {
+        nav.style.display = "none";
+    }
+
+    // دریافت وضعیت کشورها
+    loadCountries();
+}
+
+
+// ---------------------------------------
+// نمایش بازی بعد از انتخاب کشور
+// ---------------------------------------
+
+function showGame() {
+
+    console.log(
+        "کشور بازیکن:",
+        player.country
+    );
+
+    const nav =
+        document.querySelector(".bottom-nav");
+
+    if (nav) {
+        nav.style.display = "flex";
+    }
+
+    showPage("home");
+}
+
+
+// ---------------------------------------
+// دریافت کشورهای بازی
+// ---------------------------------------
+
+async function loadCountries() {
 
     try {
 
@@ -181,139 +208,224 @@ async function loadCountryName(id) {
         const countries =
             await response.json();
 
+        updateCountryMap(countries);
 
-        if (countries[id]) {
-
-            const countryName =
-                document.getElementById(
-                    "countryName"
-                );
-
-
-            if (countryName) {
-
-                countryName.textContent =
-                    countries[id].name;
-
-            }
-
-        }
-
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(
-            "Country name error:",
+            "خطا در دریافت کشورها:",
             error
         );
-
     }
-
 }
 
 
 // ---------------------------------------
-// دریافت کشورها
+// بروزرسانی نقشه کشورها
 // ---------------------------------------
 
-async function loadCountries() {
+function updateCountryMap(countries) {
 
-    const container =
-        document.getElementById(
-            "countriesList"
-        );
+    /*
+        این قسمت کشورها را پیدا می‌کند.
 
+        برای اینکه با ساختار فعلی نقشه
+        سازگار باشد، چند روش مختلف
+        برای پیدا کردن country استفاده می‌کنیم.
+    */
 
-    if (!container) {
+    Object.keys(countries).forEach(countryId => {
 
-        return;
+        const country =
+            countries[countryId];
 
-    }
-
-
-    container.innerHTML =
-        "در حال دریافت کشورها...";
-
-
-    try {
-
-        const response =
-            await fetch(
-                "/api/countries"
+        const elements =
+            document.querySelectorAll(
+                `[data-country="${countryId}"]`
             );
 
-        const countries =
-            await response.json();
+        elements.forEach(element => {
 
-
-        container.innerHTML = "";
-
-
-        Object.entries(countries)
-            .forEach(
-                ([id, country]) => {
-
-                    const div =
-                        document.createElement(
-                            "div"
-                        );
-
-
-                    div.className =
-                        "country-option";
-
-
-                    div.innerHTML = `
-
-                        <h3>
-                            ${country.name}
-                        </h3>
-
-                        <p>
-                            💰 اقتصاد:
-                            ${country.economy}
-                        </p>
-
-                        <p>
-                            ⚔️ ارتش:
-                            ${country.army}
-                        </p>
-
-                        <p>
-                            👥 جمعیت:
-                            ${country.population.toLocaleString()}
-                        </p>
-
-                    `;
-
-
-                    div.onclick = () => {
-
-                        selectCountry(id);
-
-                    };
-
-
-                    container.appendChild(div);
-
-                }
+            // پاک کردن وضعیت‌های قبلی
+            element.classList.remove(
+                "country-taken"
             );
 
+            element.classList.remove(
+                "country-owned"
+            );
+
+            // -----------------------------------
+            // کشور گرفته شده
+            // -----------------------------------
+
+            if (country.taken) {
+
+                element.classList.add(
+                    "country-taken"
+                );
+
+                element.style.opacity = "0.25";
+                element.style.filter =
+                    "grayscale(100%)";
+
+                element.style.cursor =
+                    "not-allowed";
+
+                element.onclick = function () {
+
+                    showTakenCountryMessage(
+                        country.name
+                    );
+
+                };
+
+            }
+
+            // -----------------------------------
+            // کشور خود بازیکن
+            // -----------------------------------
+
+            else if (
+                player.country === countryId
+            ) {
+
+                element.classList.add(
+                    "country-owned"
+                );
+
+                element.style.opacity = "1";
+                element.style.filter =
+                    "none";
+
+                element.style.cursor =
+                    "default";
+
+                element.onclick = null;
+
+            }
+
+            // -----------------------------------
+            // کشور آزاد
+            // -----------------------------------
+
+            else {
+
+                element.style.opacity = "1";
+
+                element.style.filter =
+                    "none";
+
+                element.style.cursor =
+                    "pointer";
+
+                element.onclick = function () {
+
+                    selectCountry(
+                        countryId
+                    );
+
+                };
+
+            }
+
+        });
+
+    });
+
+
+    /*
+        اگر نقشه از دکمه یا کارت به جای
+        data-country استفاده کند، این قسمت
+        کارت‌های کشور را هم بروزرسانی می‌کند.
+    */
+
+    document
+        .querySelectorAll("[data-country-card]")
+        .forEach(card => {
+
+            const countryId =
+                card.dataset.countryCard;
+
+            const country =
+                countries[countryId];
+
+            if (!country) {
+                return;
+            }
+
+            if (country.taken) {
+
+                card.classList.add(
+                    "country-taken"
+                );
+
+                card.style.opacity = "0.35";
+
+                card.style.filter =
+                    "grayscale(100%)";
+
+                card.style.cursor =
+                    "not-allowed";
+
+                card.onclick = function () {
+
+                    showTakenCountryMessage(
+                        country.name
+                    );
+
+                };
+
+            } else {
+
+                card.classList.remove(
+                    "country-taken"
+                );
+
+                card.style.opacity = "1";
+
+                card.style.filter =
+                    "none";
+
+                card.style.cursor =
+                    "pointer";
+
+                card.onclick = function () {
+
+                    selectCountry(
+                        countryId
+                    );
+
+                };
+
+            }
+
+        });
+}
+
+
+// ---------------------------------------
+// پیام کشور گرفته شده
+// ---------------------------------------
+
+function showTakenCountryMessage(
+    countryName
+) {
+
+    const message =
+        `${countryName}\n\n` +
+        `🔒 این کشور قبلاً توسط ` +
+        `بازیکن دیگری انتخاب شده است.`;
+
+    if (tg && tg.showAlert) {
+
+        tg.showAlert(message);
+
+    } else {
+
+        alert(message);
+
     }
-
-    catch (error) {
-
-        console.error(
-            "Countries error:",
-            error
-        );
-
-        container.innerHTML =
-            "خطا در دریافت کشورها.";
-
-    }
-
 }
 
 
@@ -326,11 +438,21 @@ async function selectCountry(countryId) {
     if (!userId) {
 
         alert(
-            "این بازی باید از داخل تلگرام اجرا شود."
+            "شناسه کاربر تلگرام پیدا نشد."
         );
 
         return;
+    }
 
+
+    // اگر خود بازیکن قبلاً کشور دارد
+    if (player.country) {
+
+        showTakenCountryMessage(
+            "شما قبلاً یک کشور انتخاب کرده‌اید."
+        );
+
+        return;
     }
 
 
@@ -341,133 +463,198 @@ async function selectCountry(countryId) {
                 `/api/select-country?user_id=${userId}&country=${countryId}`
             );
 
-
         const data =
             await response.json();
 
+
+        // -----------------------------------
+        // کشور قبلاً گرفته شده
+        // -----------------------------------
+
+        if (
+            response.status === 409 &&
+            data.error === "country_taken"
+        ) {
+
+            if (tg && tg.showAlert) {
+
+                tg.showAlert(
+                    "🔒 این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."
+                );
+
+            } else {
+
+                alert(
+                    "🔒 این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."
+                );
+
+            }
+
+            // نقشه را دوباره از سرور بگیر
+            await loadCountries();
+
+            return;
+        }
+
+
+        // -----------------------------------
+        // بازیکن قبلاً کشور دارد
+        // -----------------------------------
+
+        if (
+            response.status === 409 &&
+            data.error === "already_has_country"
+        ) {
+
+            player =
+                data.player;
+
+            showGame();
+
+            return;
+        }
+
+
+        // -----------------------------------
+        // خطای عمومی
+        // -----------------------------------
+
+        if (!response.ok) {
+
+            alert(
+                data.message ||
+                data.error ||
+                "خطایی رخ داد."
+            );
+
+            return;
+        }
+
+
+        // -----------------------------------
+        // انتخاب موفق
+        // -----------------------------------
 
         if (data.success) {
 
             player =
                 data.player;
 
+            console.log(
+                "کشور با موفقیت انتخاب شد:",
+                player.country
+            );
 
-            updatePlayerUI();
+
+            // دوباره کشورها را از سرور بگیر
+            await loadCountries();
 
 
-            showPage("home");
+            // ورود به بازی
+            showGame();
+
+
+            if (tg && tg.showPopup) {
+
+                tg.showPopup({
+                    title: "انتخاب کشور",
+                    message:
+                        "کشور شما با موفقیت انتخاب شد.",
+                    buttons: [
+                        {
+                            type: "ok"
+                        }
+                    ]
+                });
+
+            }
 
         }
 
-    }
-
-    catch (error) {
+    } catch (error) {
 
         console.error(
-            "Select country error:",
+            "خطا در انتخاب کشور:",
             error
         );
 
         alert(
-            "خطا در انتخاب کشور."
+            "ارتباط با سرور برقرار نشد."
         );
-
     }
-
 }
 
 
 // ---------------------------------------
-// دریافت اخبار
+// دریافت نام کشور
 // ---------------------------------------
 
-async function loadNews() {
-
-    const container =
-        document.getElementById(
-            "newsList"
-        );
-
-
-    if (!container) {
-
-        return;
-
-    }
-
-
-    container.innerHTML =
-        "در حال دریافت اخبار...";
-
+async function loadCountryName(countryId) {
 
     try {
 
         const response =
-            await fetch(
-                "/api/news"
-            );
+            await fetch("/api/countries");
 
-        const news =
+        const countries =
             await response.json();
 
+        if (
+            countries[countryId]
+        ) {
 
-        container.innerHTML = "";
+            return countries[countryId].name;
 
+        }
 
-        news.forEach(item => {
+    } catch (error) {
 
-            const div =
-                document.createElement(
-                    "div"
-                );
-
-
-            div.className =
-                "news-item";
-
-
-            div.innerHTML = `
-
-                <div class="news-country">
-                    ${item.country}
-                </div>
-
-                <div class="news-title">
-                    ${item.title}
-                </div>
-
-                <div class="news-text">
-                    ${item.text}
-                </div>
-
-            `;
-
-
-            container.appendChild(div);
-
-        });
+        console.error(error);
 
     }
 
-    catch (error) {
-
-        console.error(
-            "News error:",
-            error
-        );
-
-        container.innerHTML =
-            "خطا در دریافت اخبار.";
-
-    }
-
+    return countryId;
 }
 
 
 // ---------------------------------------
-// شروع بازی
+// اخبار
 // ---------------------------------------
 
-loadPlayer();
+async function loadNews() {
 
-showPage("home");
+    try {
+
+        const response =
+            await fetch("/api/news");
+
+        const news =
+            await response.json();
+
+        console.log(
+            "News:",
+            news
+        );
+
+    } catch (error) {
+
+        console.error(
+            "خطا در دریافت اخبار:",
+            error
+        );
+    }
+}
+
+
+// ---------------------------------------
+// شروع برنامه
+// ---------------------------------------
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        loadPlayer();
+
+    }
+);
