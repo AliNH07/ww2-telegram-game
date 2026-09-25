@@ -1,15 +1,30 @@
 import asyncio
 import logging
+import os
+
 from aiohttp import web
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    WebAppInfo,
+)
 
 from config import BOT_TOKEN
 
 
+# ---------------------------------------
+# Logging
+# ---------------------------------------
+
 logging.basicConfig(level=logging.INFO)
+
+
+# ---------------------------------------
+# Telegram Bot
+# ---------------------------------------
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -79,31 +94,31 @@ NEWS = [
     {
         "country": "🌍 جهان",
         "title": "آغاز دوره جدید تنش در اروپا",
-        "text": "کشورهای اروپایی در حال افزایش آمادگی نظامی خود هستند."
+        "text": "کشورهای اروپایی در حال افزایش آمادگی نظامی خود هستند.",
     },
 
     {
         "country": "🇩🇪 آلمان",
         "title": "افزایش تولید نظامی",
-        "text": "کارخانه‌های نظامی آلمان فعالیت خود را افزایش داده‌اند."
+        "text": "کارخانه‌های نظامی آلمان فعالیت خود را افزایش داده‌اند.",
     },
 
     {
         "country": "🇬🇧 بریتانیا",
         "title": "افزایش آمادگی دفاعی",
-        "text": "بریتانیا نیروهای خود را در وضعیت آماده‌باش قرار داده است."
+        "text": "بریتانیا نیروهای خود را در وضعیت آماده‌باش قرار داده است.",
     },
 
     {
         "country": "🇷🇺 شوروی",
         "title": "گسترش نیروهای ارتش",
-        "text": "واحدهای جدید ارتش شوروی در حال سازماندهی هستند."
+        "text": "واحدهای جدید ارتش شوروی در حال سازماندهی هستند.",
     },
 
     {
         "country": "🇺🇸 آمریکا",
         "title": "رشد تولید صنعتی",
-        "text": "ظرفیت صنعتی آمریکا در حال افزایش است."
+        "text": "ظرفیت صنعتی آمریکا در حال افزایش است.",
     },
 ]
 
@@ -132,8 +147,8 @@ async def start(message: types.Message):
                 InlineKeyboardButton(
                     text="🎮 ورود به بازی",
                     web_app=WebAppInfo(
-                        url="https://YOUR-RENDER-URL.onrender.com"
-                    )
+                        url="https://ww2-telegram-game.onrender.com"
+                    ),
                 )
             ]
         ]
@@ -146,12 +161,12 @@ async def start(message: types.Message):
         "و در آینده وارد جنگ شوید.\n\n"
         "برای شروع روی دکمه زیر بزنید 👇",
         reply_markup=keyboard,
-        parse_mode="HTML"
+        parse_mode="HTML",
     )
 
 
 # ---------------------------------------
-# API
+# API بازیکن
 # ---------------------------------------
 
 async def player_api(request):
@@ -159,16 +174,20 @@ async def player_api(request):
     user_id = request.query.get("user_id")
 
     if not user_id:
-        return web.json_response({
-            "error": "user_id missing"
-        }, status=400)
+        return web.json_response(
+            {"error": "user_id missing"},
+            status=400,
+        )
 
     try:
         user_id = int(user_id)
+
     except ValueError:
-        return web.json_response({
-            "error": "invalid user_id"
-        }, status=400)
+
+        return web.json_response(
+            {"error": "invalid user_id"},
+            status=400,
+        )
 
     if user_id not in players:
 
@@ -179,9 +198,7 @@ async def player_api(request):
             "year": 1939,
         }
 
-    player = players[user_id]
-
-    return web.json_response(player)
+    return web.json_response(players[user_id])
 
 
 # ---------------------------------------
@@ -213,23 +230,27 @@ async def select_country(request):
 
     if not user_id or not country_id:
 
-        return web.json_response({
-            "error": "missing data"
-        }, status=400)
+        return web.json_response(
+            {"error": "missing data"},
+            status=400,
+        )
 
     try:
         user_id = int(user_id)
+
     except ValueError:
 
-        return web.json_response({
-            "error": "invalid user"
-        }, status=400)
+        return web.json_response(
+            {"error": "invalid user"},
+            status=400,
+        )
 
     if country_id not in COUNTRIES:
 
-        return web.json_response({
-            "error": "country not found"
-        }, status=404)
+        return web.json_response(
+            {"error": "country not found"},
+            status=404,
+        )
 
     if user_id not in players:
 
@@ -241,15 +262,15 @@ async def select_country(request):
         }
 
     players[user_id]["country"] = country_id
-
     players[user_id]["money"] = COUNTRIES[country_id]["economy"]
-
     players[user_id]["army"] = COUNTRIES[country_id]["army"]
 
-    return web.json_response({
-        "success": True,
-        "player": players[user_id]
-    })
+    return web.json_response(
+        {
+            "success": True,
+            "player": players[user_id],
+        }
+    )
 
 
 # ---------------------------------------
@@ -258,7 +279,9 @@ async def select_country(request):
 
 async def health(request):
 
-    return web.Response(text="WW2 Game is running!")
+    return web.Response(
+        text="WW2 Game is running!"
+    )
 
 
 # ---------------------------------------
@@ -269,41 +292,80 @@ async def start_web_server():
 
     app = web.Application()
 
-    app.router.add_get("/", lambda request: web.FileResponse(
-        "web/index.html"
-    ))
+    # صفحه اصلی بازی
+    app.router.add_get(
+        "/",
+        lambda request: web.FileResponse(
+            "web/index.html"
+        ),
+    )
 
-    app.router.add_get("/style.css", lambda request: web.FileResponse(
-        "web/style.css"
-    ))
+    # CSS
+    app.router.add_get(
+        "/style.css",
+        lambda request: web.FileResponse(
+            "web/style.css"
+        ),
+    )
 
-    app.router.add_get("/app.js", lambda request: web.FileResponse(
-        "web/app.js"
-    ))
+    # JavaScript
+    app.router.add_get(
+        "/app.js",
+        lambda request: web.FileResponse(
+            "web/app.js"
+        ),
+    )
 
-    app.router.add_get("/api/player", player_api)
+    # APIها
+    app.router.add_get(
+        "/api/player",
+        player_api,
+    )
 
-    app.router.add_get("/api/countries", countries_api)
+    app.router.add_get(
+        "/api/countries",
+        countries_api,
+    )
 
-    app.router.add_get("/api/news", news_api)
+    app.router.add_get(
+        "/api/news",
+        news_api,
+    )
 
-    app.router.add_get("/api/select-country", select_country)
+    app.router.add_get(
+        "/api/select-country",
+        select_country,
+    )
 
-    app.router.add_get("/health", health)
+    # Health check
+    app.router.add_get(
+        "/health",
+        health,
+    )
 
     runner = web.AppRunner(app)
 
     await runner.setup()
 
+    # Render پورت را از متغیر PORT می‌دهد
+    port = int(
+        os.environ.get(
+            "PORT",
+            8080,
+        )
+    )
+
     site = web.TCPSite(
         runner,
         "0.0.0.0",
-        8080
+        port,
     )
 
     await site.start()
 
-    print("Web server started on port 8080")
+    print(
+        f"Web server started on port {port}"
+    )
 
 
 # ---------------------------------------
@@ -318,6 +380,10 @@ async def main():
 
     await dp.start_polling(bot)
 
+
+# ---------------------------------------
+# Start
+# ---------------------------------------
 
 if __name__ == "__main__":
 
