@@ -125,6 +125,12 @@
 
     </header>
 
+    <div class="back-bar">
+        <button id="preview-back-button" class="back-button">
+            → بازگشت به انتخاب کشور
+        </button>
+    </div>
+
     <div class="preview-content">
 
         <div class="preview-title">
@@ -224,20 +230,6 @@
     </main>
 
 
-    <!-- اخبار -->
-
-    <main id="news" class="game-page hidden">
-
-        <div class="page-title">
-            <span>آخرین رویدادها</span>
-            <h1>اخبار</h1>
-        </div>
-
-        <div id="news-list"></div>
-
-    </main>
-
-
     <!-- ارتباطات -->
 
     <main id="communications" class="game-page hidden">
@@ -247,8 +239,17 @@
             <h1>ارتباطات</h1>
         </div>
 
-        <div class="empty-page">
-            ارتباطات دیپلماتیک
+        <div class="comm-tabs">
+            <button class="comm-tab active" data-tab="comm-news">اخبار</button>
+            <button class="comm-tab" data-tab="comm-contacts">پیام به کشورها</button>
+        </div>
+
+        <div id="comm-news" class="comm-panel">
+            <div id="news-list" class="news-list"></div>
+        </div>
+
+        <div id="comm-contacts" class="comm-panel hidden">
+            <div id="contact-list" class="contact-list"></div>
         </div>
 
     </main>
@@ -275,9 +276,14 @@
 
     <nav class="bottom-nav">
 
-        <button class="nav-item" data-page="news">
-            <span>📰</span>
-            <small>اخبار</small>
+        <button class="nav-item" data-page="subscription">
+            <span>♛</span>
+            <small>اشتراک</small>
+        </button>
+
+        <button class="nav-item" data-page="map">
+            <span>🗺️</span>
+            <small>نقشه</small>
         </button>
 
         <button class="nav-item active" data-page="home">
@@ -288,11 +294,6 @@
         <button class="nav-item" data-page="communications">
             <span>💬</span>
             <small>ارتباطات</small>
-        </button>
-
-        <button class="nav-item" data-page="subscription">
-            <span>♛</span>
-            <small>اشتراک</small>
         </button>
 
     </nav>
