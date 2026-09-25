@@ -40,6 +40,15 @@ const COUNTRY_IDS = {
     italy: 380
 };
 
+const SECTION_NAMES = {
+    war: "جنگ",
+    army: "ارتش",
+    diplomacy: "دیپلماسی",
+    economy: "اقتصاد",
+    infrastructure: "زیرساخت",
+    market: "بازار جهانی"
+};
+
 
 /* =========================================================
    ابزارهای عمومی
@@ -71,6 +80,12 @@ function getApiUrl(path, params = {}) {
 }
 
 
+function formatMoney(value) {
+
+    return "$" + Number(value ?? 0).toLocaleString("en-US");
+}
+
+
 /* =========================================================
    دریافت بازیکن
 ========================================================= */
@@ -97,6 +112,11 @@ async function loadPlayer() {
         player = await response.json();
 
         if (player.country) {
+
+            /*
+             * بازیکنی که قبلاً واقعاً وارد بازی شده
+             * (کشورش در بک‌اند ثبت شده است).
+             */
 
             selectedCountry = player.country;
 
@@ -196,12 +216,12 @@ function updateCountryCards() {
 
 
 /* =========================================================
-   انتخاب کشور
+   انتخاب کشور (فقط پیش‌نمایش - هنوز چیزی ثبت نمی‌شود)
 ========================================================= */
 
 document.querySelectorAll("[data-country-card]").forEach(card => {
 
-    card.addEventListener("click", async () => {
+    card.addEventListener("click", () => {
 
         const countryId = card.dataset.country;
 
@@ -216,77 +236,11 @@ document.querySelectorAll("[data-country-card]").forEach(card => {
             return;
         }
 
-        await selectCountry(countryId);
-    });
-});
-
-
-async function selectCountry(countryId) {
-
-    if (!userId) {
-
-        showMessage(
-            "برای اجرای بازی باید از داخل تلگرام وارد شوید."
-        );
-
-        return;
-    }
-
-    try {
-
-        const response = await fetch(
-            getApiUrl("/api/select-country", {
-                user_id: userId,
-                country: countryId
-            })
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-
-            if (data.error === "country_taken") {
-
-                showMessage(
-                    "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."
-                );
-
-                await loadCountries();
-
-                return;
-            }
-
-            if (data.error === "already_has_country") {
-
-                showMessage(
-                    "شما قبلاً یک کشور انتخاب کرده‌اید."
-                );
-
-                return;
-            }
-
-            throw new Error(
-                data.error || "Country selection failed"
-            );
-        }
-
-        player = data;
-
         selectedCountry = countryId;
 
-        await loadCountries();
-
         showCountryPreview();
-
-    } catch (error) {
-
-        console.error(error);
-
-        showMessage(
-            "خطا در انتخاب کشور. دوباره امتحان کنید."
-        );
-    }
-}
+    });
+});
 
 
 /* =========================================================
@@ -350,27 +304,116 @@ function showCountryPreview() {
 
 
 /* =========================================================
-   دکمه بازگشت
+   دکمه بازگشت (فقط تغییر انتخاب محلی، چیزی در بک‌اند تغییر نمی‌کند)
 ========================================================= */
 
 document
     .getElementById("preview-back-button")
     .addEventListener("click", () => {
 
+        selectedCountry = null;
+
         showCountrySelection();
     });
 
 
 /* =========================================================
-   ورود به بازی
+   ورود به بازی -> اینجاست که کشور واقعاً برای کاربر ثبت می‌شود
 ========================================================= */
 
 document
     .getElementById("enter-game-button")
-    .addEventListener("click", () => {
+    .addEventListener("click", async () => {
+
+        await confirmCountrySelection();
+    });
+
+
+async function confirmCountrySelection() {
+
+    if (!userId) {
+
+        alert(
+            "برای اجرای بازی باید از داخل تلگرام وارد شوید."
+        );
+
+        return;
+    }
+
+
+    /*
+     * اگر این بازیکن قبلاً همین کشور را
+     * در بک‌اند ثبت کرده (مثلاً بعد از رفرش صفحه)،
+     * نیازی به فراخوانی دوباره API نیست.
+     */
+
+    if (player?.country === selectedCountry) {
 
         showGame();
-    });
+
+        return;
+    }
+
+
+    try {
+
+        const response = await fetch(
+            getApiUrl("/api/select-country", {
+                user_id: userId,
+                country: selectedCountry
+            })
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+
+            if (data.error === "country_taken") {
+
+                alert(
+                    "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."
+                );
+
+                selectedCountry = null;
+
+                await loadCountries();
+
+                showCountrySelection();
+
+                return;
+            }
+
+            if (data.error === "already_has_country") {
+
+                alert(
+                    "شما قبلاً یک کشور انتخاب کرده‌اید."
+                );
+
+                await loadPlayer();
+
+                return;
+            }
+
+            throw new Error(
+                data.error || "Country selection failed"
+            );
+        }
+
+        player = data.player;
+
+        await loadCountries();
+
+        showGame();
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert(
+            "خطا در ورود به بازی. دوباره امتحان کنید."
+        );
+    }
+}
 
 
 function showGame() {
@@ -379,12 +422,6 @@ function showGame() {
 
     updateGameHeader();
     updateHomeStats();
-
-    createGlobe(
-        "globe-container",
-        "globe",
-        selectedCountry
-    );
 }
 
 
@@ -414,40 +451,48 @@ function updateHomeStats() {
     }
 
     document.getElementById(
-        "home-economy"
+        "home-money"
     ).textContent =
-        player.money ?? 0;
+        formatMoney(player.money);
 
     document.getElementById(
         "home-army"
     ).textContent =
         player.army ?? 0;
 
-    const country =
-        countries[selectedCountry];
+    document.getElementById(
+        "home-power"
+    ).textContent =
+        player.power ?? 0;
 
     document.getElementById(
-        "home-population"
+        "home-season"
     ).textContent =
-        country?.population
-            ? formatPopulation(country.population)
-            : "0";
+        player.season ?? "بهار";
 
     document.getElementById(
-        "home-year"
+        "home-day"
     ).textContent =
-        player.year ?? 1939;
+        `${player.day ?? 1} / 31`;
 }
 
 
-function formatPopulation(value) {
+/* =========================================================
+   باکس‌های جنگ / ارتش / دیپلماسی / ...
+========================================================= */
 
-    if (value >= 1000000) {
-        return Math.round(value / 1000000) + "M";
-    }
+document.querySelectorAll(".action-card").forEach(card => {
 
-    return value;
-}
+    card.addEventListener("click", () => {
+
+        const section = card.dataset.section;
+
+        const name =
+            SECTION_NAMES[section] || section;
+
+        alert(`بخش ${name} به‌زودی فعال می‌شود.`);
+    });
+});
 
 
 /* =========================================================
@@ -483,15 +528,7 @@ document.querySelectorAll(".nav-item").forEach(item => {
 
         if (page === "home") {
 
-            setTimeout(() => {
-
-                createGlobe(
-                    "globe-container",
-                    "globe",
-                    selectedCountry
-                );
-
-            }, 50);
+            updateHomeStats();
         }
 
         if (page === "map") {
@@ -682,6 +719,18 @@ async function loadNews() {
    کره جهان
 ========================================================= */
 
+function getTouchDistance(touches) {
+
+    const dx =
+        touches[0].clientX - touches[1].clientX;
+
+    const dy =
+        touches[0].clientY - touches[1].clientY;
+
+    return Math.hypot(dx, dy);
+}
+
+
 async function createGlobe(
     containerId,
     svgId,
@@ -704,8 +753,16 @@ async function createGlobe(
     const height =
         container.clientHeight || 400;
 
+    /*
+     * نزدیک‌تر از قبل شروع می‌شود
+     * (قبلاً 0.42 بود)
+     */
+
     const size =
-        Math.min(width, height) * 0.42;
+        Math.min(width, height) * 0.62;
+
+    const minScale = size * 0.5;
+    const maxScale = size * 3;
 
     d3.select(svgElement).selectAll("*").remove();
 
@@ -824,8 +881,13 @@ async function createGlobe(
     let rotation = projection.rotate();
 
     let dragging = false;
+    let pinching = false;
+
     let lastX = 0;
     let lastY = 0;
+
+    let pinchStartDistance = 0;
+    let pinchStartScale = size;
 
 
     function redraw() {
@@ -837,7 +899,7 @@ async function createGlobe(
 
     function rotate() {
 
-        if (!dragging) {
+        if (!dragging && !pinching) {
 
             rotation[0] += 0.08;
 
@@ -852,7 +914,7 @@ async function createGlobe(
     requestAnimationFrame(rotate);
 
 
-    /* موس */
+    /* موس - چرخش */
 
     svgElement.addEventListener(
         "mousedown",
@@ -908,11 +970,54 @@ async function createGlobe(
     );
 
 
-    /* لمس موبایل */
+    /* موس - زوم با چرخ */
+
+    svgElement.addEventListener(
+        "wheel",
+        event => {
+
+            event.preventDefault();
+
+            const current =
+                projection.scale();
+
+            const next =
+                current *
+                (event.deltaY > 0 ? 0.9 : 1.1);
+
+            projection.scale(
+                Math.max(
+                    minScale,
+                    Math.min(maxScale, next)
+                )
+            );
+
+            redraw();
+
+        },
+        { passive: false }
+    );
+
+
+    /* لمس موبایل - چرخش با یک انگشت / زوم با دو انگشت */
 
     svgElement.addEventListener(
         "touchstart",
         event => {
+
+            if (event.touches.length === 2) {
+
+                pinching = true;
+                dragging = false;
+
+                pinchStartDistance =
+                    getTouchDistance(event.touches);
+
+                pinchStartScale =
+                    projection.scale();
+
+                return;
+            }
 
             if (!event.touches.length) {
                 return;
@@ -932,9 +1037,13 @@ async function createGlobe(
 
     svgElement.addEventListener(
         "touchend",
-        () => {
+        event => {
 
             dragging = false;
+
+            if (event.touches.length < 2) {
+                pinching = false;
+            }
         },
         { passive: true }
     );
@@ -943,6 +1052,31 @@ async function createGlobe(
     svgElement.addEventListener(
         "touchmove",
         event => {
+
+            if (pinching && event.touches.length === 2) {
+
+                event.preventDefault();
+
+                const distance =
+                    getTouchDistance(event.touches);
+
+                const ratio =
+                    distance / pinchStartDistance;
+
+                const next =
+                    pinchStartScale * ratio;
+
+                projection.scale(
+                    Math.max(
+                        minScale,
+                        Math.min(maxScale, next)
+                    )
+                );
+
+                redraw();
+
+                return;
+            }
 
             if (
                 !dragging ||
@@ -977,38 +1111,6 @@ async function createGlobe(
                 event.touches[0].clientY;
 
             event.preventDefault();
-
-        },
-        { passive: false }
-    );
-
-
-    /* زوم */
-
-    svgElement.addEventListener(
-        "wheel",
-        event => {
-
-            event.preventDefault();
-
-            const current =
-                projection.scale();
-
-            const next =
-                current *
-                (event.deltaY > 0 ? 0.9 : 1.1);
-
-            projection.scale(
-                Math.max(
-                    120,
-                    Math.min(
-                        size * 1.7,
-                        next
-                    )
-                )
-            );
-
-            redraw();
 
         },
         { passive: false }
