@@ -15,13 +15,26 @@ let selectedCountry = null;
 let worldData = null;
 let statsInterval = null;
 
+const COUNTRY_IMAGE_EXT = {
+    germany: "jpg",
+    britain: "jfif",
+    ussr: "jfif",
+    usa: "jfif",
+    france: "jfif",
+    italy: "jfif",
+    china: "jfif",
+    japan: "jfif"
+};
+
 const COUNTRY_FLAGS = {
     germany: "🇩🇪",
     britain: "🇬🇧",
     ussr: "☭",
     usa: "🇺🇸",
     france: "🇫🇷",
-    italy: "🇮🇹"
+    italy: "🇮🇹",
+    china: "🇨🇳",
+    japan: "🇯🇵"
 };
 
 const COUNTRY_NAMES = {
@@ -30,7 +43,9 @@ const COUNTRY_NAMES = {
     ussr: "شوروی",
     usa: "آمریکا",
     france: "فرانسه",
-    italy: "ایتالیا"
+    italy: "ایتالیا",
+    china: "چین",
+    japan: "ژاپن"
 };
 
 const COUNTRY_IDS = {
@@ -39,7 +54,9 @@ const COUNTRY_IDS = {
     ussr: 643,
     usa: 840,
     france: 250,
-    italy: 380
+    italy: 380,
+    china: 156,
+    japan: 392
 };
 
 const SECTION_NAMES = {
@@ -57,7 +74,7 @@ const OCEAN_LABELS = [
     [-40, 25, "اقیانوس اطلس"],
     [-150, 0, "اقیانوس آرام"],
     [75, -20, "اقیانوس هند"],
-    [90, 55, "اقیانوس منجمد شمالی"],
+    [90, 65, "اقیانوس منجمد شمالی"],
     [20, -60, "اقیانوس منجمد جنوبی"]
 ];
 
@@ -73,13 +90,22 @@ const STRAITS = [
     { lon: -79.6, lat: 9.1, name: "کانال پاناما", desc: "اتصال اقیانوس اطلس و آرام؛ حذف مسیر طولانی دور آمریکای جنوبی." },
     { lon: 103.8, lat: 1.3, name: "تنگه مالاکا", desc: "شریان اصلی تجارت دریایی میان اقیانوس هند و آرام." },
     { lon: -5.9, lat: 43.4, name: "خلیج بیسکای", desc: "مسیر دریایی مهم غرب اروپا در اقیانوس اطلس." },
-    { lon: 121.0, lat: 24.0, name: "تنگه تایوان", desc: "آبراه راهبردی میان دریای چین شرقی و جنوبی." }
+    { lon: 121.0, lat: 24.0, name: "تنگه تایوان", desc: "آبراه راهبردی میان دریای چین شرقی و جنوبی." },
+    { lon: 129.9, lat: 34.0, name: "تنگه کره", desc: "اتصال دریای ژاپن به دریای زرد؛ مسیر راهبردی نزدیک ژاپن." }
 ];
 
 
 /* =========================================================
    ابزارهای عمومی
 ========================================================= */
+
+function countryImageUrl(countryId) {
+
+    const ext = COUNTRY_IMAGE_EXT[countryId] || "jpg";
+
+    return `/images/countries/${countryId}.${ext}`;
+}
+
 
 function showOnly(id) {
 
@@ -110,6 +136,12 @@ function getApiUrl(path, params = {}) {
 function formatMoney(value) {
 
     return "$" + Math.round(Number(value ?? 0)).toLocaleString("en-US");
+}
+
+
+function formatNumber(value) {
+
+    return Number(value ?? 0).toLocaleString("en-US");
 }
 
 
@@ -365,15 +397,12 @@ function showCountryPreview() {
 
     showOnly("country-preview");
 
-    const flag =
-        COUNTRY_FLAGS[selectedCountry] || "🌍";
-
     const name =
         COUNTRY_NAMES[selectedCountry] || selectedCountry;
 
     document.getElementById(
         "selected-country-flag"
-    ).textContent = flag;
+    ).src = countryImageUrl(selectedCountry);
 
     document.getElementById(
         "preview-country-name"
@@ -509,12 +538,9 @@ function showGame() {
 
 function updateGameHeader() {
 
-    const flag =
-        COUNTRY_FLAGS[selectedCountry] || "🌍";
-
     document.getElementById(
         "game-country-flag"
-    ).textContent = flag;
+    ).src = countryImageUrl(selectedCountry);
 }
 
 
@@ -528,20 +554,30 @@ function updateHomeStats() {
         return;
     }
 
-    const flag =
-        COUNTRY_FLAGS[selectedCountry] || "🌍";
-
     const name =
         COUNTRY_NAMES[selectedCountry] || selectedCountry;
 
-    document.getElementById("home-country-flag").textContent = flag;
+    document.getElementById("home-country-flag").src =
+        countryImageUrl(selectedCountry);
+
     document.getElementById("home-country-name").textContent = name;
+
+    const photo =
+        document.getElementById("home-card-photo");
+
+    if (photo) {
+        photo.style.backgroundImage =
+            `url(${countryImageUrl(selectedCountry)})`;
+    }
 
     document.getElementById("home-money").textContent =
         formatMoney(player.money);
 
     document.getElementById("home-income").textContent =
         formatMoney(player.daily_income) + " / روز";
+
+    document.getElementById("home-manpower").textContent =
+        formatNumber(player.manpower ?? 40000);
 
     document.getElementById("home-power").textContent =
         player.power ?? 0;
@@ -814,7 +850,7 @@ async function loadNews() {
 
 
 /* =========================================================
-   کره جهان (صفحه پیش‌نمایش کشور - چرخان)
+   ابزار مشترک چرخش/زوم کره (پیش‌نمایش و نقشه)
 ========================================================= */
 
 function getTouchDistance(touches) {
@@ -825,6 +861,29 @@ function getTouchDistance(touches) {
     return Math.hypot(dx, dy);
 }
 
+
+function isPointVisible(lon, lat, rotation) {
+
+    const centerLon = -rotation[0];
+    const centerLat = -rotation[1];
+
+    const toRad = deg => (deg * Math.PI) / 180;
+
+    const lat1 = toRad(centerLat);
+    const lat2 = toRad(lat);
+    const deltaLon = toRad(lon - centerLon);
+
+    const cosDistance =
+        Math.sin(lat1) * Math.sin(lat2) +
+        Math.cos(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
+
+    return cosDistance > 0;
+}
+
+
+/* =========================================================
+   کره جهان (صفحه پیش‌نمایش کشور - چرخان، داخل کادر متوسط)
+========================================================= */
 
 async function createPreviewGlobe(
     containerId,
@@ -842,13 +901,19 @@ async function createPreviewGlobe(
         return;
     }
 
-    const width = container.clientWidth || 400;
-    const height = container.clientHeight || 400;
+    const width = container.clientWidth || 300;
+    const height = container.clientHeight || 300;
 
-    const size = Math.min(width, height) * 0.62;
+    /*
+     * کره داخل همین کادر شروع می‌شود؛
+     * وقتی خیلی زوم شود، دیگر لبهٔ گرد آن دیده نمی‌شود
+     * و فقط سطح آن کادر را پر می‌کند.
+     */
 
-    const minScale = size * 0.5;
-    const maxScale = size * 3;
+    const size = Math.min(width, height) * 0.46;
+
+    const minScale = size * 0.8;
+    const maxScale = size * 4;
 
     d3.select(svgElement).selectAll("*").remove();
 
@@ -939,7 +1004,7 @@ async function createPreviewGlobe(
         svg.selectAll("path").attr("d", path);
     }
 
-    function rotate() {
+    function autoRotate() {
 
         if (!dragging && !pinching) {
 
@@ -950,10 +1015,10 @@ async function createPreviewGlobe(
             redraw();
         }
 
-        requestAnimationFrame(rotate);
+        requestAnimationFrame(autoRotate);
     }
 
-    requestAnimationFrame(rotate);
+    requestAnimationFrame(autoRotate);
 
     svgElement.addEventListener("mousedown", event => {
         dragging = true;
@@ -1067,14 +1132,18 @@ async function createPreviewGlobe(
 
 
 /* =========================================================
-   نقشه جهان (تخت، داخل کادر، با زوم +/-/⟳)
+   نقشه جهان (فوتر) - کره واقعی داخل کادر
+   کوچک: گرد دیده می‌شود | زوم زیاد: فقط سطح را پر می‌کند
 ========================================================= */
 
-let mapInitialized = false;
-let mapZoomBehavior = null;
+let mapProjection = null;
+let mapPath = null;
 let mapSvg = null;
-let mapContentGroup = null;
-let mapDefaultTransform = null;
+let mapSize = 0;
+let mapMinScale = 0;
+let mapMaxScale = 0;
+let mapRotation = [0, 0];
+let mapInitialized = false;
 
 
 async function initWorldMap() {
@@ -1091,11 +1160,18 @@ async function initWorldMap() {
 
     if (mapInitialized) {
         updateMapColors();
+        redrawMap();
         return;
     }
 
     const width = box.clientWidth || 320;
     const height = box.clientHeight || 300;
+
+    mapSize = Math.min(width, height) * 0.46;
+    mapMinScale = mapSize * 0.8;
+    mapMaxScale = mapSize * 6;
+
+    mapRotation = [0, -10];
 
     let world;
 
@@ -1109,12 +1185,14 @@ async function initWorldMap() {
     const land =
         topojson.feature(world, world.objects.countries);
 
-    const projection =
-        d3.geoMercator()
-            .scale(width / 6.3)
-            .translate([width / 2, height / 1.5]);
+    mapProjection =
+        d3.geoOrthographic()
+            .scale(mapSize)
+            .translate([width / 2, height / 2])
+            .rotate(mapRotation)
+            .clipAngle(90);
 
-    const path = d3.geoPath(projection);
+    mapPath = d3.geoPath(mapProjection);
 
     mapSvg =
         d3.select(svgElement)
@@ -1122,18 +1200,17 @@ async function initWorldMap() {
 
     mapSvg.selectAll("*").remove();
 
-    mapContentGroup =
-        mapSvg.append("g")
-            .attr("class", "map-content");
+    mapSvg.append("path")
+        .datum({ type: "Sphere" })
+        .attr("class", "globe-water")
+        .attr("d", mapPath);
 
-    /* کشورها */
-
-    mapContentGroup.selectAll(".map-country")
+    mapSvg.selectAll(".map-country")
         .data(land.features)
         .enter()
         .append("path")
         .attr("class", "map-country")
-        .attr("d", path)
+        .attr("d", mapPath)
         .attr("data-country-id", d => d.id)
         .on("click", (event, d) => {
 
@@ -1142,11 +1219,7 @@ async function initWorldMap() {
             showCountryInfo(d);
         });
 
-    updateMapColors();
-
-    /* اسم کشورهای قابل بازی */
-
-    mapContentGroup.selectAll(".map-country-label")
+    mapSvg.selectAll(".map-country-label")
         .data(
             land.features.filter(d =>
                 Object.values(COUNTRY_IDS).includes(Number(d.id))
@@ -1156,8 +1229,6 @@ async function initWorldMap() {
         .append("text")
         .attr("class", "map-country-label")
         .attr("text-anchor", "middle")
-        .attr("x", d => path.centroid(d)[0])
-        .attr("y", d => path.centroid(d)[1])
         .text(d => {
 
             const entry =
@@ -1168,28 +1239,20 @@ async function initWorldMap() {
             return entry ? COUNTRY_NAMES[entry[0]] : "";
         });
 
-    /* اسم اقیانوس‌ها */
-
-    mapContentGroup.selectAll(".map-ocean-label")
+    mapSvg.selectAll(".map-ocean-label")
         .data(OCEAN_LABELS)
         .enter()
         .append("text")
         .attr("class", "map-ocean-label")
         .attr("text-anchor", "middle")
-        .attr("x", d => (projection([d[0], d[1]]) || [0, 0])[0])
-        .attr("y", d => (projection([d[0], d[1]]) || [0, 0])[1])
         .text(d => d[2]);
 
-    /* تنگه‌ها */
-
-    mapContentGroup.selectAll(".map-strait-dot")
+    mapSvg.selectAll(".map-strait-dot")
         .data(STRAITS)
         .enter()
         .append("circle")
         .attr("class", "map-strait-dot")
-        .attr("r", 4)
-        .attr("cx", d => (projection([d.lon, d.lat]) || [0, 0])[0])
-        .attr("cy", d => (projection([d.lon, d.lat]) || [0, 0])[1])
+        .attr("r", 2.6)
         .on("click", (event, d) => {
 
             event.stopPropagation();
@@ -1197,48 +1260,29 @@ async function initWorldMap() {
             showStraitInfo(d);
         });
 
-    /* زوم و پن */
+    updateMapColors();
+    redrawMap();
 
-    mapZoomBehavior =
-        d3.zoom()
-            .scaleExtent([1, 8])
-            .translateExtent([
-                [-width * 0.5, -height * 0.5],
-                [width * 1.5, height * 1.5]
-            ])
-            .on("zoom", event => {
-                mapContentGroup.attr(
-                    "transform",
-                    event.transform
-                );
-            });
-
-    mapSvg.call(mapZoomBehavior);
-
-    mapDefaultTransform = d3.zoomIdentity;
+    attachMapInteractions(svgElement, width, height);
 
     document.getElementById("map-zoom-in")
         .addEventListener("click", () => {
-
-            mapSvg.transition()
-                .duration(200)
-                .call(mapZoomBehavior.scaleBy, 1.4);
+            zoomMap(1.35);
         });
 
     document.getElementById("map-zoom-out")
         .addEventListener("click", () => {
-
-            mapSvg.transition()
-                .duration(200)
-                .call(mapZoomBehavior.scaleBy, 1 / 1.4);
+            zoomMap(1 / 1.35);
         });
 
     document.getElementById("map-reset")
         .addEventListener("click", () => {
 
-            mapSvg.transition()
-                .duration(250)
-                .call(mapZoomBehavior.transform, mapDefaultTransform);
+            mapProjection.scale(mapSize);
+            mapRotation = [0, -10];
+            mapProjection.rotate(mapRotation);
+
+            redrawMap();
         });
 
     document.getElementById("map-info-close")
@@ -1252,13 +1296,229 @@ async function initWorldMap() {
 }
 
 
-function updateMapColors() {
+function zoomMap(factor) {
 
-    if (!mapContentGroup) {
+    const current = mapProjection.scale();
+
+    const next = current * factor;
+
+    mapProjection.scale(
+        Math.max(mapMinScale, Math.min(mapMaxScale, next))
+    );
+
+    redrawMap();
+}
+
+
+function attachMapInteractions(svgElement, width, height) {
+
+    let dragging = false;
+    let pinching = false;
+
+    let lastX = 0;
+    let lastY = 0;
+
+    let pinchStartDistance = 0;
+    let pinchStartScale = mapSize;
+
+    svgElement.addEventListener("mousedown", event => {
+        dragging = true;
+        lastX = event.clientX;
+        lastY = event.clientY;
+    });
+
+    window.addEventListener("mouseup", () => {
+        dragging = false;
+    });
+
+    window.addEventListener("mousemove", event => {
+
+        if (!dragging) return;
+
+        const dx = event.clientX - lastX;
+        const dy = event.clientY - lastY;
+
+        mapRotation[0] += dx * 0.4;
+        mapRotation[1] -= dy * 0.4;
+        mapRotation[1] = Math.max(-90, Math.min(90, mapRotation[1]));
+
+        mapProjection.rotate(mapRotation);
+        redrawMap();
+
+        lastX = event.clientX;
+        lastY = event.clientY;
+    });
+
+    svgElement.addEventListener("wheel", event => {
+
+        event.preventDefault();
+
+        zoomMap(event.deltaY > 0 ? 0.9 : 1.1);
+
+    }, { passive: false });
+
+    svgElement.addEventListener("touchstart", event => {
+
+        if (event.touches.length === 2) {
+            pinching = true;
+            dragging = false;
+            pinchStartDistance = getTouchDistance(event.touches);
+            pinchStartScale = mapProjection.scale();
+            return;
+        }
+
+        if (!event.touches.length) return;
+
+        dragging = true;
+        lastX = event.touches[0].clientX;
+        lastY = event.touches[0].clientY;
+
+    }, { passive: true });
+
+    svgElement.addEventListener("touchend", event => {
+
+        dragging = false;
+
+        if (event.touches.length < 2) {
+            pinching = false;
+        }
+
+    }, { passive: true });
+
+    svgElement.addEventListener("touchmove", event => {
+
+        if (pinching && event.touches.length === 2) {
+
+            event.preventDefault();
+
+            const distance = getTouchDistance(event.touches);
+            const ratio = distance / pinchStartDistance;
+            const next = pinchStartScale * ratio;
+
+            mapProjection.scale(
+                Math.max(mapMinScale, Math.min(mapMaxScale, next))
+            );
+
+            redrawMap();
+
+            return;
+        }
+
+        if (!dragging || !event.touches.length) return;
+
+        const dx = event.touches[0].clientX - lastX;
+        const dy = event.touches[0].clientY - lastY;
+
+        mapRotation[0] += dx * 0.4;
+        mapRotation[1] -= dy * 0.4;
+        mapRotation[1] = Math.max(-90, Math.min(90, mapRotation[1]));
+
+        mapProjection.rotate(mapRotation);
+        redrawMap();
+
+        lastX = event.touches[0].clientX;
+        lastY = event.touches[0].clientY;
+
+        event.preventDefault();
+
+    }, { passive: false });
+}
+
+
+function redrawMap() {
+
+    if (!mapSvg || !mapProjection) {
         return;
     }
 
-    mapContentGroup.selectAll(".map-country")
+    const rotation = mapProjection.rotate();
+
+    /* بزرگ‌نمایی نسبی نسبت به اندازه پایه (برای اسم اقیانوس‌ها و دایره تنگه‌ها) */
+
+    const zoomRatio = mapProjection.scale() / mapSize;
+
+    mapSvg.selectAll("path.globe-water, path.map-country")
+        .attr("d", mapPath);
+
+    /* برچسب اقیانوس‌ها - کمی بزرگ‌تر می‌شوند، نه به‌اندازه کل زوم */
+
+    const oceanFontSize =
+        Math.min(11, 6.5 * (1 + (zoomRatio - 1) * 0.25));
+
+    mapSvg.selectAll(".map-ocean-label")
+        .style("font-size", `${oceanFontSize}px`)
+        .attr("opacity", d =>
+            isPointVisible(d[0], d[1], rotation) ? 1 : 0
+        )
+        .attr("x", d => {
+            const p = mapProjection([d[0], d[1]]);
+            return p ? p[0] : -9999;
+        })
+        .attr("y", d => {
+            const p = mapProjection([d[0], d[1]]);
+            return p ? p[1] : -9999;
+        });
+
+    /* اسم کشورها */
+
+    mapSvg.selectAll(".map-country-label")
+        .attr("opacity", d => {
+
+            const countryId = Number(d.id);
+
+            const entry =
+                Object.entries(COUNTRY_IDS).find(
+                    ([, id]) => id === countryId
+                );
+
+            if (!entry) return 0;
+
+            const [, id] = entry;
+
+            const feature =
+                mapSvg.selectAll(".map-country")
+                    .data()
+                    .find(f => Number(f.id) === id);
+
+            if (!feature) return 0;
+
+            const centroid = mapPath.centroid(feature);
+
+            return isNaN(centroid[0]) ? 0 : 1;
+        })
+        .attr("x", d => {
+            const c = mapPath.centroid(d);
+            return isNaN(c[0]) ? -9999 : c[0];
+        })
+        .attr("y", d => {
+            const c = mapPath.centroid(d);
+            return isNaN(c[1]) ? -9999 : c[1];
+        });
+
+    /* دایره تنگه‌ها - اندازه ثابت، فقط جای‌شان دقیق تغییر می‌کند */
+
+    mapSvg.selectAll(".map-strait-dot")
+        .attr("opacity", d =>
+            isPointVisible(d.lon, d.lat, rotation) ? 1 : 0
+        )
+        .attr("cx", d => {
+            const p = mapProjection([d.lon, d.lat]);
+            return p ? p[0] : -9999;
+        })
+        .attr("cy", d => {
+            const p = mapProjection([d.lon, d.lat]);
+            return p ? p[1] : -9999;
+        });
+}
+
+
+function updateMapColors() {
+
+    if (!mapSvg) {
+        return;
+    }
+
+    mapSvg.selectAll(".map-country")
         .attr("fill", d => {
 
             const countryId = Number(d.id);
