@@ -79,14 +79,31 @@ COUNTRIES = {
         "army": 500,
         "population": 44_000_000,
     },
+
+    "china": {
+        "name": "چین",
+        "flag": "🇨🇳",
+        "economy": 550,
+        "army": 750,
+        "population": 517_000_000,
+    },
+
+    "japan": {
+        "name": "ژاپن",
+        "flag": "🇯🇵",
+        "economy": 700,
+        "army": 800,
+        "population": 71_000_000,
+    },
 }
 
 
 # =========================================================
-# تنظیمات بازی (پول / زمان / فصل)
+# تنظیمات بازی (پول / زمان / فصل / نیروی انسانی)
 # =========================================================
 
 STARTING_MONEY = 10_000_000
+STARTING_MANPOWER = 40_000
 
 GAME_TOTAL_DAYS = 31
 DAYS_PER_SEASON = 2
@@ -234,6 +251,7 @@ def create_player(user_id):
         "army": 0,
         "power": 0,
         "power_capacity": 0,
+        "manpower": STARTING_MANPOWER,
         "year": 1939,
         "started_at": None,
     }
@@ -640,6 +658,14 @@ async def create_web_app():
     app.router.add_get(
         "/app.js",
         app_js
+    )
+
+
+    # تصاویر کشورها
+    app.router.add_static(
+        "/images/",
+        path="web/images",
+        name="images"
     )
 
 
