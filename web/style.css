@@ -24,6 +24,11 @@ button {
     cursor: pointer;
 }
 
+img {
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
 .hidden {
     display: none !important;
 }
@@ -104,20 +109,24 @@ button {
     filter: grayscale(1);
 }
 
-.country-flag {
+.country-photo {
     width: 58px;
     height: 58px;
     flex-shrink: 0;
     border-radius: 50%;
     background: #222a34;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
+    border: 1px solid #333f4c;
+    object-fit: cover;
+    object-position: center;
+}
+
+.country-info {
+    min-width: 0;
+    flex: 1;
 }
 
 .country-info h2 {
-    font-size: 19px;
+    font-size: 18px;
     margin-bottom: 3px;
 }
 
@@ -126,25 +135,17 @@ button {
     font-size: 11px;
 }
 
-.country-stats {
-    display: flex;
-    gap: 15px;
-    margin-top: 13px;
-}
-
-.country-stats div {
+.country-facts {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+    margin-top: 10px;
 }
 
-.country-stats small {
-    color: #727c89;
-    font-size: 9px;
-}
-
-.country-stats strong {
-    font-size: 13px;
+.country-facts span {
+    font-size: 10px;
+    color: #97a1ad;
+    line-height: 1.5;
 }
 
 
@@ -193,10 +194,9 @@ button {
     border-radius: 50%;
     background: #1d2530;
     border: 1px solid #37414e;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
+    object-fit: cover;
+    object-position: center;
+    display: block;
 }
 
 .header-button {
@@ -247,7 +247,9 @@ button {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     padding: 20px 15px 30px;
+    gap: 22px;
 }
 
 .preview-title {
@@ -269,18 +271,27 @@ button {
     font-size: 12px;
 }
 
+/* کادر متوسط دور کره - همینجا کره محصور می‌شود و با زوم زیاد از کادر بیرون نمی‌زند */
+
+.globe-card {
+    width: min(300px, 78vw);
+    height: min(300px, 36vh);
+    border-radius: 20px;
+    background: #0a1017;
+    border: 1px solid #232c37;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+
 .globe-container {
     position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
     touch-action: none;
-}
-
-#preview-globe-container {
-    width: min(430px, 88vw);
-    height: min(430px, 55vh);
-    margin: 5px auto;
+    width: 100%;
+    height: 100%;
 }
 
 #preview-globe {
@@ -290,8 +301,8 @@ button {
 }
 
 .primary-game-button {
-    width: min(360px, 90%);
-    height: 54px;
+    width: min(320px, 85%);
+    height: 52px;
     border-radius: 14px;
     background: #d88a28;
     color: #111;
@@ -332,7 +343,7 @@ button {
 }
 
 
-/* ==================== کارت خانه (شبیه اسکرین‌شات) ==================== */
+/* ==================== کارت خانه ==================== */
 
 .home-card {
     background: #10151d;
@@ -367,15 +378,28 @@ button {
 }
 
 .home-country-flag {
-    font-size: 18px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
+    object-position: center;
+    border: 1px solid #37414e;
 }
 
 .home-card-photo {
     height: 140px;
     margin: 10px 0;
-    background:
-        linear-gradient(180deg, rgba(8,11,16,0) 40%, rgba(8,11,16,.85) 100%),
-        radial-gradient(circle at 30% 20%, #3a4655, #12161c 70%);
+    background-color: #12161c;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.home-card-photo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(8,11,16,0) 40%, rgba(8,11,16,.85) 100%);
 }
 
 .home-card-body {
@@ -387,7 +411,7 @@ button {
     flex-direction: column;
     align-items: flex-end;
     text-align: right;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
 }
 
 .treasury-label {
@@ -410,6 +434,19 @@ button {
 
 .income-label span {
     color: #a9b2bd;
+}
+
+.manpower-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-top: 1px solid #1e2530;
+    margin-bottom: 4px;
+}
+
+.manpower-row .mini-value {
+    color: #cfd6de;
 }
 
 .power-army-row {
@@ -634,14 +671,15 @@ button {
 
 .map-ocean-label {
     fill: #4a6a86;
-    font-size: 11px;
+    font-size: 6.5px;
     pointer-events: none;
     user-select: none;
+    letter-spacing: .3px;
 }
 
 .map-country-label {
     fill: #d9e0e8;
-    font-size: 9px;
+    font-size: 7px;
     pointer-events: none;
     user-select: none;
 }
@@ -649,7 +687,7 @@ button {
 .map-strait-dot {
     fill: #e8b355;
     stroke: #0a1622;
-    stroke-width: 1px;
+    stroke-width: .6px;
     cursor: pointer;
 }
 
@@ -946,31 +984,21 @@ button {
         gap: 9px;
     }
 
-    .country-flag {
+    .country-photo {
         width: 45px;
         height: 45px;
-        font-size: 25px;
     }
 
     .country-info h2 {
-        font-size: 15px;
+        font-size: 14px;
     }
 
     .country-info > span {
         font-size: 9px;
     }
 
-    .country-stats {
-        gap: 8px;
-        margin-top: 9px;
-    }
-
-    .country-stats strong {
-        font-size: 11px;
-    }
-
-    .country-stats small {
-        font-size: 8px;
+    .country-facts span {
+        font-size: 9px;
     }
 
     .game-title {
@@ -978,8 +1006,8 @@ button {
         letter-spacing: 1px;
     }
 
-    #preview-globe-container {
-        height: 48vh;
+    .globe-card {
+        height: 32vh;
     }
 
     .action-card {
