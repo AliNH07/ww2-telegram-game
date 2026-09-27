@@ -239,6 +239,23 @@ img {
     background: #171d26;
 }
 
+.sub-back-bar {
+    margin-bottom: 10px;
+}
+
+.sub-back-button {
+    background: #131a23;
+    color: #d98a25;
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: 1px solid #232c37;
+}
+
+.sub-back-button:active {
+    transform: scale(.96);
+}
+
 
 /* ==================== پیش نمایش ==================== */
 
@@ -270,8 +287,6 @@ img {
     color: #8993a0;
     font-size: 12px;
 }
-
-/* کادر متوسط دور کره - همینجا کره محصور می‌شود و با زوم زیاد از کادر بیرون نمی‌زند */
 
 .globe-card {
     width: min(300px, 78vw);
@@ -445,8 +460,19 @@ img {
     margin-bottom: 4px;
 }
 
-.manpower-row .mini-value {
+.manpower-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.manpower-main .mini-value {
     color: #cfd6de;
+}
+
+.manpower-production {
+    font-size: 10.5px;
+    color: #6fe3a6;
 }
 
 .power-army-row {
@@ -500,7 +526,6 @@ img {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
 }
 
 .season-tag {
@@ -515,24 +540,6 @@ img {
     font-size: 10px;
     padding: 5px 10px;
     border-radius: 12px;
-}
-
-.next-season-button {
-    width: 100%;
-    background: #171e28;
-    border: 1px solid #2b3542;
-    color: #c3cad3;
-    font-size: 12px;
-    padding: 10px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-}
-
-.next-season-button:active {
-    transform: scale(.98);
 }
 
 
@@ -625,6 +632,271 @@ img {
 .action-market {
     background-color: #14202a;
     background-image: linear-gradient(160deg, #1a2e3a, #0c161c);
+}
+
+
+/* ==================== زیرساخت ==================== */
+
+.infra-section {
+    margin-bottom: 22px;
+}
+
+.infra-section-title {
+    font-size: 14px;
+    color: #c3cad3;
+    margin-bottom: 10px;
+}
+
+.infra-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.infra-card {
+    background: #111720;
+    border: 1px solid #252e39;
+    border-radius: 16px;
+    padding: 14px 16px;
+}
+
+.infra-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.infra-card-name {
+    font-size: 13.5px;
+    color: #eee;
+}
+
+.infra-card-level {
+    font-size: 10.5px;
+    color: #8993a0;
+    background: #1a2029;
+    border: 1px solid #2b3542;
+    padding: 3px 9px;
+    border-radius: 10px;
+}
+
+.infra-card-detail {
+    font-size: 11px;
+    color: #8a94a1;
+    margin-bottom: 10px;
+    line-height: 1.7;
+}
+
+.infra-upgrade-button {
+    width: 100%;
+    background: #1d2530;
+    border: 1px solid #37414e;
+    color: #e19a43;
+    font-size: 12.5px;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.infra-upgrade-button:active {
+    transform: scale(.97);
+}
+
+.infra-upgrade-button:disabled {
+    opacity: .4;
+    color: #8993a0;
+}
+
+
+/* ==================== ارتش ==================== */
+
+.unit-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.unit-card {
+    background: #111720;
+    border: 1px solid #252e39;
+    border-radius: 16px;
+    padding: 14px 16px;
+}
+
+.unit-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.unit-card-name {
+    font-size: 13.5px;
+    color: #eee;
+}
+
+.unit-card-count {
+    font-size: 10.5px;
+    color: #8993a0;
+    background: #1a2029;
+    border: 1px solid #2b3542;
+    padding: 3px 9px;
+    border-radius: 10px;
+}
+
+.unit-card-detail {
+    font-size: 11px;
+    color: #8a94a1;
+    margin-bottom: 10px;
+    line-height: 1.7;
+}
+
+.unit-train-button {
+    width: 100%;
+    background: #1d2530;
+    border: 1px solid #37414e;
+    color: #6fe3a6;
+    font-size: 12.5px;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.unit-train-button:active {
+    transform: scale(.97);
+}
+
+.unit-train-button:disabled {
+    opacity: .4;
+    color: #8993a0;
+}
+
+
+/* ==================== جنگ ==================== */
+
+.war-target-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.war-target-card {
+    background: #111720;
+    border: 1px solid #252e39;
+    border-radius: 16px;
+    padding: 14px 16px;
+}
+
+.war-target-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.war-target-flag {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.war-target-name {
+    font-size: 13.5px;
+    color: #eee;
+}
+
+.war-attack-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.war-attack-button {
+    flex: 1;
+    background: #241414;
+    border: 1px solid #3a2020;
+    color: #e88;
+    font-size: 11.5px;
+    padding: 9px;
+    border-radius: 10px;
+}
+
+.war-attack-button:active {
+    transform: scale(.96);
+}
+
+
+/* ==================== دیپلماسی ==================== */
+
+.diplomacy-form {
+    background: #111720;
+    border: 1px solid #252e39;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.diplomacy-label {
+    font-size: 11.5px;
+    color: #9aa4b0;
+}
+
+.diplomacy-select,
+.diplomacy-input {
+    background: #171e28;
+    border: 1px solid #2b3542;
+    color: #eee;
+    font-size: 13px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-family: inherit;
+}
+
+.diplomacy-submit {
+    margin-top: 6px;
+    background: #d98a25;
+    color: #111;
+    font-weight: bold;
+    font-size: 13px;
+    padding: 12px;
+    border-radius: 12px;
+}
+
+.diplomacy-submit:active {
+    transform: scale(.97);
+}
+
+.diplomacy-list-title {
+    font-size: 12px;
+    color: #8993a0;
+    margin: 14px 0 8px;
+}
+
+.diplomacy-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.diplomacy-item {
+    background: #111720;
+    border: 1px solid #252e39;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 11.5px;
+    color: #c3cad3;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.diplomacy-item-empty {
+    color: #626d7b;
+    font-size: 11.5px;
+    padding: 6px 2px;
 }
 
 
