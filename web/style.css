@@ -13,36 +13,26 @@ body {
 
 body {
     font-family: Tahoma, Arial, sans-serif;
-    background: #06080c;
     color: #eee;
     direction: rtl;
     position: relative;
-}
+    min-height: 100vh;
 
-/* ============ پس‌زمینه سراسری ============ */
+    background-color: #06080c;
 
-body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background: url("/images/background.jfif") center/cover no-repeat;
-    opacity: 0.45;
-    z-index: -2;
-    pointer-events: none;
-}
+    background-image:
+        radial-gradient(
+            circle at top,
+            rgba(24, 32, 43, .50) 0%,
+            rgba(6, 8, 12, .82) 65%,
+            rgba(4, 6, 9, .92) 100%
+        ),
+        url("/images/background.jfif");
 
-body::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background: radial-gradient(
-        circle at top,
-        rgba(24, 32, 43, .75) 0%,
-        rgba(6, 8, 12, .92) 65%,
-        rgba(4, 6, 9, .96) 100%
-    );
-    z-index: -1;
-    pointer-events: none;
+    background-size: cover, cover;
+    background-position: center, center;
+    background-repeat: no-repeat, no-repeat;
+    background-attachment: fixed, fixed;
 }
 
 button {
