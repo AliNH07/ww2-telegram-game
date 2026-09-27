@@ -6,7 +6,7 @@
 
     <title>WW2 Strategy</title>
 
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/style.css?v=10">
 
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
@@ -19,9 +19,7 @@
 
 <section id="loading" class="screen loading-screen">
     <div class="loading-box">
-        <div class="loading-bar">
-            <div class="loading-bar-fill"></div>
-        </div>
+        <div class="loading-bar"></div>
         <p class="loading-text">در حال اتصال به تلگرام...</p>
     </div>
 </section>
@@ -58,7 +56,7 @@
                 <h2>بریتانیا</h2>
                 <span>Britain</span>
                 <div class="country-facts">
-                    <span>🏝️ کشور جزیره‌ای</span>
+                    <span>🏝️ جزیره‌ای</span>
                     <span>⚓ ۴ راه دریایی</span>
                 </div>
             </div>
@@ -130,7 +128,7 @@
                 <h2>ژاپن</h2>
                 <span>Japan</span>
                 <div class="country-facts">
-                    <span>🏝️ کشور جزیره‌ای</span>
+                    <span>🏝️ جزیره‌ای</span>
                     <span>⚓ ۳ راه دریایی</span>
                 </div>
             </div>
@@ -140,7 +138,7 @@
 </section>
 
 
-<!-- ==================== پیش نمایش کشور ==================== -->
+<!-- ==================== پیش‌نمایش کشور ==================== -->
 
 <section id="country-preview" class="screen hidden">
 
@@ -207,7 +205,6 @@
     <main id="home" class="game-page">
 
         <div class="home-card">
-
             <div class="home-card-top">
                 <span class="world-chip">🌐 World 1</span>
                 <span class="home-country-chip">
@@ -219,7 +216,6 @@
             <div class="home-card-photo" id="home-card-photo"></div>
 
             <div class="home-card-body">
-
                 <div class="treasury-row">
                     <span class="treasury-label">🪙 موجودی خزانه</span>
                     <strong id="home-money" class="treasury-value">$0</strong>
@@ -258,7 +254,34 @@
                     <span class="season-tag">🕐 <span id="home-season">بهار</span></span>
                     <span class="no-effect-tag">بدون اثر بر اقتصاد</span>
                 </div>
+            </div>
+        </div>
 
+        <!-- کارت رتبه‌ها -->
+
+        <div class="rankings-card">
+            <div class="rankings-title">🏆 رتبه‌های شما</div>
+            <div class="rankings-grid">
+                <div class="rank-item">
+                    <span class="rank-label">کلی</span>
+                    <span class="rank-value" id="rank-overall">—</span>
+                </div>
+                <div class="rank-item">
+                    <span class="rank-label">اقتصادی</span>
+                    <span class="rank-value" id="rank-economy">—</span>
+                </div>
+                <div class="rank-item">
+                    <span class="rank-label">نظامی</span>
+                    <span class="rank-value" id="rank-military">—</span>
+                </div>
+                <div class="rank-item">
+                    <span class="rank-label">دیپلماسی</span>
+                    <span class="rank-value" id="rank-diplomacy">—</span>
+                </div>
+                <div class="rank-item">
+                    <span class="rank-label">توسعه</span>
+                    <span class="rank-value" id="rank-development">—</span>
+                </div>
             </div>
         </div>
 
@@ -276,7 +299,7 @@
                 <div class="action-overlay">
                     <span class="action-icon">⚔️</span>
                     <h3>جنگ</h3>
-                    <p>حمله زمینی، هوایی یا دریایی</p>
+                    <p>اعلام جنگ و حمله به کشورها</p>
                 </div>
             </button>
 
@@ -316,21 +339,17 @@
     </main>
 
 
-    <!-- منوی اصلی زیرساخت -->
+    <!-- منوی زیرساخت -->
 
     <main id="infrastructure" class="game-page hidden">
-
         <div class="sub-back-bar">
             <button class="sub-back-button" data-back-to="home">→ بازگشت</button>
         </div>
-
         <div class="page-title">
             <span>ساخت و توسعه</span>
             <h1>زیرساخت</h1>
         </div>
-
         <div class="infra-menu-grid">
-
             <button class="infra-menu-tile" data-infra-section="power">
                 <div class="infra-menu-icon">⚡</div>
                 <div class="infra-menu-text">
@@ -357,65 +376,50 @@
                 </div>
                 <span class="infra-menu-arrow">‹</span>
             </button>
-
         </div>
     </main>
 
-
-    <!-- برق -->
 
     <main id="infra-power" class="game-page hidden">
         <div class="sub-back-bar">
             <button class="sub-back-button" data-back-to="infrastructure">→ بازگشت</button>
         </div>
-
         <div class="page-title">
             <span>تولید انرژی</span>
             <h1>برق</h1>
         </div>
-
         <div id="infra-power-list" class="infra-card-list"></div>
     </main>
 
-
-    <!-- نیروی انسانی -->
 
     <main id="infra-manpower" class="game-page hidden">
         <div class="sub-back-bar">
             <button class="sub-back-button" data-back-to="infrastructure">→ بازگشت</button>
         </div>
-
         <div class="page-title">
             <span>مراکز تولید نیرو</span>
             <h1>نیروی انسانی</h1>
         </div>
-
         <div id="infra-manpower-list" class="infra-card-list"></div>
     </main>
 
-
-    <!-- نظامی -->
 
     <main id="infra-military" class="game-page hidden">
         <div class="sub-back-bar">
             <button class="sub-back-button" data-back-to="infrastructure">→ بازگشت</button>
         </div>
-
         <div class="page-title">
             <span>تأسیسات نظامی</span>
             <h1>نظامی</h1>
         </div>
-
         <div class="infra-section">
             <h2 class="infra-section-title">🪖 زمینی</h2>
             <div id="infra-land-list" class="infra-card-list"></div>
         </div>
-
         <div class="infra-section">
             <h2 class="infra-section-title">⚓ دریایی</h2>
             <div id="infra-naval-list" class="infra-card-list"></div>
         </div>
-
         <div class="infra-section">
             <h2 class="infra-section-title">✈️ هوایی</h2>
             <div id="infra-air-list" class="infra-card-list"></div>
@@ -429,12 +433,10 @@
         <div class="sub-back-bar">
             <button class="sub-back-button" data-back-to="home">→ بازگشت</button>
         </div>
-
         <div class="page-title">
             <span>سرمایه‌گذاری</span>
             <h1>اقتصاد</h1>
         </div>
-
         <div id="economy-list" class="infra-card-list"></div>
     </main>
 
@@ -445,12 +447,10 @@
         <div class="sub-back-bar">
             <button class="sub-back-button" data-back-to="home">→ بازگشت</button>
         </div>
-
         <div class="page-title">
             <span>آموزش نیرو</span>
             <h1>ارتش</h1>
         </div>
-
         <div id="army-units" class="unit-card-list"></div>
     </main>
 
@@ -461,13 +461,25 @@
         <div class="sub-back-bar">
             <button class="sub-back-button" data-back-to="home">→ بازگشت</button>
         </div>
-
         <div class="page-title">
             <span>عملیات نظامی</span>
             <h1>جنگ</h1>
         </div>
 
-        <div id="war-target-list" class="war-target-list"></div>
+        <div class="wars-section">
+            <h3 class="wars-section-title">⚔️ اعلام جنگ‌های شما</h3>
+            <div id="my-wars-list" class="wars-list"></div>
+        </div>
+
+        <div class="wars-section">
+            <h3 class="wars-section-title">🛡️ جنگ‌های علیه شما</h3>
+            <div id="incoming-wars-list" class="wars-list"></div>
+        </div>
+
+        <div class="wars-section">
+            <h3 class="wars-section-title">📣 اعلام جنگ جدید</h3>
+            <div id="declare-war-list" class="war-target-list"></div>
+        </div>
     </main>
 
 
@@ -477,7 +489,6 @@
         <div class="sub-back-bar">
             <button class="sub-back-button" data-back-to="home">→ بازگشت</button>
         </div>
-
         <div class="page-title">
             <span>روابط خارجی</span>
             <h1>دیپلماسی</h1>
@@ -504,7 +515,7 @@
         <div class="diplomacy-list-title">پیمان‌های فعال</div>
         <div id="diplomacy-treaties" class="diplomacy-list"></div>
 
-        <div class="diplomacy-list-title">پیشنهادهای ارسال‌شده (در انتظار پاسخ)</div>
+        <div class="diplomacy-list-title">پیشنهادهای ارسال‌شده</div>
         <div id="diplomacy-sent" class="diplomacy-list"></div>
     </main>
 
@@ -522,13 +533,13 @@
             <div class="map-controls">
                 <button id="map-zoom-in" class="map-control-btn">+</button>
                 <button id="map-zoom-out" class="map-control-btn">−</button>
-                <button id="map-reset" class="map-control-btn map-reset-btn">⟳</button>
+                <button id="map-reset" class="map-control-btn">⟳</button>
             </div>
         </div>
 
         <div class="map-legend">
             <div><span class="dot dot-own"></span> کشور خودی</div>
-            <div><span class="dot dot-own-occupied"></span> تحت تصرفِ خودی</div>
+            <div><span class="dot dot-own-occupied"></span> تحت تصرف خودی</div>
             <div><span class="dot dot-other"></span> کشور دیگر</div>
             <div><span class="dot dot-other-occupied"></span> تحت تصرف دیگری</div>
             <div><span class="dot dot-unowned"></span> بی‌صاحب</div>
@@ -591,7 +602,6 @@
             <span>امکانات ویژه</span>
             <h1>اشتراک</h1>
         </div>
-
         <div class="subscription-card">
             <h2>Premium</h2>
             <p>امکانات ویژه بازی به‌زودی فعال می‌شوند.</p>
@@ -599,7 +609,7 @@
     </main>
 
 
-    <!-- منوی پایین (۵ بخش) -->
+    <!-- منوی پایین -->
 
     <nav class="bottom-nav">
 
@@ -632,7 +642,7 @@
 
 </section>
 
-<script src="/app.js"></script>
+<script src="/app.js?v=10"></script>
 
 </body>
 </html>
