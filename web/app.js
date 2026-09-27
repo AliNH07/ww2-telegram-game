@@ -59,13 +59,44 @@ const COUNTRY_IDS = {
     japan: 392
 };
 
-const SECTION_NAMES = {
-    war: "جنگ",
-    army: "ارتش",
-    diplomacy: "دیپلماسی",
-    economy: "اقتصاد",
-    infrastructure: "زیرساخت",
-    market: "بازار جهانی"
+/* باید دقیقاً هم‌راستا با ARMY_UNITS در bot.py باشد */
+
+const ARMY_UNITS = {
+    land: {
+        name: "گردان زمینی",
+        infra: "barracks",
+        cost: 50_000,
+        manpower: 300,
+        power_required: 5,
+        army_power: 15
+    },
+    air: {
+        name: "اسکادران هوایی",
+        infra: "airport",
+        cost: 200_000,
+        manpower: 150,
+        power_required: 15,
+        army_power: 40
+    },
+    navy: {
+        name: "ناو دریایی",
+        infra: "port",
+        cost: 250_000,
+        manpower: 200,
+        power_required: 15,
+        army_power: 35
+    }
+};
+
+const TREATY_TYPE_NAMES = {
+    alliance: "پیمان اتحاد",
+    non_aggression: "پیمان عدم تجاوز"
+};
+
+const ATTACK_TYPE_NAMES = {
+    land: "زمینی",
+    air: "هوایی",
+    navy: "دریایی"
 };
 
 /* اقیانوس‌ها - [lon, lat, نام] */
@@ -121,6 +152,20 @@ function showOnly(id) {
 }
 
 
+function showGamePage(id) {
+
+    document.querySelectorAll(".game-page").forEach(page => {
+        page.classList.add("hidden");
+    });
+
+    const target = document.getElementById(id);
+
+    if (target) {
+        target.classList.remove("hidden");
+    }
+}
+
+
 function getApiUrl(path, params = {}) {
 
     const url = new URL(path, window.location.origin);
@@ -141,7 +186,7 @@ function formatMoney(value) {
 
 function formatNumber(value) {
 
-    return Number(value ?? 0).toLocaleString("en-US");
+    return Math.round(Number(value ?? 0)).toLocaleString("en-US");
 }
 
 
@@ -175,9 +220,7 @@ async function loadPlayer() {
     try {
 
         const response = await fetch(
-            getApiUrl("/api/player", {
-                user_id: userId
-            })
+            getApiUrl("/api/player", { user_id: userId })
         );
 
         if (!response.ok) {
@@ -215,9 +258,7 @@ async function refreshPlayer() {
     try {
 
         const response = await fetch(
-            getApiUrl("/api/player", {
-                user_id: userId
-            })
+            getApiUrl("/api/player", { user_id: userId })
         );
 
         if (!response.ok) {
@@ -299,10 +340,6 @@ function showCountrySelection() {
 }
 
 
-/* =========================================================
-   وضعیت کشورها
-========================================================= */
-
 function updateCountryCards() {
 
     document.querySelectorAll("[data-country-card]").forEach(card => {
@@ -331,10 +368,6 @@ function updateCountryCards() {
 }
 
 
-/* =========================================================
-   انتخاب کشور (فقط پیش‌نمایش - هنوز چیزی ثبت نمی‌شود)
-========================================================= */
-
 document.querySelectorAll("[data-country-card]").forEach(card => {
 
     card.addEventListener("click", () => {
@@ -359,10 +392,6 @@ document.querySelectorAll("[data-country-card]").forEach(card => {
 });
 
 
-/* =========================================================
-   پیام
-========================================================= */
-
 function showMessage(message) {
 
     const element =
@@ -384,10 +413,6 @@ function showMessage(message) {
 }
 
 
-/* =========================================================
-   صفحه نمایش کشور
-========================================================= */
-
 function showCountryPreview() {
 
     if (!selectedCountry) {
@@ -397,16 +422,11 @@ function showCountryPreview() {
 
     showOnly("country-preview");
 
-    const name =
+    document.getElementById("selected-country-flag").src =
+        countryImageUrl(selectedCountry);
+
+    document.getElementById("preview-country-name").textContent =
         COUNTRY_NAMES[selectedCountry] || selectedCountry;
-
-    document.getElementById(
-        "selected-country-flag"
-    ).src = countryImageUrl(selectedCountry);
-
-    document.getElementById(
-        "preview-country-name"
-    ).textContent = name;
 
     createPreviewGlobe(
         "preview-globe-container",
@@ -415,10 +435,6 @@ function showCountryPreview() {
     );
 }
 
-
-/* =========================================================
-   دکمه بازگشت
-========================================================= */
 
 document
     .getElementById("preview-back-button")
@@ -429,10 +445,6 @@ document
         showCountrySelection();
     });
 
-
-/* =========================================================
-   ورود به بازی -> اینجا کشور واقعاً برای کاربر ثبت می‌شود
-========================================================= */
 
 document
     .getElementById("enter-game-button")
@@ -446,9 +458,7 @@ async function confirmCountrySelection() {
 
     if (!userId) {
 
-        alert(
-            "برای اجرای بازی باید از داخل تلگرام وارد شوید."
-        );
+        alert("برای اجرای بازی باید از داخل تلگرام وارد شوید.");
 
         return;
     }
@@ -475,9 +485,7 @@ async function confirmCountrySelection() {
 
             if (data.error === "country_taken") {
 
-                alert(
-                    "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."
-                );
+                alert("این کشور قبلاً توسط بازیکن دیگری انتخاب شده است.");
 
                 selectedCountry = null;
 
@@ -490,18 +498,14 @@ async function confirmCountrySelection() {
 
             if (data.error === "already_has_country") {
 
-                alert(
-                    "شما قبلاً یک کشور انتخاب کرده‌اید."
-                );
+                alert("شما قبلاً یک کشور انتخاب کرده‌اید.");
 
                 await loadPlayer();
 
                 return;
             }
 
-            throw new Error(
-                data.error || "Country selection failed"
-            );
+            throw new Error(data.error || "Country selection failed");
         }
 
         player = data.player;
@@ -514,9 +518,7 @@ async function confirmCountrySelection() {
 
         console.error(error);
 
-        alert(
-            "خطا در ورود به بازی. دوباره امتحان کنید."
-        );
+        alert("خطا در ورود به بازی. دوباره امتحان کنید.");
     }
 }
 
@@ -525,6 +527,8 @@ function showGame() {
 
     showOnly("game");
 
+    showGamePage("home");
+
     updateGameHeader();
     updateHomeStats();
 
@@ -532,15 +536,10 @@ function showGame() {
 }
 
 
-/* =========================================================
-   هدر بازی
-========================================================= */
-
 function updateGameHeader() {
 
-    document.getElementById(
-        "game-country-flag"
-    ).src = countryImageUrl(selectedCountry);
+    document.getElementById("game-country-flag").src =
+        countryImageUrl(selectedCountry);
 }
 
 
@@ -554,20 +553,17 @@ function updateHomeStats() {
         return;
     }
 
-    const name =
-        COUNTRY_NAMES[selectedCountry] || selectedCountry;
+    const name = COUNTRY_NAMES[selectedCountry] || selectedCountry;
 
     document.getElementById("home-country-flag").src =
         countryImageUrl(selectedCountry);
 
     document.getElementById("home-country-name").textContent = name;
 
-    const photo =
-        document.getElementById("home-card-photo");
+    const photo = document.getElementById("home-card-photo");
 
     if (photo) {
-        photo.style.backgroundImage =
-            `url(${countryImageUrl(selectedCountry)})`;
+        photo.style.backgroundImage = `url(${countryImageUrl(selectedCountry)})`;
     }
 
     document.getElementById("home-money").textContent =
@@ -577,16 +573,21 @@ function updateHomeStats() {
         formatMoney(player.daily_income) + " / روز";
 
     document.getElementById("home-manpower").textContent =
-        formatNumber(player.manpower ?? 40000);
+        formatNumber(player.manpower);
+
+    document.getElementById("home-manpower-production").textContent =
+        formatNumber(player.manpower_production);
 
     document.getElementById("home-power").textContent =
-        player.power ?? 0;
+        formatNumber(player.power_capacity);
+
+    const powerLevel = player.infra?.power?.level ?? 0;
 
     document.getElementById("home-power-sub").textContent =
-        `${player.power ?? 0} از ${player.power_capacity ?? 0}`;
+        powerLevel > 0 ? `سطح ${powerLevel}` : "هنوز ساخته نشده";
 
     document.getElementById("home-army").textContent =
-        player.army ?? 0;
+        formatNumber(player.army);
 
     document.getElementById("home-season").textContent =
         player.season ?? "بهار";
@@ -594,14 +595,7 @@ function updateHomeStats() {
     document.getElementById("home-season-end").textContent =
         `پایان فصل تا ${player.season_days_left ?? 0} روز و ${player.season_hours_left ?? 0} ساعت`;
 
-    document.getElementById("home-next-season").textContent =
-        player.next_season ?? "تابستان";
-
-    document.getElementById("home-next-season-time").textContent =
-        `${player.season_days_left ?? 0} روز و ${player.season_hours_left ?? 0} ساعت`;
-
-    const mapMoney =
-        document.getElementById("map-money");
+    const mapMoney = document.getElementById("map-money");
 
     if (mapMoney) {
         mapMoney.textContent = formatMoney(player.money);
@@ -609,16 +603,8 @@ function updateHomeStats() {
 }
 
 
-document
-    .getElementById("next-season-button")
-    .addEventListener("click", () => {
-
-        alert("فصل‌ها به‌صورت خودکار و بر اساس زمان واقعی تغییر می‌کنند.");
-    });
-
-
 /* =========================================================
-   باکس‌های جنگ / ارتش / دیپلماسی / ...
+   باکس‌های اقدام روی خانه
 ========================================================= */
 
 document.querySelectorAll(".action-card").forEach(card => {
@@ -627,12 +613,553 @@ document.querySelectorAll(".action-card").forEach(card => {
 
         const section = card.dataset.section;
 
-        const name =
-            SECTION_NAMES[section] || section;
+        if (section === "infrastructure") {
+            openInfrastructurePage();
+            return;
+        }
 
-        alert(`بخش ${name} به‌زودی فعال می‌شود.`);
+        if (section === "army") {
+            openArmyPage();
+            return;
+        }
+
+        if (section === "war") {
+            openWarPage();
+            return;
+        }
+
+        if (section === "diplomacy") {
+            openDiplomacyPage();
+            return;
+        }
+
+        alert("این بخش به‌زودی فعال می‌شود.");
     });
 });
+
+
+document.querySelectorAll(".sub-back-button").forEach(button => {
+
+    button.addEventListener("click", () => {
+
+        showGamePage(button.dataset.backTo || "home");
+    });
+});
+
+
+/* =========================================================
+   زیرساخت
+========================================================= */
+
+async function openInfrastructurePage() {
+
+    showGamePage("infrastructure");
+
+    await refreshPlayer();
+
+    renderInfraCategory("power");
+    renderInfraCategory("manpower_camp");
+    renderInfraCategory("barracks");
+    renderInfraCategory("airport");
+    renderInfraCategory("port");
+}
+
+
+function infraDetailText(category, info) {
+
+    if (!info.current) {
+        return "هنوز ساخته نشده است.";
+    }
+
+    if (category === "power") {
+        return `ظرفیت فعلی برق: ${info.current.capacity}`;
+    }
+
+    if (category === "manpower_camp") {
+        return `تولید روزانه: ${info.current.production} نفر`;
+    }
+
+    return `ظرفیت فعلی: ${info.current.capacity} واحد`;
+}
+
+
+function infraNextText(category, info) {
+
+    if (!info.next) {
+        return "به حداکثر سطح رسیده است.";
+    }
+
+    if (category === "power") {
+        return `سطح بعد: ظرفیت ${info.next.capacity} — ${formatMoney(info.next.cost)}`;
+    }
+
+    if (category === "manpower_camp") {
+        return `سطح بعد: تولید ${info.next.production} نفر در روز — ${formatMoney(info.next.cost)}`;
+    }
+
+    return `سطح بعد: ظرفیت ${info.next.capacity} واحد — ${formatMoney(info.next.cost)}`;
+}
+
+
+function renderInfraCategory(category) {
+
+    const container = document.getElementById(`infra-${category}`);
+
+    if (!container || !player?.infra?.[category]) {
+        return;
+    }
+
+    const info = player.infra[category];
+
+    container.innerHTML = "";
+
+    const card = document.createElement("div");
+
+    card.className = "infra-card";
+
+    card.innerHTML = `
+        <div class="infra-card-top">
+            <span class="infra-card-name">${info.name}</span>
+            <span class="infra-card-level">سطح ${info.level} از ${info.max_level}</span>
+        </div>
+        <div class="infra-card-detail">
+            ${infraDetailText(category, info)}<br>
+            ${infraNextText(category, info)}
+        </div>
+        <button class="infra-upgrade-button" ${!info.next ? "disabled" : ""}>
+            ${info.next ? "ارتقا" : "حداکثر سطح"}
+        </button>
+    `;
+
+    const button = card.querySelector(".infra-upgrade-button");
+
+    if (info.next) {
+
+        button.addEventListener("click", () => {
+            upgradeInfra(category);
+        });
+    }
+
+    container.appendChild(card);
+}
+
+
+async function upgradeInfra(category) {
+
+    if (!userId) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            getApiUrl("/api/upgrade-infra", {
+                user_id: userId,
+                category: category
+            })
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+
+            alert(data.message || "امکان ارتقا وجود ندارد.");
+
+            return;
+        }
+
+        player = data.player;
+
+        updateHomeStats();
+
+        renderInfraCategory(category);
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert("خطا در ارتقای زیرساخت.");
+    }
+}
+
+
+/* =========================================================
+   ارتش
+========================================================= */
+
+async function openArmyPage() {
+
+    showGamePage("army");
+
+    await refreshPlayer();
+
+    renderArmyUnits();
+}
+
+
+function renderArmyUnits() {
+
+    const container = document.getElementById("army-units");
+
+    if (!container || !player) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    Object.entries(ARMY_UNITS).forEach(([unitId, unit]) => {
+
+        const infraInfo = player.infra?.[unit.infra];
+
+        const hasInfra = infraInfo && infraInfo.level > 0;
+
+        const capacity = hasInfra ? infraInfo.current.capacity : 0;
+
+        const count = player.units?.[unitId] ?? 0;
+
+        const card = document.createElement("div");
+
+        card.className = "unit-card";
+
+        let statusText;
+
+        if (!hasInfra) {
+
+            statusText = `نیاز به ${infraInfo?.name || unit.infra} در زیرساخت`;
+
+        } else if (count >= capacity) {
+
+            statusText = "ظرفیت پر است؛ زیرساخت را ارتقا دهید";
+
+        } else {
+
+            statusText = "آماده آموزش";
+        }
+
+        card.innerHTML = `
+            <div class="unit-card-top">
+                <span class="unit-card-name">${unit.name}</span>
+                <span class="unit-card-count">${count} از ${capacity}</span>
+            </div>
+            <div class="unit-card-detail">
+                هزینه: ${formatMoney(unit.cost)} | نیروی انسانی: ${formatNumber(unit.manpower)} | برق لازم: ${unit.power_required}<br>
+                ${statusText}
+            </div>
+            <button class="unit-train-button" ${(!hasInfra || count >= capacity) ? "disabled" : ""}>
+                آموزش
+            </button>
+        `;
+
+        const button = card.querySelector(".unit-train-button");
+
+        if (hasInfra && count < capacity) {
+
+            button.addEventListener("click", () => {
+                trainUnit(unitId);
+            });
+        }
+
+        container.appendChild(card);
+    });
+}
+
+
+async function trainUnit(unitId) {
+
+    if (!userId) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            getApiUrl("/api/train-unit", {
+                user_id: userId,
+                unit_id: unitId
+            })
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+
+            alert(data.message || "امکان آموزش این یگان وجود ندارد.");
+
+            return;
+        }
+
+        player = data.player;
+
+        updateHomeStats();
+
+        renderArmyUnits();
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert("خطا در آموزش یگان.");
+    }
+}
+
+
+/* =========================================================
+   جنگ
+========================================================= */
+
+function openWarPage() {
+
+    showGamePage("war");
+
+    renderWarTargets();
+}
+
+
+function renderWarTargets() {
+
+    const container = document.getElementById("war-target-list");
+
+    if (!container) {
+        return;
+    }
+
+    container.innerHTML = "";
+
+    Object.keys(COUNTRY_NAMES).forEach(countryId => {
+
+        if (countryId === selectedCountry) {
+            return;
+        }
+
+        const card = document.createElement("div");
+
+        card.className = "war-target-card";
+
+        card.innerHTML = `
+            <div class="war-target-top">
+                <img class="war-target-flag" src="${countryImageUrl(countryId)}" alt="">
+                <span class="war-target-name">${COUNTRY_NAMES[countryId]}</span>
+            </div>
+            <div class="war-attack-buttons">
+                <button class="war-attack-button" data-attack="land">زمینی</button>
+                <button class="war-attack-button" data-attack="air">هوایی</button>
+                <button class="war-attack-button" data-attack="navy">دریایی</button>
+            </div>
+        `;
+
+        card.querySelectorAll("[data-attack]").forEach(button => {
+
+            button.addEventListener("click", () => {
+                launchAttack(countryId, button.dataset.attack);
+            });
+        });
+
+        container.appendChild(card);
+    });
+}
+
+
+async function launchAttack(target, type) {
+
+    if (!userId) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            getApiUrl("/api/attack", {
+                user_id: userId,
+                target: target,
+                type: type
+            })
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+
+            alert(data.message || "امکان حمله وجود ندارد.");
+
+            return;
+        }
+
+        alert(data.message);
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert("خطا در ارسال عملیات.");
+    }
+}
+
+
+/* =========================================================
+   دیپلماسی
+========================================================= */
+
+function openDiplomacyPage() {
+
+    showGamePage("diplomacy");
+
+    const select = document.getElementById("diplomacy-target");
+
+    select.innerHTML = "";
+
+    Object.keys(COUNTRY_NAMES).forEach(countryId => {
+
+        if (countryId === selectedCountry) {
+            return;
+        }
+
+        const option = document.createElement("option");
+
+        option.value = countryId;
+        option.textContent = COUNTRY_NAMES[countryId];
+
+        select.appendChild(option);
+    });
+
+    loadDiplomacyStatus();
+}
+
+
+document
+    .getElementById("diplomacy-propose-button")
+    .addEventListener("click", async () => {
+
+        if (!userId) {
+            return;
+        }
+
+        const target = document.getElementById("diplomacy-target").value;
+        const type = document.getElementById("diplomacy-type").value;
+        const duration = document.getElementById("diplomacy-duration").value;
+
+        try {
+
+            const response = await fetch(
+                getApiUrl("/api/propose-treaty", {
+                    user_id: userId,
+                    target: target,
+                    type: type,
+                    duration_days: duration
+                })
+            );
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+
+                alert(data.message || "ارسال پیشنهاد ممکن نشد.");
+
+                return;
+            }
+
+            alert(data.message);
+
+            loadDiplomacyStatus();
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert("خطا در ارسال پیشنهاد.");
+        }
+    });
+
+
+async function loadDiplomacyStatus() {
+
+    if (!userId) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            getApiUrl("/api/diplomacy", { user_id: userId })
+        );
+
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+
+        renderTreatyList(data.treaties || []);
+        renderSentProposals(data.sent || []);
+
+    } catch (error) {
+
+        console.error(error);
+    }
+}
+
+
+function renderTreatyList(treaties) {
+
+    const container = document.getElementById("diplomacy-treaties");
+
+    container.innerHTML = "";
+
+    if (!treaties.length) {
+
+        container.innerHTML =
+            `<div class="diplomacy-item-empty">هیچ پیمان فعالی وجود ندارد.</div>`;
+
+        return;
+    }
+
+    treaties.forEach(treaty => {
+
+        const otherCountry =
+            treaty.country_a === selectedCountry
+                ? treaty.country_b
+                : treaty.country_a;
+
+        const item = document.createElement("div");
+
+        item.className = "diplomacy-item";
+
+        item.innerHTML = `
+            <span>${TREATY_TYPE_NAMES[treaty.treaty_type]} با ${COUNTRY_NAMES[otherCountry] || otherCountry}</span>
+        `;
+
+        container.appendChild(item);
+    });
+}
+
+
+function renderSentProposals(sent) {
+
+    const container = document.getElementById("diplomacy-sent");
+
+    container.innerHTML = "";
+
+    if (!sent.length) {
+
+        container.innerHTML =
+            `<div class="diplomacy-item-empty">پیشنهاد در انتظار پاسخی وجود ندارد.</div>`;
+
+        return;
+    }
+
+    sent.forEach(proposal => {
+
+        const item = document.createElement("div");
+
+        item.className = "diplomacy-item";
+
+        item.innerHTML = `
+            <span>${TREATY_TYPE_NAMES[proposal.treaty_type]} به ${COUNTRY_NAMES[proposal.to_country] || proposal.to_country}</span>
+            <span>در انتظار پاسخ</span>
+        `;
+
+        container.appendChild(item);
+    });
+}
 
 
 /* =========================================================
@@ -645,29 +1172,15 @@ document.querySelectorAll(".nav-item").forEach(item => {
 
         const page = item.dataset.page;
 
-        document.querySelectorAll(".game-page").forEach(
-            element => {
-                element.classList.add("hidden");
-            }
-        );
+        showGamePage(page);
 
-        const target =
-            document.getElementById(page);
-
-        if (target) {
-            target.classList.remove("hidden");
-        }
-
-        document.querySelectorAll(".nav-item").forEach(
-            nav => {
-                nav.classList.remove("active");
-            }
-        );
+        document.querySelectorAll(".nav-item").forEach(nav => {
+            nav.classList.remove("active");
+        });
 
         item.classList.add("active");
 
         if (page === "home") {
-
             updateHomeStats();
         }
 
@@ -707,8 +1220,7 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
             panel.classList.add("hidden");
         });
 
-        const panel =
-            document.getElementById(targetId);
+        const panel = document.getElementById(targetId);
 
         if (panel) {
             panel.classList.remove("hidden");
@@ -725,14 +1237,9 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
 });
 
 
-/* =========================================================
-   لیست ارتباط با کشورها
-========================================================= */
-
 function renderContactList() {
 
-    const container =
-        document.getElementById("contact-list");
+    const container = document.getElementById("contact-list");
 
     if (!container) {
         return;
@@ -746,8 +1253,7 @@ function renderContactList() {
             return;
         }
 
-        const item =
-            document.createElement("div");
+        const item = document.createElement("div");
 
         item.className = "contact-item";
 
@@ -767,10 +1273,7 @@ function renderContactList() {
     container.querySelectorAll("[data-message-country]").forEach(button => {
 
         button.addEventListener("click", () => {
-
-            sendCountryMessage(
-                button.dataset.messageCountry
-            );
+            sendCountryMessage(button.dataset.messageCountry);
         });
     });
 }
@@ -778,11 +1281,9 @@ function renderContactList() {
 
 function sendCountryMessage(countryId) {
 
-    const name =
-        COUNTRY_NAMES[countryId] || countryId;
+    const name = COUNTRY_NAMES[countryId] || countryId;
 
-    const message =
-        window.prompt(`پیام برای ${name}:`);
+    const message = window.prompt(`پیام برای ${name}:`);
 
     if (!message) {
         return;
@@ -799,8 +1300,7 @@ function sendCountryMessage(countryId) {
 
 async function loadNews() {
 
-    const container =
-        document.getElementById("news-list");
+    const container = document.getElementById("news-list");
 
     if (!container) {
         return;
@@ -808,22 +1308,19 @@ async function loadNews() {
 
     try {
 
-        const response =
-            await fetch("/api/news");
+        const response = await fetch("/api/news");
 
         if (!response.ok) {
             throw new Error("News API error");
         }
 
-        const news =
-            await response.json();
+        const news = await response.json();
 
         container.innerHTML = "";
 
         news.forEach(item => {
 
-            const article =
-                document.createElement("div");
+            const article = document.createElement("div");
 
             article.className = "news-item";
 
@@ -850,7 +1347,7 @@ async function loadNews() {
 
 
 /* =========================================================
-   ابزار مشترک چرخش/زوم کره (پیش‌نمایش و نقشه)
+   ابزار مشترک چرخش/زوم
 ========================================================= */
 
 function getTouchDistance(touches) {
@@ -882,20 +1379,13 @@ function isPointVisible(lon, lat, rotation) {
 
 
 /* =========================================================
-   کره جهان (صفحه پیش‌نمایش کشور - چرخان، داخل کادر متوسط)
+   کره جهان (صفحه پیش‌نمایش کشور)
 ========================================================= */
 
-async function createPreviewGlobe(
-    containerId,
-    svgId,
-    selected
-) {
+async function createPreviewGlobe(containerId, svgId, selected) {
 
-    const container =
-        document.getElementById(containerId);
-
-    const svgElement =
-        document.getElementById(svgId);
+    const container = document.getElementById(containerId);
+    const svgElement = document.getElementById(svgId);
 
     if (!container || !svgElement) {
         return;
@@ -903,12 +1393,6 @@ async function createPreviewGlobe(
 
     const width = container.clientWidth || 300;
     const height = container.clientHeight || 300;
-
-    /*
-     * کره داخل همین کادر شروع می‌شود؛
-     * وقتی خیلی زوم شود، دیگر لبهٔ گرد آن دیده نمی‌شود
-     * و فقط سطح آن کادر را پر می‌کند.
-     */
 
     const size = Math.min(width, height) * 0.46;
 
@@ -918,8 +1402,7 @@ async function createPreviewGlobe(
     d3.select(svgElement).selectAll("*").remove();
 
     const svg =
-        d3.select(svgElement)
-            .attr("viewBox", `0 0 ${width} ${height}`);
+        d3.select(svgElement).attr("viewBox", `0 0 ${width} ${height}`);
 
     const projection =
         d3.geoOrthographic()
@@ -938,13 +1421,10 @@ async function createPreviewGlobe(
         return;
     }
 
-    const land =
-        topojson.feature(world, world.objects.countries);
-
-    const sphere = { type: "Sphere" };
+    const land = topojson.feature(world, world.objects.countries);
 
     svg.append("path")
-        .datum(sphere)
+        .datum({ type: "Sphere" })
         .attr("class", "globe-water")
         .attr("d", path);
 
@@ -1055,9 +1535,7 @@ async function createPreviewGlobe(
         const current = projection.scale();
         const next = current * (event.deltaY > 0 ? 0.9 : 1.1);
 
-        projection.scale(
-            Math.max(minScale, Math.min(maxScale, next))
-        );
+        projection.scale(Math.max(minScale, Math.min(maxScale, next)));
 
         redraw();
 
@@ -1101,9 +1579,7 @@ async function createPreviewGlobe(
             const ratio = distance / pinchStartDistance;
             const next = pinchStartScale * ratio;
 
-            projection.scale(
-                Math.max(minScale, Math.min(maxScale, next))
-            );
+            projection.scale(Math.max(minScale, Math.min(maxScale, next)));
 
             redraw();
 
@@ -1132,8 +1608,7 @@ async function createPreviewGlobe(
 
 
 /* =========================================================
-   نقشه جهان (فوتر) - کره واقعی داخل کادر
-   کوچک: گرد دیده می‌شود | زوم زیاد: فقط سطح را پر می‌کند
+   نقشه جهان (فوتر)
 ========================================================= */
 
 let mapProjection = null;
@@ -1148,11 +1623,8 @@ let mapInitialized = false;
 
 async function initWorldMap() {
 
-    const box =
-        document.querySelector(".map-box");
-
-    const svgElement =
-        document.getElementById("map-globe");
+    const box = document.querySelector(".map-box");
+    const svgElement = document.getElementById("map-globe");
 
     if (!box || !svgElement) {
         return;
@@ -1182,8 +1654,7 @@ async function initWorldMap() {
         return;
     }
 
-    const land =
-        topojson.feature(world, world.objects.countries);
+    const land = topojson.feature(world, world.objects.countries);
 
     mapProjection =
         d3.geoOrthographic()
@@ -1194,9 +1665,7 @@ async function initWorldMap() {
 
     mapPath = d3.geoPath(mapProjection);
 
-    mapSvg =
-        d3.select(svgElement)
-            .attr("viewBox", `0 0 ${width} ${height}`);
+    mapSvg = d3.select(svgElement).attr("viewBox", `0 0 ${width} ${height}`);
 
     mapSvg.selectAll("*").remove();
 
@@ -1213,9 +1682,7 @@ async function initWorldMap() {
         .attr("d", mapPath)
         .attr("data-country-id", d => d.id)
         .on("click", (event, d) => {
-
             event.stopPropagation();
-
             showCountryInfo(d);
         });
 
@@ -1254,26 +1721,20 @@ async function initWorldMap() {
         .attr("class", "map-strait-dot")
         .attr("r", 2.6)
         .on("click", (event, d) => {
-
             event.stopPropagation();
-
             showStraitInfo(d);
         });
 
     updateMapColors();
     redrawMap();
 
-    attachMapInteractions(svgElement, width, height);
+    attachMapInteractions(svgElement);
 
     document.getElementById("map-zoom-in")
-        .addEventListener("click", () => {
-            zoomMap(1.35);
-        });
+        .addEventListener("click", () => zoomMap(1.35));
 
     document.getElementById("map-zoom-out")
-        .addEventListener("click", () => {
-            zoomMap(1 / 1.35);
-        });
+        .addEventListener("click", () => zoomMap(1 / 1.35));
 
     document.getElementById("map-reset")
         .addEventListener("click", () => {
@@ -1299,18 +1760,15 @@ async function initWorldMap() {
 function zoomMap(factor) {
 
     const current = mapProjection.scale();
-
     const next = current * factor;
 
-    mapProjection.scale(
-        Math.max(mapMinScale, Math.min(mapMaxScale, next))
-    );
+    mapProjection.scale(Math.max(mapMinScale, Math.min(mapMaxScale, next)));
 
     redrawMap();
 }
 
 
-function attachMapInteractions(svgElement, width, height) {
+function attachMapInteractions(svgElement) {
 
     let dragging = false;
     let pinching = false;
@@ -1395,9 +1853,7 @@ function attachMapInteractions(svgElement, width, height) {
             const ratio = distance / pinchStartDistance;
             const next = pinchStartScale * ratio;
 
-            mapProjection.scale(
-                Math.max(mapMinScale, Math.min(mapMaxScale, next))
-            );
+            mapProjection.scale(Math.max(mapMinScale, Math.min(mapMaxScale, next)));
 
             redrawMap();
 
@@ -1433,14 +1889,10 @@ function redrawMap() {
 
     const rotation = mapProjection.rotate();
 
-    /* بزرگ‌نمایی نسبی نسبت به اندازه پایه (برای اسم اقیانوس‌ها و دایره تنگه‌ها) */
-
     const zoomRatio = mapProjection.scale() / mapSize;
 
     mapSvg.selectAll("path.globe-water, path.map-country")
         .attr("d", mapPath);
-
-    /* برچسب اقیانوس‌ها - کمی بزرگ‌تر می‌شوند، نه به‌اندازه کل زوم */
 
     const oceanFontSize =
         Math.min(11, 6.5 * (1 + (zoomRatio - 1) * 0.25));
@@ -1458,8 +1910,6 @@ function redrawMap() {
             const p = mapProjection([d[0], d[1]]);
             return p ? p[1] : -9999;
         });
-
-    /* اسم کشورها */
 
     mapSvg.selectAll(".map-country-label")
         .attr("opacity", d => {
@@ -1494,8 +1944,6 @@ function redrawMap() {
             const c = mapPath.centroid(d);
             return isNaN(c[1]) ? -9999 : c[1];
         });
-
-    /* دایره تنگه‌ها - اندازه ثابت، فقط جای‌شان دقیق تغییر می‌کند */
 
     mapSvg.selectAll(".map-strait-dot")
         .attr("opacity", d =>
@@ -1564,9 +2012,7 @@ function showCountryInfo(feature) {
     const countryId = Number(feature.id);
 
     const gameEntry =
-        Object.entries(COUNTRY_IDS).find(
-            ([, id]) => id === countryId
-        );
+        Object.entries(COUNTRY_IDS).find(([, id]) => id === countryId);
 
     const panel = document.getElementById("map-info-panel");
     const flagEl = document.getElementById("map-info-flag");
