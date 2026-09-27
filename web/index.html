@@ -225,8 +225,11 @@
                 </div>
 
                 <div class="manpower-row">
-                    <span class="mini-label">👥 نیروی انسانی</span>
-                    <strong id="home-manpower" class="mini-value">40,000</strong>
+                    <div class="manpower-main">
+                        <span class="mini-label">👥 نیروی انسانی</span>
+                        <strong id="home-manpower" class="mini-value">0</strong>
+                    </div>
+                    <span class="manpower-production">تولید روزانه: <span id="home-manpower-production">0</span> نفر</span>
                 </div>
 
                 <div class="power-army-row">
@@ -234,7 +237,7 @@
                     <div class="power-block">
                         <span class="mini-label">⚡ برق</span>
                         <strong id="home-power" class="mini-value">0</strong>
-                        <span class="mini-sub" id="home-power-sub">0 از 0</span>
+                        <span class="mini-sub" id="home-power-sub">ظرفیت: 0</span>
                     </div>
 
                     <div class="army-block">
@@ -253,10 +256,6 @@
                     <span class="no-effect-tag">بدون اثر بر اقتصاد</span>
                 </div>
 
-                <button class="next-season-button" id="next-season-button">
-                    <span id="home-next-season">تابستان</span> تا <span id="home-next-season-time">۰ ساعت</span> →
-                </button>
-
             </div>
 
         </div>
@@ -267,7 +266,7 @@
                 <div class="action-overlay">
                     <span class="action-icon">🛡️</span>
                     <h3>ارتش</h3>
-                    <p>ساخت، تحقیق و جای یگان‌ها</p>
+                    <p>آموزش نیروی زمینی، هوایی و دریایی</p>
                 </div>
             </button>
 
@@ -275,7 +274,7 @@
                 <div class="action-overlay">
                     <span class="action-icon">⚔️</span>
                     <h3>جنگ</h3>
-                    <p>حمله، عملیات هوایی، نیروی دریایی و آبی‌خاکی</p>
+                    <p>حمله زمینی، هوایی یا دریایی به کشورهای دیگر</p>
                 </div>
             </button>
 
@@ -283,7 +282,7 @@
                 <div class="action-overlay">
                     <span class="action-icon">🤝</span>
                     <h3>دیپلماسی</h3>
-                    <p>عقد پیمان، اتحاد یا مذاکره با سایر کشورها</p>
+                    <p>پیشنهاد پیمان اتحاد یا عدم تجاوز به کشورها</p>
                 </div>
             </button>
 
@@ -291,7 +290,7 @@
                 <div class="action-overlay">
                     <span class="action-icon">💰</span>
                     <h3>اقتصاد</h3>
-                    <p>مدیریت منابع مالی و افزایش درآمد کشور</p>
+                    <p>به‌زودی فعال می‌شود</p>
                 </div>
             </button>
 
@@ -299,7 +298,7 @@
                 <div class="action-overlay">
                     <span class="action-icon">🏗️</span>
                     <h3>زیرساخت</h3>
-                    <p>ساخت نیروگاه برق، جاده و تأسیسات کشور</p>
+                    <p>برق، نیروی انسانی و تأسیسات نظامی</p>
                 </div>
             </button>
 
@@ -307,11 +306,122 @@
                 <div class="action-overlay">
                     <span class="action-icon">🌐</span>
                     <h3>بازار جهانی</h3>
-                    <p>خرید و فروش منابع در بازار بین‌المللی</p>
+                    <p>به‌زودی فعال می‌شود</p>
                 </div>
             </button>
 
         </div>
+
+    </main>
+
+
+    <!-- زیرساخت -->
+
+    <main id="infrastructure" class="game-page hidden">
+
+        <div class="sub-back-bar">
+            <button class="sub-back-button" data-back-to="home">→ بازگشت</button>
+        </div>
+
+        <div class="page-title">
+            <span>ساخت و توسعه</span>
+            <h1>زیرساخت</h1>
+        </div>
+
+        <div class="infra-section">
+            <h2 class="infra-section-title">⚡ برق</h2>
+            <div id="infra-power" class="infra-card-list"></div>
+        </div>
+
+        <div class="infra-section">
+            <h2 class="infra-section-title">👥 نیروی انسانی</h2>
+            <div id="infra-manpower_camp" class="infra-card-list"></div>
+        </div>
+
+        <div class="infra-section">
+            <h2 class="infra-section-title">🪖 نظامی</h2>
+            <div id="infra-barracks" class="infra-card-list"></div>
+            <div id="infra-airport" class="infra-card-list"></div>
+            <div id="infra-port" class="infra-card-list"></div>
+        </div>
+
+    </main>
+
+
+    <!-- ارتش -->
+
+    <main id="army" class="game-page hidden">
+
+        <div class="sub-back-bar">
+            <button class="sub-back-button" data-back-to="home">→ بازگشت</button>
+        </div>
+
+        <div class="page-title">
+            <span>آموزش نیرو</span>
+            <h1>ارتش</h1>
+        </div>
+
+        <div id="army-units" class="unit-card-list"></div>
+
+    </main>
+
+
+    <!-- جنگ -->
+
+    <main id="war" class="game-page hidden">
+
+        <div class="sub-back-bar">
+            <button class="sub-back-button" data-back-to="home">→ بازگشت</button>
+        </div>
+
+        <div class="page-title">
+            <span>عملیات نظامی</span>
+            <h1>جنگ</h1>
+        </div>
+
+        <div id="war-target-list" class="war-target-list"></div>
+
+    </main>
+
+
+    <!-- دیپلماسی -->
+
+    <main id="diplomacy" class="game-page hidden">
+
+        <div class="sub-back-bar">
+            <button class="sub-back-button" data-back-to="home">→ بازگشت</button>
+        </div>
+
+        <div class="page-title">
+            <span>روابط خارجی</span>
+            <h1>دیپلماسی</h1>
+        </div>
+
+        <div class="diplomacy-form">
+
+            <label class="diplomacy-label">کشور مقصد</label>
+            <select id="diplomacy-target" class="diplomacy-select"></select>
+
+            <label class="diplomacy-label">نوع پیمان</label>
+            <select id="diplomacy-type" class="diplomacy-select">
+                <option value="alliance">پیمان اتحاد</option>
+                <option value="non_aggression">پیمان عدم تجاوز</option>
+            </select>
+
+            <label class="diplomacy-label">مدت پیمان (روز)</label>
+            <input id="diplomacy-duration" class="diplomacy-input" type="number" value="10" min="1" max="30">
+
+            <button id="diplomacy-propose-button" class="diplomacy-submit">
+                ارسال پیشنهاد
+            </button>
+
+        </div>
+
+        <div class="diplomacy-list-title">پیمان‌های فعال</div>
+        <div id="diplomacy-treaties" class="diplomacy-list"></div>
+
+        <div class="diplomacy-list-title">پیشنهادهای ارسال‌شده (در انتظار پاسخ)</div>
+        <div id="diplomacy-sent" class="diplomacy-list"></div>
 
     </main>
 
