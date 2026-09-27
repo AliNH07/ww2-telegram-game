@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "0"))
 
 WEB_APP_URL = "https://ww2-telegram-game.onrender.com"
 
@@ -65,13 +66,10 @@ SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
 
 
 # =========================================================
-# زیرساخت‌ها (برق / نیروی انسانی / نظامی)
-# هر آیتم ۵ سطح دارد
+# زیرساخت‌ها
 # =========================================================
 
 INFRASTRUCTURE = {
-
-    # ------------------ برق (۷ مدل) ------------------
 
     "power_coal": {
         "name": "نیروگاه زغال‌سنگ",
@@ -157,8 +155,6 @@ INFRASTRUCTURE = {
         ],
     },
 
-    # ------------------ نیروی انسانی (۶ مدل) ------------------
-
     "manpower_camp": {
         "name": "اردوگاه آموزشی",
         "group": "manpower",
@@ -231,8 +227,6 @@ INFRASTRUCTURE = {
         ],
     },
 
-    # ------------------ نظامی: زمینی ------------------
-
     "land_barracks": {
         "name": "پادگان زمینی",
         "group": "land",
@@ -257,8 +251,6 @@ INFRASTRUCTURE = {
         ],
     },
 
-    # ------------------ نظامی: دریایی ------------------
-
     "naval_port": {
         "name": "بندر نظامی",
         "group": "naval",
@@ -282,8 +274,6 @@ INFRASTRUCTURE = {
             {"cost": 19_000_000, "capacity": 45},
         ],
     },
-
-    # ------------------ نظامی: هوایی ------------------
 
     "air_airport": {
         "name": "فرودگاه نظامی",
@@ -312,7 +302,7 @@ INFRASTRUCTURE = {
 
 
 # =========================================================
-# اقتصاد (۷ مدل، هرکدام ۵ سطح، برخی نیاز به برق دارند)
+# اقتصاد
 # =========================================================
 
 ECONOMY = {
@@ -751,6 +741,27 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 
+# =========================================================
+# اطلاع‌رسانی به ادمین
+# =========================================================
+
+async def notify_admin(text):
+    """ارسال پیام به ادمین (بدون کرش اگه خطا بده)"""
+
+    if not ADMIN_USER_ID:
+        logging.warning("ADMIN_USER_ID not set — skip notify")
+        return
+
+    try:
+        await bot.send_message(ADMIN_USER_ID, text)
+    except Exception as error:
+        logging.warning("Failed to notify admin: %s", error)
+
+
+# =========================================================
+# Start
+# =========================================================
+
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
 
@@ -764,6 +775,40 @@ async def start_command(message: types.Message):
 
     if user_id not in players:
         players[user_id] = create_player(user_id)
+
+    # ---- اطلاع به ادمین ----
+
+    if user_id != ADMIN_USER_ID:
+
+        user = message.from_user
+
+        full_name = (
+            (user.first_name or "") +
+            (" " + user.last_name if user.last_name else "")
+        ).strip() or "بدون نام"
+
+        username = f"@{user.username}" if user.username else "ندارد"
+
+        country_id = players[user_id].get("country")
+
+        if country_id:
+            country = COUNTRIES.get(country_id)
+            country_text = (
+                f"{country['flag']} {country['name']}"
+                if country else "نامشخص"
+            )
+        else:
+            country_text = "هنوز انتخاب نکرده"
+
+        await notify_admin(
+            "🔔 ورود کاربر به ربات\n\n"
+            f"👤 نام: {full_name}\n"
+            f"🆔 یوزرنیم: {username}\n"
+            f"🔢 آیدی: {user_id}\n"
+            f"🏳️ کشور: {country_text}"
+        )
+
+    # ---- ادامه رفتار قبلی ----
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -799,7 +844,7 @@ async def start_command(message: types.Message):
 
 
 # =========================================================
-# دکمه‌های تأیید/رد پیمان در تلگرام
+# دکمه‌های تأیید/رد پیمان
 # =========================================================
 
 @dp.callback_query(F.data.startswith("treaty:"))
@@ -1002,6 +1047,18 @@ async def select_country(request):
         "PLAYER ENTERED GAME | user_id=%s | country=%s",
         user_id, country_id
     )
+
+    # ---- اطلاع به ادمین ----
+
+    if user_id != ADMIN_USER_ID:
+
+        country = COUNTRIES[country_id]
+
+        await notify_admin(
+            "🎯 انتخاب کشور جدید\n\n"
+            f"🆔 آیدی: {user_id}\n"
+            f"🏳️ کشور: {country['flag']} {country['name']}"
+        )
 
     return web.json_response({
         "success": True,
@@ -1592,6 +1649,11 @@ async def start_web_server():
 async def main():
 
     logging.info("WW2 TELEGRAM GAME STARTING...")
+
+    if ADMIN_USER_ID:
+        logging.info("ADMIN NOTIFICATIONS ENABLED | admin_id=%s", ADMIN_USER_ID)
+    else:
+        logging.warning("ADMIN_USER_ID not set — notifications disabled")
 
     await start_web_server()
 
