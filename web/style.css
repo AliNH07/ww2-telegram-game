@@ -16,8 +16,6 @@ body {
     color: #f4f6f9;
     direction: rtl;
     min-height: 100vh;
-
-    /* فقط یک لایه تیره‌کننده + پس‌زمینه */
     background:
         linear-gradient(
             180deg,
@@ -130,7 +128,6 @@ img {
     font-weight: bold;
     margin-bottom: 8px;
     color: #f4f6f9;
-    letter-spacing: 0.5px;
 }
 
 .country-header p {
@@ -174,7 +171,6 @@ img {
 .country-card:hover {
     border-color: rgba(240, 180, 41, 0.5);
     transform: translateY(-3px);
-    box-shadow: 0 12px 32px rgba(240, 180, 41, 0.12);
 }
 
 .country-card:active {
@@ -206,7 +202,6 @@ img {
 .country-info h2 {
     font-size: 17px;
     margin-bottom: 3px;
-    color: #f4f6f9;
 }
 
 .country-info > span {
@@ -247,22 +242,15 @@ img {
     -webkit-backdrop-filter: blur(20px);
 }
 
-.header-right {
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-}
-
+.header-right,
 .header-left {
     display: flex;
-    justify-content: flex-end;
     align-items: center;
-    gap: 8px;
 }
 
-.header-center {
-    text-align: center;
-}
+.header-right { justify-content: flex-start; }
+.header-left  { justify-content: flex-end; gap: 8px; }
+.header-center { text-align: center; }
 
 .game-title {
     font-size: 13px;
@@ -304,7 +292,7 @@ img {
 
 
 /* =========================================================
-   دکمه بازگشت
+   نوار بازگشت
 ========================================================= */
 
 .back-bar {
@@ -314,11 +302,9 @@ img {
     background: rgba(9, 12, 17, 0.6);
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
 }
 
 .back-button {
-    background: transparent;
     color: #f0b429;
     font-size: 13px;
     display: flex;
@@ -326,16 +312,11 @@ img {
     gap: 6px;
     padding: 6px 10px;
     border-radius: 10px;
-    transition: all 0.2s ease;
 }
 
-.back-button:active {
-    background: rgba(240, 180, 41, 0.1);
-}
+.back-button:active { background: rgba(240, 180, 41, 0.1); }
 
-.sub-back-bar {
-    margin-bottom: 10px;
-}
+.sub-back-bar { margin-bottom: 10px; }
 
 .sub-back-button {
     background: rgba(255, 255, 255, 0.05);
@@ -344,13 +325,9 @@ img {
     padding: 8px 14px;
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    transition: all 0.2s ease;
 }
 
-.sub-back-button:active {
-    transform: scale(0.96);
-    background: rgba(240, 180, 41, 0.1);
-}
+.sub-back-button:active { transform: scale(0.96); }
 
 
 /* =========================================================
@@ -367,25 +344,10 @@ img {
     gap: 22px;
 }
 
-.preview-title {
-    text-align: center;
-}
-
-.preview-title span {
-    color: #6b7480;
-    font-size: 12px;
-}
-
-.preview-title h1 {
-    font-size: 28px;
-    margin: 5px 0;
-    color: #f4f6f9;
-}
-
-.preview-title p {
-    color: #a0a8b3;
-    font-size: 12px;
-}
+.preview-title { text-align: center; }
+.preview-title span { color: #6b7480; font-size: 12px; }
+.preview-title h1 { font-size: 28px; margin: 5px 0; }
+.preview-title p { color: #a0a8b3; font-size: 12px; }
 
 .globe-card {
     width: min(300px, 78vw);
@@ -396,7 +358,6 @@ img {
     overflow: hidden;
     position: relative;
     backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
@@ -410,11 +371,7 @@ img {
     height: 100%;
 }
 
-#preview-globe {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-}
+#preview-globe { width: 100%; height: 100%; overflow: visible; }
 
 .primary-game-button {
     width: min(320px, 85%);
@@ -426,22 +383,16 @@ img {
     font-weight: bold;
     box-shadow: 0 8px 24px rgba(240, 180, 41, 0.3);
     transition: all 0.2s ease;
-    letter-spacing: 0.5px;
 }
 
-.primary-game-button:active {
-    transform: scale(0.97);
-    box-shadow: 0 4px 14px rgba(240, 180, 41, 0.4);
-}
+.primary-game-button:active { transform: scale(0.97); }
 
 
 /* =========================================================
    بازی
 ========================================================= */
 
-.game-screen {
-    overflow: hidden;
-}
+.game-screen { overflow: hidden; }
 
 .game-page {
     height: calc(100vh - 64px - 78px);
@@ -449,33 +400,16 @@ img {
     padding: 16px 15px 96px;
 }
 
-.game-page::-webkit-scrollbar {
-    width: 4px;
-}
-
-.game-page::-webkit-scrollbar-track {
-    background: transparent;
-}
-
+.game-page::-webkit-scrollbar { width: 4px; }
+.game-page::-webkit-scrollbar-track { background: transparent; }
 .game-page::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.08);
     border-radius: 4px;
 }
 
-.page-title {
-    margin-bottom: 15px;
-}
-
-.page-title span {
-    color: #6b7480;
-    font-size: 11px;
-}
-
-.page-title h1 {
-    font-size: 24px;
-    margin-top: 4px;
-    color: #f4f6f9;
-}
+.page-title { margin-bottom: 15px; }
+.page-title span { color: #6b7480; font-size: 11px; }
+.page-title h1 { font-size: 24px; margin-top: 4px; }
 
 
 /* =========================================================
@@ -487,9 +421,8 @@ img {
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 20px;
     overflow: hidden;
-    margin-bottom: 18px;
+    margin-bottom: 16px;
     backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
@@ -522,7 +455,6 @@ img {
     height: 26px;
     border-radius: 50%;
     object-fit: cover;
-    object-position: center;
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -544,9 +476,7 @@ img {
         rgba(14, 18, 26, 0.85) 100%);
 }
 
-.home-card-body {
-    padding: 4px 16px 18px;
-}
+.home-card-body { padding: 4px 16px 18px; }
 
 .treasury-row {
     display: flex;
@@ -556,11 +486,7 @@ img {
     margin-bottom: 12px;
 }
 
-.treasury-label {
-    color: #a0a8b3;
-    font-size: 12px;
-    margin-bottom: 4px;
-}
+.treasury-label { color: #a0a8b3; font-size: 12px; margin-bottom: 4px; }
 
 .treasury-value {
     font-size: 30px;
@@ -569,15 +495,8 @@ img {
     letter-spacing: -0.5px;
 }
 
-.income-label {
-    color: #6b7480;
-    font-size: 11px;
-    margin-top: 4px;
-}
-
-.income-label span {
-    color: #4ade80;
-}
+.income-label { color: #6b7480; font-size: 11px; margin-top: 4px; }
+.income-label span { color: #4ade80; }
 
 .manpower-row {
     display: flex;
@@ -588,20 +507,9 @@ img {
     margin-bottom: 4px;
 }
 
-.manpower-main {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.manpower-main .mini-value {
-    color: #f4f6f9;
-}
-
-.manpower-production {
-    font-size: 10.5px;
-    color: #4ade80;
-}
+.manpower-main { display: flex; flex-direction: column; gap: 4px; }
+.manpower-main .mini-value { color: #f4f6f9; }
+.manpower-production { font-size: 10.5px; color: #4ade80; }
 
 .power-army-row {
     display: flex;
@@ -619,30 +527,12 @@ img {
     gap: 4px;
 }
 
-.army-block {
-    align-items: flex-end;
-    text-align: right;
-}
+.army-block { align-items: flex-end; text-align: right; }
 
-.mini-label {
-    font-size: 11px;
-    color: #a0a8b3;
-}
-
-.mini-value {
-    font-size: 19px;
-    color: #f0b429;
-    font-weight: bold;
-}
-
-.army-block .mini-value {
-    color: #f4f6f9;
-}
-
-.mini-sub {
-    font-size: 10px;
-    color: #6b7480;
-}
+.mini-label { font-size: 11px; color: #a0a8b3; }
+.mini-value { font-size: 19px; color: #f0b429; font-weight: bold; }
+.army-block .mini-value { color: #f4f6f9; }
+.mini-sub { font-size: 10px; color: #6b7480; }
 
 .season-end-row {
     font-size: 12px;
@@ -657,10 +547,7 @@ img {
     justify-content: space-between;
 }
 
-.season-tag {
-    font-size: 13px;
-    color: #f4f6f9;
-}
+.season-tag { font-size: 13px; color: #f4f6f9; }
 
 .no-effect-tag {
     background: rgba(255, 255, 255, 0.05);
@@ -670,6 +557,48 @@ img {
     padding: 5px 10px;
     border-radius: 12px;
 }
+
+
+/* =========================================================
+   کارت رتبه‌ها
+========================================================= */
+
+.rankings-card {
+    background: rgba(14, 18, 26, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 14px;
+    margin-bottom: 18px;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.rankings-title {
+    font-size: 13px;
+    color: #f4f6f9;
+    margin-bottom: 10px;
+    opacity: 0.9;
+}
+
+.rankings-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+}
+
+.rank-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 2px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.rank-label { font-size: 9px; color: #a0a8b3; text-align: center; }
+.rank-value { font-size: 11px; color: #f0b429; font-weight: bold; }
 
 
 /* =========================================================
@@ -695,12 +624,9 @@ img {
 .action-card:hover {
     transform: translateY(-3px);
     border-color: rgba(240, 180, 41, 0.35);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
-.action-card:active {
-    transform: scale(0.97);
-}
+.action-card:active { transform: scale(0.97); }
 
 .action-overlay {
     position: absolute;
@@ -714,8 +640,6 @@ img {
     background: linear-gradient(180deg,
         rgba(10, 14, 20, 0.1) 0%,
         rgba(10, 14, 20, 0.92) 100%);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
 }
 
 .action-icon {
@@ -733,57 +657,24 @@ img {
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.action-card h3 {
-    font-size: 15px;
-    color: #f4f6f9;
-    margin-bottom: 4px;
-}
+.action-card h3 { font-size: 15px; color: #f4f6f9; margin-bottom: 4px; }
+.action-card p { font-size: 10.5px; color: #a0a8b3; line-height: 1.6; }
 
-.action-card p {
-    font-size: 10.5px;
-    color: #a0a8b3;
-    line-height: 1.6;
-}
-
-/* رنگ‌های ملایم و هماهنگ برای هر کارت */
-
-.action-army {
-    background: linear-gradient(140deg, #1a2436 0%, #0c1220 100%);
-}
-
-.action-war {
-    background: linear-gradient(140deg, #2a1620 0%, #14080d 100%);
-}
-
-.action-diplomacy {
-    background: linear-gradient(140deg, #1a2a1e 0%, #0a140e 100%);
-}
-
-.action-economy {
-    background: linear-gradient(140deg, #2a2212 0%, #14100a 100%);
-}
-
-.action-infrastructure {
-    background: linear-gradient(140deg, #221a30 0%, #110c1c 100%);
-}
-
-.action-market {
-    background: linear-gradient(140deg, #122430 0%, #08141c 100%);
-}
+.action-army           { background: linear-gradient(140deg, #1a2436 0%, #0c1220 100%); }
+.action-war            { background: linear-gradient(140deg, #2a1620 0%, #14080d 100%); }
+.action-diplomacy      { background: linear-gradient(140deg, #1a2a1e 0%, #0a140e 100%); }
+.action-economy        { background: linear-gradient(140deg, #2a2212 0%, #14100a 100%); }
+.action-infrastructure { background: linear-gradient(140deg, #221a30 0%, #110c1c 100%); }
+.action-market         { background: linear-gradient(140deg, #122430 0%, #08141c 100%); }
 
 
 /* =========================================================
    منوی زیرساخت
 ========================================================= */
 
-.infra-menu-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-}
+.infra-menu-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 
 .infra-menu-tile {
-    position: relative;
     display: flex;
     align-items: center;
     gap: 14px;
@@ -795,18 +686,11 @@ img {
     text-align: right;
     transition: all 0.25s ease;
     backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-.infra-menu-tile:hover {
-    border-color: rgba(240, 180, 41, 0.4);
-    transform: translateY(-2px);
-}
-
-.infra-menu-tile:active {
-    transform: scale(0.98);
-}
+.infra-menu-tile:hover { border-color: rgba(240, 180, 41, 0.4); }
+.infra-menu-tile:active { transform: scale(0.98); }
 
 .infra-menu-icon {
     width: 48px;
@@ -821,36 +705,17 @@ img {
     font-size: 22px;
 }
 
-.infra-menu-text {
-    flex: 1;
-}
-
-.infra-menu-text h3 {
-    font-size: 15px;
-    margin-bottom: 4px;
-    color: #f4f6f9;
-}
-
-.infra-menu-text p {
-    font-size: 11px;
-    color: #a0a8b3;
-    line-height: 1.6;
-}
-
-.infra-menu-arrow {
-    color: #6b7480;
-    font-size: 18px;
-}
+.infra-menu-text { flex: 1; }
+.infra-menu-text h3 { font-size: 15px; margin-bottom: 4px; }
+.infra-menu-text p { font-size: 11px; color: #a0a8b3; line-height: 1.6; }
+.infra-menu-arrow { color: #6b7480; font-size: 18px; }
 
 
 /* =========================================================
-   کارت‌های زیرساخت / اقتصاد / واحد
+   کارت‌های زیرساخت / واحد / هدف جنگ
 ========================================================= */
 
-.infra-section {
-    margin-bottom: 22px;
-}
-
+.infra-section { margin-bottom: 22px; }
 .infra-section-title {
     font-size: 14px;
     color: #f4f6f9;
@@ -874,9 +739,7 @@ img {
     border-radius: 16px;
     padding: 14px 16px;
     backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
-    transition: all 0.2s ease;
 }
 
 .infra-card-top,
@@ -888,11 +751,7 @@ img {
 }
 
 .infra-card-name,
-.unit-card-name {
-    font-size: 13.5px;
-    color: #f4f6f9;
-    font-weight: 500;
-}
+.unit-card-name { font-size: 13.5px; color: #f4f6f9; }
 
 .infra-card-level,
 .unit-card-count {
@@ -921,7 +780,6 @@ img {
     font-size: 12.5px;
     padding: 10px;
     border-radius: 10px;
-    transition: all 0.2s ease;
     font-weight: 500;
 }
 
@@ -933,7 +791,7 @@ img {
 
 .infra-upgrade-button:disabled,
 .unit-train-button:disabled {
-    opacity: 0.35;
+    opacity: 0.4;
     color: #6b7480;
     background: rgba(255, 255, 255, 0.03);
     border-color: rgba(255, 255, 255, 0.06);
@@ -946,8 +804,22 @@ img {
     border-color: rgba(74, 222, 128, 0.25);
 }
 
-.unit-train-button:active {
-    background: rgba(74, 222, 128, 0.2);
+.unit-train-button:active { background: rgba(74, 222, 128, 0.2); }
+
+
+/* =========================================================
+   راهنمای غیرفعال
+========================================================= */
+
+.disabled-hint {
+    background: rgba(240, 180, 41, 0.08);
+    border: 1px solid rgba(240, 180, 41, 0.2);
+    color: #f0b429;
+    font-size: 10.5px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    line-height: 1.7;
 }
 
 
@@ -955,11 +827,86 @@ img {
    جنگ
 ========================================================= */
 
-.war-target-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+.wars-section { margin-bottom: 18px; }
+
+.wars-section-title {
+    font-size: 13.5px;
+    color: #f4f6f9;
+    margin-bottom: 10px;
+    padding-right: 4px;
 }
+
+.wars-list { display: flex; flex-direction: column; gap: 10px; }
+
+.wars-empty {
+    background: rgba(14, 18, 26, 0.5);
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+    color: #6b7480;
+    font-size: 11.5px;
+}
+
+.war-item {
+    background: rgba(14, 18, 26, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 12px 14px;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+
+.war-item.incoming {
+    border-color: rgba(248, 113, 113, 0.3);
+    background: rgba(40, 14, 14, 0.55);
+}
+
+.war-item-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.war-item-name {
+    font-size: 13px;
+    color: #f4f6f9;
+    margin-bottom: 2px;
+}
+
+.war-item-status {
+    font-size: 10.5px;
+    color: #4ade80;
+}
+
+.war-item-status.danger { color: #f87171; }
+
+.war-hint {
+    font-size: 11px;
+    color: #f87171;
+    line-height: 1.7;
+}
+
+.declare-war-button {
+    width: 100%;
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    color: #f87171;
+    font-size: 12.5px;
+    padding: 10px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.declare-war-button:active { transform: scale(0.97); }
+
+.declare-war-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.war-target-list { display: flex; flex-direction: column; gap: 10px; }
 
 .war-target-top {
     display: flex;
@@ -976,15 +923,9 @@ img {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.war-target-name {
-    font-size: 13.5px;
-    color: #f4f6f9;
-}
+.war-target-name { font-size: 13.5px; color: #f4f6f9; }
 
-.war-attack-buttons {
-    display: flex;
-    gap: 8px;
-}
+.war-attack-buttons { display: flex; gap: 8px; }
 
 .war-attack-button {
     flex: 1;
@@ -994,7 +935,6 @@ img {
     font-size: 11.5px;
     padding: 9px;
     border-radius: 10px;
-    transition: all 0.2s ease;
 }
 
 .war-attack-button:active {
@@ -1017,14 +957,9 @@ img {
     flex-direction: column;
     gap: 10px;
     backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 }
 
-.diplomacy-label {
-    font-size: 11.5px;
-    color: #a0a8b3;
-}
+.diplomacy-label { font-size: 11.5px; color: #a0a8b3; }
 
 .diplomacy-select,
 .diplomacy-input {
@@ -1036,18 +971,12 @@ img {
     border-radius: 10px;
     font-family: inherit;
     outline: none;
-    transition: border-color 0.2s ease;
 }
 
 .diplomacy-select:focus,
-.diplomacy-input:focus {
-    border-color: rgba(240, 180, 41, 0.5);
-}
+.diplomacy-input:focus { border-color: rgba(240, 180, 41, 0.5); }
 
-.diplomacy-select option {
-    background: #0e121a;
-    color: #f4f6f9;
-}
+.diplomacy-select option { background: #0e121a; color: #f4f6f9; }
 
 .diplomacy-submit {
     margin-top: 6px;
@@ -1057,13 +986,10 @@ img {
     font-size: 13px;
     padding: 12px;
     border-radius: 12px;
-    transition: all 0.2s ease;
     box-shadow: 0 6px 18px rgba(240, 180, 41, 0.2);
 }
 
-.diplomacy-submit:active {
-    transform: scale(0.97);
-}
+.diplomacy-submit:active { transform: scale(0.97); }
 
 .diplomacy-list-title {
     font-size: 12px;
@@ -1071,11 +997,7 @@ img {
     margin: 14px 0 8px;
 }
 
-.diplomacy-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
+.diplomacy-list { display: flex; flex-direction: column; gap: 8px; }
 
 .diplomacy-item {
     background: rgba(14, 18, 26, 0.72);
@@ -1088,14 +1010,9 @@ img {
     justify-content: space-between;
     align-items: center;
     backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
 }
 
-.diplomacy-item-empty {
-    color: #6b7480;
-    font-size: 11.5px;
-    padding: 6px 2px;
-}
+.diplomacy-item-empty { color: #6b7480; font-size: 11.5px; padding: 6px 2px; }
 
 
 /* =========================================================
@@ -1109,17 +1026,8 @@ img {
     margin-bottom: 10px;
 }
 
-.map-money {
-    font-size: 18px;
-    font-weight: bold;
-    color: #f0b429;
-}
-
-.map-title {
-    font-size: 13px;
-    color: #f4f6f9;
-    opacity: 0.85;
-}
+.map-money { font-size: 18px; font-weight: bold; color: #f0b429; }
+.map-title { font-size: 13px; color: #f4f6f9; opacity: 0.85; }
 
 .map-box {
     position: relative;
@@ -1130,27 +1038,17 @@ img {
     background: rgba(10, 20, 32, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-.map-box svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-    cursor: grab;
-}
-
-.map-box svg:active {
-    cursor: grabbing;
-}
+.map-box svg { width: 100%; height: 100%; display: block; cursor: grab; }
+.map-box svg:active { cursor: grabbing; }
 
 .map-ocean-label {
     fill: #4a6a86;
     font-size: 6.5px;
     pointer-events: none;
     user-select: none;
-    letter-spacing: 0.3px;
 }
 
 .map-country-label {
@@ -1189,18 +1087,9 @@ img {
     align-items: center;
     justify-content: center;
     backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    transition: all 0.2s ease;
 }
 
-.map-control-btn:active {
-    transform: scale(0.92);
-    background: rgba(240, 180, 41, 0.15);
-}
-
-.map-reset-btn {
-    font-size: 14px;
-}
+.map-control-btn:active { transform: scale(0.92); }
 
 .map-legend {
     display: flex;
@@ -1211,24 +1100,14 @@ img {
     color: #a0a8b3;
 }
 
-.map-legend div {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
+.map-legend div { display: flex; align-items: center; gap: 6px; }
 
-.dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    display: inline-block;
-}
-
-.dot-own { background: #f0b429; }
-.dot-own-occupied { background: #4a90e2; }
-.dot-other { background: #6fa8dc; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.dot-own { background: #d98a25; }
+.dot-own-occupied { background: #e8b355; }
+.dot-other { background: #3978b7; }
 .dot-other-occupied { background: #4a90e2; }
-.dot-unowned { background: #9b6fe2; }
+.dot-unowned { background: #6b7480; }
 
 
 /* =========================================================
@@ -1243,39 +1122,19 @@ img {
     border-radius: 16px;
     padding: 16px;
     backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .map-info-close {
     position: absolute;
     top: 10px;
     left: 12px;
-    background: transparent;
     color: #a0a8b3;
     font-size: 18px;
-    transition: color 0.2s ease;
 }
 
-.map-info-close:active {
-    color: #f0b429;
-}
-
-.map-info-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-}
-
-.map-info-flag {
-    font-size: 20px;
-}
-
-.map-info-name {
-    font-size: 15px;
-    color: #f4f6f9;
-}
+.map-info-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.map-info-flag { font-size: 20px; }
+.map-info-name { font-size: 15px; color: #f4f6f9; }
 
 .map-info-status {
     display: inline-block;
@@ -1288,22 +1147,14 @@ img {
     margin-bottom: 8px;
 }
 
-.map-info-desc {
-    color: #a0a8b3;
-    font-size: 12px;
-    line-height: 1.8;
-}
+.map-info-desc { color: #a0a8b3; font-size: 12px; line-height: 1.8; }
 
 
 /* =========================================================
    اخبار
 ========================================================= */
 
-.news-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
+.news-list { display: flex; flex-direction: column; gap: 10px; }
 
 .news-item {
     background: rgba(14, 18, 26, 0.72);
@@ -1311,32 +1162,17 @@ img {
     border-radius: 14px;
     padding: 15px;
     backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 }
 
-.news-item h3 {
-    font-size: 14px;
-    margin-bottom: 7px;
-    color: #f4f6f9;
-}
-
-.news-item p {
-    color: #a0a8b3;
-    font-size: 12px;
-    line-height: 1.8;
-}
+.news-item h3 { font-size: 14px; margin-bottom: 7px; }
+.news-item p { color: #a0a8b3; font-size: 12px; line-height: 1.8; }
 
 
 /* =========================================================
    ارتباطات
 ========================================================= */
 
-.comm-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 15px;
-}
+.comm-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
 
 .comm-tab {
     flex: 1;
@@ -1349,7 +1185,6 @@ img {
     text-align: center;
     transition: all 0.2s ease;
     backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
 }
 
 .comm-tab.active {
@@ -1358,20 +1193,7 @@ img {
     border-color: rgba(240, 180, 41, 0.4);
 }
 
-.comm-panel.hidden {
-    display: none;
-}
-
-
-/* =========================================================
-   لیست تماس
-========================================================= */
-
-.contact-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
+.contact-list { display: flex; flex-direction: column; gap: 10px; }
 
 .contact-item {
     display: flex;
@@ -1382,24 +1204,11 @@ img {
     border-radius: 14px;
     padding: 12px 15px;
     backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 }
 
-.contact-item .contact-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.contact-item .contact-flag {
-    font-size: 22px;
-}
-
-.contact-item .contact-name {
-    font-size: 13px;
-    color: #f4f6f9;
-}
+.contact-item .contact-info { display: flex; align-items: center; gap: 10px; }
+.contact-item .contact-flag { font-size: 22px; }
+.contact-item .contact-name { font-size: 13px; }
 
 .message-button {
     background: rgba(240, 180, 41, 0.12);
@@ -1408,7 +1217,6 @@ img {
     border-radius: 10px;
     padding: 7px 14px;
     font-size: 12px;
-    transition: all 0.2s ease;
 }
 
 .message-button:active {
@@ -1418,7 +1226,7 @@ img {
 
 
 /* =========================================================
-   صفحات خالی / اشتراک
+   صفحات خالی
 ========================================================= */
 
 .empty-page,
@@ -1430,18 +1238,13 @@ img {
     color: #a0a8b3;
     text-align: center;
     backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 }
 
-.subscription-card h2 {
-    color: #f4f6f9;
-    margin-bottom: 8px;
-}
+.subscription-card h2 { color: #f4f6f9; margin-bottom: 8px; }
 
 
 /* =========================================================
-   نوار پایین (5 بخش، خانه وسط بزرگ‌تر)
+   نوار پایین (5 بخش)
 ========================================================= */
 
 .bottom-nav {
@@ -1457,12 +1260,10 @@ img {
     z-index: 30;
     padding-bottom: env(safe-area-inset-bottom);
     backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
     box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .nav-item {
-    background: transparent;
     color: #6b7480;
     display: flex;
     flex-direction: column;
@@ -1471,40 +1272,16 @@ img {
     gap: 4px;
     font-size: 10px;
     transition: all 0.25s ease;
-    position: relative;
     padding-top: 6px;
-    border-radius: 0;
 }
 
-.nav-item span {
-    font-size: 19px;
-    transition: all 0.25s ease;
-    line-height: 1;
-}
+.nav-item span { font-size: 19px; transition: all 0.25s ease; line-height: 1; }
+.nav-item small { font-size: 10px; transition: color 0.25s ease; }
+.nav-item.active { color: #f0b429; }
+.nav-item.active span { transform: scale(1.15); }
+.nav-item.active small { color: #f0b429; font-weight: bold; }
 
-.nav-item small {
-    font-size: 10px;
-    transition: color 0.25s ease;
-}
-
-.nav-item.active {
-    color: #f0b429;
-}
-
-.nav-item.active span {
-    transform: scale(1.15);
-}
-
-.nav-item.active small {
-    color: #f0b429;
-    font-weight: bold;
-}
-
-/* دکمه خانه وسط */
-
-.nav-home {
-    padding-top: 0;
-}
+.nav-home { padding-top: 0; }
 
 .nav-home span {
     width: 56px;
@@ -1524,25 +1301,17 @@ img {
     transition: all 0.3s ease;
 }
 
-.nav-home small {
-    transform: translateY(-6px);
-    margin-top: 2px;
-}
+.nav-home small { transform: translateY(-6px); margin-top: 2px; }
 
 .nav-home.active span {
     background: linear-gradient(145deg, #f0b429, #b8841a);
     color: #0a0e14;
     border-color: rgba(255, 255, 255, 0.2);
-    box-shadow:
-        0 10px 28px rgba(240, 180, 41, 0.5),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 28px rgba(240, 180, 41, 0.5);
     transform: scale(1.06);
 }
 
-.nav-home.active small {
-    color: #f0b429;
-    font-weight: bold;
-}
+.nav-home.active small { color: #f0b429; font-weight: bold; }
 
 
 /* =========================================================
@@ -1551,17 +1320,9 @@ img {
 
 @media (max-width: 600px) {
 
-    .country-screen {
-        padding-top: 25px;
-    }
-
-    .country-header h1 {
-        font-size: 22px;
-    }
-
-    .country-grid {
-        gap: 10px;
-    }
+    .country-screen { padding-top: 25px; }
+    .country-header h1 { font-size: 22px; }
+    .country-grid { gap: 10px; }
 
     .country-card {
         min-height: 135px;
@@ -1569,55 +1330,20 @@ img {
         gap: 9px;
     }
 
-    .country-photo {
-        width: 45px;
-        height: 45px;
-    }
+    .country-photo { width: 45px; height: 45px; }
+    .country-info h2 { font-size: 14px; }
+    .country-info > span { font-size: 9px; }
+    .country-facts span { font-size: 9px; }
 
-    .country-info h2 {
-        font-size: 14px;
-    }
+    .game-title { font-size: 11px; letter-spacing: 1px; }
+    .globe-card { height: 32vh; }
+    .action-card { min-height: 115px; }
+    .action-card h3 { font-size: 13px; }
+    .action-card p { font-size: 9.5px; }
+    .treasury-value { font-size: 25px; }
+    .map-box { height: 42vh; }
 
-    .country-info > span {
-        font-size: 9px;
-    }
-
-    .country-facts span {
-        font-size: 9px;
-    }
-
-    .game-title {
-        font-size: 11px;
-        letter-spacing: 1px;
-    }
-
-    .globe-card {
-        height: 32vh;
-    }
-
-    .action-card {
-        min-height: 115px;
-    }
-
-    .action-card h3 {
-        font-size: 13px;
-    }
-
-    .action-card p {
-        font-size: 9.5px;
-    }
-
-    .treasury-value {
-        font-size: 25px;
-    }
-
-    .map-box {
-        height: 42vh;
-    }
-
-    .bottom-nav {
-        height: 74px;
-    }
+    .bottom-nav { height: 74px; }
 
     .nav-home span {
         width: 52px;
@@ -1625,4 +1351,8 @@ img {
         font-size: 24px;
         margin-top: -22px;
     }
+
+    .rankings-grid { grid-template-columns: repeat(5, 1fr); }
+    .rank-label { font-size: 8.5px; }
+    .rank-value { font-size: 10px; }
 }
