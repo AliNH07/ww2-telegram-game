@@ -21,7 +21,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "0"))
 
 WEB_APP_URL = "https://ww2-telegram-game.onrender.com"
 
@@ -405,7 +404,8 @@ ARMY_UNITS = {
         "cost": 50_000,
         "manpower": 300,
         "power_required": 5,
-        "army_power": 15,
+        "attack": 20,
+        "defense": 10,
     },
 
     "air": {
@@ -414,7 +414,8 @@ ARMY_UNITS = {
         "cost": 200_000,
         "manpower": 150,
         "power_required": 15,
-        "army_power": 40,
+        "attack": 60,
+        "defense": 30,
     },
 
     "navy": {
@@ -423,7 +424,8 @@ ARMY_UNITS = {
         "cost": 250_000,
         "manpower": 200,
         "power_required": 15,
-        "army_power": 35,
+        "attack": 50,
+        "defense": 60,
     },
 }
 
@@ -565,7 +567,7 @@ def get_group_capacity(player, group):
     return total
 
 
-def compute_rates(player):
+def compute_base_rates(player):
 
     power_capacity = get_power_total(player)
     power_consumption = get_power_used(player)
@@ -600,6 +602,30 @@ def compute_rates(player):
         "power_consumption": power_consumption,
         "manpower_production": manpower_production,
     }
+
+
+def compute_rates(player):
+
+    base = compute_base_rates(player)
+
+    country = player.get("country")
+
+    if not country:
+        return base
+
+    # اگر کشور تحت اشغال است، ۵۰٪ درآمد کم می‌شود
+    if country in occupations:
+
+        base["net_income"] = int(base["net_income"] * 0.5)
+
+    # اگر اشغالگر هستیم، به عنوان مالیات اضافه می‌شود
+    for occ_country, occ_data in occupations.items():
+
+        if occ_data.get("occupier") == country:
+
+            base["net_income"] += occ_data.get("bonus", 0)
+
+    return base
 
 
 def accrue_player(player):
@@ -679,32 +705,19 @@ def build_catalog_status(player, catalog):
     return result
 
 
-def serialize_player(player):
-
-    accrue_player(player)
-    rates = compute_rates(player)
-
-    data = dict(player)
-    data.update(get_game_time(player))
-
-    data["power_capacity"] = rates["power_capacity"]
-    data["power_consumption"] = rates["power_consumption"]
-    data["manpower_production"] = rates["manpower_production"]
-    data["daily_income"] = rates["net_income"]
-
-    data["infra"] = build_catalog_status(player, INFRASTRUCTURE)
-    data["economy"] = build_catalog_status(player, ECONOMY)
-
-    return data
-
-
 # =========================================================
-# بازیکنان
+# بازیکنان و State
 # =========================================================
 
 players = {}
 diplomacy_proposals = {}
 active_treaties = []
+
+# اعلام جنگ‌ها: [{"id", "attacker", "defender", "declared_at"}]
+active_wars = []
+
+# اشغال‌ها: {country_id: {"occupier": country_id, "bonus": int, "occupied_at": iso}}
+occupations = {}
 
 
 def create_player(user_id):
@@ -734,33 +747,158 @@ def get_player_by_country(country_id):
 
 
 # =========================================================
+# رتبه‌بندی
+# =========================================================
+
+def compute_all_rankings():
+
+    scores = {}
+
+    for user_id, player in players.items():
+
+        if not player.get("country"):
+            continue
+
+        rates = compute_base_rates(player)
+
+        eco = rates["net_income"]
+        mil = player.get("army", 0)
+
+        diplo = 0
+        for treaty in active_treaties:
+            if (
+                treaty["country_a"] == player["country"] or
+                treaty["country_b"] == player["country"]
+            ):
+                diplo += 1
+
+        dev = sum(player.get("infra_levels", {}).values())
+
+        overall = (
+            (eco / 100_000) * 1.0 +
+            mil * 3.0 +
+            diplo * 50.0 +
+            dev * 20.0
+        )
+
+        scores[user_id] = {
+            "economy": eco,
+            "military": mil,
+            "diplomacy": diplo,
+            "development": dev,
+            "overall": overall,
+        }
+
+    categories = [
+        "economy", "military", "diplomacy",
+        "development", "overall"
+    ]
+
+    total = len(scores)
+
+    for category in categories:
+
+        sorted_ids = sorted(
+            scores.keys(),
+            key=lambda uid: scores[uid][category],
+            reverse=True
+        )
+
+        for rank, uid in enumerate(sorted_ids, 1):
+            scores[uid][f"{category}_rank"] = rank
+
+    for uid in scores:
+        scores[uid]["total_players"] = total
+
+    return scores
+
+
+# =========================================================
+# سریالایز
+# =========================================================
+
+def serialize_player(player, rankings=None):
+
+    accrue_player(player)
+    rates = compute_rates(player)
+
+    data = dict(player)
+    data.update(get_game_time(player))
+
+    data["power_capacity"] = rates["power_capacity"]
+    data["power_consumption"] = rates["power_consumption"]
+    data["manpower_production"] = rates["manpower_production"]
+    data["daily_income"] = rates["net_income"]
+
+    data["infra"] = build_catalog_status(player, INFRASTRUCTURE)
+    data["economy"] = build_catalog_status(player, ECONOMY)
+
+    # اشغال
+    country = player.get("country")
+
+    if country and country in occupations:
+        data["occupied_by"] = occupations[country]["occupier"]
+    else:
+        data["occupied_by"] = None
+
+    # کشورهای تحت اشغال ما
+    my_occupations = [
+        c for c, o in occupations.items()
+        if o.get("occupier") == country and country
+    ]
+    data["my_occupations"] = my_occupations
+
+    # رتبه‌بندی
+    if rankings is None:
+        rankings = compute_all_rankings()
+
+    uid = player.get("user_id")
+
+    if uid in rankings:
+
+        r = rankings[uid]
+        data["rankings"] = {
+            "overall": {
+                "rank": r.get("overall_rank"),
+                "total": r.get("total_players"),
+                "score": round(r.get("overall", 0), 1),
+            },
+            "economy": {
+                "rank": r.get("economy_rank"),
+                "total": r.get("total_players"),
+                "score": r.get("economy", 0),
+            },
+            "military": {
+                "rank": r.get("military_rank"),
+                "total": r.get("total_players"),
+                "score": r.get("military", 0),
+            },
+            "diplomacy": {
+                "rank": r.get("diplomacy_rank"),
+                "total": r.get("total_players"),
+                "score": r.get("diplomacy", 0),
+            },
+            "development": {
+                "rank": r.get("development_rank"),
+                "total": r.get("total_players"),
+                "score": r.get("development", 0),
+            },
+        }
+
+    else:
+
+        data["rankings"] = None
+
+    return data
+
+
+# =========================================================
 # Bot
 # =========================================================
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-
-# =========================================================
-# اطلاع‌رسانی به ادمین
-# =========================================================
-
-async def notify_admin(text):
-    """ارسال پیام به ادمین (بدون کرش اگه خطا بده)"""
-
-    if not ADMIN_USER_ID:
-        logging.warning("ADMIN_USER_ID not set — skip notify")
-        return
-
-    try:
-        await bot.send_message(ADMIN_USER_ID, text)
-    except Exception as error:
-        logging.warning("Failed to notify admin: %s", error)
-
-
-# =========================================================
-# Start
-# =========================================================
 
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
@@ -775,40 +913,6 @@ async def start_command(message: types.Message):
 
     if user_id not in players:
         players[user_id] = create_player(user_id)
-
-    # ---- اطلاع به ادمین ----
-
-    if user_id != ADMIN_USER_ID:
-
-        user = message.from_user
-
-        full_name = (
-            (user.first_name or "") +
-            (" " + user.last_name if user.last_name else "")
-        ).strip() or "بدون نام"
-
-        username = f"@{user.username}" if user.username else "ندارد"
-
-        country_id = players[user_id].get("country")
-
-        if country_id:
-            country = COUNTRIES.get(country_id)
-            country_text = (
-                f"{country['flag']} {country['name']}"
-                if country else "نامشخص"
-            )
-        else:
-            country_text = "هنوز انتخاب نکرده"
-
-        await notify_admin(
-            "🔔 ورود کاربر به ربات\n\n"
-            f"👤 نام: {full_name}\n"
-            f"🆔 یوزرنیم: {username}\n"
-            f"🔢 آیدی: {user_id}\n"
-            f"🏳️ کشور: {country_text}"
-        )
-
-    # ---- ادامه رفتار قبلی ----
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -956,8 +1060,10 @@ async def get_player(request):
     if user_id not in players:
         players[user_id] = create_player(user_id)
 
+    rankings = compute_all_rankings()
+
     return web.json_response(
-        serialize_player(players[user_id])
+        serialize_player(players[user_id], rankings)
     )
 
 
@@ -973,12 +1079,18 @@ async def get_countries(request):
 
         owner_id, _ = get_player_by_country(country_id)
 
-        result.append({
+        entry = {
             "id": country_id,
             "name": country["name"],
             "flag": country["flag"],
             "taken": owner_id is not None,
-        })
+            "occupied_by": None,
+        }
+
+        if country_id in occupations:
+            entry["occupied_by"] = occupations[country_id].get("occupier")
+
+        result.append(entry)
 
     return web.json_response(result)
 
@@ -1014,9 +1126,11 @@ async def select_country(request):
 
         if player["country"] == country_id:
 
+            rankings = compute_all_rankings()
+
             return web.json_response({
                 "success": True,
-                "player": serialize_player(player)
+                "player": serialize_player(player, rankings)
             })
 
         return web.json_response({
@@ -1048,21 +1162,11 @@ async def select_country(request):
         user_id, country_id
     )
 
-    # ---- اطلاع به ادمین ----
-
-    if user_id != ADMIN_USER_ID:
-
-        country = COUNTRIES[country_id]
-
-        await notify_admin(
-            "🎯 انتخاب کشور جدید\n\n"
-            f"🆔 آیدی: {user_id}\n"
-            f"🏳️ کشور: {country['flag']} {country['name']}"
-        )
+    rankings = compute_all_rankings()
 
     return web.json_response({
         "success": True,
-        "player": serialize_player(player)
+        "player": serialize_player(player, rankings)
     })
 
 
@@ -1130,9 +1234,11 @@ async def upgrade_infra(request):
         user_id, item_id, current_level + 1
     )
 
+    rankings = compute_all_rankings()
+
     return web.json_response({
         "success": True,
-        "player": serialize_player(player)
+        "player": serialize_player(player, rankings)
     })
 
 
@@ -1199,8 +1305,8 @@ async def upgrade_economy(request):
             "success": False,
             "error": "not_enough_power",
             "message": (
-                "برق کافی برای راه‌اندازی این بخش ندارید. "
-                "ابتدا نیروگاه بسازید."
+                f"برق کافی ندارید. نیاز به {required_power} واحد برق "
+                f"دارید ولی فقط {power_total - power_used} واحد آزاد دارید."
             )
         }, status=400)
 
@@ -1213,9 +1319,11 @@ async def upgrade_economy(request):
         user_id, item_id, current_level + 1
     )
 
+    rankings = compute_all_rankings()
+
     return web.json_response({
         "success": True,
-        "player": serialize_player(player)
+        "player": serialize_player(player, rankings)
     })
 
 
@@ -1289,7 +1397,9 @@ async def train_unit(request):
         return web.json_response({
             "success": False,
             "error": "not_enough_power",
-            "message": "ظرفیت برق شما کافی نیست."
+            "message": (
+                f"برق کافی ندارید. نیاز به {unit['power_required']} واحد."
+            )
         }, status=400)
 
     if player.get("money", 0) < unit["cost"]:
@@ -1312,20 +1422,114 @@ async def train_unit(request):
     player.setdefault("units", {"land": 0, "air": 0, "navy": 0})
     player["units"][unit_id] = current_count + 1
 
-    player["army"] = player.get("army", 0) + unit["army_power"]
+    player["army"] = player.get("army", 0) + 10
 
     logging.info(
         "UNIT TRAINED | user_id=%s | unit=%s", user_id, unit_id
     )
 
+    rankings = compute_all_rankings()
+
     return web.json_response({
         "success": True,
-        "player": serialize_player(player)
+        "player": serialize_player(player, rankings)
     })
 
 
 # =========================================================
-# API - حمله
+# API - اعلام جنگ
+# =========================================================
+
+async def declare_war(request):
+
+    try:
+        user_id = int(request.query.get("user_id"))
+    except (TypeError, ValueError):
+        return web.json_response(
+            {"success": False, "error": "invalid_user_id"}, status=400
+        )
+
+    target = request.query.get("target")
+
+    if target not in COUNTRIES:
+        return web.json_response(
+            {"success": False, "error": "invalid_target"}, status=400
+        )
+
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
+
+    player = players[user_id]
+
+    from_country = player.get("country")
+
+    if not from_country:
+        return web.json_response({
+            "success": False,
+            "error": "no_country",
+            "message": "ابتدا وارد بازی شوید."
+        }, status=400)
+
+    if target == from_country:
+        return web.json_response({
+            "success": False,
+            "error": "self_war",
+            "message": "نمی‌توانید به خودتان اعلام جنگ کنید."
+        }, status=400)
+
+    target_user_id, target_player = get_player_by_country(target)
+
+    if target_user_id is None:
+        return web.json_response({
+            "success": False,
+            "error": "no_owner",
+            "message": "این کشور توسط هیچ بازیکنی کنترل نمی‌شود."
+        }, status=400)
+
+    # چک تکراری
+    for w in active_wars:
+        if (
+            w["attacker"] == from_country and
+            w["defender"] == target
+        ):
+            return web.json_response({
+                "success": False,
+                "error": "already_at_war",
+                "message": "شما قبلاً به این کشور اعلام جنگ کرده‌اید."
+            }, status=400)
+
+    war_id = str(uuid.uuid4())
+
+    active_wars.append({
+        "id": war_id,
+        "attacker": from_country,
+        "defender": target,
+        "declared_at": datetime.utcnow().isoformat(),
+    })
+
+    logging.info(
+        "WAR DECLARED | %s → %s", from_country, target
+    )
+
+    return web.json_response({
+        "success": True,
+        "message": (
+            f"⚔️ اعلام جنگ! "
+            f"{COUNTRIES[from_country]['flag']} "
+            f"{COUNTRIES[from_country]['name']} به "
+            f"{COUNTRIES[target]['flag']} "
+            f"{COUNTRIES[target]['name']} اعلام جنگ کرد."
+        ),
+        "war": {
+            "id": war_id,
+            "attacker": from_country,
+            "defender": target,
+        }
+    })
+
+
+# =========================================================
+# API - حملات نظامی
 # =========================================================
 
 async def attack(request):
@@ -1345,34 +1549,238 @@ async def attack(request):
             {"success": False, "error": "invalid_target"}, status=400
         )
 
+    if attack_type not in ATTACK_TYPE_NAMES:
+        return web.json_response(
+            {"success": False, "error": "invalid_type"}, status=400
+        )
+
     if user_id not in players:
         players[user_id] = create_player(user_id)
 
-    player = players[user_id]
+    attacker_player = players[user_id]
+    attacker_country = attacker_player.get("country")
 
-    if not player.get("country"):
+    if not attacker_country:
         return web.json_response({
             "success": False,
             "error": "no_country",
             "message": "ابتدا وارد بازی شوید."
         }, status=400)
 
-    if target == player.get("country"):
-        return web.json_response(
-            {"success": False, "error": "self_attack"}, status=400
-        )
+    if target == attacker_country:
+        return web.json_response({
+            "success": False,
+            "error": "self_attack",
+            "message": "به خودتان حمله نمی‌کنید."
+        }, status=400)
 
-    logging.info(
-        "ATTACK LAUNCHED | user_id=%s | from=%s | to=%s | type=%s",
-        user_id, player.get("country"), target, attack_type
+    # چک اعلام جنگ
+    at_war = any(
+        w["attacker"] == attacker_country and
+        w["defender"] == target
+        for w in active_wars
     )
 
-    type_name = ATTACK_TYPE_NAMES.get(attack_type, attack_type)
-    target_name = COUNTRIES[target]["name"]
+    if not at_war:
+        return web.json_response({
+            "success": False,
+            "error": "not_at_war",
+            "message": (
+                "ابتدا باید به این کشور اعلام جنگ کنید."
+            )
+        }, status=400)
+
+    target_user_id, defender_player = get_player_by_country(target)
+
+    if target_user_id is None:
+        return web.json_response({
+            "success": False,
+            "error": "no_owner",
+            "message": "این کشور توسط هیچ بازیکنی کنترل نمی‌شود."
+        }, status=400)
+
+    accrue_player(attacker_player)
+    accrue_player(defender_player)
+
+    attacker_units = attacker_player.get("units", {}).get(attack_type, 0)
+
+    if attacker_units <= 0:
+        return web.json_response({
+            "success": False,
+            "error": "no_units",
+            "message": (
+                f"شما هیچ یگان "
+                f"{ATTACK_TYPE_NAMES[attack_type]}ی ندارید."
+            )
+        }, status=400)
+
+    stats = ARMY_UNITS[attack_type]
+
+    attack_power = attacker_units * stats["attack"]
+
+    defender_units = defender_player.get("units", {})
+
+    defense_power = 0
+
+    for unit_type, count in defender_units.items():
+
+        if count <= 0:
+            continue
+
+        defense_power += count * ARMY_UNITS[unit_type]["defense"]
+
+    attacker_wins = attack_power > defense_power
+
+    log = []
+
+    log.append(
+        f"⚔️ حمله {ATTACK_TYPE_NAMES[attack_type]} از "
+        f"{COUNTRIES[attacker_country]['name']} به "
+        f"{COUNTRIES[target]['name']}"
+    )
+
+    log.append(
+        f"نیروی حمله: {attack_power} | "
+        f"نیروی دفاع: {defense_power}"
+    )
+
+    if attacker_wins:
+
+        # پیروزی مهاجم
+
+        # ۳۰٪ یگان‌های مهاجم از بین می‌روند
+        lost = max(1, int(attacker_units * 0.3))
+        attacker_player["units"][attack_type] = max(
+            0, attacker_units - lost
+        )
+
+        # همه یگان‌های مدافع از بین می‌روند
+        for ut in defender_units:
+            defender_player["units"][ut] = 0
+
+        # ۴۰٪ نیروی انسانی مدافع به مهاجم
+        transferred_manpower = int(defender_player.get("manpower", 0) * 0.4)
+
+        defender_player["manpower"] = (
+            defender_player.get("manpower", 0) - transferred_manpower
+        )
+
+        attacker_player["manpower"] = (
+            attacker_player.get("manpower", 0) + transferred_manpower
+        )
+
+        # ۵۰٪ درآمد روزانه مدافع به مهاجم (مالیات اشغال)
+        defender_rates = compute_base_rates(defender_player)
+        bonus_income = int(defender_rates["net_income"] * 0.5)
+
+        occupations[target] = {
+            "occupier": attacker_country,
+            "bonus": bonus_income,
+            "occupied_at": datetime.utcnow().isoformat(),
+        }
+
+        log.append(
+            f"🏆 {COUNTRIES[attacker_country]['name']} پیروز شد!"
+        )
+        log.append(
+            f"💰 {transferred_manpower:,} نیروی انسانی غنیمت گرفته شد."
+        )
+        log.append(
+            f"🏳️ {COUNTRIES[target]['name']} تحت اشغال درآمد."
+        )
+        log.append(
+            f"📈 مالیات روزانه اضافه: ${bonus_income:,}"
+        )
+
+        # حذف از لیست جنگ‌ها
+        global active_wars
+        active_wars = [
+            w for w in active_wars
+            if not (
+                w["attacker"] == attacker_country and
+                w["defender"] == target
+            )
+        ]
+
+    else:
+
+        # پیروزی مدافع
+
+        # همه یگان‌های مهاجم از بین می‌روند
+        attacker_player["units"][attack_type] = 0
+
+        # ۲۰٪ یگان‌های مدافع از بین می‌روند
+        for ut in defender_units:
+            if defender_units[ut] > 0:
+                lost = max(1, int(defender_units[ut] * 0.2))
+                defender_player["units"][ut] = max(
+                    0, defender_units[ut] - lost
+                )
+
+        log.append(
+            f"🛡️ {COUNTRIES[target]['name']} دفاع کرد و پیروز شد!"
+        )
+        log.append("یگان‌های مهاجم نابود شدند.")
+
+    # بازیابی army power
+    for p in (attacker_player, defender_player):
+        total_units = sum(p.get("units", {}).values())
+        p["army"] = total_units * 10
+
+    logging.info(
+        "ATTACK RESULT | %s → %s | winner=%s",
+        attacker_country, target,
+        attacker_country if attacker_wins else target
+    )
+
+    rankings = compute_all_rankings()
 
     return web.json_response({
         "success": True,
-        "message": f"عملیات {type_name} علیه {target_name} آغاز شد."
+        "attacker_wins": attacker_wins,
+        "log": log,
+        "player": serialize_player(attacker_player, rankings),
+    })
+
+
+# =========================================================
+# API - لیست جنگ‌های فعال
+# =========================================================
+
+async def get_wars(request):
+
+    try:
+        user_id = int(request.query.get("user_id"))
+    except (TypeError, ValueError):
+        return web.json_response(
+            {"error": "invalid_user_id"}, status=400
+        )
+
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
+
+    player = players[user_id]
+    country = player.get("country")
+
+    if not country:
+        return web.json_response({
+            "declared_by_me": [],
+            "declared_on_me": [],
+            "occupations": {},
+        })
+
+    declared_by_me = [
+        w for w in active_wars if w["attacker"] == country
+    ]
+
+    declared_on_me = [
+        w for w in active_wars if w["defender"] == country
+    ]
+
+    return web.json_response({
+        "declared_by_me": declared_by_me,
+        "declared_on_me": declared_on_me,
+        "occupations": occupations,
     })
 
 
@@ -1540,6 +1948,50 @@ async def get_diplomacy(request):
 
 
 # =========================================================
+# API - رتبه‌بندی
+# =========================================================
+
+async def get_rankings(request):
+
+    rankings = compute_all_rankings()
+
+    result = []
+
+    for user_id, r in rankings.items():
+
+        player = players.get(user_id)
+
+        if not player:
+            continue
+
+        country = player.get("country")
+
+        if not country:
+            continue
+
+        result.append({
+            "user_id": user_id,
+            "country": country,
+            "country_name": COUNTRIES[country]["name"],
+            "country_flag": COUNTRIES[country]["flag"],
+            "overall_score": round(r["overall"], 1),
+            "economy": r["economy"],
+            "military": r["military"],
+            "diplomacy": r["diplomacy"],
+            "development": r["development"],
+            "overall_rank": r.get("overall_rank"),
+            "economy_rank": r.get("economy_rank"),
+            "military_rank": r.get("military_rank"),
+            "diplomacy_rank": r.get("diplomacy_rank"),
+            "development_rank": r.get("development_rank"),
+        })
+
+    result.sort(key=lambda x: x["overall_rank"] or 999)
+
+    return web.json_response(result)
+
+
+# =========================================================
 # API - News
 # =========================================================
 
@@ -1612,11 +2064,15 @@ async def create_web_app():
     app.router.add_get("/api/upgrade-infra", upgrade_infra)
     app.router.add_get("/api/upgrade-economy", upgrade_economy)
     app.router.add_get("/api/train-unit", train_unit)
+
+    app.router.add_get("/api/declare-war", declare_war)
     app.router.add_get("/api/attack", attack)
+    app.router.add_get("/api/wars", get_wars)
 
     app.router.add_get("/api/propose-treaty", propose_treaty)
     app.router.add_get("/api/diplomacy", get_diplomacy)
 
+    app.router.add_get("/api/rankings", get_rankings)
     app.router.add_get("/api/news", get_news)
 
     app.router.add_get("/health", health)
@@ -1649,11 +2105,6 @@ async def start_web_server():
 async def main():
 
     logging.info("WW2 TELEGRAM GAME STARTING...")
-
-    if ADMIN_USER_ID:
-        logging.info("ADMIN NOTIFICATIONS ENABLED | admin_id=%s", ADMIN_USER_ID)
-    else:
-        logging.warning("ADMIN_USER_ID not set — notifications disabled")
 
     await start_web_server()
 
