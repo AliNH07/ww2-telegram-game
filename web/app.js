@@ -103,6 +103,15 @@ function showGamePage(id) {
 function formatMoney(v) { return "$" + Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
 function formatNumber(v) { return Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
 
+function formatDuration(seconds) {
+    if (!seconds || seconds <= 0) return "۰ ثانیه";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    if (m === 0) return `${s} ثانیه`;
+    if (s === 0) return `${m} دقیقه`;
+    return `${m} دقیقه و ${s} ثانیه`;
+}
+
 let toastTimer = null;
 function showToast(msg, kind) {
     let el = document.getElementById("app-toast");
@@ -157,23 +166,24 @@ function renderResourceBars() {
         Object.keys(RESOURCE_NAMES).forEach(key => {
             const amt = player.resources[key] ?? 0;
             const rate = player.resource_production?.[key] ?? 0;
+            const use = player.resource_consumption?.[key] ?? 0;
             const chip = document.createElement("div");
             chip.className = "resource-chip";
+            let rateLine = "";
+            if (rate > 0) {
+                rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>`;
+            } else if (use > 0) {
+                rateLine = `<div class="resource-chip-rate down">▼ ${formatNumber(use)} /روز</div>`;
+            } else {
+                rateLine = `<div class="resource-chip-rate zero">بدون تولید</div>`;
+            }
             chip.innerHTML = `
                 <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span></div>
                 <div class="resource-chip-value">${formatNumber(amt)}</div>
-                <div class="resource-chip-rate ${rate > 0 ? "" : "zero"}">تولید: ${formatNumber(rate)}</div>`;
+                ${rateLine}`;
             bar.appendChild(chip);
         });
     });
-}
-
-function costText(lvl) {
-    let t = formatMoney(lvl.cost);
-    if (lvl.resources) Object.entries(lvl.resources).forEach(([k, a]) => {
-        t += ` + ${formatNumber(a)} ${RESOURCE_NAMES[k]}`;
-    });
-    return t;
 }
 
 async function loadWorldAtlas() {
@@ -367,7 +377,7 @@ document.querySelectorAll(".sub-back-button").forEach(b => {
 });
 
 /* =========================================================
-   Infra (تب‌بندی شده)
+   Infra (تب‌بندی شده + کارت جدید)
 ========================================================= */
 
 async function openInfrastructureMenu() {
@@ -403,22 +413,53 @@ document.querySelectorAll(".infra-tab").forEach(tab => {
     tab.addEventListener("click", () => renderInfraTab(tab.dataset.infraTab));
 });
 
-function infraEffectText(item) {
+// ساخت یک باکس کوچک آمار
+function statBox(icon, value, label) {
+    return `<div class="stat-box">
+        <span class="stat-box-icon">${icon}</span>
+        <span class="stat-box-value">${value}</span>
+        <span class="stat-box-label">${label}</span>
+    </div>`;
+}
+
+// محاسبهٔ stats کارت براساس گروه
+function buildStatsHtml(item, levelData) {
+    if (!levelData) return "";
     const g = item.group;
-    const eff = lvl => {
-        if (g === "power") return `ظرفیت ${formatNumber(lvl.capacity)} برق`;
-        if (g === "manpower") return `تولید ${formatNumber(lvl.production)} نفر/روز`;
-        if (g === "resource") return `تولید ${formatNumber(lvl.production)} /روز`;
-        return `ظرفیت ${formatNumber(lvl.capacity)}`;
-    };
-    if (!item.current) {
-        let t = "هنوز ساخته نشده است.<br>";
-        if (item.next) t += `سطح ۱: ${eff(item.next)} — ${costText(item.next)}`;
-        return t;
+    const boxes = [];
+
+    // برق مصرفی (فقط برای اقتصاد)
+    if (item.power_required && item.power_required > 0) {
+        boxes.push(statBox("⚡", formatNumber(item.power_required), "برق"));
     }
-    let t = `اکنون: ${eff(item.current)}<br>`;
-    t += item.next ? `سطح بعد: ${eff(item.next)} — ${costText(item.next)}` : "حداکثر رسیده.";
-    return t;
+    // ظرفیت (برق، نظامی، manpower? no)
+    if (g === "power" && levelData.capacity !== undefined) {
+        boxes.push(statBox("⚡", formatNumber(levelData.capacity), "ظرفیت"));
+    }
+    if (g === "manpower" && levelData.production !== undefined) {
+        boxes.push(statBox("👥", "+" + formatNumber(levelData.production), "نفر در روز"));
+    }
+    if (g === "resource" && levelData.production !== undefined) {
+        const icon = RESOURCE_ICONS[item.resource_key] || "📦";
+        boxes.push(statBox(icon, "+" + formatNumber(levelData.production), "در روز"));
+    }
+    // capacity برای نظامی
+    if ((g === "land" || g === "naval" || g === "air") && levelData.capacity !== undefined) {
+        boxes.push(statBox("📦", formatNumber(levelData.capacity), "ظرفیت"));
+    }
+    // درآمد (اقتصاد)
+    if (item.power_required === undefined && levelData.income !== undefined) {
+        boxes.push(statBox("💰", "+" + formatMoney(levelData.income), "در روز"));
+    } else if (item.power_required !== undefined && levelData.income !== undefined) {
+        boxes.push(statBox("💰", "+" + formatMoney(levelData.income), "در روز"));
+    }
+    // زمان
+    if (levelData.time !== undefined) {
+        boxes.push(statBox("⏱️", formatDuration(levelData.time), "زمان"));
+    }
+
+    if (!boxes.length) return "";
+    return `<div class="stat-boxes-row">${boxes.join("")}</div>`;
 }
 
 function renderInfraList(cid, filterFn) {
@@ -428,17 +469,32 @@ function renderInfraList(cid, filterFn) {
     Object.entries(player.infra).forEach(([iid, item]) => {
         if (!filterFn(item)) return;
         const card = document.createElement("div");
-        card.className = "infra-card";
+        card.className = "infra-card-new";
+
+        const isBuilt = item.level > 0;
+        const statusText = isBuilt ? `سطح ${item.level}` : "ساخته نشده";
+        const shownLevel = item.next || item.current;
+        const statsHtml = buildStatsHtml(item, shownLevel);
+
+        const btnText = !item.next
+            ? "حداکثر سطح"
+            : (isBuilt ? `⬆️ ارتقا به سطح ${item.level + 1} — ${formatMoney(item.next.cost)}`
+                       : `⬆️ ساخت — ${formatMoney(item.next.cost)}`);
+        const btnDisabled = !item.next ? "disabled" : "";
+
         card.innerHTML = `
-            <div class="infra-card-top">
-                <span class="infra-card-name">${item.name}</span>
-                <span class="infra-card-level">سطح ${item.level} از ${item.max_level}</span>
+            <div class="infra-card-head">
+                <div class="infra-card-icon">${item.icon || "🏗️"}</div>
+                <div class="infra-card-titles">
+                    <div class="infra-card-name">${item.name}</div>
+                    <div class="infra-card-status">${statusText}</div>
+                </div>
             </div>
-            <div class="infra-card-detail">${infraEffectText(item)}</div>
-            <button class="infra-upgrade-button" ${!item.next ? "disabled" : ""}>
-                ${item.next ? "ارتقا" : "حداکثر"}
-            </button>`;
-        const btn = card.querySelector(".infra-upgrade-button");
+            <div class="infra-card-desc">${item.desc || ""}</div>
+            ${statsHtml}
+            <button class="infra-card-button" ${btnDisabled}>${btnText}</button>`;
+
+        const btn = card.querySelector(".infra-card-button");
         if (item.next) btn.addEventListener("click", () => upgradeInfra(iid));
         c.appendChild(card);
     });
@@ -456,7 +512,7 @@ async function upgradeInfra(iid) {
 }
 
 /* =========================================================
-   Economy
+   Economy (کارت جدید)
 ========================================================= */
 
 async function openEconomyPage() {
@@ -469,27 +525,32 @@ function renderEconomyList() {
     c.innerHTML = "";
     Object.entries(player.economy).forEach(([iid, item]) => {
         const card = document.createElement("div");
-        card.className = "infra-card";
-        let d = "";
-        if (!item.current) {
-            d = "هنوز ساخته نشده است.<br>";
-            if (item.next) d += `سطح ۱: درآمد +${formatMoney(item.next.income)} — ${costText(item.next)} | برق: ${item.power_required}`;
-        } else {
-            d = `درآمد فعلی: +${formatMoney(item.current.income)} /روز<br>`;
-            d += `برق مصرفی: ${item.power_required * item.level}`;
-            if (item.next) d += `<br>سطح بعد: +${formatMoney(item.next.income)} — ${costText(item.next)}`;
-            else d += "<br>حداکثر رسیده.";
-        }
+        card.className = "infra-card-new";
+
+        const isBuilt = item.level > 0;
+        const statusText = isBuilt ? `سطح ${item.level}` : "ساخته نشده";
+        const shownLevel = item.next || item.current;
+        const statsHtml = buildStatsHtml(item, shownLevel);
+
+        const btnText = !item.next
+            ? "حداکثر سطح"
+            : (isBuilt ? `⬆️ ارتقا به سطح ${item.level + 1} — ${formatMoney(item.next.cost)}`
+                       : `⬆️ ساخت — ${formatMoney(item.next.cost)}`);
+        const btnDisabled = !item.next ? "disabled" : "";
+
         card.innerHTML = `
-            <div class="infra-card-top">
-                <span class="infra-card-name">${item.name}</span>
-                <span class="infra-card-level">سطح ${item.level} از ${item.max_level}</span>
+            <div class="infra-card-head">
+                <div class="infra-card-icon">${item.icon || "💰"}</div>
+                <div class="infra-card-titles">
+                    <div class="infra-card-name">${item.name}</div>
+                    <div class="infra-card-status">${statusText}</div>
+                </div>
             </div>
-            <div class="infra-card-detail">${d}</div>
-            <button class="infra-upgrade-button" ${!item.next ? "disabled" : ""}>
-                ${item.next ? "سرمایه‌گذاری" : "حداکثر"}
-            </button>`;
-        const btn = card.querySelector(".infra-upgrade-button");
+            <div class="infra-card-desc">${item.desc || ""}</div>
+            ${statsHtml}
+            <button class="infra-card-button" ${btnDisabled}>${btnText}</button>`;
+
+        const btn = card.querySelector(".infra-card-button");
         if (item.next) btn.addEventListener("click", () => upgradeEconomy(iid));
         c.appendChild(card);
     });
