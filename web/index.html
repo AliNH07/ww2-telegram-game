@@ -221,7 +221,7 @@
         <div id="rankings-list" class="rankings-list"></div>
     </main>
 
-    <!-- ==================== زیرساخت (تب‌بندی شده) ==================== -->
+    <!-- ==================== زیرساخت ==================== -->
     <main id="infrastructure" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
         <div class="page-title"><span>ساخت و توسعه</span><h1>زیرساخت</h1></div>
@@ -272,11 +272,83 @@
         <div id="economy-list" class="infra-card-list"></div>
     </main>
 
-    <!-- ==================== ارتش ==================== -->
+    <!-- ==================== ارتش (طرح جدید) ==================== -->
     <main id="army" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
-        <div class="page-title"><span>آموزش نیرو</span><h1>ارتش</h1></div>
-        <div id="army-units" class="unit-card-list"></div>
+        <div class="page-title"><span>فرماندهی و پیاده‌نظام</span><h1>ارتش</h1></div>
+
+        <!-- کارت خلاصه ارتش -->
+        <div class="army-summary-card">
+            <div class="army-summary-header">
+                <div class="army-summary-label">🛡️ ارتش</div>
+                <button class="army-info-btn" title="راهنما">؟</button>
+            </div>
+            <div class="army-summary-power" id="army-total-power">0</div>
+            <div class="army-summary-sub">قدرت کل ارتش</div>
+        </div>
+
+        <!-- کارت‌های پایگاه‌ها 2x2 -->
+        <div class="base-cards-grid">
+            <div class="base-card">
+                <div class="base-card-head">
+                    <div class="base-card-name">پادگان</div>
+                    <div class="base-card-icon">🪖</div>
+                </div>
+                <div class="base-card-value" id="base-barracks-value">—</div>
+                <div class="base-card-max" id="base-barracks-max"></div>
+                <div class="base-card-progress">
+                    <div class="base-card-progress-fill" id="base-barracks-fill" style="width:0%"></div>
+                </div>
+            </div>
+            <div class="base-card">
+                <div class="base-card-head">
+                    <div class="base-card-name">فرودگاه</div>
+                    <div class="base-card-icon">✈️</div>
+                </div>
+                <div class="base-card-empty" id="base-airport-status">ساخته نشده</div>
+            </div>
+            <div class="base-card">
+                <div class="base-card-head">
+                    <div class="base-card-name">بندر</div>
+                    <div class="base-card-icon">⚓</div>
+                </div>
+                <div class="base-card-value" id="base-port-value">—</div>
+                <div class="base-card-max" id="base-port-max"></div>
+                <div class="base-card-progress">
+                    <div class="base-card-progress-fill" id="base-port-fill" style="width:0%"></div>
+                </div>
+            </div>
+            <div class="base-card">
+                <div class="base-card-head">
+                    <div class="base-card-name">پایگاه موشکی</div>
+                    <div class="base-card-icon">🚀</div>
+                </div>
+                <div class="base-card-empty" id="base-missile-status">ساخته نشده</div>
+            </div>
+        </div>
+
+        <!-- تب‌های ارتش -->
+        <div class="army-tabs">
+            <button class="army-tab active" data-army-tab="land">
+                🪖 زمینی
+                <span class="army-tab-count" id="army-count-land">0</span>
+            </button>
+            <button class="army-tab" data-army-tab="air">
+                ✈️ هوایی
+                <span class="army-tab-count" id="army-count-air">0</span>
+            </button>
+            <button class="army-tab" data-army-tab="naval">
+                ⚓ دریایی
+                <span class="army-tab-count" id="army-count-naval">0</span>
+            </button>
+            <button class="army-tab" data-army-tab="missile">
+                🚀 موشکی
+                <span class="army-tab-count" id="army-count-missile">0</span>
+            </button>
+        </div>
+
+        <!-- لیست یگان‌ها -->
+        <div id="army-units-new" class="unit-card-list-new"></div>
     </main>
 
     <!-- ==================== جنگ ==================== -->
