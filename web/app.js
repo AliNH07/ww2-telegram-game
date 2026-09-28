@@ -1,9 +1,5 @@
 const tg = window.Telegram?.WebApp;
-
-if (tg) {
-    tg.ready();
-    tg.expand();
-}
+if (tg) { tg.ready(); tg.expand(); }
 
 const userId = tg?.initDataUnsafe?.user?.id || null;
 const initData = tg?.initData || "";
@@ -13,127 +9,33 @@ let countries = {};
 let selectedCountry = null;
 let worldData = null;
 let statsInterval = null;
+let currentPMTarget = null;
 
-const COUNTRY_IMAGE_EXT = {
-    germany: "jpg",
-    britain: "jfif",
-    ussr: "jfif",
-    usa: "jfif",
-    france: "jfif",
-    italy: "jfif",
-    china: "jfif",
-    japan: "jfif"
-};
-
-const COUNTRY_FLAGS = {
-    germany: "🇩🇪", britain: "🇬🇧", ussr: "☭", usa: "🇺🇸",
-    france: "🇫🇷", italy: "🇮🇹", china: "🇨🇳", japan: "🇯🇵"
-};
-
-const COUNTRY_NAMES = {
-    germany: "آلمان", britain: "بریتانیا", ussr: "شوروی", usa: "آمریکا",
-    france: "فرانسه", italy: "ایتالیا", china: "چین", japan: "ژاپن"
-};
-
-const COUNTRY_IDS = {
-    germany: 276, britain: 826, ussr: 643, usa: 840,
-    france: 250, italy: 380, china: 156, japan: 392
-};
+const COUNTRY_IMAGE_EXT = { germany: "jpg", britain: "jfif", ussr: "jfif", usa: "jfif",
+    france: "jfif", italy: "jfif", china: "jfif", japan: "jfif" };
+const COUNTRY_FLAGS = { germany: "🇩🇪", britain: "🇬🇧", ussr: "☭", usa: "🇺🇸",
+    france: "🇫🇷", italy: "🇮🇹", china: "🇨🇳", japan: "🇯🇵" };
+const COUNTRY_NAMES = { germany: "آلمان", britain: "بریتانیا", ussr: "شوروی", usa: "آمریکا",
+    france: "فرانسه", italy: "ایتالیا", china: "چین", japan: "ژاپن" };
+const COUNTRY_IDS = { germany: 276, britain: 826, ussr: 643, usa: 840,
+    france: 250, italy: 380, china: 156, japan: 392 };
 
 let ARMY_UNITS = {};
 
 const RESOURCE_NAMES = { food: "غذا", steel: "فولاد", uranium: "اورانیوم", oil: "نفت" };
 const RESOURCE_ICONS = { food: "🌾", steel: "⚙️", uranium: "☢️", oil: "🛢️" };
 const GROUP_ICONS = { land: "🪖", naval: "⚓", air: "✈️" };
-const TREATY_TYPE_NAMES = { alliance: "پیمان اتحاد", non_aggression: "پیمان عدم تجاوز" };
-const ATTACK_TYPE_NAMES = { land: "زمینی", air: "هوایی", navy: "دریایی" };
 const GROUP_TITLES = { land: "زمینی", naval: "دریایی", air: "هوایی" };
+const TREATY_TYPE_NAMES = { alliance: "پیمان اتحاد", non_aggression: "پیمان عدم تجاوز" };
 
 const OCEAN_LABELS = [
-    [-40, 25, "اقیانوس اطلس"], [-150, 0, "اقیانوس آرام"],
-    [75, -20, "اقیانوس هند"], [90, 65, "اقیانوس منجمد شمالی"],
-    [20, -60, "اقیانوس منجمد جنوبی"]
+    [-40, 25, "اقیانوس اطلس"], [-150, 0, "اقیانوس آرام"], [75, -20, "اقیانوس هند"],
+    [90, 65, "اقیانوس منجمد شمالی"], [20, -60, "اقیانوس منجمد جنوبی"]
 ];
-
-const STRAITS = [
-    { lon: -5.6, lat: 35.9, name: "تنگه جبل‌الطارق", desc: "اتصال مدیترانه به اطلس." },
-    { lon: 29.0, lat: 41.1, name: "تنگه بسفر", desc: "تنها راه دریایی دریای سیاه." },
-    { lon: 56.3, lat: 26.6, name: "تنگه هرمز", desc: "حیاتی‌ترین تنگه انرژی جهان." },
-    { lon: 43.3, lat: 12.6, name: "تنگه باب‌المندب", desc: "دروازه دریای سرخ." },
-    { lon: 32.3, lat: 30.6, name: "کانال سوئز", desc: "کوتاه‌ترین مسیر اروپا-آسیا." },
-    { lon: 1.4, lat: 50.9, name: "تنگه دوور", desc: "باریک‌ترین نقطه مانش." },
-    { lon: -79.6, lat: 9.1, name: "کانال پاناما", desc: "اتصال اطلس و آرام." },
-    { lon: 103.8, lat: 1.3, name: "تنگه مالاکا", desc: "شریان تجارت آسیا." },
-    { lon: -5.9, lat: 43.4, name: "خلیج بیسکای", desc: "مسیر دریایی غرب اروپا." },
-    { lon: 121.0, lat: 24.0, name: "تنگه تایوان", desc: "آبراه شرق آسیا." },
-    { lon: 129.9, lat: 34.0, name: "تنگه کره", desc: "اتصال ژاپن به زرد." }
-];
-
 
 /* =========================================================
    API Client
 ========================================================= */
-
-async function apiGet(path, params = {}) {
-    const url = getApiUrl(path, params);
-    const headers = {};
-    if (initData) headers["X-Telegram-Init-Data"] = initData;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    try {
-        const r = await fetch(url, { headers, signal: controller.signal });
-        const text = await r.text();
-        console.log(`[GET ${path}] status=${r.status}`, text.slice(0, 300));
-        try { return JSON.parse(text); }
-        catch { return { error: "invalid_json", raw: text }; }
-    } finally {
-        clearTimeout(timeout);
-    }
-}
-
-async function apiPost(path, body = {}) {
-    const url = getApiUrl(path, {});
-    const headers = { "Content-Type": "application/json" };
-    if (initData) headers["X-Telegram-Init-Data"] = initData;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    try {
-        const r = await fetch(url, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(body),
-            signal: controller.signal,
-        });
-        const text = await r.text();
-        console.log(`[POST ${path}] status=${r.status}`, text.slice(0, 300));
-        try { return JSON.parse(text); }
-        catch { return { success: false, error: "invalid_json", raw: text }; }
-    } finally {
-        clearTimeout(timeout);
-    }
-}
-
-
-/* =========================================================
-   ابزارهای عمومی
-========================================================= */
-
-function countryImageUrl(countryId) {
-    const ext = COUNTRY_IMAGE_EXT[countryId] || "jpg";
-    return `/images/countries/${countryId}.${ext}`;
-}
-
-function showOnly(id) {
-    document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
-    const target = document.getElementById(id);
-    if (target) target.classList.remove("hidden");
-}
-
-function showGamePage(id) {
-    document.querySelectorAll(".game-page").forEach(p => p.classList.add("hidden"));
-    const target = document.getElementById(id);
-    if (target) target.classList.remove("hidden");
-}
 
 function getApiUrl(path, params = {}) {
     const url = new URL(path, window.location.origin);
@@ -141,25 +43,67 @@ function getApiUrl(path, params = {}) {
     return url.toString();
 }
 
-function formatMoney(value) {
-    return "$" + Math.round(Number(value ?? 0)).toLocaleString("en-US");
+async function apiGet(path, params = {}) {
+    const url = getApiUrl(path, params);
+    const headers = {};
+    if (initData) headers["X-Telegram-Init-Data"] = initData;
+    const controller = new AbortController();
+    const to = setTimeout(() => controller.abort(), 15000);
+    try {
+        const r = await fetch(url, { headers, signal: controller.signal });
+        const text = await r.text();
+        try { return JSON.parse(text); }
+        catch { return { error: "invalid_json", raw: text }; }
+    } finally { clearTimeout(to); }
 }
 
-function formatNumber(value) {
-    return Math.round(Number(value ?? 0)).toLocaleString("en-US");
+async function apiPost(path, body = {}) {
+    const url = getApiUrl(path, {});
+    const headers = { "Content-Type": "application/json" };
+    if (initData) headers["X-Telegram-Init-Data"] = initData;
+    const controller = new AbortController();
+    const to = setTimeout(() => controller.abort(), 15000);
+    try {
+        const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(body),
+            signal: controller.signal });
+        const text = await r.text();
+        try { return JSON.parse(text); }
+        catch { return { success: false, error: "invalid_json", raw: text }; }
+    } finally { clearTimeout(to); }
 }
+
+/* =========================================================
+   ابزارها
+========================================================= */
+
+function countryImageUrl(cid) {
+    return `/images/countries/${cid}.${COUNTRY_IMAGE_EXT[cid] || "jpg"}`;
+}
+
+function showOnly(id) {
+    document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
+    const t = document.getElementById(id);
+    if (t) t.classList.remove("hidden");
+}
+
+function showGamePage(id) {
+    document.querySelectorAll(".game-page").forEach(p => p.classList.add("hidden"));
+    const t = document.getElementById(id);
+    if (t) t.classList.remove("hidden");
+}
+
+function formatMoney(v) { return "$" + Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
+function formatNumber(v) { return Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
 
 let toastTimer = null;
-
-function showToast(message, kind) {
+function showToast(msg, kind) {
     let el = document.getElementById("app-toast");
     if (!el) {
         el = document.createElement("div");
-        el.id = "app-toast";
-        el.className = "toast";
+        el.id = "app-toast"; el.className = "toast";
         document.body.appendChild(el);
     }
-    el.textContent = message;
+    el.textContent = msg;
     el.classList.remove("error", "success");
     if (kind) el.classList.add(kind);
     void el.offsetWidth;
@@ -170,9 +114,9 @@ function showToast(message, kind) {
 
 function askText(title, placeholder) {
     return new Promise(resolve => {
-        const overlay = document.createElement("div");
-        overlay.className = "modal-overlay";
-        overlay.innerHTML = `
+        const ov = document.createElement("div");
+        ov.className = "modal-overlay";
+        ov.innerHTML = `
             <div class="modal-box">
                 <div class="modal-title"></div>
                 <textarea class="modal-input" maxlength="500"></textarea>
@@ -180,28 +124,22 @@ function askText(title, placeholder) {
                     <button class="modal-cancel">انصراف</button>
                     <button class="modal-ok">ارسال</button>
                 </div>
-            </div>
-        `;
-        overlay.querySelector(".modal-title").textContent = title;
-        overlay.querySelector(".modal-input").placeholder = placeholder || "";
-        const close = value => { overlay.remove(); resolve(value); };
-        overlay.querySelector(".modal-cancel").addEventListener("click", () => close(null));
-        overlay.querySelector(".modal-ok").addEventListener("click", () => {
-            const value = overlay.querySelector(".modal-input").value.trim();
-            close(value || null);
-        });
-        document.body.appendChild(overlay);
-        overlay.querySelector(".modal-input").focus();
+            </div>`;
+        ov.querySelector(".modal-title").textContent = title;
+        ov.querySelector(".modal-input").placeholder = placeholder || "";
+        const close = v => { ov.remove(); resolve(v); };
+        ov.querySelector(".modal-cancel").onclick = () => close(null);
+        ov.querySelector(".modal-ok").onclick = () => {
+            close(ov.querySelector(".modal-input").value.trim() || null);
+        };
+        document.body.appendChild(ov);
+        ov.querySelector(".modal-input").focus();
     });
 }
 
 async function loadArmyCatalog() {
-    try {
-        const data = await apiGet("/api/army-units");
-        ARMY_UNITS = data.units || {};
-    } catch (error) {
-        console.error("Army catalog:", error);
-    }
+    try { ARMY_UNITS = (await apiGet("/api/army-units")).units || {}; }
+    catch (e) { console.error("Army catalog:", e); }
 }
 
 function renderResourceBars() {
@@ -209,56 +147,47 @@ function renderResourceBars() {
     document.querySelectorAll(".resource-bar").forEach(bar => {
         bar.innerHTML = "";
         Object.keys(RESOURCE_NAMES).forEach(key => {
-            const amount = player.resources[key] ?? 0;
+            const amt = player.resources[key] ?? 0;
             const rate = player.resource_production?.[key] ?? 0;
             const chip = document.createElement("div");
             chip.className = "resource-chip";
             chip.innerHTML = `
-                <div class="resource-chip-top">
-                    <span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span>
-                </div>
-                <div class="resource-chip-value">${formatNumber(amount)}</div>
-                <div class="resource-chip-rate ${rate > 0 ? "" : "zero"}">
-                    تولید روزانه: ${formatNumber(rate)}
-                </div>
-            `;
+                <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span></div>
+                <div class="resource-chip-value">${formatNumber(amt)}</div>
+                <div class="resource-chip-rate ${rate > 0 ? "" : "zero"}">تولید: ${formatNumber(rate)}</div>`;
             bar.appendChild(chip);
         });
     });
 }
 
-function costText(levelInfo) {
-    let text = formatMoney(levelInfo.cost);
-    if (levelInfo.resources) {
-        Object.entries(levelInfo.resources).forEach(([key, amount]) => {
-            text += ` + ${formatNumber(amount)} ${RESOURCE_NAMES[key]}`;
-        });
-    }
-    return text;
+function costText(lvl) {
+    let t = formatMoney(lvl.cost);
+    if (lvl.resources) Object.entries(lvl.resources).forEach(([k, a]) => {
+        t += ` + ${formatNumber(a)} ${RESOURCE_NAMES[k]}`;
+    });
+    return t;
 }
 
 async function loadWorldAtlas() {
     if (worldData) return worldData;
-    const response = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
-    worldData = await response.json();
+    const r = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
+    worldData = await r.json();
     return worldData;
 }
 
-
 /* =========================================================
-   بازیکن
+   Player / Countries
 ========================================================= */
 
 async function loadPlayer() {
-    if (!userId) { console.warn("Telegram user ID not found."); return; }
+    if (!userId) return;
     try {
         player = await apiGet("/api/player");
         if (player?.country) selectedCountry = player.country;
-    } catch (error) { console.error(error); }
+    } catch (e) { console.error(e); }
 }
 
 let refreshController = null;
-
 async function refreshPlayer() {
     if (!userId) return;
     if (refreshController) refreshController.abort();
@@ -266,87 +195,68 @@ async function refreshPlayer() {
     try {
         player = await apiGet("/api/player");
         updateHomeStats();
-    } catch (error) {
-        if (error.name !== "AbortError") console.error(error);
-    }
+    } catch (e) { if (e.name !== "AbortError") console.error(e); }
 }
 
 function startStatsPolling() {
     stopStatsPolling();
     statsInterval = setInterval(() => refreshPlayer(), 30000);
 }
-
 function stopStatsPolling() {
     if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
 }
 
-
-/* =========================================================
-   کشورها
-========================================================= */
-
 async function loadCountries() {
     try {
         countries = {};
-        const data = await apiGet("/api/countries");
-        data.forEach(c => { countries[c.id] = c; });
+        (await apiGet("/api/countries")).forEach(c => { countries[c.id] = c; });
         updateCountryCards();
-    } catch (error) { console.error("Countries:", error); }
+    } catch (e) { console.error("Countries:", e); }
 }
 
-function showCountrySelection() {
-    showOnly("country");
-    updateCountryCards();
-}
+function showCountrySelection() { showOnly("country"); updateCountryCards(); }
 
 function updateCountryCards() {
     document.querySelectorAll("[data-country-card]").forEach(card => {
-        const countryId = card.dataset.country;
-        const country = countries[countryId];
-        if (!country) return;
-        if (country.taken) {
-            if (player?.country === countryId) card.classList.remove("taken");
+        const cid = card.dataset.country;
+        const c = countries[cid];
+        if (!c) return;
+        if (c.taken) {
+            if (player?.country === cid) card.classList.remove("taken");
             else card.classList.add("taken");
-        } else {
-            card.classList.remove("taken");
-        }
+        } else card.classList.remove("taken");
     });
 }
 
 document.querySelectorAll("[data-country-card]").forEach(card => {
     card.addEventListener("click", () => {
-        const countryId = card.dataset.country;
-        const country = countries[countryId];
-        if (country?.taken && player?.country !== countryId) {
-            showMessage("این کشور قبلاً توسط بازیکن دیگری انتخاب شده است.");
-            return;
+        const cid = card.dataset.country;
+        const c = countries[cid];
+        if (c?.taken && player?.country !== cid) {
+            showMessage("این کشور قبلاً انتخاب شده است."); return;
         }
-        selectedCountry = countryId;
+        selectedCountry = cid;
         showCountryPreview();
     });
 });
 
-function showMessage(message) {
-    const element = document.getElementById("country-message");
-    if (!element) return;
-    element.textContent = message;
-    setTimeout(() => {
-        if (element.textContent === message) element.textContent = "";
-    }, 4000);
+function showMessage(msg) {
+    const el = document.getElementById("country-message");
+    if (!el) return;
+    el.textContent = msg;
+    setTimeout(() => { if (el.textContent === msg) el.textContent = ""; }, 4000);
 }
 
 function showCountryPreview() {
     if (!selectedCountry) { showCountrySelection(); return; }
     showOnly("country-preview");
     document.getElementById("selected-country-flag").src = countryImageUrl(selectedCountry);
-    document.getElementById("preview-country-name").textContent =
-        COUNTRY_NAMES[selectedCountry] || selectedCountry;
+    document.getElementById("preview-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     createPreviewGlobe("preview-globe-container", "preview-globe", selectedCountry);
 }
 
 document.getElementById("preview-back-button").addEventListener("click", () => {
-    selectedCountry = null;
-    showCountrySelection();
+    selectedCountry = null; showCountrySelection();
 });
 
 document.getElementById("enter-game-button").addEventListener("click", async () => {
@@ -354,74 +264,42 @@ document.getElementById("enter-game-button").addEventListener("click", async () 
 });
 
 async function confirmCountrySelection() {
-    if (!userId) {
-        showToast("برای اجرای بازی باید از داخل تلگرام وارد شوید.");
-        return;
-    }
+    if (!userId) { showToast("از داخل تلگرام وارد شوید."); return; }
     if (player?.country === selectedCountry) { showGame(); return; }
-
     try {
         const data = await apiPost("/api/select-country", { country: selectedCountry });
-        console.log("[select-country] response:", data);
-
         if (!data.success) {
-            const err = data.error || "unknown";
-            const msg = data.message || "";
-            if (err === "country_taken") {
-                showToast("این کشور قبلاً توسط بازیکن دیگری انتخاب شده است.");
-                selectedCountry = null;
-                await loadCountries();
-                showCountrySelection();
-                return;
+            if (data.error === "country_taken") {
+                showToast("این کشور قبلاً انتخاب شده است.");
+                selectedCountry = null; await loadCountries(); showCountrySelection(); return;
             }
-            if (err === "already_has_country") {
-                await loadPlayer();
-                showGame();
-                return;
-            }
-            if (err === "unauthorized") {
-                showToast("احراز هویت تلگرام ناموفق. از داخل ربات وارد شوید.");
-                return;
-            }
-            showToast(`خطا (${err}): ${msg || "ناشناخته"}`);
-            return;
+            if (data.error === "already_has_country") { await loadPlayer(); showGame(); return; }
+            if (data.error === "occupied") { showToast("این کشور اشغال شده است."); return; }
+            showToast(data.message || "خطا در انتخاب کشور."); return;
         }
-        player = data.player;
-        await loadCountries();
-        showGame();
-    } catch (error) {
-        console.error("[select-country] exception:", error);
-        showToast("خطای شبکه: " + (error.message || "ناموفق"));
-    }
+        player = data.player; await loadCountries(); showGame();
+    } catch (e) { showToast("خطای شبکه."); }
 }
 
 function showGame() {
-    showOnly("game");
-    showGamePage("home");
-    updateGameHeader();
-    updateHomeStats();
-    startStatsPolling();
+    showOnly("game"); showGamePage("home");
+    updateGameHeader(); updateHomeStats(); startStatsPolling(); loadRankings();
 }
 
 function updateGameHeader() {
     document.getElementById("game-country-flag").src = countryImageUrl(selectedCountry);
 }
 
-
 /* =========================================================
-   آمار خانه
+   Home
 ========================================================= */
 
 function updateHomeStats() {
     if (!player) return;
-    const name = COUNTRY_NAMES[selectedCountry] || selectedCountry;
-
     document.getElementById("home-country-flag").src = countryImageUrl(selectedCountry);
-    document.getElementById("home-country-name").textContent = name;
-
+    document.getElementById("home-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     const photo = document.getElementById("home-card-photo");
     if (photo) photo.style.backgroundImage = `url(${countryImageUrl(selectedCountry)})`;
-
     document.getElementById("home-money").textContent = formatMoney(player.money);
     document.getElementById("home-income").textContent = formatMoney(player.daily_income) + " / روز";
     document.getElementById("home-manpower").textContent = formatNumber(player.manpower);
@@ -432,13 +310,33 @@ function updateHomeStats() {
     document.getElementById("home-season").textContent = player.season ?? "بهار";
     document.getElementById("home-season-end").textContent =
         `پایان فصل تا ${player.season_days_left ?? 0} روز و ${player.season_hours_left ?? 0} ساعت`;
-
-    const mapMoney = document.getElementById("map-money");
-    if (mapMoney) mapMoney.textContent = formatMoney(player.money);
-
+    const mm = document.getElementById("map-money");
+    if (mm) mm.textContent = formatMoney(player.money);
     renderResourceBars();
 }
 
+async function loadRankings() {
+    try {
+        const rows = await apiGet("/api/rankings");
+        const box = document.getElementById("rankings-list");
+        if (!box) return;
+        box.innerHTML = "";
+        if (!rows.length) { box.innerHTML = `<div class="diplomacy-item-empty">هنوز رتبه‌ای نیست.</div>`; return; }
+        rows.forEach(r => {
+            const div = document.createElement("div");
+            const cls = r.rank === 1 ? "rank-1" : r.rank === 2 ? "rank-2" : r.rank === 3 ? "rank-3" : "";
+            div.className = `rank-row ${cls} ${r.is_eliminated ? "rank-elim" : ""}`;
+            div.innerHTML = `
+                <div class="rank-num">${r.rank}</div>
+                <div>
+                    <div class="rank-name">${r.flag} ${r.name}</div>
+                    <div class="rank-sub">💰${r.economy} ⚔️${r.military} 🤝${r.diplomacy} 🏗️${r.development}</div>
+                </div>
+                <div class="rank-score">${formatNumber(r.overall)}</div>`;
+            box.appendChild(div);
+        });
+    } catch (e) { console.error(e); }
+}
 
 /* =========================================================
    اکشن‌ها
@@ -446,43 +344,34 @@ function updateHomeStats() {
 
 document.querySelectorAll(".action-card").forEach(card => {
     card.addEventListener("click", () => {
-        const section = card.dataset.section;
-        if (section === "infrastructure") { openInfrastructureMenu(); return; }
-        if (section === "army") { openArmyPage(); return; }
-        if (section === "war") { openWarPage(); return; }
-        if (section === "diplomacy") { openDiplomacyPage(); return; }
-        if (section === "economy") { openEconomyPage(); return; }
-        if (section === "market") { showToast("این بخش به‌زودی فعال می‌شود."); return; }
+        const s = card.dataset.section;
+        if (s === "infrastructure") openInfrastructureMenu();
+        else if (s === "army") openArmyPage();
+        else if (s === "war") openWarPage();
+        else if (s === "diplomacy") openDiplomacyPage();
+        else if (s === "economy") openEconomyPage();
+        else if (s === "market") { showGamePage("market"); loadMarketListings(); }
     });
 });
 
-document.querySelectorAll(".sub-back-button").forEach(button => {
-    button.addEventListener("click", () => {
-        showGamePage(button.dataset.backTo || "home");
-    });
+document.querySelectorAll(".sub-back-button").forEach(b => {
+    b.addEventListener("click", () => showGamePage(b.dataset.backTo || "home"));
 });
-
 
 /* =========================================================
-   زیرساخت
+   Infra
 ========================================================= */
 
 function openInfrastructureMenu() { showGamePage("infrastructure"); }
 
 document.querySelectorAll("[data-infra-section]").forEach(tile => {
     tile.addEventListener("click", async () => {
-        const section = tile.dataset.infraSection;
+        const s = tile.dataset.infraSection;
         await refreshPlayer();
-        if (section === "power") {
-            renderInfraList("infra-power-list", "power");
-            showGamePage("infra-power");
-        } else if (section === "manpower") {
-            renderInfraList("infra-manpower-list", "manpower");
-            showGamePage("infra-manpower");
-        } else if (section === "resource") {
-            renderInfraList("infra-resource-list", "resource");
-            showGamePage("infra-resource");
-        } else if (section === "military") {
+        if (s === "power") { renderInfraList("infra-power-list", "power"); showGamePage("infra-power"); }
+        else if (s === "manpower") { renderInfraList("infra-manpower-list", "manpower"); showGamePage("infra-manpower"); }
+        else if (s === "resource") { renderInfraList("infra-resource-list", "resource"); showGamePage("infra-resource"); }
+        else if (s === "military") {
             renderInfraList("infra-land-list", "land");
             renderInfraList("infra-naval-list", "naval");
             renderInfraList("infra-air-list", "air");
@@ -492,33 +381,28 @@ document.querySelectorAll("[data-infra-section]").forEach(tile => {
 });
 
 function infraEffectText(item) {
-    const group = item.group;
-    const effectOf = level => {
-        if (group === "power") return `ظرفیت ${formatNumber(level.capacity)} برق`;
-        if (group === "manpower") return `تولید ${formatNumber(level.production)} نفر در روز`;
-        if (group === "resource") return `تولید ${formatNumber(level.production)} در روز`;
-        return `ظرفیت ${formatNumber(level.capacity)} واحد`;
+    const g = item.group;
+    const eff = lvl => {
+        if (g === "power") return `ظرفیت ${formatNumber(lvl.capacity)} برق`;
+        if (g === "manpower") return `تولید ${formatNumber(lvl.production)} نفر/روز`;
+        if (g === "resource") return `تولید ${formatNumber(lvl.production)} /روز`;
+        return `ظرفیت ${formatNumber(lvl.capacity)}`;
     };
-
     if (!item.current) {
-        let nextText = "";
-        if (item.next) nextText = `سطح ۱: ${effectOf(item.next)} — ${costText(item.next)}`;
-        return `هنوز ساخته نشده است.<br>${nextText}`;
+        let t = "هنوز ساخته نشده است.<br>";
+        if (item.next) t += `سطح ۱: ${eff(item.next)} — ${costText(item.next)}`;
+        return t;
     }
-
-    const line1 = `اکنون: ${effectOf(item.current)}`;
-    const line2 = item.next
-        ? `سطح بعد: ${effectOf(item.next)} — ${costText(item.next)}`
-        : "به حداکثر سطح رسیده است.";
-    return `${line1}<br>${line2}`;
+    let t = `اکنون: ${eff(item.current)}<br>`;
+    t += item.next ? `سطح بعد: ${eff(item.next)} — ${costText(item.next)}` : "حداکثر رسیده.";
+    return t;
 }
 
-function renderInfraList(containerId, group) {
-    const container = document.getElementById(containerId);
-    if (!container || !player?.infra) return;
-    container.innerHTML = "";
-
-    Object.entries(player.infra).forEach(([itemId, item]) => {
+function renderInfraList(cid, group) {
+    const c = document.getElementById(cid);
+    if (!c || !player?.infra) return;
+    c.innerHTML = "";
+    Object.entries(player.infra).forEach(([iid, item]) => {
         if (item.group !== group) return;
         const card = document.createElement("div");
         card.className = "infra-card";
@@ -529,298 +413,339 @@ function renderInfraList(containerId, group) {
             </div>
             <div class="infra-card-detail">${infraEffectText(item)}</div>
             <button class="infra-upgrade-button" ${!item.next ? "disabled" : ""}>
-                ${item.next ? "ارتقا" : "حداکثر سطح"}
-            </button>
-        `;
-        const button = card.querySelector(".infra-upgrade-button");
-        if (item.next) button.addEventListener("click", () => upgradeInfra(itemId));
-        container.appendChild(card);
+                ${item.next ? "ارتقا" : "حداکثر"}
+            </button>`;
+        const btn = card.querySelector(".infra-upgrade-button");
+        if (item.next) btn.addEventListener("click", () => upgradeInfra(iid));
+        c.appendChild(card);
     });
 }
 
-async function upgradeInfra(itemId) {
+async function upgradeInfra(iid) {
     if (!userId) return;
     try {
-        const data = await apiPost("/api/upgrade-infra", { category: itemId });
-        if (!data.success) {
-            showToast(data.message || "امکان ارتقا وجود ندارد.");
-            return;
-        }
-        player = data.player;
-        updateHomeStats();
-
-        const activePage = document.querySelector(".game-page:not(.hidden)");
-        if (!activePage) return;
-        const pageId = activePage.id;
-        if (pageId === "infra-power") renderInfraList("infra-power-list", "power");
-        else if (pageId === "infra-manpower") renderInfraList("infra-manpower-list", "manpower");
-        else if (pageId === "infra-resource") renderInfraList("infra-resource-list", "resource");
-        else if (pageId === "infra-military") {
+        const d = await apiPost("/api/upgrade-infra", { category: iid });
+        if (!d.success) { showToast(d.message || "امکان ارتقا نیست."); return; }
+        player = d.player; updateHomeStats();
+        const ap = document.querySelector(".game-page:not(.hidden)");
+        if (!ap) return;
+        const pid = ap.id;
+        if (pid === "infra-power") renderInfraList("infra-power-list", "power");
+        else if (pid === "infra-manpower") renderInfraList("infra-manpower-list", "manpower");
+        else if (pid === "infra-resource") renderInfraList("infra-resource-list", "resource");
+        else if (pid === "infra-military") {
             renderInfraList("infra-land-list", "land");
             renderInfraList("infra-naval-list", "naval");
             renderInfraList("infra-air-list", "air");
         }
-    } catch (error) {
-        console.error(error);
-        showToast("خطا در ارتقای زیرساخت.");
-    }
+    } catch (e) { showToast("خطا."); }
 }
 
-
 /* =========================================================
-   اقتصاد
+   Economy
 ========================================================= */
 
 async function openEconomyPage() {
-    showGamePage("economy");
-    await refreshPlayer();
-    renderEconomyList();
+    showGamePage("economy"); await refreshPlayer(); renderEconomyList();
 }
 
 function renderEconomyList() {
-    const container = document.getElementById("economy-list");
-    if (!container || !player?.economy) return;
-    container.innerHTML = "";
-
-    Object.entries(player.economy).forEach(([itemId, item]) => {
+    const c = document.getElementById("economy-list");
+    if (!c || !player?.economy) return;
+    c.innerHTML = "";
+    Object.entries(player.economy).forEach(([iid, item]) => {
         const card = document.createElement("div");
         card.className = "infra-card";
-        let detail = "";
-
+        let d = "";
         if (!item.current) {
-            detail = `هنوز ساخته نشده است.<br>`;
-            if (item.next) {
-                detail += `سطح ۱: درآمد +${formatMoney(item.next.income)} — ${costText(item.next)} | برق: ${item.power_required}`;
-            }
+            d = "هنوز ساخته نشده است.<br>";
+            if (item.next) d += `سطح ۱: درآمد +${formatMoney(item.next.income)} — ${costText(item.next)} | برق: ${item.power_required}`;
         } else {
-            detail = `درآمد فعلی: +${formatMoney(item.current.income)} / روز<br>`;
-            detail += `برق مصرفی: ${item.power_required * item.level}`;
-            if (item.next) detail += `<br>سطح بعد: درآمد +${formatMoney(item.next.income)} — ${costText(item.next)}`;
-            else detail += `<br>به حداکثر سطح رسیده است.`;
+            d = `درآمد فعلی: +${formatMoney(item.current.income)} /روز<br>`;
+            d += `برق مصرفی: ${item.power_required * item.level}`;
+            if (item.next) d += `<br>سطح بعد: +${formatMoney(item.next.income)} — ${costText(item.next)}`;
+            else d += "<br>حداکثر رسیده.";
         }
-
         card.innerHTML = `
             <div class="infra-card-top">
                 <span class="infra-card-name">${item.name}</span>
                 <span class="infra-card-level">سطح ${item.level} از ${item.max_level}</span>
             </div>
-            <div class="infra-card-detail">${detail}</div>
+            <div class="infra-card-detail">${d}</div>
             <button class="infra-upgrade-button" ${!item.next ? "disabled" : ""}>
-                ${item.next ? "سرمایه‌گذاری" : "حداکثر سطح"}
-            </button>
-        `;
-
-        const button = card.querySelector(".infra-upgrade-button");
-        if (item.next) button.addEventListener("click", () => upgradeEconomy(itemId));
-        container.appendChild(card);
+                ${item.next ? "سرمایه‌گذاری" : "حداکثر"}
+            </button>`;
+        const btn = card.querySelector(".infra-upgrade-button");
+        if (item.next) btn.addEventListener("click", () => upgradeEconomy(iid));
+        c.appendChild(card);
     });
 }
 
-async function upgradeEconomy(itemId) {
+async function upgradeEconomy(iid) {
     if (!userId) return;
     try {
-        const data = await apiPost("/api/upgrade-economy", { category: itemId });
-        if (!data.success) {
-            showToast(data.message || "امکان سرمایه‌گذاری وجود ندارد.");
-            return;
-        }
-        player = data.player;
-        updateHomeStats();
-        renderEconomyList();
-    } catch (error) {
-        console.error(error);
-        showToast("خطا در سرمایه‌گذاری.");
-    }
+        const d = await apiPost("/api/upgrade-economy", { category: iid });
+        if (!d.success) { showToast(d.message || "خطا"); return; }
+        player = d.player; updateHomeStats(); renderEconomyList();
+    } catch (e) { showToast("خطا."); }
 }
 
-
 /* =========================================================
-   ارتش
+   Army
 ========================================================= */
 
 async function openArmyPage() {
-    showGamePage("army");
-    await refreshPlayer();
-    renderArmyUnits();
+    showGamePage("army"); await refreshPlayer(); renderArmyUnits();
 }
 
 function getGroupCapacity(group) {
     if (!player?.infra) return 0;
-    let total = 0;
-    Object.values(player.infra).forEach(item => {
-        if (item.group === group && item.current) total += item.current.capacity ?? 0;
-    });
-    return total;
+    let t = 0;
+    Object.values(player.infra).forEach(i => { if (i.group === group && i.current) t += i.current.capacity ?? 0; });
+    return t;
 }
 
 function getGroupUsed(group) {
-    let total = 0;
-    Object.entries(ARMY_UNITS).forEach(([unitId, unit]) => {
-        if (unit.group === group) total += player?.units?.[unitId] ?? 0;
+    let t = 0;
+    Object.entries(ARMY_UNITS).forEach(([uid_, u]) => {
+        if (u.group === group) t += player?.units?.[uid_] ?? 0;
     });
-    return total;
+    return t;
 }
 
-function unitCostText(unit) {
-    let text = `${formatMoney(unit.cost)} | ${formatNumber(unit.manpower)} نفر`;
-    Object.entries(unit.resources || {}).forEach(([key, amount]) => {
-        text += ` | ${formatNumber(amount)} ${RESOURCE_NAMES[key]}`;
-    });
-    return text;
+function unitCostText(u) {
+    let t = `${formatMoney(u.cost)} | ${formatNumber(u.manpower)} نفر`;
+    Object.entries(u.resources || {}).forEach(([k, a]) => { t += ` | ${formatNumber(a)} ${RESOURCE_NAMES[k]}`; });
+    return t;
 }
 
 function renderArmyUnits() {
-    const container = document.getElementById("army-units");
-    if (!container || !player) return;
-    container.innerHTML = "";
-
+    const c = document.getElementById("army-units");
+    if (!c || !player) return;
+    c.innerHTML = "";
     ["land", "naval", "air"].forEach(group => {
-        const capacity = getGroupCapacity(group);
+        const cap = getGroupCapacity(group);
         const used = getGroupUsed(group);
-
         const title = document.createElement("div");
         title.className = "army-group-title";
-        title.innerHTML = `
-            <span>${GROUP_ICONS[group]} ${GROUP_TITLES[group]}</span>
-            <span class="army-group-capacity">${used} از ${capacity} ظرفیت</span>
-        `;
-        container.appendChild(title);
+        title.innerHTML = `<span>${GROUP_ICONS[group]} ${GROUP_TITLES[group]}</span>
+                           <span class="army-group-capacity">${used} از ${cap}</span>`;
+        c.appendChild(title);
 
-        Object.entries(ARMY_UNITS).forEach(([unitId, unit]) => {
-            if (unit.group !== group) return;
-            const count = player.units?.[unitId] ?? 0;
-            const required = player.infra?.[unit.requires];
-            const hasRequired = (required?.level ?? 0) > 0;
-            const full = used >= capacity;
-
-            let statusText;
-            let disabled = false;
-
-            if (!hasRequired) {
-                statusText = `برای باز شدن، «${required?.name || unit.requires}» را بسازید.`;
-                disabled = true;
-            } else if (full) {
-                statusText = "ظرفیت پر است؛ زیرساخت را ارتقا دهید.";
-                disabled = true;
-            } else {
-                statusText = "آماده آموزش";
-            }
+        Object.entries(ARMY_UNITS).forEach(([uid_, u]) => {
+            if (u.group !== group) return;
+            const count = player.units?.[uid_] ?? 0;
+            const req = player.infra?.[u.requires];
+            const hasReq = (req?.level ?? 0) > 0;
+            const full = used >= cap;
+            let statusText; let disabled = false;
+            if (!hasReq) { statusText = `برای باز شدن، «${req?.name || u.requires}» را بسازید.`; disabled = true; }
+            else if (full) { statusText = "ظرفیت پر است."; disabled = true; }
+            else statusText = "آماده آموزش";
 
             const card = document.createElement("div");
             card.className = "unit-card";
             card.innerHTML = `
                 <div class="unit-card-top">
-                    <span class="unit-card-name">${unit.name}</span>
-                    <span class="unit-card-count">${formatNumber(count)} عدد</span>
+                    <span class="unit-card-name">${u.name}</span>
+                    <span class="unit-card-count">${formatNumber(count)}</span>
                 </div>
                 <div class="unit-card-detail">
-                    حمله: ${unit.attack} | دفاع: ${unit.defense} | برق: ${unit.power_required}<br>
-                    هزینه: ${unitCostText(unit)}<br>
-                    ${statusText}
+                    حمله: ${u.attack} | دفاع: ${u.defense} | برق: ${u.power_required}<br>
+                    ${unitCostText(u)}<br>${statusText}
                 </div>
                 <div class="unit-buttons">
-                    <button class="unit-train-button" data-count="1" ${disabled ? "disabled" : ""}>آموزش ×۱</button>
-                    <button class="unit-train-button" data-count="10" ${disabled ? "disabled" : ""}>آموزش ×۱۰</button>
-                </div>
-            `;
-
-            card.querySelectorAll(".unit-train-button").forEach(button => {
+                    <button class="unit-train-button" data-count="1" ${disabled ? "disabled" : ""}>×۱</button>
+                    <button class="unit-train-button" data-count="10" ${disabled ? "disabled" : ""}>×۱۰</button>
+                </div>`;
+            card.querySelectorAll(".unit-train-button").forEach(b => {
                 if (disabled) return;
-                button.addEventListener("click", () => trainUnit(unitId, Number(button.dataset.count)));
+                b.addEventListener("click", () => trainUnit(uid_, Number(b.dataset.count)));
             });
-
-            container.appendChild(card);
+            c.appendChild(card);
         });
     });
 }
 
-async function trainUnit(unitId, count) {
+async function trainUnit(uid_, count) {
     if (!userId) return;
     try {
-        const data = await apiPost("/api/train-unit", { unit_id: unitId, count: count || 1 });
-        if (!data.success) {
-            showToast(data.message || "امکان آموزش این یگان وجود ندارد.", "error");
-            return;
-        }
-        player = data.player;
-        updateHomeStats();
-        renderArmyUnits();
-    } catch (error) {
-        console.error(error);
-        showToast("خطا در آموزش یگان.", "error");
-    }
+        const d = await apiPost("/api/train-unit", { unit_id: uid_, count });
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        player = d.player; updateHomeStats(); renderArmyUnits();
+    } catch (e) { showToast("خطا."); }
 }
 
-
 /* =========================================================
-   جنگ
+   War
 ========================================================= */
+
+document.querySelectorAll(".war-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+        document.querySelectorAll(".war-tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        document.querySelectorAll(".war-panel").forEach(p => p.classList.add("hidden"));
+        const panel = document.getElementById(tab.dataset.warTab);
+        if (panel) panel.classList.remove("hidden");
+    });
+});
 
 function openWarPage() {
     showGamePage("war");
     renderWarTargets();
+    loadWarData();
 }
 
 function renderWarTargets() {
-    const container = document.getElementById("war-target-list");
-    if (!container) return;
-    container.innerHTML = "";
-
-    Object.keys(COUNTRY_NAMES).forEach(countryId => {
-        if (countryId === selectedCountry) return;
-
+    const c = document.getElementById("war-target-list");
+    if (!c) return;
+    c.innerHTML = "";
+    const hasUnits = player && Object.values(player.units || {}).some(v => v > 0);
+    if (!hasUnits) {
+        c.innerHTML = `<div class="diplomacy-item-empty">برای اعلام جنگ ابتدا باید یگان بسازید.</div>`;
+        return;
+    }
+    Object.keys(COUNTRY_NAMES).forEach(cid => {
+        if (cid === selectedCountry) return;
+        const info = countries[cid];
+        const occupied = info?.occupier;
         const card = document.createElement("div");
         card.className = "war-target-card";
+        const occText = occupied ? ` (اشغال توسط ${COUNTRY_NAMES[occupied] || occupied})` : "";
         card.innerHTML = `
             <div class="war-target-top">
-                <img class="war-target-flag" src="${countryImageUrl(countryId)}" alt="">
-                <span class="war-target-name">${COUNTRY_NAMES[countryId]}</span>
+                <img class="war-target-flag" src="${countryImageUrl(cid)}" alt="">
+                <span class="war-target-name">${COUNTRY_NAMES[cid]}${occText}</span>
             </div>
-            <div class="war-attack-buttons">
-                <button class="war-attack-button" data-attack="land">زمینی</button>
-                <button class="war-attack-button" data-attack="air">هوایی</button>
-                <button class="war-attack-button" data-attack="navy">دریایی</button>
-            </div>
-        `;
-
-        card.querySelectorAll("[data-attack]").forEach(button => {
-            button.addEventListener("click", () => launchAttack(countryId, button.dataset.attack));
-        });
-
-        container.appendChild(card);
+            <button class="war-attack-button" data-declare="${cid}">⚔️ اعلام جنگ</button>`;
+        card.querySelector("[data-declare]").addEventListener("click", () => declareWar(cid));
+        c.appendChild(card);
     });
 }
 
-async function launchAttack(target, type) {
-    if (!userId) return;
+async function declareWar(target) {
+    if (!confirm(`اعلام جنگ به ${COUNTRY_NAMES[target]}؟\nاین درخواست به سازمان ملل (ادمین) می‌رود.`)) return;
     try {
-        const data = await apiPost("/api/attack", { target, type });
-        if (!data.success) {
-            showToast(data.message || "امکان حمله وجود ندارد.");
-            return;
-        }
-        showToast(data.message);
-    } catch (error) {
-        console.error(error);
-        showToast("خطا در ارسال عملیات.");
-    }
+        const d = await apiPost("/api/war/declare", { target });
+        if (!d.success) { showToast(d.message || "امکان اعلام جنگ نیست."); return; }
+        showToast(d.message || "اعلام جنگ ارسال شد.");
+        loadWarData();
+    } catch (e) { showToast("خطا."); }
 }
 
+async function loadWarData() {
+    try {
+        const d = await apiGet("/api/wars");
+
+        const act = document.getElementById("war-active-list");
+        if (act) {
+            act.innerHTML = "";
+            const all = [...(d.pending || []), ...(d.active || [])];
+            if (!all.length) act.innerHTML = `<div class="diplomacy-item-empty">جنگ فعالی نیست.</div>`;
+            all.forEach(w => {
+                const div = document.createElement("div");
+                div.className = "war-active-card";
+                let statusText = w.status === "pending_admin" ? "در انتظار تأیید سازمان ملل" :
+                                 w.status === "negotiation" ? "در حال مذاکره (۲۴ ساعته)" :
+                                 w.status === "battle" ? "آماده نبرد" : w.status;
+                div.innerHTML = `
+                    <h4>${COUNTRY_NAMES[w.attacker]} → ${COUNTRY_NAMES[w.defender]}</h4>
+                    <p>${statusText}${w.penalty ? ` — جریمه اتحاد: ${formatMoney(w.penalty)}` : ""}</p>`;
+                // اگه مهاجم خودم و نبرد آماده
+                if (w.status === "battle" && w.attacker === selectedCountry) {
+                    const btn = document.createElement("button");
+                    btn.className = "infra-upgrade-button";
+                    btn.textContent = "ارسال نیروها و اجرای نبرد";
+                    btn.addEventListener("click", () => openBattleModal(w.id));
+                    div.appendChild(btn);
+                }
+                act.appendChild(div);
+            });
+        }
+
+        const rep = document.getElementById("war-reports-list");
+        if (rep) {
+            rep.innerHTML = "";
+            if (!d.reports?.length) rep.innerHTML = `<div class="diplomacy-item-empty">گزارشی نیست.</div>`;
+            d.reports?.slice().reverse().forEach(r => {
+                const div = document.createElement("div");
+                div.className = "war-report-card";
+                const winnerName = r.winner === "attacker" ? COUNTRY_NAMES[r.attacker] : COUNTRY_NAMES[r.defender];
+                let fronts = "";
+                ["air", "naval", "land"].forEach(f => {
+                    if (!r.fronts[f]) return;
+                    const label = f === "air" ? "✈️ هوا" : f === "naval" ? "⚓ دریا" : "🪖 زمین";
+                    fronts += `<div class="front-item">
+                        <div class="front-label">${label}</div>
+                        <div class="front-values">
+                            <span class="front-atk">${formatNumber(r.fronts[f].attacker_power)}</span> /
+                            <span class="front-def">${formatNumber(r.fronts[f].defender_power)}</span>
+                        </div>
+                    </div>`;
+                });
+                div.innerHTML = `
+                    <h4>${COUNTRY_NAMES[r.attacker]} ⚔️ ${COUNTRY_NAMES[r.defender]}</h4>
+                    <p>برنده: <strong>${winnerName}</strong></p>
+                    <div class="front-bar">${fronts}</div>`;
+                rep.appendChild(div);
+            });
+        }
+    } catch (e) { console.error(e); }
+}
+
+function openBattleModal(wid) {
+    const ov = document.createElement("div");
+    ov.className = "modal-overlay";
+    ov.innerHTML = `
+        <div class="modal-box">
+            <div class="modal-title">ارسال نیروها به جبهه‌ها</div>
+            <label class="diplomacy-label">🪖 زمینی (تعداد)</label>
+            <input id="bt-land" class="diplomacy-input" type="number" value="0" min="0">
+            <label class="diplomacy-label">⚓ دریایی (تعداد)</label>
+            <input id="bt-naval" class="diplomacy-input" type="number" value="0" min="0">
+            <label class="diplomacy-label">✈️ هوایی (تعداد)</label>
+            <input id="bt-air" class="diplomacy-input" type="number" value="0" min="0">
+            <div class="modal-actions">
+                <button class="modal-cancel">انصراف</button>
+                <button class="modal-ok">اجرای نبرد</button>
+            </div>
+        </div>`;
+    ov.querySelector(".modal-cancel").onclick = () => ov.remove();
+    ov.querySelector(".modal-ok").onclick = async () => {
+        const fronts = {
+            land: Number(ov.querySelector("#bt-land").value) || 0,
+            naval: Number(ov.querySelector("#bt-naval").value) || 0,
+            air: Number(ov.querySelector("#bt-air").value) || 0,
+        };
+        if (!fronts.land && !fronts.naval && !fronts.air) {
+            showToast("حداقل یک جبهه را پر کنید."); return;
+        }
+        ov.remove();
+        try {
+            const d = await apiPost("/api/war/battle", { war_id: wid, fronts });
+            if (!d.success) { showToast(d.message || "خطا"); return; }
+            showToast(d.report?.winner === "attacker" ? "پیروزی!" : "شکست در نبرد.");
+            await refreshPlayer();
+            loadWarData();
+            loadCountries();
+        } catch (e) { showToast("خطا."); }
+    };
+    document.body.appendChild(ov);
+}
 
 /* =========================================================
-   دیپلماسی
+   Diplomacy
 ========================================================= */
 
 function openDiplomacyPage() {
     showGamePage("diplomacy");
-    const select = document.getElementById("diplomacy-target");
-    select.innerHTML = "";
-    Object.keys(COUNTRY_NAMES).forEach(countryId => {
-        if (countryId === selectedCountry) return;
-        const option = document.createElement("option");
-        option.value = countryId;
-        option.textContent = COUNTRY_NAMES[countryId];
-        select.appendChild(option);
+    const sel = document.getElementById("diplomacy-target");
+    sel.innerHTML = "";
+    Object.keys(COUNTRY_NAMES).forEach(cid => {
+        if (cid === selectedCountry) return;
+        const o = document.createElement("option");
+        o.value = cid; o.textContent = COUNTRY_NAMES[cid];
+        sel.appendChild(o);
     });
     loadDiplomacyStatus();
 }
@@ -829,337 +754,521 @@ document.getElementById("diplomacy-propose-button").addEventListener("click", as
     if (!userId) return;
     const target = document.getElementById("diplomacy-target").value;
     const type = document.getElementById("diplomacy-type").value;
-    const duration = document.getElementById("diplomacy-duration").value;
-
+    const dur = document.getElementById("diplomacy-duration").value;
     try {
-        const data = await apiPost("/api/propose-treaty", {
-            target, type, duration_days: Number(duration),
-        });
-        if (!data.success) {
-            showToast(data.message || "ارسال پیشنهاد ممکن نشد.");
-            return;
-        }
-        showToast(data.message);
-        loadDiplomacyStatus();
-    } catch (error) {
-        console.error(error);
-        showToast("خطا در ارسال پیشنهاد.");
-    }
+        const d = await apiPost("/api/propose-treaty", { target, type, duration_days: Number(dur) });
+        if (!d.success) { showToast(d.message || "خطا"); return; }
+        showToast(d.message); loadDiplomacyStatus();
+    } catch (e) { showToast("خطا."); }
 });
 
 async function loadDiplomacyStatus() {
     if (!userId) return;
     try {
-        const data = await apiGet("/api/diplomacy");
-        renderTreatyList(data.treaties || []);
-        renderSentProposals(data.sent || []);
-    } catch (error) { console.error(error); }
+        const d = await apiGet("/api/diplomacy");
+        renderReceivedProposals(d.received || []);
+        renderTreatyList(d.treaties || []);
+        renderSentProposals(d.sent || []);
+    } catch (e) { console.error(e); }
 }
 
-function renderTreatyList(treaties) {
-    const container = document.getElementById("diplomacy-treaties");
-    container.innerHTML = "";
-    if (!treaties.length) {
-        container.innerHTML = `<div class="diplomacy-item-empty">هیچ پیمان فعالی وجود ندارد.</div>`;
-        return;
+function renderReceivedProposals(list) {
+    const c = document.getElementById("diplomacy-received");
+    c.innerHTML = "";
+    if (!list.length) {
+        c.innerHTML = `<div class="diplomacy-item-empty">پیشنهاد دریافتی نیست.</div>`; return;
     }
-    treaties.forEach(treaty => {
-        const otherCountry = treaty.country_a === selectedCountry ? treaty.country_b : treaty.country_a;
-        const item = document.createElement("div");
-        item.className = "diplomacy-item";
-        item.innerHTML = `<span>${TREATY_TYPE_NAMES[treaty.treaty_type]} با ${COUNTRY_NAMES[otherCountry] || otherCountry}</span>`;
-        container.appendChild(item);
+    list.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "diplomacy-item";
+        div.innerHTML = `
+            <span>${TREATY_TYPE_NAMES[p.treaty_type]} از ${COUNTRY_NAMES[p.from_country]} — ${p.duration_days} روز</span>
+            <span>
+                <button class="message-button" data-accept="${p.id}" style="background:rgba(74,222,128,.15);color:#4ade80;border-color:rgba(74,222,128,.3);">قبول</button>
+                <button class="message-button" data-reject="${p.id}">رد</button>
+            </span>`;
+        c.appendChild(div);
+    });
+    c.querySelectorAll("[data-accept]").forEach(b => b.onclick = () => respondTreaty(b.dataset.accept, true));
+    c.querySelectorAll("[data-reject]").forEach(b => b.onclick = () => respondTreaty(b.dataset.reject, false));
+}
+
+async function respondTreaty(pid, accept) {
+    try {
+        const d = await apiPost("/api/respond-treaty", { proposal_id: pid, accept });
+        if (!d.success) { showToast("خطا"); return; }
+        showToast(accept ? "پذیرفته شد." : "رد شد.");
+        loadDiplomacyStatus();
+    } catch (e) { showToast("خطا."); }
+}
+
+function renderTreatyList(list) {
+    const c = document.getElementById("diplomacy-treaties");
+    c.innerHTML = "";
+    if (!list.length) { c.innerHTML = `<div class="diplomacy-item-empty">پیمانی نیست.</div>`; return; }
+    list.forEach(t => {
+        const other = t.country_a === selectedCountry ? t.country_b : t.country_a;
+        const div = document.createElement("div");
+        div.className = "diplomacy-item";
+        div.innerHTML = `<span>${TREATY_TYPE_NAMES[t.treaty_type]} با ${COUNTRY_NAMES[other] || other}</span>`;
+        c.appendChild(div);
     });
 }
 
-function renderSentProposals(sent) {
-    const container = document.getElementById("diplomacy-sent");
-    container.innerHTML = "";
-    if (!sent.length) {
-        container.innerHTML = `<div class="diplomacy-item-empty">پیشنهاد در انتظار پاسخی وجود ندارد.</div>`;
-        return;
-    }
-    sent.forEach(proposal => {
-        const item = document.createElement("div");
-        item.className = "diplomacy-item";
-        item.innerHTML = `
-            <span>${TREATY_TYPE_NAMES[proposal.treaty_type]} به ${COUNTRY_NAMES[proposal.to_country] || proposal.to_country}</span>
-            <span>در انتظار پاسخ</span>
-        `;
-        container.appendChild(item);
+function renderSentProposals(list) {
+    const c = document.getElementById("diplomacy-sent");
+    c.innerHTML = "";
+    if (!list.length) { c.innerHTML = `<div class="diplomacy-item-empty">پیشنهاد ارسالی نیست.</div>`; return; }
+    list.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "diplomacy-item";
+        div.innerHTML = `<span>${TREATY_TYPE_NAMES[p.treaty_type]} به ${COUNTRY_NAMES[p.to_country]}</span><span>در انتظار</span>`;
+        c.appendChild(div);
     });
 }
-
 
 /* =========================================================
-   نوار پایین
+   Bottom Nav
 ========================================================= */
 
 document.querySelectorAll(".nav-item").forEach(item => {
     item.addEventListener("click", () => {
         const page = item.dataset.page;
         showGamePage(page);
-        document.querySelectorAll(".nav-item").forEach(nav => nav.classList.remove("active"));
+        document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
         item.classList.add("active");
-
-        if (page === "home") updateHomeStats();
-        if (page === "map") setTimeout(() => initWorldMap(), 30);
-        if (page === "communications") { loadNews(); renderContactList(); }
+        if (page === "home") { updateHomeStats(); loadRankings(); }
+        else if (page === "map") setTimeout(() => initWorldMap(), 30);
+        else if (page === "communications") { loadAnnouncements(); loadUnion(); loadNews(); }
+        else if (page === "market") { loadMarketListings(); loadMyListings(); }
     });
 });
 
-
 /* =========================================================
-   ارتباطات
+   Communications — Tabs
 ========================================================= */
 
 document.querySelectorAll(".comm-tab").forEach(tab => {
     tab.addEventListener("click", () => {
-        const targetId = tab.dataset.tab;
+        const tid = tab.dataset.tab;
         document.querySelectorAll(".comm-tab").forEach(t => t.classList.remove("active"));
         tab.classList.add("active");
-        document.querySelectorAll(".comm-panel").forEach(panel => panel.classList.add("hidden"));
-        const panel = document.getElementById(targetId);
+        document.querySelectorAll(".comm-panel").forEach(p => p.classList.add("hidden"));
+        const panel = document.getElementById(tid);
         if (panel) panel.classList.remove("hidden");
-        if (targetId === "comm-news") loadNews();
-        if (targetId === "comm-contacts") renderContactList();
+        if (tid === "comm-announcements") loadAnnouncements();
+        else if (tid === "comm-unions") loadUnion();
+        else if (tid === "comm-news") loadNews();
+        else if (tid === "comm-contacts") renderContactList();
     });
 });
 
-function renderContactList() {
-    const container = document.getElementById("contact-list");
-    if (!container) return;
-    container.innerHTML = "";
-    Object.keys(COUNTRY_NAMES).forEach(countryId => {
-        if (countryId === selectedCountry) return;
-        const item = document.createElement("div");
-        item.className = "contact-item";
-        item.innerHTML = `
-            <div class="contact-info">
-                <span class="contact-flag">${COUNTRY_FLAGS[countryId]}</span>
-                <span class="contact-name">${COUNTRY_NAMES[countryId]}</span>
-            </div>
-            <button class="message-button" data-message-country="${countryId}">پیام</button>
-        `;
-        container.appendChild(item);
-    });
-    container.querySelectorAll("[data-message-country]").forEach(button => {
-        button.addEventListener("click", () => sendCountryMessage(button.dataset.messageCountry));
-    });
+/* =========================================================
+   Announcements
+========================================================= */
+
+document.getElementById("ann-submit").addEventListener("click", async () => {
+    const ta = document.getElementById("ann-text");
+    const text = ta.value.trim();
+    if (!text) return;
+    try {
+        const d = await apiPost("/api/announcements/create", { text });
+        if (!d.success) { showToast(d.message || "خطا"); return; }
+        ta.value = "";
+        showToast("بیانیه ثبت شد.");
+        loadAnnouncements();
+    } catch (e) { showToast("خطا."); }
+});
+
+async function loadAnnouncements() {
+    try {
+        const list = await apiGet("/api/announcements");
+        const c = document.getElementById("ann-list");
+        c.innerHTML = "";
+        if (!list.length) { c.innerHTML = `<div class="diplomacy-item-empty">بیانیه‌ای نیست.</div>`; return; }
+        list.forEach(a => {
+            const div = document.createElement("div");
+            div.className = "ann-card";
+            const supportFlags = a.support.map(c => COUNTRY_FLAGS[c] || c).join(" ");
+            const accuseFlags = a.accuse.map(c => COUNTRY_FLAGS[c] || c).join(" ");
+            div.innerHTML = `
+                <div class="ann-header">
+                    <span class="ann-flag">${COUNTRY_FLAGS[a.from_country] || ""}</span>
+                    <span class="ann-name">${COUNTRY_NAMES[a.from_country] || a.from_country}</span>
+                </div>
+                <div class="ann-text">${escapeHtml(a.text)}</div>
+                <div class="ann-reactions">
+                    <button class="ann-react support" data-react="support" data-id="${a.id}">✅ حمایت</button>
+                    <button class="ann-react accuse" data-react="accuse" data-id="${a.id}">❌ اتهام</button>
+                </div>
+                <div class="ann-flags">
+                    ${supportFlags ? `<div class="ann-flags-row"><span>✅</span> ${supportFlags}</div>` : ""}
+                    ${accuseFlags ? `<div class="ann-flags-row"><span>❌</span> ${accuseFlags}</div>` : ""}
+                </div>
+                <div class="ann-comments" id="ann-comments-${a.id}"></div>
+                <div class="ann-comment-row">
+                    <input class="ann-comment-input" data-ann="${a.id}" placeholder="کامنت...">
+                    <button class="ann-comment-send" data-ann="${a.id}">ارسال</button>
+                </div>`;
+            c.appendChild(div);
+        });
+        c.querySelectorAll(".ann-react").forEach(b => b.onclick = () => reactAnn(b.dataset.id, b.dataset.react));
+        c.querySelectorAll(".ann-comment-send").forEach(b => b.onclick = () => commentAnn(b.dataset.ann));
+    } catch (e) { console.error(e); }
 }
 
-async function sendCountryMessage(countryId) {
-    const name = COUNTRY_NAMES[countryId] || countryId;
-    const message = await askText(`پیام برای ${name}`, "متن پیام...");
-    if (!message) return;
-    showToast(`پیام شما به ${name} ارسال شد.`);
+async function reactAnn(id, reaction) {
+    try {
+        const d = await apiPost("/api/announcements/react", { announcement_id: id, reaction });
+        if (!d.success) { showToast("خطا"); return; }
+        loadAnnouncements();
+    } catch (e) {}
 }
 
+async function commentAnn(id) {
+    const inp = document.querySelector(`.ann-comment-input[data-ann="${id}"]`);
+    if (!inp || !inp.value.trim()) return;
+    try {
+        const d = await apiPost("/api/announcements/comment", { announcement_id: id, text: inp.value.trim() });
+        if (!d.success) { showToast("خطا"); return; }
+        inp.value = "";
+        loadAnnouncements();
+    } catch (e) {}
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
 
 /* =========================================================
-   اخبار
+   Unions
+========================================================= */
+
+async function loadUnion() {
+    const c = document.getElementById("union-content");
+    c.innerHTML = "";
+    try {
+        const d = await apiGet("/api/union");
+        if (!d.union) {
+            c.innerHTML = `
+                <div class="ann-form">
+                    <input id="union-name" class="diplomacy-input" placeholder="نام اتحادیه..." maxlength="40">
+                    <button id="union-create" class="diplomacy-submit">ساخت اتحادیه</button>
+                </div>`;
+            document.getElementById("union-create").onclick = async () => {
+                const name = document.getElementById("union-name").value.trim();
+                if (!name) return;
+                const r = await apiPost("/api/union/create", { name });
+                if (!r.success) { showToast("خطا"); return; }
+                showToast("اتحادیه ساخته شد."); loadUnion();
+            };
+
+            if (d.invites?.length) {
+                const invBox = document.createElement("div");
+                invBox.style.marginTop = "14px";
+                invBox.innerHTML = `<div class="diplomacy-list-title">دعوت‌ها</div>`;
+                d.invites.forEach(inv => {
+                    const row = document.createElement("div");
+                    row.className = "diplomacy-item";
+                    row.innerHTML = `<span>${inv.name} از ${COUNTRY_NAMES[inv.leader]}</span>
+                        <span>
+                            <button class="message-button" data-invite-accept="${inv.union_id}" style="background:rgba(74,222,128,.15);color:#4ade80;">قبول</button>
+                            <button class="message-button" data-invite-reject="${inv.union_id}">رد</button>
+                        </span>`;
+                    invBox.appendChild(row);
+                });
+                c.appendChild(invBox);
+                invBox.querySelectorAll("[data-invite-accept]").forEach(b => b.onclick = () => respondInvite(b.dataset.inviteAccept, true));
+                invBox.querySelectorAll("[data-invite-reject]").forEach(b => b.onclick = () => respondInvite(b.dataset.inviteReject, false));
+            }
+            return;
+        }
+
+        const u = d.union;
+        const isLeader = d.is_leader;
+        const header = document.createElement("div");
+        header.className = "infra-card";
+        header.innerHTML = `
+            <div class="infra-card-top">
+                <span class="infra-card-name">${u.name}</span>
+                <span class="infra-card-level">${u.members.length} عضو</span>
+            </div>
+            <div class="infra-card-detail">
+                اعضا: ${u.members.map(m => COUNTRY_FLAGS[m] + " " + COUNTRY_NAMES[m]).join(" • ")}
+            </div>`;
+        c.appendChild(header);
+
+        if (isLeader) {
+            const invForm = document.createElement("div");
+            invForm.className = "ann-form";
+            invForm.innerHTML = `
+                <label class="diplomacy-label">دعوت کشور</label>
+                <select id="invite-target" class="diplomacy-select">
+                    ${Object.keys(COUNTRY_NAMES).filter(cid => !u.members.includes(cid) && cid !== selectedCountry)
+                        .map(cid => `<option value="${cid}">${COUNTRY_NAMES[cid]}</option>`).join("")}
+                </select>
+                <button id="invite-submit" class="diplomacy-submit">ارسال دعوت</button>`;
+            c.appendChild(invForm);
+            document.getElementById("invite-submit").onclick = async () => {
+                const target = document.getElementById("invite-target").value;
+                const r = await apiPost("/api/union/invite", { union_id: u.id, target });
+                if (!r.success) { showToast("خطا"); return; }
+                showToast("دعوت ارسال شد.");
+            };
+        }
+
+        const msgTitle = document.createElement("div");
+        msgTitle.className = "diplomacy-list-title";
+        msgTitle.textContent = "پیام‌های اتحادیه";
+        c.appendChild(msgTitle);
+
+        const msgBox = document.createElement("div");
+        msgBox.className = "ann-list";
+        u.messages?.forEach(m => {
+            const d2 = document.createElement("div");
+            d2.className = "ann-card";
+            d2.innerHTML = `<div class="ann-header">
+                <span class="ann-flag">${COUNTRY_FLAGS[m.from_country]}</span>
+                <span class="ann-name">${COUNTRY_NAMES[m.from_country]}</span>
+            </div><div class="ann-text">${escapeHtml(m.text)}</div>`;
+            msgBox.appendChild(d2);
+        });
+        c.appendChild(msgBox);
+
+        const inp = document.createElement("div");
+        inp.className = "ann-form";
+        inp.innerHTML = `
+            <textarea id="union-msg" class="ann-input" maxlength="500" placeholder="پیام به اتحادیه..."></textarea>
+            <button id="union-msg-send" class="ann-submit">ارسال</button>
+            <button id="union-leave" class="diplomacy-submit" style="background:#6a2b2b;color:#fff;">خروج از اتحادیه</button>`;
+        c.appendChild(inp);
+        document.getElementById("union-msg-send").onclick = async () => {
+            const text = document.getElementById("union-msg").value.trim();
+            if (!text) return;
+            await apiPost("/api/union/message", { text });
+            loadUnion();
+        };
+        document.getElementById("union-leave").onclick = async () => {
+            if (!confirm("از اتحادیه خارج می‌شوید؟")) return;
+            await apiPost("/api/union/leave", {});
+            loadUnion();
+        };
+    } catch (e) { console.error(e); }
+}
+
+async function respondInvite(u_id, accept) {
+    await apiPost("/api/union/respond", { union_id: u_id, accept });
+    loadUnion();
+}
+
+/* =========================================================
+   News
 ========================================================= */
 
 async function loadNews() {
-    const container = document.getElementById("news-list");
-    if (!container) return;
+    const c = document.getElementById("news-list");
+    if (!c) return;
     try {
         const news = await apiGet("/api/news");
-        container.innerHTML = "";
+        c.innerHTML = "";
         news.forEach(item => {
-            const article = document.createElement("div");
-            article.className = "news-item";
-            article.innerHTML = `<h3>${item.title || ""}</h3><p>${item.text || ""}</p>`;
-            container.appendChild(article);
+            const div = document.createElement("div");
+            div.className = "news-item";
+            div.innerHTML = `<h3>${escapeHtml(item.title || "")}</h3><p>${escapeHtml(item.text || "")}</p>`;
+            c.appendChild(div);
         });
-    } catch (error) {
-        console.error(error);
-        container.innerHTML = `<div class="news-item"><h3>اخبار</h3><p>خبری برای نمایش نیست.</p></div>`;
+    } catch (e) {
+        c.innerHTML = `<div class="news-item"><h3>اخبار</h3><p>خبری نیست.</p></div>`;
     }
 }
 
-
 /* =========================================================
-   ابزار چرخش/زوم
+   Private Messages
 ========================================================= */
 
-function getTouchDistance(touches) {
-    const dx = touches[0].clientX - touches[1].clientX;
-    const dy = touches[0].clientY - touches[1].clientY;
-    return Math.hypot(dx, dy);
+function renderContactList() {
+    const c = document.getElementById("contact-list");
+    if (!c) return;
+    c.innerHTML = "";
+    Object.keys(COUNTRY_NAMES).forEach(cid => {
+        if (cid === selectedCountry) return;
+        const div = document.createElement("div");
+        div.className = "contact-item";
+        div.innerHTML = `
+            <div class="contact-info">
+                <span class="contact-flag">${COUNTRY_FLAGS[cid]}</span>
+                <span class="contact-name">${COUNTRY_NAMES[cid]}</span>
+            </div>
+            <button class="message-button" data-open-pm="${cid}">گفتگو</button>`;
+        c.appendChild(div);
+    });
+    c.querySelectorAll("[data-open-pm]").forEach(b => b.onclick = () => openPM(b.dataset.openPm));
 }
 
-function isPointVisible(lon, lat, rotation) {
-    const centerLon = -rotation[0];
-    const centerLat = -rotation[1];
-    const toRad = deg => (deg * Math.PI) / 180;
-    const lat1 = toRad(centerLat);
-    const lat2 = toRad(lat);
-    const deltaLon = toRad(lon - centerLon);
-    const cosDistance = Math.sin(lat1) * Math.sin(lat2) + Math.cos(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
-    return cosDistance > 0;
+function openPM(target) {
+    currentPMTarget = target;
+    document.getElementById("contact-list").classList.add("hidden");
+    document.getElementById("pm-conversation").classList.remove("hidden");
+    document.getElementById("pm-target-name").textContent = COUNTRY_NAMES[target];
+    loadPM(target);
 }
 
+document.getElementById("pm-back").onclick = () => {
+    currentPMTarget = null;
+    document.getElementById("contact-list").classList.remove("hidden");
+    document.getElementById("pm-conversation").classList.add("hidden");
+};
+
+document.getElementById("pm-send").onclick = async () => {
+    const ta = document.getElementById("pm-input");
+    const text = ta.value.trim();
+    if (!text || !currentPMTarget) return;
+    await apiPost("/api/pm/send", { target: currentPMTarget, text });
+    ta.value = "";
+    loadPM(currentPMTarget);
+};
+
+async function loadPM(target) {
+    try {
+        const d = await apiGet("/api/pm", { target });
+        const c = document.getElementById("pm-messages");
+        c.innerHTML = "";
+        (d.messages || []).forEach(m => {
+            const mine = m.from === selectedCountry;
+            const div = document.createElement("div");
+            div.className = `pm-msg ${mine ? "pm-mine" : "pm-other"}`;
+            div.textContent = m.text;
+            c.appendChild(div);
+        });
+    } catch (e) { console.error(e); }
+}
 
 /* =========================================================
-   گلوب پیش‌نمایش
+   Market
 ========================================================= */
 
-let previewGlobeAbort = null;
+document.querySelectorAll(".market-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+        document.querySelectorAll(".market-tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        document.querySelectorAll(".market-panel").forEach(p => p.classList.add("hidden"));
+        const panel = document.getElementById(tab.dataset.marketTab);
+        if (panel) panel.classList.remove("hidden");
+        if (tab.dataset.marketTab === "market-list-panel") loadMarketListings();
+        else if (tab.dataset.marketTab === "market-mine-panel") loadMyListings();
+    });
+});
 
-async function createPreviewGlobe(containerId, svgId, selected) {
-    const container = document.getElementById(containerId);
-    const svgElement = document.getElementById(svgId);
-    if (!container || !svgElement) return;
-
-    if (previewGlobeAbort) previewGlobeAbort.abort();
-    previewGlobeAbort = new AbortController();
-    const signal = previewGlobeAbort.signal;
-
-    const width = container.clientWidth || 300;
-    const height = container.clientHeight || 300;
-    const size = Math.min(width, height) * 0.46;
-    const minScale = size * 0.8;
-    const maxScale = size * 4;
-
-    d3.select(svgElement).selectAll("*").remove();
-    const svg = d3.select(svgElement).attr("viewBox", `0 0 ${width} ${height}`);
-
-    const projection = d3.geoOrthographic()
-        .scale(size).translate([width / 2, height / 2]).clipAngle(90);
-
-    const path = d3.geoPath(projection);
-    let world;
-    try { world = await loadWorldAtlas(); }
-    catch (error) { console.error(error); return; }
-    if (signal.aborted) return;
-
-    const land = topojson.feature(world, world.objects.countries);
-
-    svg.append("path").datum({ type: "Sphere" }).attr("class", "globe-water").attr("d", path);
-
-    svg.selectAll(".country-shape")
-        .data(land.features).enter().append("path")
-        .attr("class", "country-shape").attr("d", path)
-        .attr("fill", d => {
-            const countryId = Number(d.id);
-            if (selected && COUNTRY_IDS[selected] === countryId) return "#d98a25";
-            const isTaken = Object.values(countries).some(c => c.taken && COUNTRY_IDS[c.id] === countryId);
-            if (isTaken) return "#3978b7";
-            const isGameCountry = Object.values(COUNTRY_IDS).includes(countryId);
-            return isGameCountry ? "#111820" : "#151b21";
-        })
-        .attr("stroke", d => Object.values(COUNTRY_IDS).includes(Number(d.id)) ? "#26313c" : "none")
-        .attr("stroke-width", .6);
-
-    let rotation = projection.rotate();
-    let dragging = false, pinching = false;
-    let lastX = 0, lastY = 0;
-    let pinchStartDistance = 0, pinchStartScale = size;
-    let rafId = null;
-
-    function redraw() { svg.selectAll("path").attr("d", path); }
-    function autoRotate() {
-        if (signal.aborted) return;
-        if (!dragging && !pinching) {
-            rotation[0] += 0.08;
-            projection.rotate(rotation);
-            redraw();
-        }
-        rafId = requestAnimationFrame(autoRotate);
-    }
-    rafId = requestAnimationFrame(autoRotate);
-    signal.addEventListener("abort", () => { if (rafId) cancelAnimationFrame(rafId); });
-
-    svgElement.addEventListener("mousedown", e => { dragging = true; lastX = e.clientX; lastY = e.clientY; }, { signal });
-    window.addEventListener("mouseup", () => { dragging = false; }, { signal });
-    window.addEventListener("mousemove", e => {
-        if (!dragging) return;
-        rotation[0] += (e.clientX - lastX) * 0.5;
-        rotation[1] -= (e.clientY - lastY) * 0.5;
-        rotation[1] = Math.max(-90, Math.min(90, rotation[1]));
-        projection.rotate(rotation); redraw();
-        lastX = e.clientX; lastY = e.clientY;
-    }, { signal });
-
-    svgElement.addEventListener("wheel", e => {
-        e.preventDefault();
-        const next = projection.scale() * (e.deltaY > 0 ? 0.9 : 1.1);
-        projection.scale(Math.max(minScale, Math.min(maxScale, next)));
-        redraw();
-    }, { passive: false, signal });
-
-    svgElement.addEventListener("touchstart", e => {
-        if (e.touches.length === 2) {
-            pinching = true; dragging = false;
-            pinchStartDistance = getTouchDistance(e.touches);
-            pinchStartScale = projection.scale();
-            return;
-        }
-        if (!e.touches.length) return;
-        dragging = true;
-        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-    }, { passive: true, signal });
-
-    svgElement.addEventListener("touchend", e => {
-        dragging = false;
-        if (e.touches.length < 2) pinching = false;
-    }, { passive: true, signal });
-
-    svgElement.addEventListener("touchmove", e => {
-        if (pinching && e.touches.length === 2) {
-            e.preventDefault();
-            const ratio = getTouchDistance(e.touches) / pinchStartDistance;
-            projection.scale(Math.max(minScale, Math.min(maxScale, pinchStartScale * ratio)));
-            redraw(); return;
-        }
-        if (!dragging || !e.touches.length) return;
-        rotation[0] += (e.touches[0].clientX - lastX) * 0.5;
-        rotation[1] -= (e.touches[0].clientY - lastY) * 0.5;
-        rotation[1] = Math.max(-90, Math.min(90, rotation[1]));
-        projection.rotate(rotation); redraw();
-        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-        e.preventDefault();
-    }, { passive: false, signal });
+async function loadMarketListings() {
+    const c = document.getElementById("market-listings");
+    if (!c) return;
+    c.innerHTML = "";
+    try {
+        const d = await apiGet("/api/market");
+        if (!d.listings?.length) { c.innerHTML = `<div class="diplomacy-item-empty">سفارشی نیست.</div>`; return; }
+        d.listings.forEach(l => {
+            const div = document.createElement("div");
+            div.className = "infra-card";
+            const wantText = l.want_resource === "money" ? formatMoney(l.want_amount)
+                : `${formatNumber(l.want_amount)} ${RESOURCE_NAMES[l.want_resource]}`;
+            div.innerHTML = `
+                <div class="infra-card-top">
+                    <span class="infra-card-name">${COUNTRY_FLAGS[l.seller]} ${COUNTRY_NAMES[l.seller]}</span>
+                    <span class="infra-card-level">${RESOURCE_ICONS[l.sell_resource]} ${formatNumber(l.sell_amount)}</span>
+                </div>
+                <div class="infra-card-detail">در ازای: ${wantText}</div>
+                <button class="infra-upgrade-button" data-buy="${l.id}">معامله</button>`;
+            c.appendChild(div);
+        });
+        c.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => acceptListing(b.dataset.buy));
+    } catch (e) {}
 }
 
+async function acceptListing(lid) {
+    try {
+        const d = await apiPost("/api/market/accept", { listing_id: lid });
+        if (!d.success) { showToast(d.message || "خطا"); return; }
+        showToast("معامله انجام شد.");
+        loadMarketListings(); await refreshPlayer();
+    } catch (e) {}
+}
+
+document.getElementById("mk-submit").onclick = async () => {
+    const sr = document.getElementById("mk-sell-res").value;
+    const wr = document.getElementById("mk-want-res").value;
+    const sa = Number(document.getElementById("mk-sell-amt").value);
+    const wa = Number(document.getElementById("mk-want-amt").value);
+    try {
+        const d = await apiPost("/api/market/create", { sell_resource: sr, sell_amount: sa,
+            want_resource: wr, want_amount: wa });
+        if (!d.success) { showToast(d.message || "خطا"); return; }
+        showToast("سفارش ثبت شد.");
+        loadMarketListings();
+    } catch (e) {}
+};
+
+async function loadMyListings() {
+    const c = document.getElementById("market-mine");
+    if (!c) return;
+    c.innerHTML = "";
+    try {
+        const d = await apiGet("/api/market");
+        const mine = (d.listings || []).filter(l => l.seller === selectedCountry);
+        if (!mine.length) { c.innerHTML = `<div class="diplomacy-item-empty">سفارشی ندارید.</div>`; return; }
+        mine.forEach(l => {
+            const div = document.createElement("div");
+            div.className = "infra-card";
+            div.innerHTML = `
+                <div class="infra-card-top">
+                    <span class="infra-card-name">${RESOURCE_ICONS[l.sell_resource]} ${formatNumber(l.sell_amount)}</span>
+                    <span class="infra-card-level">در ازای ${l.want_resource === "money" ? formatMoney(l.want_amount) : formatNumber(l.want_amount) + " " + RESOURCE_NAMES[l.want_resource]}</span>
+                </div>
+                <button class="infra-upgrade-button" data-cancel="${l.id}" style="background:rgba(248,113,113,.15);color:#f87171;border-color:rgba(248,113,113,.3);">لغو سفارش</button>`;
+            c.appendChild(div);
+        });
+        c.querySelectorAll("[data-cancel]").forEach(b => b.onclick = async () => {
+            await apiPost("/api/market/cancel", { listing_id: b.dataset.cancel });
+            loadMyListings();
+        });
+    } catch (e) {}
+}
 
 /* =========================================================
-   نقشه
+   Map — World globe
 ========================================================= */
 
 let mapProjection = null, mapPath = null, mapSvg = null;
 let mapSize = 0, mapMinScale = 0, mapMaxScale = 0;
-let mapRotation = [0, 0];
+let mapRotation = [0, -10];
 let mapInitialized = false;
 let mapAbort = null;
+let mapSites = [];
+let mapSitesSvg = null;
 
 async function initWorldMap() {
     const box = document.querySelector(".map-box");
-    const svgElement = document.getElementById("map-globe");
-    if (!box || !svgElement) return;
+    const svgEl = document.getElementById("map-globe");
+    if (!box || !svgEl) return;
 
-    if (mapInitialized) { updateMapColors(); redrawMap(); return; }
+    if (mapInitialized) {
+        updateMapColors(); redrawMap(); return;
+    }
 
-    const width = box.clientWidth || 320;
-    const height = box.clientHeight || 300;
-    mapSize = Math.min(width, height) * 0.46;
+    const w = box.clientWidth || 320;
+    const h = box.clientHeight || 300;
+    mapSize = Math.min(w, h) * 0.46;
     mapMinScale = mapSize * 0.8;
     mapMaxScale = mapSize * 6;
-    mapRotation = [0, -10];
 
     let world;
     try { world = await loadWorldAtlas(); }
-    catch (error) { console.error(error); return; }
+    catch (e) { console.error(e); return; }
 
     const land = topojson.feature(world, world.objects.countries);
-
-    mapProjection = d3.geoOrthographic()
-        .scale(mapSize).translate([width / 2, height / 2])
+    mapProjection = d3.geoOrthographic().scale(mapSize).translate([w / 2, h / 2])
         .rotate(mapRotation).clipAngle(90);
-
     mapPath = d3.geoPath(mapProjection);
-    mapSvg = d3.select(svgElement).attr("viewBox", `0 0 ${width} ${height}`);
+    mapSvg = d3.select(svgEl).attr("viewBox", `0 0 ${w} ${h}`);
     mapSvg.selectAll("*").remove();
 
     mapSvg.append("path").datum({ type: "Sphere" }).attr("class", "globe-water").attr("d", mapPath);
@@ -1175,8 +1284,8 @@ async function initWorldMap() {
         .enter().append("text")
         .attr("class", "map-country-label").attr("text-anchor", "middle")
         .text(d => {
-            const entry = Object.entries(COUNTRY_IDS).find(([, id]) => id === Number(d.id));
-            return entry ? COUNTRY_NAMES[entry[0]] : "";
+            const e = Object.entries(COUNTRY_IDS).find(([, id]) => id === Number(d.id));
+            return e ? COUNTRY_NAMES[e[0]] : "";
         });
 
     mapSvg.selectAll(".map-ocean-label")
@@ -1184,104 +1293,115 @@ async function initWorldMap() {
         .attr("class", "map-ocean-label").attr("text-anchor", "middle")
         .text(d => d[2]);
 
-    mapSvg.selectAll(".map-strait-dot")
-        .data(STRAITS).enter().append("circle")
-        .attr("class", "map-strait-dot").attr("r", 2.6)
-        .on("click", (e, d) => { e.stopPropagation(); showStraitInfo(d); });
+    // سایت‌ها (سکو/معدن/تنگه)
+    await loadMapSites();
+    mapSitesSvg = mapSvg.append("g").attr("class", "map-sites-layer");
+    renderMapSites();
 
     updateMapColors(); redrawMap();
-    attachMapInteractions(svgElement);
+    attachMapInteractions(svgEl);
 
-    document.getElementById("map-zoom-in").addEventListener("click", () => zoomMap(1.35));
-    document.getElementById("map-zoom-out").addEventListener("click", () => zoomMap(1 / 1.35));
-    document.getElementById("map-reset").addEventListener("click", () => {
-        mapProjection.scale(mapSize);
-        mapRotation = [0, -10];
-        mapProjection.rotate(mapRotation);
-        redrawMap();
-    });
-    document.getElementById("map-info-close").addEventListener("click", () => {
+    document.getElementById("map-zoom-in").onclick = () => zoomMap(1.35);
+    document.getElementById("map-zoom-out").onclick = () => zoomMap(1 / 1.35);
+    document.getElementById("map-reset").onclick = () => {
+        mapProjection.scale(mapSize); mapRotation = [0, -10]; mapProjection.rotate(mapRotation); redrawMap();
+    };
+    document.getElementById("map-info-close").onclick = () => {
         document.getElementById("map-info-panel").classList.add("hidden");
-    });
-
+    };
     mapInitialized = true;
 }
 
-function zoomMap(factor) {
-    const next = mapProjection.scale() * factor;
-    mapProjection.scale(Math.max(mapMinScale, Math.min(mapMaxScale, next)));
+async function loadMapSites() {
+    try { mapSites = await apiGet("/api/map-sites"); }
+    catch (e) { mapSites = []; }
+}
+
+function renderMapSites() {
+    if (!mapSitesSvg) return;
+    mapSitesSvg.selectAll("*").remove();
+    mapSitesSvg.selectAll(".map-site")
+        .data(mapSites).enter().append("circle")
+        .attr("class", d => `map-site map-site-${d.kind === "strait" ? "strait" : d.type}`)
+        .attr("r", 3.2)
+        .on("click", (e, d) => { e.stopPropagation(); showSiteInfo(d); });
+}
+
+function updateMapSitePositions() {
+    if (!mapSitesSvg || !mapProjection) return;
+    const rot = mapProjection.rotate();
+    mapSitesSvg.selectAll(".map-site")
+        .attr("opacity", d => isPointVisible(d.lon, d.lat, rot) ? 1 : 0)
+        .attr("cx", d => { const p = mapProjection([d.lon, d.lat]); return p ? p[0] : -9999; })
+        .attr("cy", d => { const p = mapProjection([d.lon, d.lat]); return p ? p[1] : -9999; });
+}
+
+function zoomMap(f) {
+    const n = mapProjection.scale() * f;
+    mapProjection.scale(Math.max(mapMinScale, Math.min(mapMaxScale, n)));
     redrawMap();
 }
 
-function attachMapInteractions(svgElement) {
+function attachMapInteractions(svgEl) {
     if (mapAbort) mapAbort.abort();
     mapAbort = new AbortController();
     const signal = mapAbort.signal;
+    let dragging = false, pinching = false, lx = 0, ly = 0, pd = 0, ps = mapSize;
 
-    let dragging = false, pinching = false;
-    let lastX = 0, lastY = 0;
-    let pinchStartDistance = 0, pinchStartScale = mapSize;
-
-    svgElement.addEventListener("mousedown", e => { dragging = true; lastX = e.clientX; lastY = e.clientY; }, { signal });
+    svgEl.addEventListener("mousedown", e => { dragging = true; lx = e.clientX; ly = e.clientY; }, { signal });
     window.addEventListener("mouseup", () => { dragging = false; }, { signal });
     window.addEventListener("mousemove", e => {
         if (!dragging) return;
-        mapRotation[0] += (e.clientX - lastX) * 0.4;
-        mapRotation[1] -= (e.clientY - lastY) * 0.4;
+        mapRotation[0] += (e.clientX - lx) * 0.4;
+        mapRotation[1] -= (e.clientY - ly) * 0.4;
         mapRotation[1] = Math.max(-90, Math.min(90, mapRotation[1]));
         mapProjection.rotate(mapRotation); redrawMap();
-        lastX = e.clientX; lastY = e.clientY;
+        lx = e.clientX; ly = e.clientY;
     }, { signal });
 
-    svgElement.addEventListener("wheel", e => {
+    svgEl.addEventListener("wheel", e => {
         e.preventDefault();
         zoomMap(e.deltaY > 0 ? 0.9 : 1.1);
     }, { passive: false, signal });
 
-    svgElement.addEventListener("touchstart", e => {
+    svgEl.addEventListener("touchstart", e => {
         if (e.touches.length === 2) {
             pinching = true; dragging = false;
-            pinchStartDistance = getTouchDistance(e.touches);
-            pinchStartScale = mapProjection.scale(); return;
+            pd = getTouchDistance(e.touches); ps = mapProjection.scale(); return;
         }
         if (!e.touches.length) return;
-        dragging = true;
-        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+        dragging = true; lx = e.touches[0].clientX; ly = e.touches[0].clientY;
     }, { passive: true, signal });
 
-    svgElement.addEventListener("touchend", e => {
+    svgEl.addEventListener("touchend", e => {
         dragging = false;
         if (e.touches.length < 2) pinching = false;
     }, { passive: true, signal });
 
-    svgElement.addEventListener("touchmove", e => {
+    svgEl.addEventListener("touchmove", e => {
         if (pinching && e.touches.length === 2) {
             e.preventDefault();
-            const ratio = getTouchDistance(e.touches) / pinchStartDistance;
-            mapProjection.scale(Math.max(mapMinScale, Math.min(mapMaxScale, pinchStartScale * ratio)));
+            const r = getTouchDistance(e.touches) / pd;
+            mapProjection.scale(Math.max(mapMinScale, Math.min(mapMaxScale, ps * r)));
             redrawMap(); return;
         }
         if (!dragging || !e.touches.length) return;
-        mapRotation[0] += (e.touches[0].clientX - lastX) * 0.4;
-        mapRotation[1] -= (e.touches[0].clientY - lastY) * 0.4;
+        mapRotation[0] += (e.touches[0].clientX - lx) * 0.4;
+        mapRotation[1] -= (e.touches[0].clientY - ly) * 0.4;
         mapRotation[1] = Math.max(-90, Math.min(90, mapRotation[1]));
         mapProjection.rotate(mapRotation); redrawMap();
-        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+        lx = e.touches[0].clientX; ly = e.touches[0].clientY;
         e.preventDefault();
     }, { passive: false, signal });
 }
 
 function redrawMap() {
     if (!mapSvg || !mapProjection) return;
-    const rotation = mapProjection.rotate();
-    const zoomRatio = mapProjection.scale() / mapSize;
-
+    const rot = mapProjection.rotate();
     mapSvg.selectAll("path.globe-water, path.map-country").attr("d", mapPath);
-    const oceanFontSize = Math.min(11, 6.5 * (1 + (zoomRatio - 1) * 0.25));
 
     mapSvg.selectAll(".map-ocean-label")
-        .style("font-size", `${oceanFontSize}px`)
-        .attr("opacity", d => isPointVisible(d[0], d[1], rotation) ? 1 : 0)
+        .attr("opacity", d => isPointVisible(d[0], d[1], rot) ? 1 : 0)
         .attr("x", d => { const p = mapProjection([d[0], d[1]]); return p ? p[0] : -9999; })
         .attr("y", d => { const p = mapProjection([d[0], d[1]]); return p ? p[1] : -9999; });
 
@@ -1290,22 +1410,25 @@ function redrawMap() {
         .attr("y", d => { const c = mapPath.centroid(d); return isNaN(c[1]) ? -9999 : c[1]; })
         .attr("opacity", d => { const c = mapPath.centroid(d); return isNaN(c[0]) ? 0 : 1; });
 
-    mapSvg.selectAll(".map-strait-dot")
-        .attr("opacity", d => isPointVisible(d.lon, d.lat, rotation) ? 1 : 0)
-        .attr("cx", d => { const p = mapProjection([d.lon, d.lat]); return p ? p[0] : -9999; })
-        .attr("cy", d => { const p = mapProjection([d.lon, d.lat]); return p ? p[1] : -9999; });
+    updateMapSitePositions();
 }
 
 function updateMapColors() {
     if (!mapSvg) return;
     mapSvg.selectAll(".map-country")
         .attr("fill", d => {
-            const countryId = Number(d.id);
-            const gameEntry = Object.entries(COUNTRY_IDS).find(([, id]) => id === countryId);
-            if (!gameEntry) return "#151b21";
-            const [countryKey] = gameEntry;
-            if (countryKey === selectedCountry) return "#d98a25";
-            const info = countries[countryKey];
+            const cid = Number(d.id);
+            const e = Object.entries(COUNTRY_IDS).find(([, id]) => id === cid);
+            if (!e) return "#151b21";
+            const [key] = e;
+            const info = countries[key];
+            // اگه خودمون اشغال کردیم (سبز)، یا دیگران (بنفش)
+            if (info?.occupier) {
+                if (info.occupier === selectedCountry) return "#2fa360";
+                if (info.taken && key === selectedCountry) return "#2fa360";
+                return "#8e4ec6";
+            }
+            if (key === selectedCountry) return "#d98a25";
             if (info?.taken) return "#3978b7";
             return "#1c2733";
         })
@@ -1314,66 +1437,215 @@ function updateMapColors() {
 }
 
 function showCountryInfo(feature) {
-    const countryId = Number(feature.id);
-    const gameEntry = Object.entries(COUNTRY_IDS).find(([, id]) => id === countryId);
+    const cid = Number(feature.id);
+    const e = Object.entries(COUNTRY_IDS).find(([, id]) => id === cid);
     const panel = document.getElementById("map-info-panel");
     const flagEl = document.getElementById("map-info-flag");
     const nameEl = document.getElementById("map-info-name");
     const statusEl = document.getElementById("map-info-status");
     const descEl = document.getElementById("map-info-desc");
+    const actionBtn = document.getElementById("map-info-action");
+    actionBtn.classList.add("hidden");
 
-    if (!gameEntry) {
-        flagEl.textContent = "🏳️";
-        nameEl.textContent = "منطقه غیرقابل‌بازی";
-        statusEl.textContent = "بی‌صاحب";
-        descEl.textContent = "این منطقه تحت کنترل هیچ بازیکنی نیست.";
-        panel.classList.remove("hidden");
-        return;
+    if (!e) {
+        flagEl.textContent = "🏳️"; nameEl.textContent = "منطقه غیربازی";
+        statusEl.textContent = "بی‌صاحب"; descEl.textContent = "کنترل نشده.";
+        panel.classList.remove("hidden"); return;
     }
-
-    const [countryKey] = gameEntry;
-    const info = countries[countryKey];
-    flagEl.textContent = COUNTRY_FLAGS[countryKey];
-    nameEl.textContent = COUNTRY_NAMES[countryKey];
-
-    if (countryKey === selectedCountry) {
-        statusEl.textContent = "کشور شما";
-        descEl.textContent = "این کشور تحت فرماندهی شماست.";
+    const [key] = e;
+    const info = countries[key];
+    flagEl.textContent = COUNTRY_FLAGS[key];
+    nameEl.textContent = COUNTRY_NAMES[key];
+    if (info?.occupier) {
+        statusEl.textContent = `اشغال توسط ${COUNTRY_NAMES[info.occupier]}`;
+        descEl.textContent = "این کشور توسط نیروهای مهاجم اشغال شده است.";
+    } else if (key === selectedCountry) {
+        statusEl.textContent = "کشور شما"; descEl.textContent = "تحت فرماندهی شماست.";
     } else if (info?.taken) {
-        statusEl.textContent = "در اختیار بازیکن دیگر";
-        descEl.textContent = "این کشور توسط بازیکن دیگری انتخاب شده است.";
+        statusEl.textContent = "بازیکن دیگر"; descEl.textContent = "در اختیار بازیکن دیگر.";
     } else {
-        statusEl.textContent = "بی‌صاحب";
-        descEl.textContent = "هنوز بازیکنی این کشور را انتخاب نکرده است.";
+        statusEl.textContent = "بی‌صاحب"; descEl.textContent = "هنوز انتخاب نشده.";
     }
     panel.classList.remove("hidden");
 }
 
-function showStraitInfo(strait) {
-    document.getElementById("map-info-flag").textContent = "⚓";
-    document.getElementById("map-info-name").textContent = strait.name;
-    document.getElementById("map-info-status").textContent = "تحت کنترل هیچ‌کس نیست";
-    document.getElementById("map-info-desc").textContent = strait.desc;
-    document.getElementById("map-info-panel").classList.remove("hidden");
+function showSiteInfo(site) {
+    const panel = document.getElementById("map-info-panel");
+    const flagEl = document.getElementById("map-info-flag");
+    const nameEl = document.getElementById("map-info-name");
+    const statusEl = document.getElementById("map-info-status");
+    const descEl = document.getElementById("map-info-desc");
+    const actionBtn = document.getElementById("map-info-action");
+
+    if (site.kind === "strait") {
+        flagEl.textContent = "⚓";
+        descEl.textContent = `درآمد روزانه: ${formatMoney(site.income)}`;
+    } else {
+        flagEl.textContent = RESOURCE_ICONS[site.type] || "📍";
+        descEl.textContent = `تولید: ${formatNumber(site.production)} در روز`;
+    }
+    nameEl.textContent = site.name;
+    if (site.owner) {
+        statusEl.textContent = `متعلق به ${COUNTRY_NAMES[site.owner] || site.owner}`;
+    } else {
+        statusEl.textContent = "بی‌صاحب";
+    }
+
+    if (site.owner !== selectedCountry) {
+        actionBtn.classList.remove("hidden");
+        actionBtn.onclick = () => captureSite(site.id);
+    } else {
+        actionBtn.classList.add("hidden");
+    }
+    panel.classList.remove("hidden");
 }
 
+async function captureSite(siteId) {
+    if (!confirm("۱ ناو برای تصرف فرستاده می‌شود. ادامه؟")) return;
+    try {
+        const d = await apiPost("/api/map/capture", { site_id: siteId });
+        if (!d.success) { showToast(d.message || "خطا"); return; }
+        showToast(d.message);
+        await loadMapSites();
+        renderMapSites();
+        updateMapSitePositions();
+        await refreshPlayer();
+    } catch (e) { showToast("خطا."); }
+}
 
 /* =========================================================
-   شروع
+   Helpers for Globe
+========================================================= */
+
+function getTouchDistance(t) {
+    return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+}
+
+function isPointVisible(lon, lat, rot) {
+    const clon = -rot[0], clat = -rot[1];
+    const r = d => (d * Math.PI) / 180;
+    const l1 = r(clat), l2 = r(lat), dl = r(lon - clon);
+    return Math.sin(l1) * Math.sin(l2) + Math.cos(l1) * Math.cos(l2) * Math.cos(dl) > 0;
+}
+
+/* =========================================================
+   Preview Globe
+========================================================= */
+
+let previewGlobeAbort = null;
+
+async function createPreviewGlobe(containerId, svgId, selected) {
+    const cont = document.getElementById(containerId);
+    const svgEl = document.getElementById(svgId);
+    if (!cont || !svgEl) return;
+
+    if (previewGlobeAbort) previewGlobeAbort.abort();
+    previewGlobeAbort = new AbortController();
+    const signal = previewGlobeAbort.signal;
+
+    const w = cont.clientWidth || 300;
+    const h = cont.clientHeight || 300;
+    const size = Math.min(w, h) * 0.46;
+    const minS = size * 0.8, maxS = size * 4;
+
+    d3.select(svgEl).selectAll("*").remove();
+    const svg = d3.select(svgEl).attr("viewBox", `0 0 ${w} ${h}`);
+    const proj = d3.geoOrthographic().scale(size).translate([w / 2, h / 2]).clipAngle(90);
+    const path = d3.geoPath(proj);
+
+    let world;
+    try { world = await loadWorldAtlas(); }
+    catch (e) { return; }
+    if (signal.aborted) return;
+    const land = topojson.feature(world, world.objects.countries);
+
+    svg.append("path").datum({ type: "Sphere" }).attr("class", "globe-water").attr("d", path);
+
+    svg.selectAll(".country-shape").data(land.features).enter().append("path")
+        .attr("class", "country-shape").attr("d", path)
+        .attr("fill", d => {
+            const cid = Number(d.id);
+            if (selected && COUNTRY_IDS[selected] === cid) return "#d98a25";
+            const taken = Object.values(countries).some(c => c.taken && COUNTRY_IDS[c.id] === cid);
+            if (taken) return "#3978b7";
+            const isGame = Object.values(COUNTRY_IDS).includes(cid);
+            return isGame ? "#111820" : "#151b21";
+        })
+        .attr("stroke", d => Object.values(COUNTRY_IDS).includes(Number(d.id)) ? "#26313c" : "none")
+        .attr("stroke-width", .6);
+
+    let rot = proj.rotate(), dragging = false, pinching = false, lx = 0, ly = 0, pd = 0, ps = size, raf = null;
+
+    function redraw() { svg.selectAll("path").attr("d", path); }
+    function autoRotate() {
+        if (signal.aborted) return;
+        if (!dragging && !pinching) { rot[0] += 0.08; proj.rotate(rot); redraw(); }
+        raf = requestAnimationFrame(autoRotate);
+    }
+    raf = requestAnimationFrame(autoRotate);
+    signal.addEventListener("abort", () => { if (raf) cancelAnimationFrame(raf); });
+
+    svgEl.addEventListener("mousedown", e => { dragging = true; lx = e.clientX; ly = e.clientY; }, { signal });
+    window.addEventListener("mouseup", () => { dragging = false; }, { signal });
+    window.addEventListener("mousemove", e => {
+        if (!dragging) return;
+        rot[0] += (e.clientX - lx) * 0.5;
+        rot[1] -= (e.clientY - ly) * 0.5;
+        rot[1] = Math.max(-90, Math.min(90, rot[1]));
+        proj.rotate(rot); redraw();
+        lx = e.clientX; ly = e.clientY;
+    }, { signal });
+
+    svgEl.addEventListener("wheel", e => {
+        e.preventDefault();
+        const n = proj.scale() * (e.deltaY > 0 ? 0.9 : 1.1);
+        proj.scale(Math.max(minS, Math.min(maxS, n))); redraw();
+    }, { passive: false, signal });
+
+    svgEl.addEventListener("touchstart", e => {
+        if (e.touches.length === 2) {
+            pinching = true; dragging = false;
+            pd = getTouchDistance(e.touches); ps = proj.scale(); return;
+        }
+        if (!e.touches.length) return;
+        dragging = true; lx = e.touches[0].clientX; ly = e.touches[0].clientY;
+    }, { passive: true, signal });
+
+    svgEl.addEventListener("touchend", e => {
+        dragging = false;
+        if (e.touches.length < 2) pinching = false;
+    }, { passive: true, signal });
+
+    svgEl.addEventListener("touchmove", e => {
+        if (pinching && e.touches.length === 2) {
+            e.preventDefault();
+            const r = getTouchDistance(e.touches) / pd;
+            proj.scale(Math.max(minS, Math.min(maxS, ps * r))); redraw(); return;
+        }
+        if (!dragging || !e.touches.length) return;
+        rot[0] += (e.touches[0].clientX - lx) * 0.5;
+        rot[1] -= (e.touches[0].clientY - ly) * 0.5;
+        rot[1] = Math.max(-90, Math.min(90, rot[1]));
+        proj.rotate(rot); redraw();
+        lx = e.touches[0].clientX; ly = e.touches[0].clientY;
+        e.preventDefault();
+    }, { passive: false, signal });
+}
+
+/* =========================================================
+   Init
 ========================================================= */
 
 (async function init() {
     showOnly("loading");
-    const startTime = Date.now();
-
-    console.log("[init] userId:", userId, "hasInitData:", !!initData);
+    const t0 = Date.now();
 
     await loadCountries();
     await loadPlayer();
     await loadArmyCatalog();
 
-    const elapsed = Date.now() - startTime;
-    if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
+    const el = Date.now() - t0;
+    if (el < 1000) await new Promise(r => setTimeout(r, 1000 - el));
 
     if (player?.country) {
         selectedCountry = player.country;
