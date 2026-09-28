@@ -7,6 +7,8 @@
     --brand-glow: rgba(59, 130, 246, 0.35);
     --bg-deep: #06101c;
     --bg-card: rgba(10, 18, 30, 0.78);
+    --green: #4ade80;
+    --red: #f87171;
 }
 
 html, body {
@@ -160,7 +162,7 @@ img { -webkit-user-drag: none; user-select: none; }
 
 .sub-back-bar {
     display: flex;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 .sub-back-button {
     width: 100%;
@@ -320,7 +322,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .home-stat-sub {
     font-size: 10px; color: #a0a8b3; margin-top: 2px;
 }
-.home-stat-sub span { color: #4ade80; }
+.home-stat-sub span { color: var(--green); }
 
 .season-bar {
     position: relative;
@@ -394,13 +396,102 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 .infra-panel.hidden { display: none; }
 
-/* ==================== کارت‌ها ==================== */
-.infra-section { margin-bottom: 22px; }
-.infra-section-title {
-    font-size: 14px; color: #f4f6f9; margin-bottom: 10px;
-    padding-right: 4px; opacity: 0.9;
+/* ==================== کارت جدید زیرساخت/اقتصاد ==================== */
+.infra-card-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 10px; }
+.infra-card-new {
+    background: rgba(10, 18, 30, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 14px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
-.infra-card-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.infra-card-head {
+    display: flex; align-items: center; gap: 12px;
+}
+.infra-card-icon {
+    width: 46px; height: 46px; flex-shrink: 0;
+    border-radius: 12px;
+    background: rgba(var(--brand-rgb), 0.12);
+    border: 1px solid rgba(var(--brand-rgb), 0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+}
+.infra-card-titles {
+    display: flex; flex-direction: column; gap: 3px;
+    min-width: 0; flex: 1;
+}
+.infra-card-titles .infra-card-name {
+    font-size: 14.5px; color: #f4f6f9; font-weight: bold;
+}
+.infra-card-status {
+    font-size: 11px; color: #a0a8b3;
+}
+.infra-card-desc {
+    font-size: 11.5px; color: #a0a8b3;
+    line-height: 1.8;
+    padding: 0 2px;
+}
+
+/* باکس‌های کوچک آماری */
+.stat-boxes-row {
+    display: flex; flex-wrap: wrap; gap: 6px;
+}
+.stat-box {
+    flex: 1 1 calc(33% - 6px);
+    min-width: 88px;
+    background: rgba(6, 16, 28, 0.65);
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    border-radius: 10px;
+    padding: 7px 8px;
+    display: flex; flex-direction: column;
+    align-items: flex-start; gap: 2px;
+    text-align: right;
+}
+.stat-box-icon {
+    font-size: 12px;
+    line-height: 1;
+}
+.stat-box-value {
+    font-size: 12.5px;
+    color: #f4f6f9;
+    font-weight: bold;
+    line-height: 1.2;
+}
+.stat-box-label {
+    font-size: 9.5px;
+    color: #7a8699;
+    line-height: 1;
+}
+
+.infra-card-button {
+    width: 100%;
+    background: rgba(var(--brand-rgb), 0.14);
+    border: 1px solid rgba(var(--brand-rgb), 0.35);
+    color: var(--brand);
+    font-size: 12.5px;
+    font-weight: bold;
+    padding: 11px;
+    border-radius: 11px;
+    transition: all 0.2s ease;
+}
+.infra-card-button:active {
+    transform: scale(0.98);
+    background: rgba(var(--brand-rgb), 0.22);
+}
+.infra-card-button:disabled {
+    opacity: 0.4;
+    color: #6b7480;
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.06);
+    cursor: not-allowed;
+}
+
+/* ==================== کارت‌های قدیمی (جنگ، دیپلماسی، بازار) ==================== */
 .infra-card, .unit-card, .war-target-card {
     background: rgba(10, 18, 30, 0.75);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -436,7 +527,7 @@ img { -webkit-user-drag: none; user-select: none; }
     border-color: rgba(255, 255, 255, 0.06); cursor: not-allowed;
 }
 .unit-train-button {
-    color: #4ade80; background: rgba(74, 222, 128, 0.1);
+    color: var(--green); background: rgba(74, 222, 128, 0.1);
     border-color: rgba(74, 222, 128, 0.25);
 }
 .unit-train-button:active { background: rgba(74, 222, 128, 0.2); }
@@ -466,7 +557,9 @@ img { -webkit-user-drag: none; user-select: none; }
     font-size: 11.5px; color: #9aa4b0;
 }
 .resource-chip-value { font-size: 15px; color: #eee; font-weight: bold; }
-.resource-chip-rate { font-size: 10px; color: #6fe3a6; }
+.resource-chip-rate { font-size: 10px; }
+.resource-chip-rate.up { color: var(--green); }
+.resource-chip-rate.down { color: var(--red); }
 .resource-chip-rate.zero { color: #626d7b; }
 
 /* ==================== تب‌ها ==================== */
@@ -495,7 +588,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .war-attack-button {
     flex: 1; background: rgba(248, 113, 113, 0.1);
     border: 1px solid rgba(248, 113, 113, 0.25);
-    color: #f87171; font-size: 11.5px; padding: 9px;
+    color: var(--red); font-size: 11.5px; padding: 9px;
     border-radius: 10px; transition: all 0.2s ease;
 }
 .war-attack-button:active { transform: scale(0.96); background: rgba(248, 113, 113, 0.2); }
@@ -506,11 +599,11 @@ img { -webkit-user-drag: none; user-select: none; }
     border-radius: 14px; padding: 14px; margin-bottom: 10px;
     backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
 }
-.war-active-card h4 { font-size: 13px; color: #f87171; margin-bottom: 8px; }
+.war-active-card h4 { font-size: 13px; color: var(--red); margin-bottom: 8px; }
 .war-active-card p { font-size: 11px; color: #a0a8b3; line-height: 1.7; margin-bottom: 8px; }
 .war-report-card h4 { font-size: 13px; color: var(--brand); margin-bottom: 6px; }
 .war-report-card p { font-size: 11.5px; color: #a0a8b3; line-height: 1.7; margin-bottom: 8px; }
-.war-report-card strong { color: #4ade80; }
+.war-report-card strong { color: var(--green); }
 
 .front-bar {
     display: flex; gap: 8px; margin-top: 10px;
@@ -519,8 +612,8 @@ img { -webkit-user-drag: none; user-select: none; }
 .front-item { flex: 1; text-align: center; }
 .front-label { font-size: 10px; color: #626d7b; margin-bottom: 3px; }
 .front-values { font-size: 10px; }
-.front-atk { color: #f87171; }
-.front-def { color: #4ade80; }
+.front-atk { color: var(--red); }
+.front-def { color: var(--green); }
 
 /* ==================== دیپلماسی ==================== */
 .diplomacy-form {
@@ -591,7 +684,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .map-site:hover { r: 5; }
 .map-site-oil { fill: #2d2a1a; stroke: var(--brand); stroke-width: 1.2; }
 .map-site-steel { fill: #1e2833; stroke: #94a8bc; stroke-width: 1.2; }
-.map-site-uranium { fill: #1a2d1f; stroke: #4ade80; stroke-width: 1.2; }
+.map-site-uranium { fill: #1a2d1f; stroke: var(--green); stroke-width: 1.2; }
 .map-site-food { fill: #2d2618; stroke: #d4a017; stroke-width: 1.2; }
 .map-site-strait { fill: var(--brand); stroke: #0a1622; stroke-width: 0.6; }
 .map-controls {
@@ -624,7 +717,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .dot-unowned        { background: #4a5460; }
 .dot-oil            { background: var(--brand); border: 1px solid #0a1622; }
 .dot-steel          { background: #94a8bc; border: 1px solid #0a1622; }
-.dot-uranium        { background: #4ade80; border: 1px solid #0a1622; }
+.dot-uranium        { background: var(--green); border: 1px solid #0a1622; }
 .dot-food           { background: #d4a017; border: 1px solid #0a1622; }
 .dot-strait         { background: var(--brand); border: 2px solid #0a1622; }
 
@@ -708,12 +801,12 @@ img { -webkit-user-drag: none; user-select: none; }
 .ann-react.support {
     background: rgba(74, 222, 128, 0.1);
     border: 1px solid rgba(74, 222, 128, 0.3);
-    color: #4ade80;
+    color: var(--green);
 }
 .ann-react.accuse {
     background: rgba(248, 113, 113, 0.1);
     border: 1px solid rgba(248, 113, 113, 0.3);
-    color: #f87171;
+    color: var(--red);
 }
 .ann-react:active { transform: scale(0.96); }
 .ann-flags { margin-bottom: 8px; }
@@ -937,6 +1030,8 @@ img { -webkit-user-drag: none; user-select: none; }
     .map-box { height: 42vh; }
     .bottom-nav { height: 74px; }
     .nav-home span { width: 52px; height: 52px; font-size: 24px; margin-top: -22px; }
+    .stat-box { min-width: 80px; padding: 6px 7px; }
+    .stat-box-value { font-size: 11.5px; }
 }
 
 /* ==================== Toast ==================== */
