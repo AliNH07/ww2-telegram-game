@@ -1,215 +1,69 @@
 import os
-import asyncio
-import logging
-import secrets
+import json
+import hmac
+import hashlib
 import uuid
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any
+import logging
+import random
+from datetime import datetime, timezone, timedelta
+from urllib.parse import parse_qsl
 
 from aiohttp import web
-from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart
-from aiogram.types import (
-    Message,
-    WebAppInfo,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    CallbackQuery,
-)
-
-from config import BOT_TOKEN
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from dotenv import load_dotenv
 
 
 # =========================================================
-# CONFIG
+# تنظیمات
 # =========================================================
 
-BASE_DIR = Path(__file__).resolve().parent
+load_dotenv()
 
-PORT = int(os.environ.get("PORT", "10000"))
-HOST = "0.0.0.0"
-
-WEB_APP_URL = os.environ.get(
-    "WEB_APP_URL",
-    "https://ww2-telegram-game.onrender.com",
-)
-
-ADMIN_ID = 8900923747
-
-DAILY_SECONDS = 24 * 60 * 60
-WAR_PREPARATION_SECONDS = 24 * 60 * 60
-SITE_TRAVEL_SECONDS = 2 * 60 * 60
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+WEB_APP_URL = os.getenv("WEB_APP_URL", "https://ww2-telegram-game.onrender.com")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "0") == "1"   # در رندر 1 کن
+DATA_DIR = os.getenv("DATA_DIR", "data")
+STATE_FILE = os.path.join(DATA_DIR, "state.json")
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
+    format="%(asctime)s | %(levelname)s | %(message)s"
 )
 
-logger = logging.getLogger("ww2-game")
-
 
 # =========================================================
-# TELEGRAM
-# =========================================================
-
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
-
-
-# =========================================================
-# GLOBAL GAME STORAGE
-# =========================================================
-
-players: dict[str, dict[str, Any]] = {}
-country_owner: dict[str, str] = {}
-
-wars: dict[str, dict[str, Any]] = {}
-treaties: dict[str, dict[str, Any]] = {}
-
-statements: list[dict[str, Any]] = []
-statement_comments: list[dict[str, Any]] = []
-
-unions: dict[str, dict[str, Any]] = {}
-union_invites: list[dict[str, Any]] = []
-union_messages: dict[str, list[dict[str, Any]]] = {}
-
-private_messages: list[dict[str, Any]] = []
-
-market_orders: dict[str, dict[str, Any]] = {}
-
-notifications: list[dict[str, Any]] = []
-
-strategic_sites: dict[str, dict[str, Any]] = {}
-
-news_items: list[dict[str, Any]] = []
-
-pending_war_notifications: dict[str, set[str]] = {}
-
-
-# =========================================================
-# COUNTRY DATA
+# داده‌های پایه
 # =========================================================
 
 COUNTRIES = {
-    "germany": {
-        "name": "آلمان",
-        "flag": "🇩🇪",
-        "economy": 850,
-        "army": 900,
-        "population": 80_000_000,
-        "income": 120_000,
-        "production": {
-            "food": 4_500,
-            "steel": 5_500,
-            "uranium": 700,
-            "oil": 1_500,
-        },
-    },
-    "britain": {
-        "name": "بریتانیا",
-        "flag": "🇬🇧",
-        "economy": 800,
-        "army": 700,
-        "population": 47_000_000,
-        "income": 115_000,
-        "production": {
-            "food": 5_000,
-            "steel": 4_200,
-            "uranium": 600,
-            "oil": 1_000,
-        },
-    },
-    "ussr": {
-        "name": "شوروی",
-        "flag": "☭",
-        "economy": 750,
-        "army": 950,
-        "population": 170_000_000,
-        "income": 105_000,
-        "production": {
-            "food": 6_000,
-            "steel": 6_000,
-            "uranium": 800,
-            "oil": 2_500,
-        },
-    },
-    "usa": {
-        "name": "آمریکا",
-        "flag": "🇺🇸",
-        "economy": 950,
-        "army": 750,
-        "population": 132_000_000,
-        "income": 150_000,
-        "production": {
-            "food": 7_000,
-            "steel": 7_000,
-            "uranium": 900,
-            "oil": 4_000,
-        },
-    },
-    "france": {
-        "name": "فرانسه",
-        "flag": "🇫🇷",
-        "economy": 720,
-        "army": 680,
-        "population": 42_000_000,
-        "income": 100_000,
-        "production": {
-            "food": 5_000,
-            "steel": 3_800,
-            "uranium": 500,
-            "oil": 900,
-        },
-    },
-    "italy": {
-        "name": "ایتالیا",
-        "flag": "🇮🇹",
-        "economy": 650,
-        "army": 620,
-        "population": 44_000_000,
-        "income": 90_000,
-        "production": {
-            "food": 4_200,
-            "steel": 3_200,
-            "uranium": 450,
-            "oil": 700,
-        },
-    },
-    "china": {
-        "name": "چین",
-        "flag": "🇨🇳",
-        "economy": 620,
-        "army": 700,
-        "population": 520_000_000,
-        "income": 80_000,
-        "production": {
-            "food": 7_500,
-            "steel": 2_800,
-            "uranium": 350,
-            "oil": 800,
-        },
-    },
-    "japan": {
-        "name": "ژاپن",
-        "flag": "🇯🇵",
-        "economy": 730,
-        "army": 760,
-        "population": 71_000_000,
-        "income": 105_000,
-        "production": {
-            "food": 3_800,
-            "steel": 4_000,
-            "uranium": 500,
-            "oil": 500,
-        },
-    },
+    "germany": {"name": "آلمان", "flag": "🇩🇪"},
+    "britain": {"name": "بریتانیا", "flag": "🇬🇧"},
+    "ussr":    {"name": "شوروی", "flag": "☭"},
+    "usa":     {"name": "آمریکا", "flag": "🇺🇸"},
+    "france":  {"name": "فرانسه", "flag": "🇫🇷"},
+    "italy":   {"name": "ایتالیا", "flag": "🇮🇹"},
+    "china":   {"name": "چین", "flag": "🇨🇳"},
+    "japan":   {"name": "ژاپن", "flag": "🇯🇵"},
 }
 
+STARTING_MONEY = 10_000_000
+STARTING_MANPOWER = 50_000
+BASE_DAILY_INCOME = 100_000
+BASE_MANPOWER_PRODUCTION = 500
 
-# =========================================================
-# RESOURCES
-# =========================================================
+GAME_TOTAL_DAYS = 31
+DAYS_PER_SEASON = 7
+SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
+
+STARTING_RESOURCES = {
+    "food": 150_000,
+    "steel": 150_000,
+    "uranium": 150_000,
+    "oil": 150_000,
+}
 
 RESOURCE_NAMES = {
     "food": "غذا",
@@ -218,4889 +72,1215 @@ RESOURCE_NAMES = {
     "oil": "نفت",
 }
 
+GROUP_NAMES = {
+    "land": "زمینی",
+    "naval": "دریایی",
+    "air": "هوایی",
+    "power": "برق",
+    "manpower": "نیروی انسانی",
+    "resource": "منابع",
+}
 
-# =========================================================
-# ARMY
-# =========================================================
+TREATY_TYPE_NAMES = {
+    "alliance": "پیمان اتحاد",
+    "non_aggression": "پیمان عدم تجاوز",
+}
 
-ARMY_UNITS = {
-    "infantry": {
-        "name": "گردان پیاده‌نظام",
-        "group": "land",
-        "attack": 20,
-        "defense": 10,
-        "cost": {
-            "money": 8_000,
-            "food": 100,
-            "steel": 50,
-            "oil": 0,
-            "uranium": 0,
-        },
-        "upkeep": {
-            "food": 4,
-        },
-        "factory": "barracks",
-    },
-
-    "tank": {
-        "name": "گردان تانک",
-        "group": "land",
-        "attack": 50,
-        "defense": 25,
-        "cost": {
-            "money": 35_000,
-            "food": 150,
-            "steel": 450,
-            "oil": 120,
-            "uranium": 0,
-        },
-        "upkeep": {
-            "food": 6,
-            "oil": 3,
-        },
-        "factory": "tank_factory",
-    },
-
-    "fighter": {
-        "name": "اسکادران جنگنده",
-        "group": "air",
-        "attack": 60,
-        "defense": 30,
-        "cost": {
-            "money": 45_000,
-            "food": 100,
-            "steel": 250,
-            "oil": 300,
-            "uranium": 0,
-        },
-        "upkeep": {
-            "food": 4,
-            "oil": 8,
-        },
-        "factory": "airbase",
-    },
-
-    "bomber": {
-        "name": "اسکادران بمب‌افکن",
-        "group": "air",
-        "attack": 75,
-        "defense": 20,
-        "cost": {
-            "money": 60_000,
-            "food": 120,
-            "steel": 350,
-            "oil": 400,
-            "uranium": 0,
-        },
-        "upkeep": {
-            "food": 5,
-            "oil": 10,
-        },
-        "factory": "airbase",
-    },
-
-    "warship": {
-        "name": "ناو جنگی",
-        "group": "naval",
-        "attack": 50,
-        "defense": 60,
-        "cost": {
-            "money": 80_000,
-            "food": 200,
-            "steel": 900,
-            "oil": 350,
-            "uranium": 0,
-        },
-        "upkeep": {
-            "food": 8,
-            "oil": 8,
-        },
-        "factory": "shipyard",
-    },
-
-    "submarine": {
-        "name": "زیردریایی",
-        "group": "naval",
-        "attack": 45,
-        "defense": 25,
-        "cost": {
-            "money": 65_000,
-            "food": 120,
-            "steel": 650,
-            "oil": 250,
-            "uranium": 0,
-        },
-        "upkeep": {
-            "food": 5,
-            "oil": 6,
-        },
-        "factory": "shipyard",
-    },
+ATTACK_TYPE_NAMES = {
+    "land": "زمینی",
+    "air": "هوایی",
+    "navy": "دریایی",
 }
 
 
 # =========================================================
-# INFRASTRUCTURE
+# زیرساخت‌ها
 # =========================================================
 
 INFRASTRUCTURE = {
-    "power": {
-        "name": "نیروگاه",
-        "base_cost": 100_000,
-        "cost_growth": 1.35,
-        "max_level": 10,
-    },
 
-    "manpower": {
-        "name": "مرکز نیروی انسانی",
-        "base_cost": 120_000,
-        "cost_growth": 1.40,
-        "max_level": 10,
-    },
+    # ------------------ برق ------------------
+    "power_coal":      {"name": "نیروگاه زغال‌سنگ", "group": "power",
+        "levels": [{"cost": 250_000, "capacity": 10}, {"cost": 700_000, "capacity": 25},
+                   {"cost": 1_800_000, "capacity": 55}, {"cost": 4_500_000, "capacity": 100},
+                   {"cost": 10_000_000, "capacity": 180}]},
+    "power_gas":       {"name": "نیروگاه گازی", "group": "power",
+        "levels": [{"cost": 400_000, "capacity": 15}, {"cost": 1_000_000, "capacity": 35},
+                   {"cost": 2_500_000, "capacity": 70}, {"cost": 6_000_000, "capacity": 130},
+                   {"cost": 14_000_000, "capacity": 230}]},
+    "power_wind":      {"name": "نیروگاه بادی", "group": "power",
+        "levels": [{"cost": 350_000, "capacity": 9}, {"cost": 900_000, "capacity": 22},
+                   {"cost": 2_200_000, "capacity": 48}, {"cost": 5_500_000, "capacity": 95},
+                   {"cost": 12_000_000, "capacity": 165}]},
+    "power_solar":     {"name": "نیروگاه خورشیدی", "group": "power",
+        "levels": [{"cost": 500_000, "capacity": 12}, {"cost": 1_300_000, "capacity": 28},
+                   {"cost": 3_200_000, "capacity": 62}, {"cost": 8_000_000, "capacity": 120},
+                   {"cost": 18_000_000, "capacity": 210}]},
+    "power_hydro":     {"name": "نیروگاه آبی", "group": "power",
+        "levels": [{"cost": 600_000, "capacity": 18}, {"cost": 1_500_000, "capacity": 40},
+                   {"cost": 3_800_000, "capacity": 85}, {"cost": 9_000_000, "capacity": 160},
+                   {"cost": 20_000_000, "capacity": 280}]},
+    "power_geothermal":{"name": "نیروگاه زمین‌گرمایی", "group": "power",
+        "levels": [{"cost": 800_000, "capacity": 22}, {"cost": 2_000_000, "capacity": 50},
+                   {"cost": 5_000_000, "capacity": 105}, {"cost": 12_000_000, "capacity": 195},
+                   {"cost": 26_000_000, "capacity": 340}]},
+    "power_nuclear":   {"name": "نیروگاه هسته‌ای", "group": "power",
+        "levels": [
+            {"cost": 1_500_000, "capacity": 35, "resources": {"uranium": 5_000}},
+            {"cost": 4_000_000, "capacity": 85, "resources": {"uranium": 12_000}},
+            {"cost": 10_000_000, "capacity": 180, "resources": {"uranium": 25_000}},
+            {"cost": 24_000_000, "capacity": 340, "resources": {"uranium": 50_000}},
+            {"cost": 55_000_000, "capacity": 600, "resources": {"uranium": 90_000}},
+        ]},
 
-    "food": {
-        "name": "مزرعه و صنایع غذایی",
-        "base_cost": 80_000,
-        "cost_growth": 1.30,
-        "max_level": 10,
-    },
+    # ------------------ نیروی انسانی ------------------
+    "manpower_camp":                {"name": "اردوگاه آموزشی", "group": "manpower",
+        "levels": [{"cost": 150_000, "production": 200}, {"cost": 400_000, "production": 500},
+                   {"cost": 1_000_000, "production": 1200}, {"cost": 2_500_000, "production": 2500},
+                   {"cost": 6_000_000, "production": 5_000}]},
+    "manpower_barracks_training":   {"name": "پادگان آموزشی", "group": "manpower",
+        "levels": [{"cost": 250_000, "production": 300}, {"cost": 650_000, "production": 700},
+                   {"cost": 1_600_000, "production": 1600}, {"cost": 4_000_000, "production": 3400},
+                   {"cost": 9_500_000, "production": 6_800}]},
+    "manpower_volunteer":           {"name": "پایگاه داوطلبان", "group": "manpower",
+        "levels": [{"cost": 200_000, "production": 240}, {"cost": 500_000, "production": 560},
+                   {"cost": 1_300_000, "production": 1300}, {"cost": 3_300_000, "production": 2800},
+                   {"cost": 8_000_000, "production": 5_500}]},
+    "manpower_medical":             {"name": "مرکز پزشکی", "group": "manpower",
+        "levels": [{"cost": 350_000, "production": 260}, {"cost": 900_000, "production": 620},
+                   {"cost": 2_200_000, "production": 1400}, {"cost": 5_500_000, "production": 3000},
+                   {"cost": 13_000_000, "production": 6_000}]},
+    "manpower_mobilization":        {"name": "مرکز بسیج", "group": "manpower",
+        "levels": [{"cost": 300_000, "production": 380}, {"cost": 800_000, "production": 900},
+                   {"cost": 2_000_000, "production": 2000}, {"cost": 5_000_000, "production": 4200},
+                   {"cost": 12_000_000, "production": 8_500}]},
+    "manpower_academy":             {"name": "آکادمی نظامی", "group": "manpower",
+        "levels": [{"cost": 500_000, "production": 450}, {"cost": 1_300_000, "production": 1100},
+                   {"cost": 3_200_000, "production": 2400}, {"cost": 8_000_000, "production": 5000},
+                   {"cost": 19_000_000, "production": 10_000}]},
 
-    "barracks": {
-        "name": "پادگان",
-        "base_cost": 150_000,
-        "cost_growth": 1.40,
-        "max_level": 10,
-    },
+    # ------------------ نظامی: زمینی ------------------
+    "land_barracks":       {"name": "پادگان زمینی", "group": "land",
+        "levels": [{"cost": 300_000, "capacity": 5}, {"cost": 800_000, "capacity": 12},
+                   {"cost": 2_000_000, "capacity": 25}, {"cost": 5_000_000, "capacity": 45},
+                   {"cost": 12_000_000, "capacity": 80}]},
+    "land_hq":             {"name": "ستاد فرماندهی", "group": "land",
+        "levels": [{"cost": 400_000, "capacity": 3}, {"cost": 1_000_000, "capacity": 8},
+                   {"cost": 2_500_000, "capacity": 18}, {"cost": 6_000_000, "capacity": 35},
+                   {"cost": 15_000_000, "capacity": 60}]},
+    "land_tank_factory":   {"name": "کارخانه تانک‌سازی", "group": "land",
+        "levels": [{"cost": 450_000, "capacity": 3}, {"cost": 1_200_000, "capacity": 8},
+                   {"cost": 3_000_000, "capacity": 16}, {"cost": 7_500_000, "capacity": 30},
+                   {"cost": 18_000_000, "capacity": 55}]},
 
-    "tank_factory": {
-        "name": "کارخانه تانک",
-        "base_cost": 450_000,
-        "cost_growth": 1.55,
-        "max_level": 8,
-    },
+    # ------------------ نظامی: دریایی ------------------
+    "naval_port":     {"name": "بندر نظامی", "group": "naval",
+        "levels": [{"cost": 400_000, "capacity": 3}, {"cost": 1_000_000, "capacity": 8},
+                   {"cost": 2_500_000, "capacity": 18}, {"cost": 6_000_000, "capacity": 30},
+                   {"cost": 15_000_000, "capacity": 55}]},
+    "naval_shipyard": {"name": "کشتی‌سازی", "group": "naval",
+        "levels": [{"cost": 500_000, "capacity": 2}, {"cost": 1_300_000, "capacity": 6},
+                   {"cost": 3_200_000, "capacity": 14}, {"cost": 8_000_000, "capacity": 25},
+                   {"cost": 19_000_000, "capacity": 45}]},
 
-    "airbase": {
-        "name": "پایگاه هوایی",
-        "base_cost": 400_000,
-        "cost_growth": 1.50,
-        "max_level": 8,
-    },
+    # ------------------ نظامی: هوایی ------------------
+    "air_airport": {"name": "فرودگاه نظامی", "group": "air",
+        "levels": [{"cost": 500_000, "capacity": 3}, {"cost": 1_300_000, "capacity": 8},
+                   {"cost": 3_200_000, "capacity": 18}, {"cost": 8_000_000, "capacity": 30},
+                   {"cost": 19_000_000, "capacity": 55}]},
+    "air_arsenal": {"name": "ادوات هوایی", "group": "air",
+        "levels": [{"cost": 600_000, "capacity": 2}, {"cost": 1_500_000, "capacity": 6},
+                   {"cost": 3_800_000, "capacity": 14}, {"cost": 9_000_000, "capacity": 25},
+                   {"cost": 22_000_000, "capacity": 45}]},
 
-    "shipyard": {
-        "name": "کارخانه کشتی‌سازی",
-        "base_cost": 500_000,
-        "cost_growth": 1.55,
-        "max_level": 8,
-    },
+    # ------------------ منابع (پایه: 50k در روز در سطح ۱) ------------------
+    "resource_farm":         {"name": "مجتمع کشاورزی", "group": "resource", "resource_key": "food",
+        "levels": [{"cost": 200_000, "production": 50_000}, {"cost": 600_000, "production": 130_000},
+                   {"cost": 1_600_000, "production": 300_000}, {"cost": 4_000_000, "production": 700_000},
+                   {"cost": 10_000_000, "production": 1_500_000}]},
+    "resource_oil_well":     {"name": "چاه نفت", "group": "resource", "resource_key": "oil",
+        "levels": [{"cost": 500_000, "production": 50_000}, {"cost": 1_500_000, "production": 130_000},
+                   {"cost": 4_000_000, "production": 300_000}, {"cost": 10_000_000, "production": 700_000},
+                   {"cost": 25_000_000, "production": 1_500_000}]},
+    "resource_steel_mill":   {"name": "کارخانه فولاد", "group": "resource", "resource_key": "steel",
+        "levels": [{"cost": 500_000, "production": 50_000}, {"cost": 1_500_000, "production": 130_000},
+                   {"cost": 4_000_000, "production": 300_000}, {"cost": 10_000_000, "production": 700_000},
+                   {"cost": 25_000_000, "production": 1_500_000}]},
+    "resource_uranium_mine": {"name": "معدن اورانیوم", "group": "resource", "resource_key": "uranium",
+        "levels": [{"cost": 700_000, "production": 50_000}, {"cost": 2_000_000, "production": 130_000},
+                   {"cost": 5_000_000, "production": 300_000}, {"cost": 12_000_000, "production": 700_000},
+                   {"cost": 30_000_000, "production": 1_500_000}]},
 }
 
 
 # =========================================================
-# STRATEGIC SITES
+# اقتصاد
 # =========================================================
 
-SITE_DATA = [
-    {
-        "id": "gibraltar",
-        "name": "تنگه جبل‌الطارق",
-        "type": "strait",
-        "lat": 35.9,
-        "lon": -5.6,
-        "resource": None,
-    },
-    {
-        "id": "bosporus",
-        "name": "تنگه بسفر",
-        "type": "strait",
-        "lat": 41.1,
-        "lon": 29.0,
-        "resource": None,
-    },
-    {
-        "id": "hormuz",
-        "name": "تنگه هرمز",
-        "type": "strait",
-        "lat": 26.6,
-        "lon": 56.3,
-        "resource": "oil",
-    },
-    {
-        "id": "bab_el_mandeb",
-        "name": "باب‌المندب",
-        "type": "strait",
-        "lat": 12.6,
-        "lon": 43.3,
-        "resource": "oil",
-    },
-    {
-        "id": "suez",
-        "name": "کانال سوئز",
-        "type": "canal",
-        "lat": 30.6,
-        "lon": 32.3,
-        "resource": None,
-    },
-    {
-        "id": "dover",
-        "name": "تنگه دوور",
-        "type": "strait",
-        "lat": 50.9,
-        "lon": 1.4,
-        "resource": None,
-    },
-    {
-        "id": "panama",
-        "name": "کانال پاناما",
-        "type": "canal",
-        "lat": 9.1,
-        "lon": -79.6,
-        "resource": None,
-    },
-    {
-        "id": "malacca",
-        "name": "تنگه مالاکا",
-        "type": "strait",
-        "lat": 1.3,
-        "lon": 103.8,
-        "resource": "oil",
-    },
-    {
-        "id": "taiwan",
-        "name": "تنگه تایوان",
-        "type": "strait",
-        "lat": 24.0,
-        "lon": 121.0,
-        "resource": None,
-    },
-    {
-        "id": "korea",
-        "name": "تنگه کره",
-        "type": "strait",
-        "lat": 34.0,
-        "lon": 129.9,
-        "resource": None,
-    },
-
-    {
-        "id": "north_sea_oil",
-        "name": "میدان نفتی دریای شمال",
-        "type": "oil_platform",
-        "lat": 57.0,
-        "lon": 2.0,
-        "resource": "oil",
-    },
-    {
-        "id": "caspian_oil",
-        "name": "میدان نفتی خزر",
-        "type": "oil_field",
-        "lat": 40.0,
-        "lon": 50.0,
-        "resource": "oil",
-    },
-    {
-        "id": "caucasus_oil",
-        "name": "میدان نفتی قفقاز",
-        "type": "oil_field",
-        "lat": 43.0,
-        "lon": 45.0,
-        "resource": "oil",
-    },
-    {
-        "id": "urals_steel",
-        "name": "معادن فولاد اورال",
-        "type": "mine",
-        "lat": 57.0,
-        "lon": 60.0,
-        "resource": "steel",
-    },
-    {
-        "id": "central_asia_uranium",
-        "name": "معادن اورانیوم آسیای مرکزی",
-        "type": "mine",
-        "lat": 45.0,
-        "lon": 67.0,
-        "resource": "uranium",
-    },
-]
-
-
-def initialize_sites():
-    for site in SITE_DATA:
-        strategic_sites[site["id"]] = {
-            **site,
-            "owner": None,
-            "pending": None,
-        }
-
-
-initialize_sites()
+ECONOMY = {
+    "eco_agriculture": {"name": "کشاورزی و دامداری", "power_required": 5,
+        "levels": [{"cost": 200_000, "income": 30_000}, {"cost": 600_000, "income": 80_000},
+                   {"cost": 1_600_000, "income": 190_000}, {"cost": 4_000_000, "income": 420_000},
+                   {"cost": 10_000_000, "income": 850_000}]},
+    "eco_textile":     {"name": "کارخانه نساجی", "power_required": 8,
+        "levels": [{"cost": 300_000, "income": 45_000}, {"cost": 900_000, "income": 115_000},
+                   {"cost": 2_400_000, "income": 270_000}, {"cost": 6_000_000, "income": 600_000},
+                   {"cost": 15_000_000, "income": 1_200_000}]},
+    "eco_mining":      {"name": "معدن‌کاری", "power_required": 12,
+        "levels": [{"cost": 500_000, "income": 70_000}, {"cost": 1_400_000, "income": 180_000},
+                   {"cost": 3_600_000, "income": 420_000}, {"cost": 9_000_000, "income": 920_000},
+                   {"cost": 22_000_000, "income": 1_850_000}]},
+    "eco_steel":       {"name": "کارخانه فولاد", "power_required": 18,
+        "levels": [{"cost": 800_000, "income": 100_000}, {"cost": 2_200_000, "income": 260_000},
+                   {"cost": 5_500_000, "income": 600_000}, {"cost": 14_000_000, "income": 1_300_000},
+                   {"cost": 32_000_000, "income": 2_600_000}]},
+    "eco_trade":       {"name": "تجارت بین‌الملل", "power_required": 20,
+        "levels": [{"cost": 1_500_000, "income": 130_000}, {"cost": 4_000_000, "income": 330_000},
+                   {"cost": 10_000_000, "income": 760_000}, {"cost": 24_000_000, "income": 1_600_000},
+                   {"cost": 55_000_000, "income": 3_200_000}]},
+    "eco_oil":         {"name": "پالایشگاه نفت", "power_required": 25,
+        "levels": [{"cost": 1_200_000, "income": 140_000}, {"cost": 3_200_000, "income": 360_000},
+                   {"cost": 8_000_000, "income": 820_000}, {"cost": 20_000_000, "income": 1_750_000},
+                   {"cost": 45_000_000, "income": 3_500_000}]},
+    "eco_bank":        {"name": "بانک مرکزی", "power_required": 30,
+        "levels": [{"cost": 2_000_000, "income": 180_000}, {"cost": 5_500_000, "income": 460_000},
+                   {"cost": 14_000_000, "income": 1_050_000}, {"cost": 34_000_000, "income": 2_200_000},
+                   {"cost": 75_000_000, "income": 4_400_000}]},
+}
 
 
 # =========================================================
-# HELPERS
+# یگان‌ها
 # =========================================================
 
-def now() -> datetime:
+ARMY_UNITS = {
+    "infantry":  {"name": "پیاده‌نظام", "group": "land", "requires": "land_barracks",
+                  "cost": 50_000, "manpower": 300, "resources": {"food": 100},
+                  "power_required": 5, "attack": 20, "defense": 10},
+    "tank":      {"name": "تانک", "group": "land", "requires": "land_tank_factory",
+                  "cost": 150_000, "manpower": 250, "resources": {"steel": 300, "food": 150},
+                  "power_required": 12, "attack": 50, "defense": 25},
+    "ship":      {"name": "ناو دریایی", "group": "naval", "requires": "naval_port",
+                  "cost": 250_000, "manpower": 200, "resources": {"oil": 250, "food": 150},
+                  "power_required": 15, "attack": 50, "defense": 60},
+    "submarine": {"name": "زیردریایی", "group": "naval", "requires": "naval_shipyard",
+                  "cost": 200_000, "manpower": 120, "resources": {"oil": 200, "steel": 150},
+                  "power_required": 15, "attack": 45, "defense": 25},
+    "fighter":   {"name": "جنگنده", "group": "air", "requires": "air_airport",
+                  "cost": 200_000, "manpower": 150, "resources": {"oil": 200, "steel": 100},
+                  "power_required": 15, "attack": 45, "defense": 40},
+    "bomber":    {"name": "بمب‌افکن", "group": "air", "requires": "air_arsenal",
+                  "cost": 250_000, "manpower": 180, "resources": {"oil": 300, "steel": 150},
+                  "power_required": 18, "attack": 60, "defense": 15},
+}
+
+
+# =========================================================
+# منابع روی نقشه (سکو و معدن) — مصرف در فاز ۴
+# =========================================================
+
+MAP_RESOURCES = {
+    "oil_gulf":       {"type": "oil",     "name": "سکوی نفتی خلیج فارس",   "lon": 51.5,  "lat": 27.0, "production": 5_000_000},
+    "oil_caspian":    {"type": "oil",     "name": "سکوی نفتی خزر",         "lon": 51.0,  "lat": 41.5, "production": 3_000_000},
+    "oil_northsea":   {"type": "oil",     "name": "سکوی نفتی دریای شمال",  "lon": 2.0,   "lat": 56.5, "production": 4_000_000},
+    "oil_texas":      {"type": "oil",     "name": "میدان نفتی تگزاس",      "lon": -100.0,"lat": 31.0, "production": 4_000_000},
+    "steel_ural":     {"type": "steel",   "name": "معدن فولاد اورال",       "lon": 60.0,  "lat": 58.0, "production": 3_000_000},
+    "steel_ruhr":     {"type": "steel",   "name": "معدن فولاد رور",         "lon": 7.0,   "lat": 51.4, "production": 4_000_000},
+    "steel_brazil":   {"type": "steel",   "name": "معدن فولاد برزیل",       "lon": -50.0, "lat": -15.0,"production": 3_500_000},
+    "uranium_kazakh": {"type": "uranium", "name": "معدن اورانیوم قزاقستان","lon": 68.0,  "lat": 48.0, "production": 2_500_000},
+    "uranium_canada": {"type": "uranium", "name": "معدن اورانیوم کانادا",   "lon": -105.0,"lat": 58.0, "production": 2_000_000},
+    "uranium_aussie": {"type": "uranium", "name": "معدن اورانیوم استرالیا","lon": 134.0, "lat": -25.0,"production": 2_200_000},
+    "food_ukraine":   {"type": "food",    "name": "دشت‌های کشاورزی اوکراین","lon": 32.0, "lat": 49.0, "production": 2_500_000},
+    "food_india":     {"type": "food",    "name": "دشت‌های هند",            "lon": 78.0,  "lat": 22.0, "production": 2_500_000},
+}
+
+
+# =========================================================
+# ابزار زمان
+# =========================================================
+
+def utcnow():
     return datetime.now(timezone.utc)
 
 
-def iso(dt: datetime | None):
-    if not dt:
+def parse_dt(s):
+    if not s:
         return None
-
-    return dt.isoformat()
-
-
-def parse_dt(value):
-    if not value:
-        return None
-
     try:
-        result = datetime.fromisoformat(
-            value.replace("Z", "+00:00")
-        )
-
-        if result.tzinfo is None:
-            result = result.replace(
-                tzinfo=timezone.utc
-            )
-
-        return result
-
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
     except Exception:
         return None
 
 
-def json_response(data, status=200):
-    return web.json_response(
-        data,
-        status=status,
-        dumps=lambda x: __import__("json").dumps(
-            x,
-            ensure_ascii=False,
-        ),
-    )
+def get_game_time(player):
+    started_at = player.get("started_at")
+    if not started_at:
+        return {
+            "day": 1, "season": SEASONS[0],
+            "season_days_left": DAYS_PER_SEASON, "season_hours_left": 0,
+            "next_season": SEASONS[1],
+        }
 
+    started = parse_dt(started_at)
+    now = utcnow()
+    elapsed_days = max(0, (now - started).total_seconds() / 86400)
+    day = min(GAME_TOTAL_DAYS, int(elapsed_days) + 1)
+    season_index = ((day - 1) // DAYS_PER_SEASON) % len(SEASONS)
 
-def get_user_id(request):
-    user_id = (
-        request.query.get("user_id")
-        or request.headers.get("X-Telegram-User-ID")
-    )
+    season_end = started + timedelta(days=(season_index + 1) * DAYS_PER_SEASON)
+    game_end = started + timedelta(days=GAME_TOTAL_DAYS)
+    season_end = min(season_end, game_end)
 
-    if not user_id:
-        return None
+    remaining = season_end - now
+    if remaining.total_seconds() < 0:
+        remaining = timedelta(0)
 
-    return str(user_id)
-
-
-def get_player(user_id):
-    if not user_id:
-        return None
-
-    return players.get(str(user_id))
-
-
-def get_country_player(country):
-    user_id = country_owner.get(country)
-
-    if not user_id:
-        return None
-
-    return players.get(user_id)
-
-
-def country_name(country):
-    data = COUNTRIES.get(country)
-
-    if not data:
-        return country
-
-    return data["name"]
-
-
-def country_flag(country):
-    data = COUNTRIES.get(country)
-
-    if not data:
-        return ""
-
-    return data["flag"]
-
-
-def make_id(prefix):
-    return f"{prefix}_{uuid.uuid4().hex[:10]}"
-
-
-# =========================================================
-# PLAYER CREATION
-# =========================================================
-
-def create_player(user_id, country):
-    base = COUNTRIES[country]
-
-    player = {
-        "user_id": str(user_id),
-        "country": country,
-
-        "money": 1_000_000,
-
-        "resources": {
-            "food": 150_000,
-            "steel": 150_000,
-            "uranium": 150_000,
-            "oil": 150_000,
-        },
-
-        "population": base["population"],
-        "manpower": 500_000,
-
-        "army": {
-            "infantry": 50,
-            "tank": 10,
-            "fighter": 5,
-            "bomber": 2,
-            "warship": 3,
-            "submarine": 2,
-        },
-
-        "infrastructure": {
-            "power": 1,
-            "manpower": 1,
-            "food": 1,
-            "barracks": 1,
-            "tank_factory": 0,
-            "airbase": 0,
-            "shipyard": 0,
-        },
-
-        "economy": base["economy"],
-        "development": 1,
-
-        "occupied_territories": [],
-
-        "created_at": iso(now()),
-        "last_tick": iso(now()),
-
-        "statement_day": now().date().isoformat(),
-        "statement_count": 0,
-        "last_statement_at": None,
-
-        "notifications": [],
-
-        "union_id": None,
-
-        "eliminated": False,
+    return {
+        "day": day,
+        "season": SEASONS[season_index],
+        "season_days_left": remaining.days,
+        "season_hours_left": remaining.seconds // 3600,
+        "next_season": SEASONS[(season_index + 1) % len(SEASONS)],
     }
 
-    players[str(user_id)] = player
-    country_owner[country] = str(user_id)
-
-    return player
-
 
 # =========================================================
-# ECONOMY TICK
+# محاسبه نرخ‌ها
 # =========================================================
 
-def update_player_economy(player):
-    if not player:
-        return
-
-    if player.get("eliminated"):
-        return
-
-    last_tick = parse_dt(
-        player.get("last_tick")
-    )
-
-    current = now()
-
-    if not last_tick:
-        player["last_tick"] = iso(current)
-        return
-
-    elapsed = (
-        current - last_tick
-    ).total_seconds()
-
-    if elapsed < 1:
-        return
-
-    days = elapsed / DAILY_SECONDS
-
-    country = player["country"]
-    base = COUNTRIES.get(country, {})
-
-    infra = player["infrastructure"]
-
-    income = base.get(
-        "income",
-        50_000,
-    )
-
-    income *= (
-        1
-        + max(
-            0,
-            player.get("development", 1) - 1,
-        )
-        * 0.05
-    )
-
-    income *= days
-
-    player["money"] += int(income)
-
-    production = base.get(
-        "production",
-        {},
-    )
-
-    food_bonus = 1 + (
-        infra.get("food", 1) - 1
-    ) * 0.15
-
-    for resource, amount in production.items():
-
-        multiplier = 1
-
-        if resource == "food":
-            multiplier = food_bonus
-
-        if resource == "oil":
-            multiplier += (
-                count_resource_sites(
-                    country,
-                    "oil",
-                )
-                * 0.25
-            )
-
-        if resource == "steel":
-            multiplier += (
-                count_resource_sites(
-                    country,
-                    "steel",
-                )
-                * 0.20
-            )
-
-        if resource == "uranium":
-            multiplier += (
-                count_resource_sites(
-                    country,
-                    "uranium",
-                )
-                * 0.20
-            )
-
-        generated = (
-            amount
-            * multiplier
-            * days
-        )
-
-        player["resources"][resource] = (
-            player["resources"].get(resource, 0)
-            + int(generated)
-        )
-
-    # مصرف روزانه ارتش
-    upkeep_days = days
-
-    for unit_id, quantity in player["army"].items():
-
-        unit = ARMY_UNITS.get(unit_id)
-
-        if not unit:
-            continue
-
-        for resource, cost in unit["upkeep"].items():
-
-            consumption = (
-                cost
-                * quantity
-                * upkeep_days
-            )
-
-            player["resources"][resource] = max(
-                0,
-                player["resources"].get(resource, 0)
-                - int(consumption),
-            )
-
-    player["last_tick"] = iso(current)
+def get_infra_level(player, item_id):
+    return player.get("infra_levels", {}).get(item_id, 0)
 
 
-def update_all_players():
-    for player in players.values():
-        update_player_economy(player)
+def get_item_info(catalog, item_id, level):
+    if level <= 0:
+        return None
+    levels = catalog[item_id]["levels"]
+    index = min(level, len(levels)) - 1
+    return levels[index]
 
 
-# =========================================================
-# RESOURCE SITES
-# =========================================================
-
-def count_resource_sites(country, resource):
+def get_power_total(player):
     total = 0
-
-    for site in strategic_sites.values():
-        if (
-            site.get("owner") == country
-            and site.get("resource") == resource
-        ):
-            total += 1
-
+    for item_id, item in INFRASTRUCTURE.items():
+        if item.get("group") != "power":
+            continue
+        level = get_infra_level(player, item_id)
+        if level > 0:
+            total += item["levels"][level - 1]["capacity"]
     return total
 
 
-# =========================================================
-# NEWS
-# =========================================================
-
-def add_news(
-    title,
-    description,
-    category="general",
-    country=None,
-):
-    item = {
-        "id": make_id("news"),
-        "title": title,
-        "description": description,
-        "category": category,
-        "country": country,
-        "created_at": iso(now()),
-    }
-
-    news_items.insert(0, item)
-
-    if len(news_items) > 300:
-        del news_items[300:]
-
-    return item
-
-
-# =========================================================
-# NOTIFICATIONS
-# =========================================================
-
-def add_notification(
-    user_id,
-    title,
-    message,
-    category="general",
-):
-    item = {
-        "id": make_id("notification"),
-        "title": title,
-        "message": message,
-        "category": category,
-        "created_at": iso(now()),
-        "read": False,
-    }
-
-    if user_id in players:
-        players[user_id]["notifications"].insert(
-            0,
-            item,
-        )
-
-        players[user_id]["notifications"] = (
-            players[user_id]["notifications"][:100]
-        )
-
-    notifications.append(
-        {
-            **item,
-            "user_id": user_id,
-        }
-    )
-
-    return item
-
-
-async def telegram_notify(
-    user_id,
-    text,
-):
-    try:
-        await bot.send_message(
-            int(user_id),
-            text,
-            parse_mode="HTML",
-        )
-    except Exception as exc:
-        logger.warning(
-            "Telegram notification failed for %s: %s",
-            user_id,
-            exc,
-        )
-
-
-async def broadcast_telegram(text):
-    tasks = []
-
-    for user_id, player in players.items():
-
-        if player.get("eliminated"):
-            continue
-
-        tasks.append(
-            telegram_notify(
-                user_id,
-                text,
-            )
-        )
-
-    if tasks:
-        await asyncio.gather(
-            *tasks,
-            return_exceptions=True,
-        )
-
-
-# =========================================================
-# API: HEALTH
-# =========================================================
-
-async def api_health(request):
-    return json_response(
-        {
-            "success": True,
-            "status": "online",
-            "players": len(players),
-            "countries_taken": len(country_owner),
-            "wars": len(wars),
-            "time": iso(now()),
-        }
-    )
-
-
-# =========================================================
-# API: COUNTRIES
-# =========================================================
-
-async def api_countries(request):
-    update_all_players()
-
-    result = {}
-
-    for country_id, data in COUNTRIES.items():
-
-        owner_id = country_owner.get(
-            country_id
-        )
-
-        owner = players.get(
-            owner_id
-        ) if owner_id else None
-
-        result[country_id] = {
-            "id": country_id,
-            "name": data["name"],
-            "flag": data["flag"],
-            "economy": data["economy"],
-            "army": data["army"],
-            "population": data["population"],
-            "taken": bool(owner_id),
-            "owner_id": owner_id,
-            "occupied_by": (
-                owner.get("country")
-                if owner
-                else None
-            ),
-        }
-
-    return json_response(
-        {
-            "success": True,
-            "countries": result,
-        }
-    )
-
-
-# =========================================================
-# API: PLAYER
-# =========================================================
-
-def serialize_player(player):
-    if not player:
-        return None
-
-    update_player_economy(player)
-
-    country = player["country"]
-
-    base = COUNTRIES[country]
-
-    army_power = 0
-
-    for unit_id, quantity in player["army"].items():
-
-        unit = ARMY_UNITS.get(unit_id)
-
-        if unit:
-            army_power += (
-                quantity
-                * (
-                    unit["attack"]
-                    + unit["defense"]
-                )
-            )
-
-    return {
-        **player,
-        "country_name": base["name"],
-        "country_flag": base["flag"],
-        "army_power": army_power,
-        "daily_income": base["income"],
-        "daily_production": base["production"],
-        "occupation_sites": [
-            site["id"]
-            for site in strategic_sites.values()
-            if site.get("owner") == country
-        ],
-    }
-
-
-async def api_player(request):
-    user_id = get_user_id(request)
-
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": True,
-                "player": None,
-            }
-        )
-
-    return json_response(
-        {
-            "success": True,
-            "player": serialize_player(player),
-        }
-    )
-
-
-# =========================================================
-# API: SELECT COUNTRY
-# =========================================================
-
-async def api_select_country(request):
-    user_id = get_user_id(request)
-
-    if not user_id:
-        return json_response(
-            {
-                "success": False,
-                "message": "شناسه کاربر ارسال نشده است.",
-            },
-            400,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    country = (
-        data.get("country")
-        or request.query.get("country")
-    )
-
-    if country not in COUNTRIES:
-        return json_response(
-            {
-                "success": False,
-                "message": "کشور نامعتبر است.",
-            },
-            400,
-        )
-
-    existing = players.get(user_id)
-
-    if existing:
-        return json_response(
-            {
-                "success": False,
-                "message": "شما قبلاً کشور انتخاب کرده‌اید.",
-                "player": serialize_player(existing),
-            },
-            409,
-        )
-
-    if country in country_owner:
-        return json_response(
-            {
-                "success": False,
-                "message": "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است.",
-            },
-            409,
-        )
-
-    player = create_player(
-        user_id,
-        country,
-    )
-
-    add_news(
-        "انتخاب کشور جدید",
-        f"{country_flag(country)} {country_name(country)} وارد بازی شد.",
-        "country",
-        country,
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "message": "کشور با موفقیت انتخاب شد.",
-            "player": serialize_player(player),
-        }
-    )
-
-
-# =========================================================
-# API: ARMY CATALOG
-# =========================================================
-
-async def api_army_units(request):
-    result = {}
+def get_power_used(player):
+    """مصرف برق: اقتصاد + یگان‌های نظامی"""
+    total = 0
+    for item_id, item in ECONOMY.items():
+        level = get_infra_level(player, item_id)
+        if level > 0:
+            total += item["power_required"] * level
 
     for unit_id, unit in ARMY_UNITS.items():
-        result[unit_id] = {
-            "id": unit_id,
-            **unit,
-        }
-
-    return json_response(
-        {
-            "success": True,
-            "units": result,
-        }
-    )
-
-
-# =========================================================
-# API: TRAIN UNIT
-# =========================================================
-
-async def api_train_unit(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    update_player_economy(player)
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    unit_id = (
-        data.get("unit")
-        or data.get("unit_id")
-    )
-
-    try:
-        quantity = int(
-            data.get(
-                "quantity",
-                1,
-            )
-        )
-    except Exception:
-        quantity = 1
-
-    quantity = max(
-        1,
-        min(quantity, 1000),
-    )
-
-    unit = ARMY_UNITS.get(unit_id)
-
-    if not unit:
-        return json_response(
-            {
-                "success": False,
-                "message": "یگان نامعتبر است.",
-            },
-            400,
-        )
-
-    factory = unit["factory"]
-
-    if player["infrastructure"].get(
-        factory,
-        0,
-    ) < 1:
-
-        return json_response(
-            {
-                "success": False,
-                "message": (
-                    f"برای ساخت {unit['name']} "
-                    f"ابتدا باید {INFRASTRUCTURE[factory]['name']} "
-                    "را بسازید."
-                ),
-            },
-            400,
-        )
-
-    total_cost = {}
-
-    for resource, cost in unit["cost"].items():
-        total_cost[resource] = (
-            cost * quantity
-        )
-
-    for resource, cost in total_cost.items():
-
-        if resource == "money":
-            current = player["money"]
-        else:
-            current = player["resources"].get(
-                resource,
-                0,
-            )
-
-        if current < cost:
-            return json_response(
-                {
-                    "success": False,
-                    "message": (
-                        f"منابع کافی برای تولید "
-                        f"{quantity:,} واحد وجود ندارد."
-                    ),
-                },
-                400,
-            )
-
-    for resource, cost in total_cost.items():
-
-        if resource == "money":
-            player["money"] -= cost
-        else:
-            player["resources"][resource] -= cost
-
-    player["army"][unit_id] = (
-        player["army"].get(unit_id, 0)
-        + quantity
-    )
-
-    add_news(
-        "تولید تجهیزات نظامی",
-        (
-            f"{country_flag(player['country'])} "
-            f"{country_name(player['country'])} "
-            f"{quantity:,} واحد {unit['name']} تولید کرد."
-        ),
-        "military",
-        player["country"],
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "message": "تولید با موفقیت انجام شد.",
-            "player": serialize_player(player),
-        }
-    )
-
-
-# =========================================================
-# API: INFRASTRUCTURE
-# =========================================================
-
-async def api_upgrade_infra(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    update_player_economy(player)
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    infra_id = (
-        data.get("infrastructure")
-        or data.get("type")
-    )
-
-    config = INFRASTRUCTURE.get(
-        infra_id
-    )
-
-    if not config:
-        return json_response(
-            {
-                "success": False,
-                "message": "زیرساخت نامعتبر است.",
-            },
-            400,
-        )
-
-    current_level = player[
-        "infrastructure"
-    ].get(
-        infra_id,
-        0,
-    )
-
-    if current_level >= config["max_level"]:
-        return json_response(
-            {
-                "success": False,
-                "message": "این زیرساخت به حداکثر سطح رسیده است.",
-            },
-            400,
-        )
-
-    cost = int(
-        config["base_cost"]
-        * (
-            config["cost_growth"]
-            ** current_level
-        )
-    )
-
-    if player["money"] < cost:
-        return json_response(
-            {
-                "success": False,
-                "message": "پول کافی نیست.",
-            },
-            400,
-        )
-
-    player["money"] -= cost
-
-    player["infrastructure"][infra_id] = (
-        current_level + 1
-    )
-
-    if infra_id == "food":
-        player["development"] += 0.05
-
-    if infra_id == "power":
-        player["development"] += 0.03
-
-    if infra_id == "manpower":
-        player["manpower"] += 25_000
-
-    add_news(
-        "توسعه زیرساخت",
-        (
-            f"{country_flag(player['country'])} "
-            f"{country_name(player['country'])} "
-            f"{config['name']} را به سطح "
-            f"{current_level + 1} رساند."
-        ),
-        "development",
-        player["country"],
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "message": "زیرساخت ارتقا یافت.",
-            "cost": cost,
-            "player": serialize_player(player),
-        }
-    )
-
-
-# =========================================================
-# API: ECONOMY
-# =========================================================
-
-async def api_upgrade_economy(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    update_player_economy(player)
-
-    cost = int(
-        250_000
-        * (
-            1.45
-            ** max(
-                0,
-                player["development"] - 1,
-            )
-        )
-    )
-
-    if player["money"] < cost:
-        return json_response(
-            {
-                "success": False,
-                "message": "پول کافی نیست.",
-            },
-            400,
-        )
-
-    player["money"] -= cost
-    player["economy"] += 35
-    player["development"] += 1
-
-    add_news(
-        "رشد اقتصادی",
-        (
-            f"{country_flag(player['country'])} "
-            f"{country_name(player['country'])} "
-            "اقتصاد خود را توسعه داد."
-        ),
-        "economy",
-        player["country"],
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "message": "اقتصاد توسعه یافت.",
-            "cost": cost,
-            "player": serialize_player(player),
-        }
-    )
-
-
-# =========================================================
-# TREATY HELPERS
-# =========================================================
-
-def treaty_key(country_a, country_b):
-    return "|".join(
-        sorted(
-            [
-                country_a,
-                country_b,
-            ]
-        )
-    )
-
-
-def get_treaty(country_a, country_b):
-    return treaties.get(
-        treaty_key(
-            country_a,
-            country_b,
-        )
-    )
-
-
-def active_treaty(
-    country_a,
-    country_b,
-    treaty_type=None,
-):
-    treaty = get_treaty(
-        country_a,
-        country_b,
-    )
-
-    if not treaty:
-        return False
-
-    if treaty["status"] != "active":
-        return False
-
-    if treaty_type:
-        return treaty["type"] == treaty_type
-
-    return True
-
-
-# =========================================================
-# API: DIPLOMACY
-# =========================================================
-
-async def api_diplomacy(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    country = player["country"]
-
-    result = []
-
-    for other_country in COUNTRIES:
-
-        if other_country == country:
-            continue
-
-        treaty = get_treaty(
-            country,
-            other_country,
-        )
-
-        result.append(
-            {
-                "country": other_country,
-                "name": country_name(other_country),
-                "flag": country_flag(other_country),
-                "treaty": treaty,
-            }
-        )
-
-    return json_response(
-        {
-            "success": True,
-            "country": country,
-            "relations": result,
-        }
-    )
-
-
-# =========================================================
-# API: PROPOSE TREATY
-# =========================================================
-
-async def api_propose_treaty(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    target = data.get("target_country")
-    treaty_type = data.get("type")
-
-    if target not in COUNTRIES:
-        return json_response(
-            {
-                "success": False,
-                "message": "کشور مقصد نامعتبر است.",
-            },
-            400,
-        )
-
-    if target == player["country"]:
-        return json_response(
-            {
-                "success": False,
-                "message": "نمی‌توانید با خودتان پیمان ببندید.",
-            },
-            400,
-        )
-
-    if treaty_type not in (
-        "alliance",
-        "non_aggression",
-    ):
-        return json_response(
-            {
-                "success": False,
-                "message": "نوع پیمان نامعتبر است.",
-            },
-            400,
-        )
-
-    key = treaty_key(
-        player["country"],
-        target,
-    )
-
-    existing = treaties.get(key)
-
-    if existing and existing["status"] == "active":
-        return json_response(
-            {
-                "success": False,
-                "message": "پیمان فعال وجود دارد.",
-            },
-            400,
-        )
-
-    treaty = {
-        "id": make_id("treaty"),
-        "country_a": player["country"],
-        "country_b": target,
-        "type": treaty_type,
-        "status": "pending",
-        "proposed_by": player["country"],
-        "created_at": iso(now()),
-    }
-
-    treaties[key] = treaty
-
-    target_player = get_country_player(
-        target
-    )
-
-    if target_player:
-
-        add_notification(
-            target_player["user_id"],
-            "پیشنهاد دیپلماتیک",
-            (
-                f"{country_flag(player['country'])} "
-                f"{country_name(player['country'])} "
-                f"پیشنهاد {TREATY_TYPE_NAMES(treaty_type)} "
-                "ارسال کرده است."
-            ),
-            "diplomacy",
-        )
-
-    return json_response(
-        {
-            "success": True,
-            "message": "پیشنهاد پیمان ارسال شد.",
-            "treaty": treaty,
-        }
-    )
-
-
-# =========================================================
-# TREATY NAME
-# =========================================================
-
-def TREATY_TYPE_NAMES(treaty_type):
-    return {
-        "alliance": "پیمان اتحاد",
-        "non_aggression": "پیمان عدم تجاوز",
-    }.get(
-        treaty_type,
-        treaty_type,
-    )
-
-
-# =========================================================
-# API: ACCEPT TREATY
-# =========================================================
-
-async def api_accept_treaty(request):
-    user_id = get_user_id(request)
-
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    treaty_id = data.get("treaty_id")
-
-    target_treaty = None
-
-    for treaty in treaties.values():
-        if treaty["id"] == treaty_id:
-            target_treaty = treaty
-            break
-
-    if not target_treaty:
-        return json_response(
-            {
-                "success": False,
-                "message": "پیمان پیدا نشد.",
-            },
-            404,
-        )
-
-    if player["country"] not in (
-        target_treaty["country_a"],
-        target_treaty["country_b"],
-    ):
-        return json_response(
-            {
-                "success": False,
-                "message": "شما عضو این پیمان نیستید.",
-            },
-            403,
-        )
-
-    if target_treaty["status"] != "pending":
-        return json_response(
-            {
-                "success": False,
-                "message": "این پیشنهاد دیگر فعال نیست.",
-            },
-            400,
-        )
-
-    target_treaty["status"] = "active"
-    target_treaty["accepted_at"] = iso(now())
-
-    other_country = (
-        target_treaty["country_a"]
-        if player["country"]
-        == target_treaty["country_b"]
-        else target_treaty["country_b"]
-    )
-
-    other_player = get_country_player(
-        other_country
-    )
-
-    if other_player:
-        add_notification(
-            other_player["user_id"],
-            "پیمان تأیید شد",
-            (
-                f"{country_flag(player['country'])} "
-                f"{country_name(player['country'])} "
-                "پیمان دیپلماتیک را پذیرفت."
-            ),
-            "diplomacy",
-        )
-
-    add_news(
-        "پیمان دیپلماتیک",
-        (
-            f"{country_flag(target_treaty['country_a'])} "
-            f"{country_name(target_treaty['country_a'])} و "
-            f"{country_flag(target_treaty['country_b'])} "
-            f"{country_name(target_treaty['country_b'])} "
-            f"پیمان {TREATY_TYPE_NAMES(target_treaty['type'])} بستند."
-        ),
-        "diplomacy",
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "treaty": target_treaty,
-        }
-    )
-
-
-# =========================================================
-# API: REJECT TREATY
-# =========================================================
-
-async def api_reject_treaty(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    treaty_id = data.get("treaty_id")
-
-    for key, treaty in treaties.items():
-
-        if treaty["id"] != treaty_id:
-            continue
-
-        if player["country"] not in (
-            treaty["country_a"],
-            treaty["country_b"],
-        ):
-            return json_response(
-                {
-                    "success": False,
-                    "message": "دسترسی غیرمجاز.",
-                },
-                403,
-            )
-
-        treaty["status"] = "rejected"
-
-        return json_response(
-            {
-                "success": True,
-                "treaty": treaty,
-            }
-        )
-
-    return json_response(
-        {
-            "success": False,
-            "message": "پیمان پیدا نشد.",
-        },
-        404,
-    )
-
-
-# =========================================================
-# WAR HELPERS
-# =========================================================
-
-def player_has_military(player):
-    return any(
-        quantity > 0
-        for quantity in player["army"].values()
-    )
-
-
-def calculate_army_power(
-    player,
-    group=None,
-):
-    power = 0
-
-    for unit_id, quantity in player["army"].items():
-
-        unit = ARMY_UNITS.get(unit_id)
-
-        if not unit:
-            continue
-
-        if group and unit["group"] != group:
-            continue
-
-        power += (
-            quantity
-            * unit["attack"]
-        )
-
-    return power
-
-
-def calculate_defense_power(
-    player,
-    group=None,
-):
-    power = 0
-
-    for unit_id, quantity in player["army"].items():
-
-        unit = ARMY_UNITS.get(unit_id)
-
-        if not unit:
-            continue
-
-        if group and unit["group"] != group:
-            continue
-
-        power += (
-            quantity
-            * unit["defense"]
-        )
-
-    return power
-
-
-def count_sent_units(forces):
-    total = 0
-
-    for value in forces.values():
-
-        if isinstance(value, dict):
-            for quantity in value.values():
-                total += int(quantity)
-
-        else:
-            total += int(value or 0)
+        count = player.get("units", {}).get(unit_id, 0)
+        total += unit["power_required"] * count
 
     return total
 
 
-def normalize_war_forces(
-    player,
-    raw_forces,
-):
-    result = {
-        "land": {},
-        "naval": {},
-        "air": {},
+def get_group_capacity(player, group):
+    total = 0
+    for item_id, item in INFRASTRUCTURE.items():
+        if item.get("group") != group:
+            continue
+        level = get_infra_level(player, item_id)
+        if level > 0:
+            total += item["levels"][level - 1]["capacity"]
+    return total
+
+
+def get_group_units(player, group):
+    total = 0
+    for unit_id, unit in ARMY_UNITS.items():
+        if unit["group"] == group:
+            total += player.get("units", {}).get(unit_id, 0)
+    return total
+
+
+def recompute_army(player):
+    total = 0
+    for unit_id, unit in ARMY_UNITS.items():
+        count = player.get("units", {}).get(unit_id, 0)
+        total += count * (unit["attack"] + unit["defense"])
+    player["army"] = total
+
+
+def ensure_player_fields(player):
+    player.setdefault("resources", dict(STARTING_RESOURCES))
+    for key in RESOURCE_NAMES:
+        player["resources"].setdefault(key, 0)
+
+    units = player.setdefault("units", {})
+    for unit_id in ARMY_UNITS:
+        units.setdefault(unit_id, 0)
+    for stale in [k for k in units if k not in ARMY_UNITS]:
+        del units[stale]
+
+    player.setdefault("infra_levels", {})
+    player.setdefault("map_holdings", {})  # سکوها/معدن‌ها/تنگه‌های گرفته‌شده
+
+
+def compute_rates(player):
+    power_capacity = get_power_total(player)
+    power_consumption = get_power_used(player)
+
+    manpower_production = BASE_MANPOWER_PRODUCTION
+    resource_production = {key: 0 for key in RESOURCE_NAMES}
+    income = BASE_DAILY_INCOME
+
+    for item_id, item in INFRASTRUCTURE.items():
+        group = item.get("group")
+        level = get_infra_level(player, item_id)
+        if level <= 0:
+            continue
+        lvl_data = item["levels"][level - 1]
+
+        if group == "manpower":
+            manpower_production += lvl_data["production"]
+        elif group == "resource":
+            key = item.get("resource_key")
+            if key:
+                resource_production[key] += lvl_data["production"]
+
+    for item_id, item in ECONOMY.items():
+        level = get_infra_level(player, item_id)
+        if level > 0:
+            income += item["levels"][level - 1]["income"]
+
+    # درآمد سکوهای گرفته‌شده
+    for key, owner in player.get("map_holdings", {}).items():
+        if owner == player.get("country"):
+            res = MAP_RESOURCES.get(key)
+            if res and res["type"] == "oil":
+                income += res["production"] // 10
+
+    return {
+        "gross_income": income,
+        "net_income": income,
+        "power_capacity": power_capacity,
+        "power_consumption": power_consumption,
+        "manpower_production": manpower_production,
+        "resource_production": resource_production,
     }
 
-    if not isinstance(raw_forces, dict):
-        return result
 
-    for group in result:
+def accrue_player(player):
+    if not player.get("started_at"):
+        return
 
-        group_data = raw_forces.get(
-            group,
-            {},
-        )
+    now = utcnow()
+    last = parse_dt(player.get("last_update")) or parse_dt(player["started_at"])
+    if not last:
+        return
 
-        if not isinstance(group_data, dict):
-            continue
+    elapsed_seconds = max(0, (now - last).total_seconds())
+    rates = compute_rates(player)
+    fraction_of_day = elapsed_seconds / 86400
 
-        for unit_id, quantity in group_data.items():
+    player["money"] = player.get("money", STARTING_MONEY) + rates["net_income"] * fraction_of_day
+    player["manpower"] = player.get("manpower", STARTING_MANPOWER) + rates["manpower_production"] * fraction_of_day
 
-            unit = ARMY_UNITS.get(unit_id)
+    ensure_player_fields(player)
 
-            if not unit:
-                continue
+    for key, amount in rates["resource_production"].items():
+        player["resources"][key] = player["resources"].get(key, 0) + amount * fraction_of_day
 
-            if unit["group"] != group:
-                continue
+    player["last_update"] = now.isoformat()
 
-            try:
-                quantity = int(quantity)
-            except Exception:
-                quantity = 0
 
-            quantity = max(
-                0,
-                quantity,
-            )
+def build_catalog_status(player, catalog):
+    result = {}
+    for item_id, item in catalog.items():
+        level = get_infra_level(player, item_id)
+        current = get_item_info(catalog, item_id, level)
+        levels = item["levels"]
+        next_level = level + 1
+        next_info = levels[next_level - 1] if next_level <= len(levels) else None
 
-            available = player["army"].get(
-                unit_id,
-                0,
-            )
-
-            quantity = min(
-                quantity,
-                available,
-            )
-
-            if quantity:
-                result[group][unit_id] = quantity
-
+        result[item_id] = {
+            "name": item["name"],
+            "group": item.get("group"),
+            "resource_key": item.get("resource_key"),
+            "power_required": item.get("power_required"),
+            "level": level,
+            "max_level": len(levels),
+            "current": current,
+            "next": next_info,
+        }
     return result
 
 
-def remove_forces(
-    player,
-    forces,
-):
-    for group in forces.values():
+def serialize_player(player):
+    ensure_player_fields(player)
+    accrue_player(player)
+    recompute_army(player)
+    rates = compute_rates(player)
 
-        for unit_id, quantity in group.items():
-
-            player["army"][unit_id] = max(
-                0,
-                player["army"].get(
-                    unit_id,
-                    0,
-                ) - quantity,
-            )
-
-
-def force_attack_power(
-    forces,
-    group,
-):
-    power = 0
-
-    for unit_id, quantity in forces.get(
-        group,
-        {},
-    ).items():
-
-        unit = ARMY_UNITS[unit_id]
-
-        power += (
-            quantity
-            * unit["attack"]
-        )
-
-    return power
-
-
-def force_defense_power(
-    forces,
-    group,
-):
-    power = 0
-
-    for unit_id, quantity in forces.get(
-        group,
-        {},
-    ).items():
-
-        unit = ARMY_UNITS[unit_id]
-
-        power += (
-            quantity
-            * unit["defense"]
-        )
-
-    return power
-
-
-def casualty_forces(
-    forces,
-    ratio,
-):
-    casualties = {}
-
-    for group, units in forces.items():
-
-        casualties[group] = {}
-
-        for unit_id, quantity in units.items():
-
-            casualties[group][unit_id] = max(
-                0,
-                int(quantity * ratio),
-            )
-
-    return casualties
-
-
-def apply_casualties(
-    player,
-    casualties,
-):
-    for group in casualties.values():
-
-        for unit_id, quantity in group.items():
-
-            player["army"][unit_id] = max(
-                0,
-                player["army"].get(
-                    unit_id,
-                    0,
-                ) - quantity,
-            )
+    data = dict(player)
+    data.update(get_game_time(player))
+    data["resource_production"] = rates["resource_production"]
+    data["power_capacity"] = rates["power_capacity"]
+    data["power_consumption"] = rates["power_consumption"]
+    data["manpower_production"] = rates["manpower_production"]
+    data["daily_income"] = rates["net_income"]
+    data["infra"] = build_catalog_status(player, INFRASTRUCTURE)
+    data["economy"] = build_catalog_status(player, ECONOMY)
+    return data
 
 
 # =========================================================
-# WAR DECLARATION
+# State + Persistence
 # =========================================================
 
-async def api_declare_war(request):
-    user_id = get_user_id(request)
-    attacker = get_player(user_id)
+players = {}
+diplomacy_proposals = {}
+active_treaties = []
+map_holdings = {}  # { "oil_gulf": "germany", ... }
 
-    if not attacker:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
 
-    update_player_economy(attacker)
+def create_player(user_id):
+    return {
+        "user_id": user_id,
+        "country": None,
+        "money": STARTING_MONEY,
+        "army": 0,
+        "manpower": STARTING_MANPOWER,
+        "infra_levels": {},
+        "units": {uid: 0 for uid in ARMY_UNITS},
+        "resources": dict(STARTING_RESOURCES),
+        "map_holdings": {},
+        "started_at": None,
+        "last_update": None,
+    }
 
+
+def get_player_by_country(country_id):
+    for uid, player in players.items():
+        if player.get("country") == country_id:
+            return uid, player
+    return None, None
+
+
+def save_state():
     try:
-        data = await request.json()
-    except Exception:
-        data = {}
+        os.makedirs(DATA_DIR, exist_ok=True)
+        state = {
+            "players": {str(k): v for k, v in players.items()},
+            "diplomacy_proposals": diplomacy_proposals,
+            "active_treaties": active_treaties,
+            "map_holdings": map_holdings,
+        }
+        tmp = STATE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False)
+        os.replace(tmp, STATE_FILE)
+    except Exception as e:
+        logging.error("save_state failed: %s", e)
 
-    target_country = (
-        data.get("target_country")
-        or data.get("target")
-    )
 
-    if target_country not in COUNTRIES:
-        return json_response(
-            {
-                "success": False,
-                "message": "کشور هدف نامعتبر است.",
-            },
-            400,
-        )
-
-    if target_country == attacker["country"]:
-        return json_response(
-            {
-                "success": False,
-                "message": "نمی‌توانید به خودتان حمله کنید.",
-            },
-            400,
-        )
-
-    defender = get_country_player(
-        target_country
-    )
-
-    if not defender:
-        return json_response(
-            {
-                "success": False,
-                "message": "کشور هدف هنوز توسط بازیکن انتخاب نشده است.",
-            },
-            400,
-        )
-
-    if not player_has_military(attacker):
-        return json_response(
-            {
-                "success": False,
-                "message": "برای اعلام جنگ باید نیرو داشته باشید.",
-            },
-            400,
-        )
-
-    if active_treaty(
-        attacker["country"],
-        target_country,
-        "non_aggression",
-    ):
-        return json_response(
-            {
-                "success": False,
-                "message": "بین دو کشور پیمان عدم تجاوز فعال است.",
-            },
-            400,
-        )
-
-    # بررسی اتحاد
-    alliance_violation = active_treaty(
-        attacker["country"],
-        target_country,
-        "alliance",
-    )
-
-    if alliance_violation:
-        attacker["money"] = max(
-            0,
-            attacker["money"] - 2_000_000,
-        )
-
-        add_news(
-            "نقض پیمان اتحاد",
-            (
-                f"{country_flag(attacker['country'])} "
-                f"{country_name(attacker['country'])} "
-                "پیمان اتحاد را نقض کرد و ۲,۰۰۰,۰۰۰ جریمه شد."
-            ),
-            "diplomacy",
-            attacker["country"],
-        )
-
-    raw_forces = data.get(
-        "forces",
-        {},
-    )
-
-    forces = normalize_war_forces(
-        attacker,
-        raw_forces,
-    )
-
-    if count_sent_units(forces) <= 0:
-        return json_response(
-            {
-                "success": False,
-                "message": "حداقل یک نیروی نظامی باید اعزام شود.",
-            },
-            400,
-        )
-
-    # بررسی جنگ فعال
-    for war in wars.values():
-
-        if war["status"] in (
-            "pending",
-            "preparing",
-            "active",
-        ):
-
-            pair = {
-                war["attacker_country"],
-                war["defender_country"],
-            }
-
-            if pair == {
-                attacker["country"],
-                target_country,
-            }:
-                return json_response(
-                    {
-                        "success": False,
-                        "message": "بین این دو کشور جنگ فعال وجود دارد.",
-                    },
-                    400,
-                )
-
-    war_id = make_id("war")
-
-    war = {
-        "id": war_id,
-
-        "attacker_user_id": attacker["user_id"],
-        "defender_user_id": defender["user_id"],
-
-        "attacker_country": attacker["country"],
-        "defender_country": target_country,
-
-        "forces": forces,
-
-        "status": "pending",
-
-        "created_at": iso(now()),
-        "approved_at": None,
-        "battle_at": None,
-        "resolved_at": None,
-
-        "result": None,
-        "battle_report": None,
-    }
-
-    wars[war_id] = war
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✅ تأیید جنگ",
-                    callback_data=f"war_approve:{war_id}",
-                ),
-                InlineKeyboardButton(
-                    text="❌ رد جنگ",
-                    callback_data=f"war_reject:{war_id}",
-                ),
-            ]
-        ]
-    )
-
-    text = (
-        "🌐 <b>درخواست جدید اعلام جنگ</b>\n\n"
-        f"⚔️ مهاجم: {country_flag(attacker['country'])} "
-        f"<b>{country_name(attacker['country'])}</b>\n"
-        f"🛡️ مدافع: {country_flag(target_country)} "
-        f"<b>{country_name(target_country)}</b>\n\n"
-        "نیروهای اعزامی:\n"
-        f"🪖 زمینی: {sum(forces['land'].values()):,}\n"
-        f"⚓ دریایی: {sum(forces['naval'].values()):,}\n"
-        f"✈️ هوایی: {sum(forces['air'].values()):,}\n\n"
-        f"🆔 <code>{war_id}</code>\n\n"
-        "پس از تأیید، دوره ۲۴ ساعته مذاکره و آماده‌سازی آغاز می‌شود."
-    )
-
+def load_state():
+    global diplomacy_proposals, active_treaties, map_holdings
+    if not os.path.exists(STATE_FILE):
+        logging.info("No state file found, starting fresh.")
+        return
     try:
-        await bot.send_message(
-            ADMIN_ID,
-            text,
-            reply_markup=keyboard,
-            parse_mode="HTML",
-        )
-    except Exception as exc:
-        logger.error(
-            "Could not notify admin: %s",
-            exc,
-        )
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            state = json.load(f)
 
-    add_news(
-        "اعلام جنگ",
-        (
-            f"{country_flag(attacker['country'])} "
-            f"{country_name(attacker['country'])} "
-            f"علیه {country_flag(target_country)} "
-            f"{country_name(target_country)} اعلام جنگ کرد. "
-            "در انتظار تأیید."
-        ),
-        "war",
-    )
+        for k, v in state.get("players", {}).items():
+            players[int(k)] = v
+        diplomacy_proposals = state.get("diplomacy_proposals", {})
+        active_treaties = state.get("active_treaties", [])
+        map_holdings = state.get("map_holdings", {})
+        logging.info("State loaded: %d players", len(players))
+    except Exception as e:
+        logging.error("load_state failed: %s", e)
 
-    return json_response(
-        {
-            "success": True,
-            "message": "درخواست جنگ برای تأیید ارسال شد.",
-            "war": war,
-        }
-    )
+
+async def autosave_loop():
+    while True:
+        await asyncio.sleep(60)
+        save_state()
 
 
 # =========================================================
-# ADMIN WAR APPROVAL
+# Telegram Auth
 # =========================================================
 
-async def approve_war(war_id):
-    war = wars.get(war_id)
-
-    if not war:
-        return {
-            "success": False,
-            "message": "جنگ پیدا نشد.",
-        }
-
-    if war["status"] != "pending":
-        return {
-            "success": False,
-            "message": "این جنگ قبلاً پردازش شده است.",
-        }
-
-    battle_time = (
-        now()
-        + timedelta(
-            seconds=WAR_PREPARATION_SECONDS
-        )
-    )
-
-    war["status"] = "preparing"
-    war["approved_at"] = iso(now())
-    war["battle_at"] = iso(
-        battle_time
-    )
-
-    attacker = players.get(
-        war["attacker_user_id"]
-    )
-
-    defender = players.get(
-        war["defender_user_id"]
-    )
-
-    for player in (
-        attacker,
-        defender,
-    ):
-
-        if player:
-
-            add_notification(
-                player["user_id"],
-                "اعلام جنگ تأیید شد",
-                (
-                    f"{country_flag(war['attacker_country'])} "
-                    f"{country_name(war['attacker_country'])} "
-                    "و "
-                    f"{country_flag(war['defender_country'])} "
-                    f"{country_name(war['defender_country'])} "
-                    "وارد مرحله آماده‌سازی شدند."
-                ),
-                "war",
-            )
-
-    add_news(
-        "جنگ تأیید شد",
-        (
-            f"{country_flag(war['attacker_country'])} "
-            f"{country_name(war['attacker_country'])} "
-            "و "
-            f"{country_flag(war['defender_country'])} "
-            f"{country_name(war['defender_country'])} "
-            "پس از تأیید سازمان ملل وارد مرحله ۲۴ ساعته آماده‌سازی شدند."
-        ),
-        "war",
-    )
-
-    await broadcast_telegram(
-        "⚔️ <b>جنگ جدید</b>\n\n"
-        f"{country_flag(war['attacker_country'])} "
-        f"<b>{country_name(war['attacker_country'])}</b> "
-        "و "
-        f"{country_flag(war['defender_country'])} "
-        f"<b>{country_name(war['defender_country'])}</b> "
-        "درگیر جنگ شدند.\n\n"
-        "⏳ نبرد نهایی پس از ۲۴ ساعت آغاز می‌شود."
-    )
-
-    return {
-        "success": True,
-        "war": war,
-    }
-
-
-async def reject_war(war_id):
-    war = wars.get(war_id)
-
-    if not war:
-        return {
-            "success": False,
-            "message": "جنگ پیدا نشد.",
-        }
-
-    war["status"] = "rejected"
-
-    attacker = players.get(
-        war["attacker_user_id"]
-    )
-
-    if attacker:
-        add_notification(
-            attacker["user_id"],
-            "اعلام جنگ رد شد",
-            "درخواست اعلام جنگ شما توسط ادمین رد شد.",
-            "war",
-        )
-
-    return {
-        "success": True,
-        "war": war,
-    }
-
-
-async def api_admin_war_approve(request):
-    admin_id = get_user_id(request)
-
-    if str(admin_id) != str(ADMIN_ID):
-        return json_response(
-            {
-                "success": False,
-                "message": "دسترسی غیرمجاز.",
-            },
-            403,
-        )
-
-    war_id = request.query.get(
-        "war_id"
-    )
-
-    result = await approve_war(
-        war_id
-    )
-
-    return json_response(result)
-
-
-async def api_admin_war_reject(request):
-    admin_id = get_user_id(request)
-
-    if str(admin_id) != str(ADMIN_ID):
-        return json_response(
-            {
-                "success": False,
-                "message": "دسترسی غیرمجاز.",
-            },
-            403,
-        )
-
-    war_id = request.query.get(
-        "war_id"
-    )
-
-    result = await reject_war(
-        war_id
-    )
-
-    return json_response(result)
-
-
-# =========================================================
-# WAR RESOLUTION
-# =========================================================
-
-def resolve_front(
-    attacker,
-    defender,
-    attacker_forces,
-    group,
-):
-    attack_power = force_attack_power(
-        attacker_forces,
-        group,
-    )
-
-    defense_power = (
-        force_defense_power(
-            defender,
-            group,
-        )
-        + int(
-            defender.get("economy", 0)
-            * 0.10
-        )
-    )
-
-    # اگر مهاجم هیچ نیرویی ندارد
-    if attack_power <= 0:
-        return {
-            "winner": "defender",
-            "attacker_power": 0,
-            "defender_power": defense_power,
-            "attacker_losses": {},
-            "defender_losses": {},
-        }
-
-    # ضریب تصادفی کوچک
-    random_factor = (
-        0.92
-        + secrets.randbelow(1601) / 10000
-    )
-
-    effective_attack = (
-        attack_power
-        * random_factor
-    )
-
-    attacker_wins = (
-        effective_attack
-        > defense_power
-    )
-
-    if attacker_wins:
-
-        attacker_losses = casualty_forces(
-            attacker_forces,
-            0.10,
-        )
-
-        defender_losses = {}
-
-        for unit_id, quantity in defender["army"].items():
-
-            unit = ARMY_UNITS.get(unit_id)
-
-            if not unit:
-                continue
-
-            if unit["group"] != group:
-                continue
-
-            defender_losses.setdefault(
-                group,
-                {},
-            )[unit_id] = int(
-                quantity * 0.30
-            )
-
-        winner = "attacker"
-
-    else:
-
-        attacker_losses = casualty_forces(
-            attacker_forces,
-            0.30,
-        )
-
-        defender_losses = {}
-
-        for unit_id, quantity in defender["army"].items():
-
-            unit = ARMY_UNITS.get(unit_id)
-
-            if not unit:
-                continue
-
-            if unit["group"] != group:
-                continue
-
-            defender_losses.setdefault(
-                group,
-                {},
-            )[unit_id] = int(
-                quantity * 0.10
-            )
-
-        winner = "defender"
-
-    return {
-        "winner": winner,
-        "attacker_power": int(
-            attack_power
-        ),
-        "defender_power": int(
-            defense_power
-        ),
-        "attacker_losses": attacker_losses,
-        "defender_losses": defender_losses,
-    }
-
-
-async def resolve_war(war_id):
-    war = wars.get(war_id)
-
-    if not war:
+def verify_init_data(init_data: str):
+    if not init_data:
+        return None
+    try:
+        parsed = dict(parse_qsl(init_data, keep_blank_values=True))
+        received_hash = parsed.pop("hash", None)
+        if not received_hash:
+            return None
+        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+        secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+        computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(computed, received_hash):
+            return None
+        user_raw = parsed.get("user")
+        if user_raw:
+            return json.loads(user_raw)
+        return None
+    except Exception as e:
+        logging.error("verify_init_data error: %s", e)
         return None
 
-    if war["status"] not in (
-        "preparing",
-        "active",
-    ):
-        return war
 
-    attacker = players.get(
-        war["attacker_user_id"]
+def get_auth_user_id(request):
+    """user_id معتبر، یا None"""
+    if not AUTH_REQUIRED:
+        # حالت توسعه: از query یا body
+        uid = request.query.get("user_id")
+        if uid:
+            try:
+                return int(uid)
+            except (TypeError, ValueError):
+                return None
+        return None
+
+    init_data = (
+        request.headers.get("X-Telegram-Init-Data")
+        or request.query.get("init_data")
     )
+    user = verify_init_data(init_data)
+    if user and user.get("id"):
+        return int(user["id"])
+    return None
 
-    defender = players.get(
-        war["defender_user_id"]
-    )
 
-    if not attacker or not defender:
-        war["status"] = "cancelled"
-        return war
+async def read_json(request):
+    try:
+        return await request.json()
+    except Exception:
+        return {}
 
-    if attacker.get("eliminated"):
-        war["status"] = "defender_victory"
-        return war
 
-    if defender.get("eliminated"):
-        war["status"] = "attacker_victory"
-        return war
+# =========================================================
+# Bot
+# =========================================================
 
-    war["status"] = "active"
+from aiogram.client.default import DefaultBotProperties
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=None))
+dp = Dispatcher()
 
-    fronts = {}
 
-    attacker_forces = war["forces"]
+@dp.message(Command("start"))
+async def start_command(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
+        save_state()
 
-    # دفاع از ارتش فعلی مدافع
-    groups = [
-        "air",
-        "naval",
-        "land",
-    ]
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🌍 ورود به بازی", web_app=WebAppInfo(url=WEB_APP_URL))
+    ]])
 
-    attacker_front_wins = 0
-    defender_front_wins = 0
-
-    air_bonus = 1.0
-
-    for group in groups:
-
-        result = resolve_front(
-            attacker,
-            defender,
-            attacker_forces,
-            group,
-        )
-
-        if group != "air":
-
-            result["attacker_power"] = int(
-                result["attacker_power"]
-                * air_bonus
-            )
-
-        fronts[group] = result
-
-        if result["winner"] == "attacker":
-            attacker_front_wins += 1
-
-            if group == "air":
-                air_bonus = 1.15
-
-        else:
-            defender_front_wins += 1
-
-    # اعمال تلفات
-    for result in fronts.values():
-
-        apply_casualties(
-            attacker,
-            result.get(
-                "attacker_losses",
-                {},
-            ),
-        )
-
-        apply_casualties(
-            defender,
-            result.get(
-                "defender_losses",
-                {},
-            ),
-        )
-
-    if attacker_front_wins >= 2:
-        winner = "attacker"
+    if players[user_id]["country"]:
+        c = COUNTRIES[players[user_id]["country"]]
+        text = (f"⚔️ به جنگ جهانی دوم خوش آمدید.\n\n"
+                f"کشور شما: {c['flag']} {c['name']}\n\n"
+                f"برای ورود روی دکمه زیر بزنید.")
     else:
-        winner = "defender"
-
-    report = {
-        "fronts": fronts,
-        "attacker_front_wins": attacker_front_wins,
-        "defender_front_wins": defender_front_wins,
-        "winner": winner,
-    }
-
-    war["battle_report"] = report
-    war["resolved_at"] = iso(now())
-
-    if winner == "attacker":
-
-        war["status"] = "attacker_victory"
-
-        transfer_country(
-            attacker,
-            defender,
-        )
-
-        # 40 درصد نیروی انسانی
-        transferred_manpower = int(
-            defender["manpower"]
-            * 0.40
-        )
-
-        attacker["manpower"] += (
-            transferred_manpower
-        )
-
-        # 50 درصد درآمد روزانه
-        defender_base = COUNTRIES[
-            defender["country"]
-        ]
-
-        attacker["money"] += int(
-            defender_base["income"]
-            * 0.50
-        )
-
-        add_news(
-            "پیروزی در جنگ",
-            (
-                f"{country_flag(attacker['country'])} "
-                f"{country_name(attacker['country'])} "
-                f"در جنگ با "
-                f"{country_flag(defender['country'])} "
-                f"{country_name(defender['country'])} "
-                "پیروز شد."
-            ),
-            "war",
-        )
-
-        add_notification(
-            attacker["user_id"],
-            "پیروزی در جنگ",
-            "نیروهای شما در جنگ پیروز شدند.",
-            "war",
-        )
-
-        add_notification(
-            defender["user_id"],
-            "شکست در جنگ",
-            "کشور شما شکست خورد و تحت کنترل دشمن قرار گرفت.",
-            "war",
-        )
-
-    else:
-
-        war["status"] = "defender_victory"
-
-        add_news(
-            "دفاع موفق",
-            (
-                f"{country_flag(defender['country'])} "
-                f"{country_name(defender['country'])} "
-                "در برابر حمله دشمن مقاومت کرد."
-            ),
-            "war",
-        )
-
-        add_notification(
-            defender["user_id"],
-            "پیروزی دفاعی",
-            "کشور شما حمله دشمن را دفع کرد.",
-            "war",
-        )
-
-        add_notification(
-            attacker["user_id"],
-            "شکست نظامی",
-            "حمله شما با شکست مواجه شد.",
-            "war",
-        )
-
-    await broadcast_telegram(
-        "⚔️ <b>گزارش نبرد</b>\n\n"
-        f"{country_flag(war['attacker_country'])} "
-        f"{country_name(war['attacker_country'])}\n"
-        "در برابر\n"
-        f"{country_flag(war['defender_country'])} "
-        f"{country_name(war['defender_country'])}\n\n"
-        f"نتیجه: "
-        f"<b>{'پیروزی مهاجم' if winner == 'attacker' else 'پیروزی مدافع'}</b>"
-    )
-
-    return war
-
-
-def transfer_country(
-    winner,
-    loser,
-):
-    winner_country = winner["country"]
-    loser_country = loser["country"]
-
-    loser["eliminated"] = True
-
-    country_owner.pop(
-        loser_country,
-        None,
-    )
-
-    winner["occupied_territories"].append(
-        loser_country
-    )
-
-    # کشور شکست‌خورده از بازیکنان فعال حذف می‌شود
-    players.pop(
-        loser["user_id"],
-        None,
-    )
-
-    add_news(
-        "اشغال کشور",
-        (
-            f"{country_flag(winner_country)} "
-            f"{country_name(winner_country)} "
-            f"سرزمین {country_flag(loser_country)} "
-            f"{country_name(loser_country)} را تحت کنترل گرفت."
-        ),
-        "occupation",
-        winner_country,
-    )
-
-
-# =========================================================
-# API: WAR STATUS
-# =========================================================
-
-async def api_war_status(request):
-    user_id = get_user_id(request)
-
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "wars": [],
-            }
-        )
-
-    country = player["country"]
-
-    result = []
-
-    for war in wars.values():
-
-        if country in (
-            war["attacker_country"],
-            war["defender_country"],
-        ):
-
-            result.append(
-                war
-            )
-
-    return json_response(
-        {
-            "success": True,
-            "wars": result,
-        }
-    )
-
-
-# =========================================================
-# API: ALL WARS
-# =========================================================
-
-async def api_wars(request):
-    return json_response(
-        {
-            "success": True,
-            "wars": list(
-                wars.values()
-            ),
-        }
-    )
-
-
-# =========================================================
-# STATEMENTS
-# =========================================================
-
-def reset_statement_counter(player):
-
-    today = now().date().isoformat()
-
-    if player.get(
-        "statement_day"
-    ) != today:
-
-        player["statement_day"] = today
-        player["statement_count"] = 0
-        player["last_statement_at"] = None
-
-
-async def api_statements(request):
-    return json_response(
-        {
-            "success": True,
-            "statements": statements[:100],
-            "comments": statement_comments[:200],
-        }
-    )
-
-
-async def api_create_statement(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    reset_statement_counter(
-        player
-    )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    text = str(
-        data.get(
-            "text",
-            "",
-        )
-    ).strip()
-
-    if not text:
-        return json_response(
-            {
-                "success": False,
-                "message": "متن بیانیه خالی است.",
-            },
-            400,
-        )
-
-    if len(text) > 1000:
-        return json_response(
-            {
-                "success": False,
-                "message": "بیانیه بیش از حد طولانی است.",
-            },
-            400,
-        )
-
-    count = player["statement_count"]
-
-    if count >= 4:
-        return json_response(
-            {
-                "success": False,
-                "message": "سقف روزانه ۴ بیانیه است.",
-            },
-            400,
-        )
-
-    last_time = parse_dt(
-        player.get(
-            "last_statement_at"
-        )
-    )
-
-    if last_time:
-
-        minutes = (
-            now() - last_time
-        ).total_seconds() / 60
-
-        if minutes < 60:
-            return json_response(
-                {
-                    "success": False,
-                    "message": (
-                        "بین دو بیانیه باید حداقل یک ساعت فاصله باشد."
-                    ),
-                },
-                400,
-            )
-
-    cost = 0
-
-    if count == 2:
-        cost = 10_000
-
-    elif count == 3:
-        cost = 400_000
-
-    if player["money"] < cost:
-        return json_response(
-            {
-                "success": False,
-                "message": "برای انتشار این بیانیه پول کافی ندارید.",
-            },
-            400,
-        )
-
-    player["money"] -= cost
-
-    statement = {
-        "id": make_id("statement"),
-        "country": player["country"],
-        "country_name": country_name(
-            player["country"]
-        ),
-        "flag": country_flag(
-            player["country"]
-        ),
-        "text": text,
-        "created_at": iso(now()),
-        "supporters": [],
-        "accusers": [],
-    }
-
-    statements.insert(
-        0,
-        statement,
-    )
-
-    player["statement_count"] += 1
-    player["last_statement_at"] = iso(now())
-
-    return json_response(
-        {
-            "success": True,
-            "statement": statement,
-            "cost": cost,
-        }
-    )
-
-
-async def api_statement_react(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    statement_id = data.get(
-        "statement_id"
-    )
-
-    reaction = data.get(
-        "reaction"
-    )
-
-    if reaction not in (
-        "support",
-        "accuse",
-    ):
-        return json_response(
-            {
-                "success": False,
-                "message": "واکنش نامعتبر است.",
-            },
-            400,
-        )
-
-    statement = next(
-        (
-            item
-            for item in statements
-            if item["id"] == statement_id
-        ),
-        None,
-    )
-
-    if not statement:
-        return json_response(
-            {
-                "success": False,
-                "message": "بیانیه پیدا نشد.",
-            },
-            404,
-        )
-
-    country = player["country"]
-
-    statement["supporters"] = [
-        x
-        for x in statement["supporters"]
-        if x != country
-    ]
-
-    statement["accusers"] = [
-        x
-        for x in statement["accusers"]
-        if x != country
-    ]
-
-    if reaction == "support":
-        statement["supporters"].append(
-            country
-        )
-    else:
-        statement["accusers"].append(
-            country
-        )
-
-    return json_response(
-        {
-            "success": True,
-            "statement": statement,
-        }
-    )
-
-
-async def api_statement_comment(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    statement_id = data.get(
-        "statement_id"
-    )
-
-    text = str(
-        data.get(
-            "text",
-            "",
-        )
-    ).strip()
-
-    if not text:
-        return json_response(
-            {
-                "success": False,
-                "message": "متن نظر خالی است.",
-            },
-            400,
-        )
-
-    comment = {
-        "id": make_id("comment"),
-        "statement_id": statement_id,
-        "country": player["country"],
-        "flag": country_flag(
-            player["country"]
-        ),
-        "text": text[:500],
-        "created_at": iso(now()),
-    }
-
-    statement_comments.insert(
-        0,
-        comment,
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "comment": comment,
-        }
-    )
-
-
-# =========================================================
-# UNIONS
-# =========================================================
-
-async def api_unions(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    result = []
-
-    for union in unions.values():
-
-        result.append(
-            {
-                **union,
-                "member_count": len(
-                    union["members"]
-                ),
-            }
-        )
-
-    invites = [
-        invite
-        for invite in union_invites
-        if invite["target_country"]
-        == player["country"]
-        and invite["status"] == "pending"
-    ]
-
-    return json_response(
-        {
-            "success": True,
-            "unions": result,
-            "my_union": (
-                unions.get(
-                    player["union_id"]
-                )
-                if player["union_id"]
-                else None
-            ),
-            "invites": invites,
-        }
-    )
-
-
-async def api_create_union(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    if player.get("union_id"):
-        return json_response(
-            {
-                "success": False,
-                "message": "شما قبلاً عضو یک اتحادیه هستید.",
-            },
-            400,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    name = str(
-        data.get(
-            "name",
-            "",
-        )
-    ).strip()
-
-    if not name:
-        return json_response(
-            {
-                "success": False,
-                "message": "نام اتحادیه را وارد کنید.",
-            },
-            400,
-        )
-
-    union_id = make_id("union")
-
-    union = {
-        "id": union_id,
-        "name": name[:50],
-        "leader_country": player["country"],
-        "members": [
-            player["country"]
-        ],
-        "created_at": iso(now()),
-    }
-
-    unions[union_id] = union
-
-    union_messages[union_id] = []
-
-    player["union_id"] = union_id
-
-    add_news(
-        "تشکیل اتحادیه",
-        (
-            f"{country_flag(player['country'])} "
-            f"{country_name(player['country'])} "
-            f"اتحادیه «{name}» را تشکیل داد."
-        ),
-        "union",
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "union": union,
-        }
-    )
-
-
-async def api_union_invite(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    union_id = player.get(
-        "union_id"
-    )
-
-    union = unions.get(
-        union_id
-    )
-
-    if not union:
-        return json_response(
-            {
-                "success": False,
-                "message": "شما عضو اتحادیه نیستید.",
-            },
-            400,
-        )
-
-    if union["leader_country"] != player["country"]:
-        return json_response(
-            {
-                "success": False,
-                "message": "فقط رهبر اتحادیه می‌تواند دعوت ارسال کند.",
-            },
-            403,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    target = data.get(
-        "target_country"
-    )
-
-    target_player = get_country_player(
-        target
-    )
-
-    if not target_player:
-        return json_response(
-            {
-                "success": False,
-                "message": "کشور هدف بازیکن ندارد.",
-            },
-            400,
-        )
-
-    if target_player.get(
-        "union_id"
-    ):
-        return json_response(
-            {
-                "success": False,
-                "message": "این کشور قبلاً عضو یک اتحادیه است.",
-            },
-            400,
-        )
-
-    invite = {
-        "id": make_id("invite"),
-        "union_id": union_id,
-        "union_name": union["name"],
-        "from_country": player["country"],
-        "target_country": target,
-        "status": "pending",
-        "created_at": iso(now()),
-    }
-
-    union_invites.append(
-        invite
-    )
-
-    add_notification(
-        target_player["user_id"],
-        "دعوت به اتحادیه",
-        (
-            f"شما به اتحادیه «{union['name']}» "
-            "دعوت شده‌اید."
-        ),
-        "union",
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "invite": invite,
-        }
-    )
-
-
-async def api_union_respond(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    invite_id = data.get(
-        "invite_id"
-    )
-
-    action = data.get(
-        "action"
-    )
-
-    invite = next(
-        (
-            x
-            for x in union_invites
-            if x["id"] == invite_id
-        ),
-        None,
-    )
-
-    if not invite:
-        return json_response(
-            {
-                "success": False,
-                "message": "دعوت پیدا نشد.",
-            },
-            404,
-        )
-
-    if invite["target_country"] != player["country"]:
-        return json_response(
-            {
-                "success": False,
-                "message": "این دعوت برای شما نیست.",
-            },
-            403,
-        )
-
-    if invite["status"] != "pending":
-        return json_response(
-            {
-                "success": False,
-                "message": "این دعوت دیگر فعال نیست.",
-            },
-            400,
-        )
+        text = ("⚔️ به جنگ جهانی دوم خوش آمدید.\n\n"
+                "سال ۱۹۳۹ است.\n"
+                "ابتدا وارد بازی شوید و کشور خود را انتخاب کنید.")
+
+    await message.answer(text, reply_markup=keyboard)
+
+
+@dp.callback_query(F.data.startswith("treaty:"))
+async def handle_treaty_callback(callback: types.CallbackQuery):
+    _, action, proposal_id = callback.data.split(":")
+    proposal = diplomacy_proposals.get(proposal_id)
+    if not proposal or proposal["status"] != "pending":
+        await callback.answer("این پیشنهاد دیگر معتبر نیست.")
+        return
+    if callback.from_user.id != proposal["to_user"]:
+        await callback.answer("این پیشنهاد برای شما نیست.")
+        return
+
+    type_name = TREATY_TYPE_NAMES.get(proposal["treaty_type"], proposal["treaty_type"])
 
     if action == "accept":
-
-        if player.get("union_id"):
-            return json_response(
-                {
-                    "success": False,
-                    "message": "شما قبلاً عضو یک اتحادیه هستید.",
-                },
-                400,
-            )
-
-        union = unions.get(
-            invite["union_id"]
+        proposal["status"] = "accepted"
+        active_treaties.append({
+            "id": str(uuid.uuid4()),
+            "country_a": proposal["from_country"],
+            "country_b": proposal["to_country"],
+            "treaty_type": proposal["treaty_type"],
+            "expires_at": (utcnow() + timedelta(days=proposal["duration_days"])).isoformat(),
+        })
+        await callback.message.edit_text(
+            f"✅ {type_name} با {COUNTRIES[proposal['to_country']]['name']} پذیرفته شد."
+        )
+    elif action == "reject":
+        proposal["status"] = "rejected"
+        await callback.message.edit_text(
+            f"❌ {type_name} با {COUNTRIES[proposal['to_country']]['name']} رد شد."
         )
 
-        if not union:
-            return json_response(
-                {
-                    "success": False,
-                    "message": "اتحادیه پیدا نشد.",
-                },
-                404,
-            )
-
-        union["members"].append(
-            player["country"]
-        )
-
-        player["union_id"] = union["id"]
-
-        invite["status"] = "accepted"
-
-    else:
-
-        invite["status"] = "rejected"
-
-    return json_response(
-        {
-            "success": True,
-            "invite": invite,
-        }
-    )
-
-
-async def api_union_chat(request):
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    union_id = player.get(
-        "union_id"
-    )
-
-    if not union_id:
-        return json_response(
-            {
-                "success": False,
-                "message": "شما عضو اتحادیه نیستید.",
-            },
-            400,
-        )
-
-    if request.method == "GET":
-
-        return json_response(
-            {
-                "success": True,
-                "messages": union_messages.get(
-                    union_id,
-                    [],
-                )[-200:],
-            }
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    text = str(
-        data.get(
-            "text",
-            "",
-        )
-    ).strip()
-
-    if not text:
-        return json_response(
-            {
-                "success": False,
-                "message": "پیام خالی است.",
-            },
-            400,
-        )
-
-    message = {
-        "id": make_id("union_msg"),
-        "country": player["country"],
-        "flag": country_flag(
-            player["country"]
-        ),
-        "text": text[:500],
-        "created_at": iso(now()),
-    }
-
-    union_messages.setdefault(
-        union_id,
-        [],
-    ).append(
-        message
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "message": message,
-        }
-    )
+    save_state()
+    await callback.answer()
 
 
 # =========================================================
-# PRIVATE MESSAGES
+# API — Player
 # =========================================================
 
-async def api_messages(request):
-    user_id = get_user_id(request)
+async def get_player(request):
+    user_id = get_auth_user_id(request)
+    if not user_id:
+        return web.json_response({"error": "unauthorized"}, status=401)
 
-    player = get_player(user_id)
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
+        save_state()
 
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
+    return web.json_response(serialize_player(players[user_id]))
 
-    if request.method == "GET":
 
-        country = player["country"]
+async def get_countries(request):
+    result = []
+    for cid, c in COUNTRIES.items():
+        owner_id, _ = get_player_by_country(cid)
+        result.append({"id": cid, "name": c["name"], "flag": c["flag"], "taken": owner_id is not None})
+    return web.json_response(result)
 
-        result = [
-            message
-            for message in private_messages
-            if message["from_country"] == country
-            or message["to_country"] == country
-        ]
 
-        return json_response(
-            {
-                "success": True,
-                "messages": result[-200:],
-            }
-        )
+async def select_country(request):
+    user_id = get_auth_user_id(request)
+    if not user_id:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
 
+    data = await read_json(request)
+    country_id = data.get("country")
+
+    if country_id not in COUNTRIES:
+        return web.json_response({"success": False, "error": "invalid_country",
+                                  "message": "کشور انتخاب شده معتبر نیست."}, status=400)
+
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
+
+    player = players[user_id]
+
+    if player["country"]:
+        if player["country"] == country_id:
+            return web.json_response({"success": True, "player": serialize_player(player)})
+        return web.json_response({"success": False, "error": "already_has_country",
+                                  "message": "شما قبلاً یک کشور انتخاب کرده‌اید."}, status=409)
+
+    owner_id, _ = get_player_by_country(country_id)
+    if owner_id is not None and owner_id != user_id:
+        return web.json_response({"success": False, "error": "country_taken",
+                                  "message": "این کشور قبلاً توسط بازیکن دیگری انتخاب شده است."}, status=409)
+
+    player["country"] = country_id
+    if not player.get("started_at"):
+        now = utcnow().isoformat()
+        player["started_at"] = now
+        player["last_update"] = now
+
+    save_state()
+    return web.json_response({"success": True, "player": serialize_player(player)})
+
+
+# =========================================================
+# API — ارتقا زیرساخت
+# =========================================================
+
+async def upgrade_infra(request):
+    user_id = get_auth_user_id(request)
+    if not user_id:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+
+    data = await read_json(request)
+    item_id = data.get("category")
+
+    if item_id not in INFRASTRUCTURE:
+        return web.json_response({"success": False, "error": "invalid_category"}, status=400)
+
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
+
+    player = players[user_id]
+
+    if not player.get("country"):
+        return web.json_response({"success": False, "error": "no_country",
+                                  "message": "ابتدا وارد بازی شوید."}, status=400)
+
+    accrue_player(player)
+
+    item = INFRASTRUCTURE[item_id]
+    current_level = get_infra_level(player, item_id)
+    levels = item["levels"]
+
+    if current_level >= len(levels):
+        return web.json_response({"success": False, "error": "max_level",
+                                  "message": "این زیرساخت به حداکثر سطح رسیده است."}, status=400)
+
+    cost = levels[current_level]["cost"]
+    resource_cost = levels[current_level].get("resources", {})
+
+    if player.get("money", 0) < cost:
+        return web.json_response({"success": False, "error": "not_enough_money",
+                                  "message": "پول کافی ندارید."}, status=400)
+
+    ensure_player_fields(player)
+    for key, amount in resource_cost.items():
+        if player["resources"].get(key, 0) < amount:
+            return web.json_response({"success": False, "error": "not_enough_resource",
+                                      "message": f"{RESOURCE_NAMES[key]} کافی ندارید."}, status=400)
+
+    player["money"] -= cost
+    for key, amount in resource_cost.items():
+        player["resources"][key] -= amount
+
+    player["infra_levels"][item_id] = current_level + 1
+    save_state()
+
+    return web.json_response({"success": True, "player": serialize_player(player)})
+
+
+# =========================================================
+# API — ارتقا اقتصاد
+# =========================================================
+
+async def upgrade_economy(request):
+    user_id = get_auth_user_id(request)
+    if not user_id:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+
+    data = await read_json(request)
+    item_id = data.get("category")
+
+    if item_id not in ECONOMY:
+        return web.json_response({"success": False, "error": "invalid_category"}, status=400)
+
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
+
+    player = players[user_id]
+
+    if not player.get("country"):
+        return web.json_response({"success": False, "error": "no_country",
+                                  "message": "ابتدا وارد بازی شوید."}, status=400)
+
+    accrue_player(player)
+
+    item = ECONOMY[item_id]
+    current_level = get_infra_level(player, item_id)
+    levels = item["levels"]
+
+    if current_level >= len(levels):
+        return web.json_response({"success": False, "error": "max_level",
+                                  "message": "به حداکثر سطح رسیده است."}, status=400)
+
+    cost = levels[current_level]["cost"]
+
+    if player.get("money", 0) < cost:
+        return web.json_response({"success": False, "error": "not_enough_money",
+                                  "message": "پول کافی ندارید."}, status=400)
+
+    required_power = item["power_required"]
+    power_used = get_power_used(player)
+    power_total = get_power_total(player)
+
+    if power_total < power_used + required_power:
+        return web.json_response({"success": False, "error": "not_enough_power",
+                                  "message": "برق کافی برای راه‌اندازی این بخش ندارید. ابتدا نیروگاه بسازید."}, status=400)
+
+    player["money"] -= cost
+    player["infra_levels"][item_id] = current_level + 1
+    save_state()
+
+    return web.json_response({"success": True, "player": serialize_player(player)})
+
+
+# =========================================================
+# API — آموزش یگان (با اصلاح باگ برق)
+# =========================================================
+
+async def train_unit(request):
+    user_id = get_auth_user_id(request)
+    if not user_id:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+
+    data = await read_json(request)
+    unit_id = data.get("unit_id")
     try:
-        data = await request.json()
-    except Exception:
-        data = {}
+        count = int(data.get("count", 1))
+    except (TypeError, ValueError):
+        count = 1
+    count = max(1, min(count, 50))
 
-    target = data.get(
-        "target_country"
-    )
+    if unit_id not in ARMY_UNITS:
+        return web.json_response({"success": False, "error": "invalid_unit"}, status=400)
 
-    text = str(
-        data.get(
-            "text",
-            "",
-        )
-    ).strip()
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
+
+    player = players[user_id]
+
+    if not player.get("country"):
+        return web.json_response({"success": False, "error": "no_country",
+                                  "message": "ابتدا وارد بازی شوید."}, status=400)
+
+    ensure_player_fields(player)
+    accrue_player(player)
+
+    unit = ARMY_UNITS[unit_id]
+    group = unit["group"]
+    requires = unit["requires"]
+
+    if get_infra_level(player, requires) <= 0:
+        return web.json_response({"success": False, "error": "no_infra",
+                                  "message": f"برای ساخت {unit['name']} ابتدا «{INFRASTRUCTURE[requires]['name']}» را بسازید."}, status=400)
+
+    capacity = get_group_capacity(player, group)
+    used = get_group_units(player, group)
+
+    if used >= capacity:
+        return web.json_response({"success": False, "error": "capacity_full",
+                                  "message": f"ظرفیت نیروی {GROUP_NAMES[group]} پر است؛ زیرساخت را ارتقا دهید."}, status=400)
+
+    count = min(count, capacity - used)
+
+    # ==== اصلاح باگ برق: مصرف فعلی + مصرف جدید باید <= ظرفیت باشد ====
+    power_capacity = get_power_total(player)
+    power_used = get_power_used(player)
+    new_power = unit["power_required"] * count
+
+    if power_used + new_power > power_capacity:
+        available = max(0, power_capacity - power_used)
+        return web.json_response({"success": False, "error": "not_enough_power",
+                                  "message": f"برق کافی ندارید. برق آزاد: {available}، نیاز: {new_power}."}, status=400)
+
+    total_cost = unit["cost"] * count
+    total_manpower = unit["manpower"] * count
+
+    if player.get("money", 0) < total_cost:
+        return web.json_response({"success": False, "error": "not_enough_money",
+                                  "message": "پول کافی ندارید."}, status=400)
+
+    if player.get("manpower", 0) < total_manpower:
+        return web.json_response({"success": False, "error": "not_enough_manpower",
+                                  "message": "نیروی انسانی کافی ندارید."}, status=400)
+
+    for key, amount in unit["resources"].items():
+        if player["resources"].get(key, 0) < amount * count:
+            return web.json_response({"success": False, "error": "not_enough_resource",
+                                      "message": f"{RESOURCE_NAMES[key]} کافی ندارید."}, status=400)
+
+    player["money"] -= total_cost
+    player["manpower"] -= total_manpower
+    for key, amount in unit["resources"].items():
+        player["resources"][key] -= amount * count
+    player["units"][unit_id] = player["units"].get(unit_id, 0) + count
+
+    recompute_army(player)
+    save_state()
+
+    return web.json_response({"success": True, "player": serialize_player(player)})
+
+
+async def get_army_units(request):
+    return web.json_response({
+        "units": ARMY_UNITS,
+        "resources": RESOURCE_NAMES,
+        "groups": GROUP_NAMES,
+    })
+
+
+async def get_map_resources(request):
+    """لیست منابع روی نقشه + مالکیت فعلی"""
+    result = []
+    for key, info in MAP_RESOURCES.items():
+        result.append({
+            **info,
+            "id": key,
+            "owner": map_holdings.get(key),
+        })
+    return web.json_response(result)
+
+
+# =========================================================
+# API — حمله (فعلاً stub — فاز ۳ کامل می‌شود)
+# =========================================================
+
+async def attack(request):
+    user_id = get_auth_user_id(request)
+    if not user_id:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+
+    data = await read_json(request)
+    target = data.get("target")
+    attack_type = data.get("type", "land")
 
     if target not in COUNTRIES:
-        return json_response(
-            {
-                "success": False,
-                "message": "کشور مقصد نامعتبر است.",
-            },
-            400,
-        )
+        return web.json_response({"success": False, "error": "invalid_target"}, status=400)
 
-    if not text:
-        return json_response(
-            {
-                "success": False,
-                "message": "پیام خالی است.",
-            },
-            400,
-        )
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
 
-    message = {
-        "id": make_id("msg"),
-        "from_country": player["country"],
-        "to_country": target,
-        "text": text[:1000],
-        "created_at": iso(now()),
-        "read": False,
+    player = players[user_id]
+
+    if not player.get("country"):
+        return web.json_response({"success": False, "error": "no_country",
+                                  "message": "ابتدا وارد بازی شوید."}, status=400)
+
+    if target == player.get("country"):
+        return web.json_response({"success": False, "error": "self_attack"}, status=400)
+
+    type_name = ATTACK_TYPE_NAMES.get(attack_type, attack_type)
+    target_name = COUNTRIES[target]["name"]
+
+    return web.json_response({"success": True,
+                              "message": f"عملیات {type_name} علیه {target_name} آغاز شد. (منطق جنگ در فاز بعدی)"})
+
+
+# =========================================================
+# API — دیپلماسی
+# =========================================================
+
+async def propose_treaty(request):
+    user_id = get_auth_user_id(request)
+    if not user_id:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+
+    data = await read_json(request)
+    target_country = data.get("target")
+    treaty_type = data.get("type")
+    try:
+        duration_days = int(data.get("duration_days", 10))
+    except (TypeError, ValueError):
+        duration_days = 10
+    duration_days = max(1, min(duration_days, 30))
+
+    if target_country not in COUNTRIES:
+        return web.json_response({"success": False, "error": "invalid_target"}, status=400)
+    if treaty_type not in TREATY_TYPE_NAMES:
+        return web.json_response({"success": False, "error": "invalid_type"}, status=400)
+
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
+
+    player = players[user_id]
+    from_country = player.get("country")
+
+    if not from_country:
+        return web.json_response({"success": False, "error": "no_country",
+                                  "message": "ابتدا وارد بازی شوید."}, status=400)
+    if target_country == from_country:
+        return web.json_response({"success": False, "error": "self_proposal"}, status=400)
+
+    target_user_id, _ = get_player_by_country(target_country)
+    if target_user_id is None:
+        return web.json_response({"success": False, "error": "country_unowned",
+                                  "message": "این کشور هنوز انتخاب نشده است."}, status=400)
+
+    proposal_id = str(uuid.uuid4())
+    diplomacy_proposals[proposal_id] = {
+        "id": proposal_id,
+        "from_user": user_id,
+        "from_country": from_country,
+        "to_user": target_user_id,
+        "to_country": target_country,
+        "treaty_type": treaty_type,
+        "duration_days": duration_days,
+        "status": "pending",
+        "created_at": utcnow().isoformat(),
     }
 
-    private_messages.append(
-        message
-    )
+    type_name = TREATY_TYPE_NAMES[treaty_type]
+    from_name = COUNTRIES[from_country]["name"]
 
-    target_player = get_country_player(
-        target
-    )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ قبول", callback_data=f"treaty:accept:{proposal_id}"),
+        InlineKeyboardButton(text="❌ رد", callback_data=f"treaty:reject:{proposal_id}"),
+    ]])
 
-    if target_player:
-        add_notification(
-            target_player["user_id"],
-            "پیام جدید",
-            (
-                f"{country_flag(player['country'])} "
-                f"{country_name(player['country'])} "
-                "برای شما پیام فرستاد."
-            ),
-            "message",
-        )
-
-    return json_response(
-        {
-            "success": True,
-            "message": message,
-        }
-    )
-
-
-# =========================================================
-# MARKET
-# =========================================================
-
-async def api_market(request):
-
-    if request.method == "GET":
-
-        return json_response(
-            {
-                "success": True,
-                "orders": list(
-                    market_orders.values()
-                ),
-            }
-        )
-
-    user_id = get_user_id(request)
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
+    sent = False
     try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    resource = data.get(
-        "resource"
-    )
-
-    amount = int(
-        data.get(
-            "amount",
-            0,
+        await bot.send_message(
+            target_user_id,
+            f"📜 پیشنهاد {type_name}\n\nکشور {from_name} به شما پیشنهاد {type_name} به مدت {duration_days} روز داده است.",
+            reply_markup=keyboard
         )
-    )
+        sent = True
+    except Exception as e:
+        logging.warning("Failed to send treaty proposal: %s", e)
 
-    price_money = int(
-        data.get(
-            "price_money",
-            0,
-        )
-    )
+    save_state()
 
-    if resource not in RESOURCE_NAMES:
-        return json_response(
-            {
-                "success": False,
-                "message": "منبع نامعتبر است.",
-            },
-            400,
-        )
+    if not sent:
+        return web.json_response({"success": True,
+                                  "message": "پیشنهاد داخل بازی ثبت شد (کاربر پیام تلگرام را دریافت نکرد)."})
+    return web.json_response({"success": True,
+                              "message": "پیشنهاد ارسال شد و منتظر تأیید طرف مقابل است."})
 
-    if amount <= 0:
-        return json_response(
-            {
-                "success": False,
-                "message": "مقدار سفارش نامعتبر است.",
-            },
-            400,
-        )
 
-    if price_money <= 0:
-        return json_response(
-            {
-                "success": False,
-                "message": "قیمت نامعتبر است.",
-            },
-            400,
-        )
+async def get_diplomacy(request):
+    user_id = get_auth_user_id(request)
+    if not user_id:
+        return web.json_response({"error": "unauthorized"}, status=401)
 
-    if player["resources"].get(
-        resource,
-        0,
-    ) < amount:
+    if user_id not in players:
+        players[user_id] = create_player(user_id)
+    player = players[user_id]
+    accrue_player(player)
 
-        return json_response(
-            {
-                "success": False,
-                "message": "موجودی منبع کافی نیست.",
-            },
-            400,
-        )
+    country_id = player.get("country")
 
-    # منابع سفارش تا زمان اجرا رزرو می‌شوند
-    player["resources"][resource] -= amount
+    sent = [p for p in diplomacy_proposals.values()
+            if p["from_user"] == user_id and p["status"] == "pending"]
+    received = [p for p in diplomacy_proposals.values()
+                if p["to_user"] == user_id and p["status"] == "pending"]
+    treaties = [t for t in active_treaties
+                if country_id and (t["country_a"] == country_id or t["country_b"] == country_id)]
 
-    order = {
-        "id": make_id("order"),
-        "seller_country": player["country"],
-        "resource": resource,
-        "amount": amount,
-        "remaining": amount,
-        "price_money": price_money,
-        "created_at": iso(now()),
-        "status": "open",
-    }
+    return web.json_response({"sent": sent, "received": received, "treaties": treaties})
 
-    market_orders[
-        order["id"]
-    ] = order
 
-    return json_response(
-        {
-            "success": True,
-            "order": order,
-        }
-    )
+async def respond_treaty(request):
+    """پاسخ به پیشنهاد داخل بازی (به‌جای دکمه تلگرام)"""
+    user_id = get_auth_user_id(request)
+    if not user_id:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+
+    data = await read_json(request)
+    proposal_id = data.get("proposal_id")
+    accept = bool(data.get("accept"))
+
+    proposal = diplomacy_proposals.get(proposal_id)
+    if not proposal or proposal["status"] != "pending":
+        return web.json_response({"success": False, "error": "invalid_proposal"}, status=400)
+    if proposal["to_user"] != user_id:
+        return web.json_response({"success": False, "error": "not_yours"}, status=403)
+
+    if accept:
+        proposal["status"] = "accepted"
+        active_treaties.append({
+            "id": str(uuid.uuid4()),
+            "country_a": proposal["from_country"],
+            "country_b": proposal["to_country"],
+            "treaty_type": proposal["treaty_type"],
+            "expires_at": (utcnow() + timedelta(days=proposal["duration_days"])).isoformat(),
+        })
+    else:
+        proposal["status"] = "rejected"
+
+    save_state()
+    return web.json_response({"success": True})
 
 
 # =========================================================
-# MARKET EXECUTE
+# API — News
 # =========================================================
 
-async def api_market_execute(request):
-    user_id = get_user_id(request)
+async def get_news(request):
+    news = [
+        {"title": "سال ۱۹۳۹", "text": "اروپا در آستانه یک بحران بزرگ قرار دارد. تصمیمات فرماندهان سرنوشت جهان را تغییر خواهد داد."},
+        {"title": "فرماندهی آغاز شد", "text": "کشور خود را انتخاب کنید و برای توسعه اقتصاد، ارتش و روابط خارجی آماده شوید."},
+    ]
+    return web.json_response(news)
 
-    buyer = get_player(user_id)
 
-    if not buyer:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    order_id = data.get(
-        "order_id"
-    )
-
-    quantity = int(
-        data.get(
-            "quantity",
-            0,
-        )
-    )
-
-    order = market_orders.get(
-        order_id
-    )
-
-    if not order:
-        return json_response(
-            {
-                "success": False,
-                "message": "سفارش پیدا نشد.",
-            },
-            404,
-        )
-
-    if order["status"] != "open":
-        return json_response(
-            {
-                "success": False,
-                "message": "سفارش دیگر فعال نیست.",
-            },
-            400,
-        )
-
-    if order["seller_country"] == buyer["country"]:
-        return json_response(
-            {
-                "success": False,
-                "message": "نمی‌توانید سفارش خودتان را اجرا کنید.",
-            },
-            400,
-        )
-
-    quantity = max(
-        1,
-        min(
-            quantity,
-            order["remaining"],
-        ),
-    )
-
-    total_money = (
-        order["price_money"]
-        * quantity
-    )
-
-    if buyer["money"] < total_money:
-        return json_response(
-            {
-                "success": False,
-                "message": "پول کافی نیست.",
-            },
-            400,
-        )
-
-    seller = get_country_player(
-        order["seller_country"]
-    )
-
-    if not seller:
-        return json_response(
-            {
-                "success": False,
-                "message": "فروشنده دیگر در بازی نیست.",
-            },
-            400,
-        )
-
-    buyer["money"] -= total_money
-    seller["money"] += total_money
-
-    buyer["resources"][
-        order["resource"]
-    ] += quantity
-
-    order["remaining"] -= quantity
-
-    if order["remaining"] <= 0:
-        order["status"] = "completed"
-
-    add_news(
-        "معامله بازار",
-        (
-            f"{country_flag(buyer['country'])} "
-            f"{country_name(buyer['country'])} "
-            "یک معامله منابع انجام داد."
-        ),
-        "market",
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "order": order,
-            "player": serialize_player(
-                buyer
-            ),
-        }
-    )
+async def health(request):
+    return web.json_response({"status": "ok", "players": len(players)})
 
 
 # =========================================================
-# MARKET DELETE
+# فایل‌های Web App
 # =========================================================
 
-async def api_market_delete(request):
-    user_id = get_user_id(request)
+WEB_DIR = os.path.join("web")
 
-    player = get_player(user_id)
+async def index(request):
+    return web.FileResponse(os.path.join(WEB_DIR, "index.html"))
 
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
+async def style(request):
+    return web.FileResponse(os.path.join(WEB_DIR, "style.css"))
 
-    order_id = request.query.get(
-        "order_id"
-    )
-
-    order = market_orders.get(
-        order_id
-    )
-
-    if not order:
-        return json_response(
-            {
-                "success": False,
-                "message": "سفارش پیدا نشد.",
-            },
-            404,
-        )
-
-    if order["seller_country"] != player["country"]:
-        return json_response(
-            {
-                "success": False,
-                "message": "این سفارش متعلق به شما نیست.",
-            },
-            403,
-        )
-
-    if order["status"] != "open":
-        return json_response(
-            {
-                "success": False,
-                "message": "این سفارش دیگر فعال نیست.",
-            },
-            400,
-        )
-
-    remaining = order["remaining"]
-
-    player["resources"][
-        order["resource"]
-    ] += remaining
-
-    order["remaining"] = 0
-    order["status"] = "cancelled"
-
-    return json_response(
-        {
-            "success": True,
-            "order": order,
-        }
-    )
+async def app_js(request):
+    return web.FileResponse(os.path.join(WEB_DIR, "app.js"))
 
 
 # =========================================================
-# STRATEGIC SITES
+# ساخت Web Server
 # =========================================================
 
-async def api_sites(request):
-
-    result = []
-
-    for site in strategic_sites.values():
-
-        result.append(
-            {
-                **site,
-                "owner_name": (
-                    country_name(
-                        site["owner"]
-                    )
-                    if site["owner"]
-                    else None
-                ),
-                "owner_flag": (
-                    country_flag(
-                        site["owner"]
-                    )
-                    if site["owner"]
-                    else None
-                ),
-            }
-        )
-
-    return json_response(
-        {
-            "success": True,
-            "sites": result,
-        }
-    )
-
-
-async def api_capture_site(request):
-    user_id = get_user_id(request)
-
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "message": "بازیکن پیدا نشد.",
-            },
-            404,
-        )
-
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-
-    site_id = data.get(
-        "site_id"
-    )
-
-    site = strategic_sites.get(
-        site_id
-    )
-
-    if not site:
-        return json_response(
-            {
-                "success": False,
-                "message": "موقعیت راهبردی پیدا نشد.",
-            },
-            404,
-        )
-
-    if site.get("owner") == player["country"]:
-        return json_response(
-            {
-                "success": False,
-                "message": "این موقعیت در اختیار شماست.",
-            },
-            400,
-        )
-
-    if site.get("pending"):
-        return json_response(
-            {
-                "success": False,
-                "message": "یک عملیات برای این موقعیت در حال انجام است.",
-            },
-            400,
-        )
-
-    naval_count = (
-        player["army"].get(
-            "warship",
-            0,
-        )
-        + player["army"].get(
-            "submarine",
-            0,
-        )
-    )
-
-    if naval_count <= 0:
-        return json_response(
-            {
-                "success": False,
-                "message": "برای عملیات دریایی حداقل یک ناو یا زیردریایی لازم است.",
-            },
-            400,
-        )
-
-    arrival = (
-        now()
-        + timedelta(
-            seconds=SITE_TRAVEL_SECONDS
-        )
-    )
-
-    site["pending"] = {
-        "country": player["country"],
-        "arrival": iso(arrival),
-    }
-
-    add_news(
-        "اعزام ناوگان",
-        (
-            f"{country_flag(player['country'])} "
-            f"{country_name(player['country'])} "
-            f"برای تصرف «{site['name']}» ناوگان اعزام کرد."
-        ),
-        "strategic",
-        player["country"],
-    )
-
-    return json_response(
-        {
-            "success": True,
-            "message": "ناوگان اعزام شد. زمان رسیدن ۲ ساعت است.",
-            "site": site,
-        }
-    )
-
-
-# =========================================================
-# RANKS
-# =========================================================
-
-async def api_ranks(request):
-    update_all_players()
-
-    ranking_players = []
-
-    for player in players.values():
-
-        army_power = 0
-
-        for unit_id, quantity in player["army"].items():
-
-            unit = ARMY_UNITS.get(
-                unit_id
-            )
-
-            if unit:
-                army_power += (
-                    quantity
-                    * (
-                        unit["attack"]
-                        + unit["defense"]
-                    )
-                )
-
-        diplomacy_score = 0
-
-        for treaty in treaties.values():
-
-            if (
-                treaty["status"] == "active"
-                and player["country"]
-                in (
-                    treaty["country_a"],
-                    treaty["country_b"],
-                )
-            ):
-                diplomacy_score += 100
-
-        ranking_players.append(
-            {
-                "country": player["country"],
-                "name": country_name(
-                    player["country"]
-                ),
-                "flag": country_flag(
-                    player["country"]
-                ),
-                "economic": player["money"],
-                "military": army_power,
-                "diplomacy": diplomacy_score,
-                "development": player[
-                    "development"
-                ],
-            }
-        )
-
-    def rank_by(key):
-        return sorted(
-            ranking_players,
-            key=lambda x: x[key],
-            reverse=True,
-        )
-
-    return json_response(
-        {
-            "success": True,
-            "overall": rank_by("economic"),
-            "economic": rank_by("economic"),
-            "military": rank_by("military"),
-            "diplomacy": rank_by("diplomacy"),
-            "development": rank_by("development"),
-        }
-    )
-
-
-# =========================================================
-# NOTIFICATIONS
-# =========================================================
-
-async def api_notifications(request):
-    user_id = get_user_id(request)
-
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-                "notifications": [],
-            }
-        )
-
-    return json_response(
-        {
-            "success": True,
-            "notifications": player[
-                "notifications"
-            ][:100],
-        }
-    )
-
-
-async def api_notification_read(request):
-    user_id = get_user_id(request)
-
-    player = get_player(user_id)
-
-    if not player:
-        return json_response(
-            {
-                "success": False,
-            },
-            404,
-        )
-
-    notification_id = request.query.get(
-        "id"
-    )
-
-    for item in player["notifications"]:
-
-        if item["id"] == notification_id:
-            item["read"] = True
-
-    return json_response(
-        {
-            "success": True,
-        }
-    )
-
-
-# =========================================================
-# GLOBAL NEWS
-# =========================================================
-
-async def api_news(request):
-    return json_response(
-        {
-            "success": True,
-            "news": news_items[:200],
-        }
-    )
-
-
-# =========================================================
-# GAME TICK
-# =========================================================
-
-async def game_tick():
-
-    while True:
-
-        try:
-
-            update_all_players()
-
-            current = now()
-
-            # -----------------------------------------
-            # جنگ‌های آماده برای نبرد
-            # -----------------------------------------
-
-            for war_id, war in list(
-                wars.items()
-            ):
-
-                if (
-                    war["status"] == "preparing"
-                    and parse_dt(
-                        war["battle_at"]
-                    )
-                    and parse_dt(
-                        war["battle_at"]
-                    ) <= current
-                ):
-
-                    logger.info(
-                        "Resolving war %s",
-                        war_id,
-                    )
-
-                    await resolve_war(
-                        war_id
-                    )
-
-            # -----------------------------------------
-            # موقعیت‌های راهبردی
-            # -----------------------------------------
-
-            for site in strategic_sites.values():
-
-                pending = site.get(
-                    "pending"
-                )
-
-                if not pending:
-                    continue
-
-                arrival = parse_dt(
-                    pending.get(
-                        "arrival"
-                    )
-                )
-
-                if not arrival:
-                    continue
-
-                if arrival <= current:
-
-                    country = pending[
-                        "country"
-                    ]
-
-                    old_owner = site.get(
-                        "owner"
-                    )
-
-                    site["owner"] = country
-                    site["pending"] = None
-
-                    add_news(
-                        "تصرف موقعیت راهبردی",
-                        (
-                            f"{country_flag(country)} "
-                            f"{country_name(country)} "
-                            f"«{site['name']}» را تصرف کرد."
-                        ),
-                        "strategic",
-                        country,
-                    )
-
-                    owner_id = country_owner.get(
-                        country
-                    )
-
-                    if owner_id:
-                        add_notification(
-                            owner_id,
-                            "تصرف موفق",
-                            (
-                                f"موقعیت «{site['name']}» "
-                                "با موفقیت تصرف شد."
-                            ),
-                            "strategic",
-                        )
-
-                    if old_owner:
-
-                        old_id = country_owner.get(
-                            old_owner
-                        )
-
-                        if old_id:
-
-                            add_notification(
-                                old_id,
-                                "از دست رفتن موقعیت",
-                                (
-                                    f"موقعیت «{site['name']}» "
-                                    "توسط کشور دیگری تصرف شد."
-                                ),
-                                "strategic",
-                            )
-
-            await asyncio.sleep(30)
-
-        except asyncio.CancelledError:
-            break
-
-        except Exception:
-            logger.exception(
-                "Game tick error"
-            )
-
-            await asyncio.sleep(30)
-
-
-# =========================================================
-# TELEGRAM START
-# =========================================================
-
-@dp.message(CommandStart())
-async def command_start(message: Message):
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🎮 ورود به بازی",
-                    web_app=WebAppInfo(
-                        url=WEB_APP_URL
-                    ),
-                )
-            ]
-        ]
-    )
-
-    await message.answer(
-        "🌍 <b>جنگ جهانی دوم</b>\n\n"
-        "به بازی استراتژیک جنگ جهانی دوم خوش آمدید.\n\n"
-        "کشور خود را انتخاب کنید و امپراتوری خود را بسازید.\n\n"
-        "🪖 ارتش\n"
-        "⚓ نیروی دریایی\n"
-        "✈️ نیروی هوایی\n"
-        "💰 اقتصاد\n"
-        "🤝 دیپلماسی\n"
-        "⚔️ جنگ\n"
-        "🌍 کنترل مناطق راهبردی\n\n"
-        "برای شروع وارد بازی شوید.",
-        reply_markup=keyboard,
-        parse_mode="HTML",
-    )
-
-
-# =========================================================
-# TELEGRAM WEB APP DATA
-# =========================================================
-
-@dp.message(F.web_app_data)
-async def web_app_data(
-    message: Message,
-):
-
-    logger.info(
-        "WebApp data from %s: %s",
-        message.from_user.id,
-        message.web_app_data.data,
-    )
-
-
-# =========================================================
-# ADMIN CALLBACK
-# =========================================================
-
-@dp.callback_query(
-    F.data.startswith("war_approve:")
-)
-async def telegram_approve_war(
-    callback: CallbackQuery,
-):
-
-    if callback.from_user.id != ADMIN_ID:
-
-        await callback.answer(
-            "⛔ دسترسی ندارید.",
-            show_alert=True,
-        )
-
-        return
-
-    war_id = callback.data.split(
-        ":",
-        1,
-    )[1]
-
-    result = await approve_war(
-        war_id
-    )
-
-    if not result["success"]:
-
-        await callback.answer(
-            result["message"],
-            show_alert=True,
-        )
-
-        return
-
-    await callback.message.edit_text(
-        "✅ <b>جنگ تأیید شد</b>\n\n"
-        f"🆔 <code>{war_id}</code>\n\n"
-        "⏳ دوره ۲۴ ساعته مذاکره و آماده‌سازی آغاز شد.",
-        parse_mode="HTML",
-    )
-
-    await callback.answer(
-        "جنگ تأیید شد."
-    )
-
-
-@dp.callback_query(
-    F.data.startswith("war_reject:")
-)
-async def telegram_reject_war(
-    callback: CallbackQuery,
-):
-
-    if callback.from_user.id != ADMIN_ID:
-
-        await callback.answer(
-            "⛔ دسترسی ندارید.",
-            show_alert=True,
-        )
-
-        return
-
-    war_id = callback.data.split(
-        ":",
-        1,
-    )[1]
-
-    result = await reject_war(
-        war_id
-    )
-
-    if not result["success"]:
-
-        await callback.answer(
-            result["message"],
-            show_alert=True,
-        )
-
-        return
-
-    await callback.message.edit_text(
-        "❌ <b>اعلام جنگ رد شد</b>\n\n"
-        f"🆔 <code>{war_id}</code>",
-        parse_mode="HTML",
-    )
-
-    await callback.answer(
-        "اعلام جنگ رد شد."
-    )
-
-
-# =========================================================
-# STATIC FILES
-# =========================================================
-
-async def index_handler(request):
-    file = BASE_DIR / "index.html"
-
-    if not file.exists():
-        return web.Response(
-            text="index.html پیدا نشد.",
-            status=404,
-        )
-
-    return web.FileResponse(
-        file
-    )
-
-
-async def style_handler(request):
-    file = BASE_DIR / "style.css"
-
-    if not file.exists():
-        return web.Response(
-            text="style.css پیدا نشد.",
-            status=404,
-        )
-
-    return web.FileResponse(
-        file
-    )
-
-
-async def js_handler(request):
-    file = BASE_DIR / "app.js"
-
-    if not file.exists():
-        return web.Response(
-            text="app.js پیدا نشد.",
-            status=404,
-        )
-
-    return web.FileResponse(
-        file
-    )
-
-
-# =========================================================
-# CREATE WEB APP
-# =========================================================
-
-def create_app():
-
+async def create_web_app():
     app = web.Application()
+    app.router.add_get("/", index)
+    app.router.add_get("/style.css", style)
+    app.router.add_get("/app.js", app_js)
+    app.router.add_static("/images/", path=os.path.join(WEB_DIR, "images"), name="images")
 
-    # -----------------------------------------
-    # Frontend
-    # -----------------------------------------
+    # GET endpoints (خواندنی)
+    app.router.add_get("/api/player", get_player)
+    app.router.add_get("/api/countries", get_countries)
+    app.router.add_get("/api/army-units", get_army_units)
+    app.router.add_get("/api/diplomacy", get_diplomacy)
+    app.router.add_get("/api/news", get_news)
+    app.router.add_get("/api/map-resources", get_map_resources)
+    app.router.add_get("/health", health)
 
-    app.router.add_get(
-        "/",
-        index_handler,
-    )
-
-    app.router.add_get(
-        "/index.html",
-        index_handler,
-    )
-
-    app.router.add_get(
-        "/style.css",
-        style_handler,
-    )
-
-    app.router.add_get(
-        "/app.js",
-        js_handler,
-    )
-
-    # -----------------------------------------
-    # Images
-    # -----------------------------------------
-
-    images_dir = BASE_DIR / "images"
-
-    if images_dir.exists():
-
-        app.router.add_static(
-            "/images/",
-            images_dir,
-        )
-
-    # -----------------------------------------
-    # Health
-    # -----------------------------------------
-
-    app.router.add_get(
-        "/health",
-        api_health,
-    )
-
-    # -----------------------------------------
-    # Game API
-    # -----------------------------------------
-
-    app.router.add_get(
-        "/api/countries",
-        api_countries,
-    )
-
-    app.router.add_get(
-        "/api/player",
-        api_player,
-    )
-
-    app.router.add_post(
-        "/api/select-country",
-        api_select_country,
-    )
-
-    app.router.add_get(
-        "/api/army-units",
-        api_army_units,
-    )
-
-    app.router.add_post(
-        "/api/train-unit",
-        api_train_unit,
-    )
-
-    app.router.add_post(
-        "/api/upgrade-infra",
-        api_upgrade_infra,
-    )
-
-    app.router.add_post(
-        "/api/upgrade-economy",
-        api_upgrade_economy,
-    )
-
-    # -----------------------------------------
-    # Diplomacy
-    # -----------------------------------------
-
-    app.router.add_get(
-        "/api/diplomacy",
-        api_diplomacy,
-    )
-
-    app.router.add_post(
-        "/api/propose-treaty",
-        api_propose_treaty,
-    )
-
-    app.router.add_post(
-        "/api/accept-treaty",
-        api_accept_treaty,
-    )
-
-    app.router.add_post(
-        "/api/reject-treaty",
-        api_reject_treaty,
-    )
-
-    # -----------------------------------------
-    # War
-    # -----------------------------------------
-
-    app.router.add_post(
-        "/api/war/declare",
-        api_declare_war,
-    )
-
-    app.router.add_get(
-        "/api/war/status",
-        api_war_status,
-    )
-
-    app.router.add_get(
-        "/api/wars",
-        api_wars,
-    )
-
-    app.router.add_post(
-        "/api/war/admin/approve",
-        api_admin_war_approve,
-    )
-
-    app.router.add_post(
-        "/api/war/admin/reject",
-        api_admin_war_reject,
-    )
-
-    # -----------------------------------------
-    # Communications
-    # -----------------------------------------
-
-    app.router.add_get(
-        "/api/news",
-        api_news,
-    )
-
-    app.router.add_get(
-        "/api/notifications",
-        api_notifications,
-    )
-
-    app.router.add_post(
-        "/api/notification/read",
-        api_notification_read,
-    )
-
-    app.router.add_get(
-        "/api/statements",
-        api_statements,
-    )
-
-    app.router.add_post(
-        "/api/statements/create",
-        api_create_statement,
-    )
-
-    app.router.add_post(
-        "/api/statements/react",
-        api_statement_react,
-    )
-
-    app.router.add_post(
-        "/api/statements/comment",
-        api_statement_comment,
-    )
-
-    # -----------------------------------------
-    # Union
-    # -----------------------------------------
-
-    app.router.add_get(
-        "/api/unions",
-        api_unions,
-    )
-
-    app.router.add_post(
-        "/api/unions/create",
-        api_create_union,
-    )
-
-    app.router.add_post(
-        "/api/unions/invite",
-        api_union_invite,
-    )
-
-    app.router.add_post(
-        "/api/unions/respond",
-        api_union_respond,
-    )
-
-    app.router.add_get(
-        "/api/unions/chat",
-        api_union_chat,
-    )
-
-    app.router.add_post(
-        "/api/unions/chat",
-        api_union_chat,
-    )
-
-    # -----------------------------------------
-    # Private Messages
-    # -----------------------------------------
-
-    app.router.add_get(
-        "/api/messages",
-        api_messages,
-    )
-
-    app.router.add_post(
-        "/api/messages",
-        api_messages,
-    )
-
-    # -----------------------------------------
-    # Market
-    # -----------------------------------------
-
-    app.router.add_get(
-        "/api/market",
-        api_market,
-    )
-
-    app.router.add_post(
-        "/api/market",
-        api_market,
-    )
-
-    app.router.add_post(
-        "/api/market/execute",
-        api_market_execute,
-    )
-
-    app.router.add_delete(
-        "/api/market/order",
-        api_market_delete,
-    )
-
-    # -----------------------------------------
-    # Strategic Sites
-    # -----------------------------------------
-
-    app.router.add_get(
-        "/api/strategic-sites",
-        api_sites,
-    )
-
-    app.router.add_post(
-        "/api/strategic-sites/send",
-        api_capture_site,
-    )
-
-    # -----------------------------------------
-    # Ranks
-    # -----------------------------------------
-
-    app.router.add_get(
-        "/api/ranks",
-        api_ranks,
-    )
+    # POST endpoints (نوشتنی)
+    app.router.add_post("/api/select-country", select_country)
+    app.router.add_post("/api/upgrade-infra", upgrade_infra)
+    app.router.add_post("/api/upgrade-economy", upgrade_economy)
+    app.router.add_post("/api/train-unit", train_unit)
+    app.router.add_post("/api/attack", attack)
+    app.router.add_post("/api/propose-treaty", propose_treaty)
+    app.router.add_post("/api/respond-treaty", respond_treaty)
 
     return app
 
 
+async def start_web_server():
+    app = await create_web_app()
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", "10000"))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logging.info("WEB SERVER STARTED | port=%s", port)
+
+
 # =========================================================
-# MAIN
+# Main
 # =========================================================
 
 async def main():
+    logging.info("WW2 TELEGRAM GAME STARTING...")
 
-    logger.info(
-        "======================================"
-    )
+    load_state()
+    asyncio.create_task(autosave_loop())
 
-    logger.info(
-        "WW2 Telegram Game starting..."
-    )
+    await start_web_server()
+    logging.info("BOT POLLING STARTED")
+    await dp.start_polling(bot)
 
-    logger.info(
-        "Host: %s",
-        HOST,
-    )
-
-    logger.info(
-        "Port: %s",
-        PORT,
-    )
-
-    logger.info(
-        "Web App: %s",
-        WEB_APP_URL,
-    )
-
-    logger.info(
-        "Admin ID: %s",
-        ADMIN_ID,
-    )
-
-    logger.info(
-        "======================================"
-    )
-
-    app = create_app()
-
-    runner = web.AppRunner(
-        app
-    )
-
-    await runner.setup()
-
-    site = web.TCPSite(
-        runner,
-        HOST,
-        PORT,
-    )
-
-    await site.start()
-
-    logger.info(
-        "HTTP server is running on %s:%s",
-        HOST,
-        PORT,
-    )
-
-    # اجرای موتور بازی
-    tick_task = asyncio.create_task(
-        game_tick()
-    )
-
-    try:
-
-        await dp.start_polling(
-            bot
-        )
-
-    finally:
-
-        tick_task.cancel()
-
-        try:
-            await tick_task
-        except asyncio.CancelledError:
-            pass
-
-        await runner.cleanup()
-
-        await bot.session.close()
-
-
-# =========================================================
-# START
-# =========================================================
 
 if __name__ == "__main__":
-
+    import asyncio
     try:
-        asyncio.run(
-            main()
-        )
-
-    except KeyboardInterrupt:
-
-        logger.info(
-            "Game stopped."
-        )
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        save_state()
+        logging.info("State saved on shutdown.")
