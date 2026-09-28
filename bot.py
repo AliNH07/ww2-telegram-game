@@ -273,13 +273,12 @@ def get_power_total(player):
         if lv > 0: total += item["levels"][lv - 1]["capacity"]
     return total
 
+# برق فقط توسط اقتصاد مصرف می‌شود (ارتش دیگر برق مصرف نمی‌کند)
 def get_power_used(player):
     total = 0
     for item_id, item in ECONOMY.items():
         lv = get_infra_level(player, item_id)
         if lv > 0: total += item["power_required"] * lv
-    for unit_id, unit in ARMY_UNITS.items():
-        total += unit["power_required"] * player.get("units", {}).get(unit_id, 0)
     return total
 
 def get_group_capacity(player, group):
@@ -717,11 +716,6 @@ async def train_unit(request):
         return web.json_response({"success": False, "error": "capacity_full",
                                   "message": f"ظرفیت {GROUP_NAMES[group]} پر است."}, status=400)
     count = min(count, cap - used)
-    new_power = unit["power_required"] * count
-    if get_power_used(p) + new_power > get_power_total(p):
-        avail = max(0, get_power_total(p) - get_power_used(p))
-        return web.json_response({"success": False, "error": "not_enough_power",
-                                  "message": f"برق آزاد: {avail}، نیاز: {new_power}."}, status=400)
     total_cost = unit["cost"] * count; total_mp = unit["manpower"] * count
     if p.get("money", 0) < total_cost:
         return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
