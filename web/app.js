@@ -26,102 +26,52 @@ const COUNTRY_IMAGE_EXT = {
 };
 
 const COUNTRY_FLAGS = {
-    germany: "🇩🇪",
-    britain: "🇬🇧",
-    ussr: "☭",
-    usa: "🇺🇸",
-    france: "🇫🇷",
-    italy: "🇮🇹",
-    china: "🇨🇳",
-    japan: "🇯🇵"
+    germany: "🇩🇪", britain: "🇬🇧", ussr: "☭", usa: "🇺🇸",
+    france: "🇫🇷", italy: "🇮🇹", china: "🇨🇳", japan: "🇯🇵"
 };
 
 const COUNTRY_NAMES = {
-    germany: "آلمان",
-    britain: "بریتانیا",
-    ussr: "شوروی",
-    usa: "آمریکا",
-    france: "فرانسه",
-    italy: "ایتالیا",
-    china: "چین",
-    japan: "ژاپن"
+    germany: "آلمان", britain: "بریتانیا", ussr: "شوروی", usa: "آمریکا",
+    france: "فرانسه", italy: "ایتالیا", china: "چین", japan: "ژاپن"
 };
 
 const COUNTRY_IDS = {
-    germany: 276,
-    britain: 826,
-    ussr: 643,
-    usa: 840,
-    france: 250,
-    italy: 380,
-    china: 156,
-    japan: 392
+    germany: 276, britain: 826, ussr: 643, usa: 840,
+    france: 250, italy: 380, china: 156, japan: 392
 };
 
 let ARMY_UNITS = {};
 
-const RESOURCE_NAMES = {
-    food: "غذا",
-    steel: "فولاد",
-    uranium: "اورانیوم",
-    oil: "نفت"
-};
-
-const RESOURCE_ICONS = {
-    food: "🌾",
-    steel: "⚙️",
-    uranium: "☢️",
-    oil: "🛢️"
-};
-
-const GROUP_ICONS = {
-    land: "🪖",
-    naval: "⚓",
-    air: "✈️"
-};
-
-const TREATY_TYPE_NAMES = {
-    alliance: "پیمان اتحاد",
-    non_aggression: "پیمان عدم تجاوز"
-};
-
-const ATTACK_TYPE_NAMES = {
-    land: "زمینی",
-    air: "هوایی",
-    navy: "دریایی"
-};
-
-const GROUP_TITLES = {
-    land: "زمینی",
-    naval: "دریایی",
-    air: "هوایی"
-};
+const RESOURCE_NAMES = { food: "غذا", steel: "فولاد", uranium: "اورانیوم", oil: "نفت" };
+const RESOURCE_ICONS = { food: "🌾", steel: "⚙️", uranium: "☢️", oil: "🛢️" };
+const GROUP_ICONS = { land: "🪖", naval: "⚓", air: "✈️" };
+const TREATY_TYPE_NAMES = { alliance: "پیمان اتحاد", non_aggression: "پیمان عدم تجاوز" };
+const ATTACK_TYPE_NAMES = { land: "زمینی", air: "هوایی", navy: "دریایی" };
+const GROUP_TITLES = { land: "زمینی", naval: "دریایی", air: "هوایی" };
 
 const OCEAN_LABELS = [
-    [-40, 25, "اقیانوس اطلس"],
-    [-150, 0, "اقیانوس آرام"],
-    [75, -20, "اقیانوس هند"],
-    [90, 65, "اقیانوس منجمد شمالی"],
+    [-40, 25, "اقیانوس اطلس"], [-150, 0, "اقیانوس آرام"],
+    [75, -20, "اقیانوس هند"], [90, 65, "اقیانوس منجمد شمالی"],
     [20, -60, "اقیانوس منجمد جنوبی"]
 ];
 
 const STRAITS = [
-    { lon: -5.6, lat: 35.9, name: "تنگه جبل‌الطارق", desc: "اتصال مدیترانه به اطلس؛ پرتردد‌ترین آبراه نظامی دنیا." },
-    { lon: 29.0, lat: 41.1, name: "تنگه بسفر", desc: "تنها راه دریایی دریای سیاه به مدیترانه." },
+    { lon: -5.6, lat: 35.9, name: "تنگه جبل‌الطارق", desc: "اتصال مدیترانه به اطلس." },
+    { lon: 29.0, lat: 41.1, name: "تنگه بسفر", desc: "تنها راه دریایی دریای سیاه." },
     { lon: 56.3, lat: 26.6, name: "تنگه هرمز", desc: "حیاتی‌ترین تنگه انرژی جهان." },
-    { lon: 43.3, lat: 12.6, name: "تنگه باب‌المندب", desc: "دروازه ورودی دریای سرخ و کانال سوئز." },
-    { lon: 32.3, lat: 30.6, name: "کانال سوئز", desc: "کوتاه‌ترین مسیر اروپا به آسیا." },
-    { lon: 1.4, lat: 50.9, name: "تنگه دوور", desc: "باریک‌ترین نقطه کانال مانش." },
+    { lon: 43.3, lat: 12.6, name: "تنگه باب‌المندب", desc: "دروازه دریای سرخ." },
+    { lon: 32.3, lat: 30.6, name: "کانال سوئز", desc: "کوتاه‌ترین مسیر اروپا-آسیا." },
+    { lon: 1.4, lat: 50.9, name: "تنگه دوور", desc: "باریک‌ترین نقطه مانش." },
     { lon: -79.6, lat: 9.1, name: "کانال پاناما", desc: "اتصال اطلس و آرام." },
-    { lon: 103.8, lat: 1.3, name: "تنگه مالاکا", desc: "شریان اصلی تجارت دریایی آسیا." },
-    { lon: -5.9, lat: 43.4, name: "خلیج بیسکای", desc: "مسیر دریایی مهم غرب اروپا." },
-    { lon: 121.0, lat: 24.0, name: "تنگه تایوان", desc: "آبراه راهبردی شرق آسیا." },
-    { lon: 129.9, lat: 34.0, name: "تنگه کره", desc: "اتصال دریای ژاپن به دریای زرد." }
+    { lon: 103.8, lat: 1.3, name: "تنگه مالاکا", desc: "شریان تجارت آسیا." },
+    { lon: -5.9, lat: 43.4, name: "خلیج بیسکای", desc: "مسیر دریایی غرب اروپا." },
+    { lon: 121.0, lat: 24.0, name: "تنگه تایوان", desc: "آبراه شرق آسیا." },
+    { lon: 129.9, lat: 34.0, name: "تنگه کره", desc: "اتصال ژاپن به زرد." }
 ];
 
 
 /* =========================================================
-   API Client (با Auth و POST و Timeout)
+   API Client
 ========================================================= */
 
 async function apiGet(path, params = {}) {
@@ -132,7 +82,10 @@ async function apiGet(path, params = {}) {
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
         const r = await fetch(url, { headers, signal: controller.signal });
-        return await r.json();
+        const text = await r.text();
+        console.log(`[GET ${path}] status=${r.status}`, text.slice(0, 300));
+        try { return JSON.parse(text); }
+        catch { return { error: "invalid_json", raw: text }; }
     } finally {
         clearTimeout(timeout);
     }
@@ -151,7 +104,10 @@ async function apiPost(path, body = {}) {
             body: JSON.stringify(body),
             signal: controller.signal,
         });
-        return await r.json();
+        const text = await r.text();
+        console.log(`[POST ${path}] status=${r.status}`, text.slice(0, 300));
+        try { return JSON.parse(text); }
+        catch { return { success: false, error: "invalid_json", raw: text }; }
     } finally {
         clearTimeout(timeout);
     }
@@ -197,31 +153,25 @@ let toastTimer = null;
 
 function showToast(message, kind) {
     let el = document.getElementById("app-toast");
-
     if (!el) {
         el = document.createElement("div");
         el.id = "app-toast";
         el.className = "toast";
         document.body.appendChild(el);
     }
-
     el.textContent = message;
     el.classList.remove("error", "success");
-
     if (kind) el.classList.add(kind);
-
     void el.offsetWidth;
     el.classList.add("show");
-
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove("show"), 3200);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
 }
 
 function askText(title, placeholder) {
     return new Promise(resolve => {
         const overlay = document.createElement("div");
         overlay.className = "modal-overlay";
-
         overlay.innerHTML = `
             <div class="modal-box">
                 <div class="modal-title"></div>
@@ -232,21 +182,14 @@ function askText(title, placeholder) {
                 </div>
             </div>
         `;
-
         overlay.querySelector(".modal-title").textContent = title;
         overlay.querySelector(".modal-input").placeholder = placeholder || "";
-
-        const close = value => {
-            overlay.remove();
-            resolve(value);
-        };
-
+        const close = value => { overlay.remove(); resolve(value); };
         overlay.querySelector(".modal-cancel").addEventListener("click", () => close(null));
         overlay.querySelector(".modal-ok").addEventListener("click", () => {
             const value = overlay.querySelector(".modal-input").value.trim();
             close(value || null);
         });
-
         document.body.appendChild(overlay);
         overlay.querySelector(".modal-input").focus();
     });
@@ -263,17 +206,13 @@ async function loadArmyCatalog() {
 
 function renderResourceBars() {
     if (!player?.resources) return;
-
     document.querySelectorAll(".resource-bar").forEach(bar => {
         bar.innerHTML = "";
-
         Object.keys(RESOURCE_NAMES).forEach(key => {
             const amount = player.resources[key] ?? 0;
             const rate = player.resource_production?.[key] ?? 0;
-
             const chip = document.createElement("div");
             chip.className = "resource-chip";
-
             chip.innerHTML = `
                 <div class="resource-chip-top">
                     <span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span>
@@ -283,7 +222,6 @@ function renderResourceBars() {
                     تولید روزانه: ${formatNumber(rate)}
                 </div>
             `;
-
             bar.appendChild(chip);
         });
     });
@@ -291,42 +229,32 @@ function renderResourceBars() {
 
 function costText(levelInfo) {
     let text = formatMoney(levelInfo.cost);
-
     if (levelInfo.resources) {
         Object.entries(levelInfo.resources).forEach(([key, amount]) => {
             text += ` + ${formatNumber(amount)} ${RESOURCE_NAMES[key]}`;
         });
     }
-
     return text;
 }
 
 async function loadWorldAtlas() {
     if (worldData) return worldData;
-    const response = await fetch(
-        "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
-    );
+    const response = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
     worldData = await response.json();
     return worldData;
 }
 
 
 /* =========================================================
-   دریافت بازیکن
+   بازیکن
 ========================================================= */
 
 async function loadPlayer() {
-    if (!userId) {
-        console.warn("Telegram user ID not found.");
-        return;
-    }
-
+    if (!userId) { console.warn("Telegram user ID not found."); return; }
     try {
         player = await apiGet("/api/player");
         if (player?.country) selectedCountry = player.country;
-    } catch (error) {
-        console.error(error);
-    }
+    } catch (error) { console.error(error); }
 }
 
 let refreshController = null;
@@ -349,15 +277,12 @@ function startStatsPolling() {
 }
 
 function stopStatsPolling() {
-    if (statsInterval) {
-        clearInterval(statsInterval);
-        statsInterval = null;
-    }
+    if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
 }
 
 
 /* =========================================================
-   دریافت کشورها
+   کشورها
 ========================================================= */
 
 async function loadCountries() {
@@ -366,15 +291,8 @@ async function loadCountries() {
         const data = await apiGet("/api/countries");
         data.forEach(c => { countries[c.id] = c; });
         updateCountryCards();
-    } catch (error) {
-        console.error("Countries:", error);
-    }
+    } catch (error) { console.error("Countries:", error); }
 }
-
-
-/* =========================================================
-   انتخاب کشور
-========================================================= */
 
 function showCountrySelection() {
     showOnly("country");
@@ -387,11 +305,8 @@ function updateCountryCards() {
         const country = countries[countryId];
         if (!country) return;
         if (country.taken) {
-            if (player?.country === countryId) {
-                card.classList.remove("taken");
-            } else {
-                card.classList.add("taken");
-            }
+            if (player?.country === countryId) card.classList.remove("taken");
+            else card.classList.add("taken");
         } else {
             card.classList.remove("taken");
         }
@@ -421,10 +336,7 @@ function showMessage(message) {
 }
 
 function showCountryPreview() {
-    if (!selectedCountry) {
-        showCountrySelection();
-        return;
-    }
+    if (!selectedCountry) { showCountrySelection(); return; }
     showOnly("country-preview");
     document.getElementById("selected-country-flag").src = countryImageUrl(selectedCountry);
     document.getElementById("preview-country-name").textContent =
@@ -446,33 +358,40 @@ async function confirmCountrySelection() {
         showToast("برای اجرای بازی باید از داخل تلگرام وارد شوید.");
         return;
     }
-    if (player?.country === selectedCountry) {
-        showGame();
-        return;
-    }
+    if (player?.country === selectedCountry) { showGame(); return; }
+
     try {
         const data = await apiPost("/api/select-country", { country: selectedCountry });
+        console.log("[select-country] response:", data);
+
         if (!data.success) {
-            if (data.error === "country_taken") {
+            const err = data.error || "unknown";
+            const msg = data.message || "";
+            if (err === "country_taken") {
                 showToast("این کشور قبلاً توسط بازیکن دیگری انتخاب شده است.");
                 selectedCountry = null;
                 await loadCountries();
                 showCountrySelection();
                 return;
             }
-            if (data.error === "already_has_country") {
+            if (err === "already_has_country") {
                 await loadPlayer();
                 showGame();
                 return;
             }
-            throw new Error(data.error || "Country selection failed");
+            if (err === "unauthorized") {
+                showToast("احراز هویت تلگرام ناموفق. از داخل ربات وارد شوید.");
+                return;
+            }
+            showToast(`خطا (${err}): ${msg || "ناشناخته"}`);
+            return;
         }
         player = data.player;
         await loadCountries();
         showGame();
     } catch (error) {
-        console.error(error);
-        showToast("خطا در ورود به بازی. دوباره امتحان کنید.");
+        console.error("[select-country] exception:", error);
+        showToast("خطای شبکه: " + (error.message || "ناموفق"));
     }
 }
 
@@ -495,7 +414,6 @@ function updateGameHeader() {
 
 function updateHomeStats() {
     if (!player) return;
-
     const name = COUNTRY_NAMES[selectedCountry] || selectedCountry;
 
     document.getElementById("home-country-flag").src = countryImageUrl(selectedCountry);
@@ -505,18 +423,11 @@ function updateHomeStats() {
     if (photo) photo.style.backgroundImage = `url(${countryImageUrl(selectedCountry)})`;
 
     document.getElementById("home-money").textContent = formatMoney(player.money);
-    document.getElementById("home-income").textContent =
-        formatMoney(player.daily_income) + " / روز";
+    document.getElementById("home-income").textContent = formatMoney(player.daily_income) + " / روز";
     document.getElementById("home-manpower").textContent = formatNumber(player.manpower);
-    document.getElementById("home-manpower-production").textContent =
-        formatNumber(player.manpower_production);
-
-    document.getElementById("home-power").textContent =
-        formatNumber(player.power_capacity);
-
-    document.getElementById("home-power-sub").textContent =
-        `مصرف: ${formatNumber(player.power_consumption ?? 0)}`;
-
+    document.getElementById("home-manpower-production").textContent = formatNumber(player.manpower_production);
+    document.getElementById("home-power").textContent = formatNumber(player.power_capacity);
+    document.getElementById("home-power-sub").textContent = `مصرف: ${formatNumber(player.power_consumption ?? 0)}`;
     document.getElementById("home-army").textContent = formatNumber(player.army);
     document.getElementById("home-season").textContent = player.season ?? "بهار";
     document.getElementById("home-season-end").textContent =
@@ -530,22 +441,18 @@ function updateHomeStats() {
 
 
 /* =========================================================
-   باکس‌های اقدام
+   اکشن‌ها
 ========================================================= */
 
 document.querySelectorAll(".action-card").forEach(card => {
     card.addEventListener("click", () => {
         const section = card.dataset.section;
-
         if (section === "infrastructure") { openInfrastructureMenu(); return; }
         if (section === "army") { openArmyPage(); return; }
         if (section === "war") { openWarPage(); return; }
         if (section === "diplomacy") { openDiplomacyPage(); return; }
         if (section === "economy") { openEconomyPage(); return; }
-        if (section === "market") {
-            showToast("این بخش به‌زودی فعال می‌شود.");
-            return;
-        }
+        if (section === "market") { showToast("این بخش به‌زودی فعال می‌شود."); return; }
     });
 });
 
@@ -557,18 +464,15 @@ document.querySelectorAll(".sub-back-button").forEach(button => {
 
 
 /* =========================================================
-   منوی زیرساخت
+   زیرساخت
 ========================================================= */
 
-function openInfrastructureMenu() {
-    showGamePage("infrastructure");
-}
+function openInfrastructureMenu() { showGamePage("infrastructure"); }
 
 document.querySelectorAll("[data-infra-section]").forEach(tile => {
     tile.addEventListener("click", async () => {
         const section = tile.dataset.infraSection;
         await refreshPlayer();
-
         if (section === "power") {
             renderInfraList("infra-power-list", "power");
             showGamePage("infra-power");
@@ -587,14 +491,8 @@ document.querySelectorAll("[data-infra-section]").forEach(tile => {
     });
 });
 
-
-/* =========================================================
-   رندر زیرساخت
-========================================================= */
-
 function infraEffectText(item) {
     const group = item.group;
-
     const effectOf = level => {
         if (group === "power") return `ظرفیت ${formatNumber(level.capacity)} برق`;
         if (group === "manpower") return `تولید ${formatNumber(level.production)} نفر در روز`;
@@ -604,9 +502,7 @@ function infraEffectText(item) {
 
     if (!item.current) {
         let nextText = "";
-        if (item.next) {
-            nextText = `سطح ۱: ${effectOf(item.next)} — ${costText(item.next)}`;
-        }
+        if (item.next) nextText = `سطح ۱: ${effectOf(item.next)} — ${costText(item.next)}`;
         return `هنوز ساخته نشده است.<br>${nextText}`;
     }
 
@@ -614,40 +510,30 @@ function infraEffectText(item) {
     const line2 = item.next
         ? `سطح بعد: ${effectOf(item.next)} — ${costText(item.next)}`
         : "به حداکثر سطح رسیده است.";
-
     return `${line1}<br>${line2}`;
 }
 
 function renderInfraList(containerId, group) {
     const container = document.getElementById(containerId);
     if (!container || !player?.infra) return;
-
     container.innerHTML = "";
 
     Object.entries(player.infra).forEach(([itemId, item]) => {
         if (item.group !== group) return;
-
         const card = document.createElement("div");
         card.className = "infra-card";
-
         card.innerHTML = `
             <div class="infra-card-top">
                 <span class="infra-card-name">${item.name}</span>
                 <span class="infra-card-level">سطح ${item.level} از ${item.max_level}</span>
             </div>
-            <div class="infra-card-detail">
-                ${infraEffectText(item)}
-            </div>
+            <div class="infra-card-detail">${infraEffectText(item)}</div>
             <button class="infra-upgrade-button" ${!item.next ? "disabled" : ""}>
                 ${item.next ? "ارتقا" : "حداکثر سطح"}
             </button>
         `;
-
         const button = card.querySelector(".infra-upgrade-button");
-        if (item.next) {
-            button.addEventListener("click", () => upgradeInfra(itemId));
-        }
-
+        if (item.next) button.addEventListener("click", () => upgradeInfra(itemId));
         container.appendChild(card);
     });
 }
@@ -666,7 +552,6 @@ async function upgradeInfra(itemId) {
         const activePage = document.querySelector(".game-page:not(.hidden)");
         if (!activePage) return;
         const pageId = activePage.id;
-
         if (pageId === "infra-power") renderInfraList("infra-power-list", "power");
         else if (pageId === "infra-manpower") renderInfraList("infra-manpower-list", "manpower");
         else if (pageId === "infra-resource") renderInfraList("infra-resource-list", "resource");
@@ -695,28 +580,23 @@ async function openEconomyPage() {
 function renderEconomyList() {
     const container = document.getElementById("economy-list");
     if (!container || !player?.economy) return;
-
     container.innerHTML = "";
 
     Object.entries(player.economy).forEach(([itemId, item]) => {
         const card = document.createElement("div");
         card.className = "infra-card";
-
         let detail = "";
 
         if (!item.current) {
             detail = `هنوز ساخته نشده است.<br>`;
             if (item.next) {
-                detail += `سطح ۱: درآمد +${formatMoney(item.next.income)} — ${costText(item.next)} | برق مصرفی: ${item.power_required}`;
+                detail += `سطح ۱: درآمد +${formatMoney(item.next.income)} — ${costText(item.next)} | برق: ${item.power_required}`;
             }
         } else {
             detail = `درآمد فعلی: +${formatMoney(item.current.income)} / روز<br>`;
             detail += `برق مصرفی: ${item.power_required * item.level}`;
-            if (item.next) {
-                detail += `<br>سطح بعد: درآمد +${formatMoney(item.next.income)} — ${costText(item.next)}`;
-            } else {
-                detail += `<br>به حداکثر سطح رسیده است.`;
-            }
+            if (item.next) detail += `<br>سطح بعد: درآمد +${formatMoney(item.next.income)} — ${costText(item.next)}`;
+            else detail += `<br>به حداکثر سطح رسیده است.`;
         }
 
         card.innerHTML = `
@@ -732,7 +612,6 @@ function renderEconomyList() {
 
         const button = card.querySelector(".infra-upgrade-button");
         if (item.next) button.addEventListener("click", () => upgradeEconomy(itemId));
-
         container.appendChild(card);
     });
 }
@@ -769,9 +648,7 @@ function getGroupCapacity(group) {
     if (!player?.infra) return 0;
     let total = 0;
     Object.values(player.infra).forEach(item => {
-        if (item.group === group && item.current) {
-            total += item.current.capacity ?? 0;
-        }
+        if (item.group === group && item.current) total += item.current.capacity ?? 0;
     });
     return total;
 }
@@ -779,9 +656,7 @@ function getGroupCapacity(group) {
 function getGroupUsed(group) {
     let total = 0;
     Object.entries(ARMY_UNITS).forEach(([unitId, unit]) => {
-        if (unit.group === group) {
-            total += player?.units?.[unitId] ?? 0;
-        }
+        if (unit.group === group) total += player?.units?.[unitId] ?? 0;
     });
     return total;
 }
@@ -797,7 +672,6 @@ function unitCostText(unit) {
 function renderArmyUnits() {
     const container = document.getElementById("army-units");
     if (!container || !player) return;
-
     container.innerHTML = "";
 
     ["land", "naval", "air"].forEach(group => {
@@ -814,7 +688,6 @@ function renderArmyUnits() {
 
         Object.entries(ARMY_UNITS).forEach(([unitId, unit]) => {
             if (unit.group !== group) return;
-
             const count = player.units?.[unitId] ?? 0;
             const required = player.infra?.[unit.requires];
             const hasRequired = (required?.level ?? 0) > 0;
@@ -824,10 +697,10 @@ function renderArmyUnits() {
             let disabled = false;
 
             if (!hasRequired) {
-                statusText = `برای باز شدن این یگان، «${required?.name || unit.requires}» را در زیرساخت بسازید.`;
+                statusText = `برای باز شدن، «${required?.name || unit.requires}» را بسازید.`;
                 disabled = true;
             } else if (full) {
-                statusText = "ظرفیت پر است؛ زیرساخت‌های این بخش را ارتقا دهید.";
+                statusText = "ظرفیت پر است؛ زیرساخت را ارتقا دهید.";
                 disabled = true;
             } else {
                 statusText = "آماده آموزش";
@@ -835,15 +708,14 @@ function renderArmyUnits() {
 
             const card = document.createElement("div");
             card.className = "unit-card";
-
             card.innerHTML = `
                 <div class="unit-card-top">
                     <span class="unit-card-name">${unit.name}</span>
                     <span class="unit-card-count">${formatNumber(count)} عدد</span>
                 </div>
                 <div class="unit-card-detail">
-                    حمله: ${unit.attack} | دفاع: ${unit.defense} | برق لازم: ${unit.power_required}<br>
-                    هزینه هر واحد: ${unitCostText(unit)}<br>
+                    حمله: ${unit.attack} | دفاع: ${unit.defense} | برق: ${unit.power_required}<br>
+                    هزینه: ${unitCostText(unit)}<br>
                     ${statusText}
                 </div>
                 <div class="unit-buttons">
@@ -854,9 +726,7 @@ function renderArmyUnits() {
 
             card.querySelectorAll(".unit-train-button").forEach(button => {
                 if (disabled) return;
-                button.addEventListener("click", () => {
-                    trainUnit(unitId, Number(button.dataset.count));
-                });
+                button.addEventListener("click", () => trainUnit(unitId, Number(button.dataset.count)));
             });
 
             container.appendChild(card);
@@ -894,7 +764,6 @@ function openWarPage() {
 function renderWarTargets() {
     const container = document.getElementById("war-target-list");
     if (!container) return;
-
     container.innerHTML = "";
 
     Object.keys(COUNTRY_NAMES).forEach(countryId => {
@@ -902,7 +771,6 @@ function renderWarTargets() {
 
         const card = document.createElement("div");
         card.className = "war-target-card";
-
         card.innerHTML = `
             <div class="war-target-top">
                 <img class="war-target-flag" src="${countryImageUrl(countryId)}" alt="">
@@ -916,9 +784,7 @@ function renderWarTargets() {
         `;
 
         card.querySelectorAll("[data-attack]").forEach(button => {
-            button.addEventListener("click", () => {
-                launchAttack(countryId, button.dataset.attack);
-            });
+            button.addEventListener("click", () => launchAttack(countryId, button.dataset.attack));
         });
 
         container.appendChild(card);
@@ -947,10 +813,8 @@ async function launchAttack(target, type) {
 
 function openDiplomacyPage() {
     showGamePage("diplomacy");
-
     const select = document.getElementById("diplomacy-target");
     select.innerHTML = "";
-
     Object.keys(COUNTRY_NAMES).forEach(countryId => {
         if (countryId === selectedCountry) return;
         const option = document.createElement("option");
@@ -958,7 +822,6 @@ function openDiplomacyPage() {
         option.textContent = COUNTRY_NAMES[countryId];
         select.appendChild(option);
     });
-
     loadDiplomacyStatus();
 }
 
@@ -970,9 +833,7 @@ document.getElementById("diplomacy-propose-button").addEventListener("click", as
 
     try {
         const data = await apiPost("/api/propose-treaty", {
-            target,
-            type,
-            duration_days: Number(duration),
+            target, type, duration_days: Number(duration),
         });
         if (!data.success) {
             showToast(data.message || "ارسال پیشنهاد ممکن نشد.");
@@ -992,29 +853,21 @@ async function loadDiplomacyStatus() {
         const data = await apiGet("/api/diplomacy");
         renderTreatyList(data.treaties || []);
         renderSentProposals(data.sent || []);
-    } catch (error) {
-        console.error(error);
-    }
+    } catch (error) { console.error(error); }
 }
 
 function renderTreatyList(treaties) {
     const container = document.getElementById("diplomacy-treaties");
     container.innerHTML = "";
-
     if (!treaties.length) {
         container.innerHTML = `<div class="diplomacy-item-empty">هیچ پیمان فعالی وجود ندارد.</div>`;
         return;
     }
-
     treaties.forEach(treaty => {
-        const otherCountry =
-            treaty.country_a === selectedCountry ? treaty.country_b : treaty.country_a;
-
+        const otherCountry = treaty.country_a === selectedCountry ? treaty.country_b : treaty.country_a;
         const item = document.createElement("div");
         item.className = "diplomacy-item";
-        item.innerHTML = `
-            <span>${TREATY_TYPE_NAMES[treaty.treaty_type]} با ${COUNTRY_NAMES[otherCountry] || otherCountry}</span>
-        `;
+        item.innerHTML = `<span>${TREATY_TYPE_NAMES[treaty.treaty_type]} با ${COUNTRY_NAMES[otherCountry] || otherCountry}</span>`;
         container.appendChild(item);
     });
 }
@@ -1022,12 +875,10 @@ function renderTreatyList(treaties) {
 function renderSentProposals(sent) {
     const container = document.getElementById("diplomacy-sent");
     container.innerHTML = "";
-
     if (!sent.length) {
         container.innerHTML = `<div class="diplomacy-item-empty">پیشنهاد در انتظار پاسخی وجود ندارد.</div>`;
         return;
     }
-
     sent.forEach(proposal => {
         const item = document.createElement("div");
         item.className = "diplomacy-item";
@@ -1047,18 +898,13 @@ function renderSentProposals(sent) {
 document.querySelectorAll(".nav-item").forEach(item => {
     item.addEventListener("click", () => {
         const page = item.dataset.page;
-
         showGamePage(page);
-
         document.querySelectorAll(".nav-item").forEach(nav => nav.classList.remove("active"));
         item.classList.add("active");
 
         if (page === "home") updateHomeStats();
         if (page === "map") setTimeout(() => initWorldMap(), 30);
-        if (page === "communications") {
-            loadNews();
-            renderContactList();
-        }
+        if (page === "communications") { loadNews(); renderContactList(); }
     });
 });
 
@@ -1084,7 +930,6 @@ function renderContactList() {
     const container = document.getElementById("contact-list");
     if (!container) return;
     container.innerHTML = "";
-
     Object.keys(COUNTRY_NAMES).forEach(countryId => {
         if (countryId === selectedCountry) return;
         const item = document.createElement("div");
@@ -1098,11 +943,8 @@ function renderContactList() {
         `;
         container.appendChild(item);
     });
-
     container.querySelectorAll("[data-message-country]").forEach(button => {
-        button.addEventListener("click", () => {
-            sendCountryMessage(button.dataset.messageCountry);
-        });
+        button.addEventListener("click", () => sendCountryMessage(button.dataset.messageCountry));
     });
 }
 
@@ -1132,18 +974,13 @@ async function loadNews() {
         });
     } catch (error) {
         console.error(error);
-        container.innerHTML = `
-            <div class="news-item">
-                <h3>اخبار</h3>
-                <p>فعلاً خبری برای نمایش وجود ندارد.</p>
-            </div>
-        `;
+        container.innerHTML = `<div class="news-item"><h3>اخبار</h3><p>خبری برای نمایش نیست.</p></div>`;
     }
 }
 
 
 /* =========================================================
-   ابزار مشترک چرخش/زوم
+   ابزار چرخش/زوم
 ========================================================= */
 
 function getTouchDistance(touches) {
@@ -1159,15 +996,13 @@ function isPointVisible(lon, lat, rotation) {
     const lat1 = toRad(centerLat);
     const lat2 = toRad(lat);
     const deltaLon = toRad(lon - centerLon);
-    const cosDistance =
-        Math.sin(lat1) * Math.sin(lat2) +
-        Math.cos(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
+    const cosDistance = Math.sin(lat1) * Math.sin(lat2) + Math.cos(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
     return cosDistance > 0;
 }
 
 
 /* =========================================================
-   کره پیش‌نمایش (با AbortController برای پاکسازی)
+   گلوب پیش‌نمایش
 ========================================================= */
 
 let previewGlobeAbort = null;
@@ -1191,58 +1026,39 @@ async function createPreviewGlobe(containerId, svgId, selected) {
     const svg = d3.select(svgElement).attr("viewBox", `0 0 ${width} ${height}`);
 
     const projection = d3.geoOrthographic()
-        .scale(size)
-        .translate([width / 2, height / 2])
-        .clipAngle(90);
+        .scale(size).translate([width / 2, height / 2]).clipAngle(90);
 
     const path = d3.geoPath(projection);
     let world;
-
     try { world = await loadWorldAtlas(); }
     catch (error) { console.error(error); return; }
-
     if (signal.aborted) return;
 
     const land = topojson.feature(world, world.objects.countries);
 
-    svg.append("path")
-        .datum({ type: "Sphere" })
-        .attr("class", "globe-water")
-        .attr("d", path);
+    svg.append("path").datum({ type: "Sphere" }).attr("class", "globe-water").attr("d", path);
 
     svg.selectAll(".country-shape")
-        .data(land.features)
-        .enter()
-        .append("path")
-        .attr("class", "country-shape")
-        .attr("d", path)
+        .data(land.features).enter().append("path")
+        .attr("class", "country-shape").attr("d", path)
         .attr("fill", d => {
             const countryId = Number(d.id);
             if (selected && COUNTRY_IDS[selected] === countryId) return "#d98a25";
-            const isTaken = Object.values(countries).some(
-                country => country.taken && COUNTRY_IDS[country.id] === countryId
-            );
+            const isTaken = Object.values(countries).some(c => c.taken && COUNTRY_IDS[c.id] === countryId);
             if (isTaken) return "#3978b7";
             const isGameCountry = Object.values(COUNTRY_IDS).includes(countryId);
             return isGameCountry ? "#111820" : "#151b21";
         })
-        .attr("stroke", d => {
-            const countryId = Number(d.id);
-            const isGameCountry = Object.values(COUNTRY_IDS).includes(countryId);
-            return isGameCountry ? "#26313c" : "none";
-        })
+        .attr("stroke", d => Object.values(COUNTRY_IDS).includes(Number(d.id)) ? "#26313c" : "none")
         .attr("stroke-width", .6);
 
     let rotation = projection.rotate();
-    let dragging = false;
-    let pinching = false;
+    let dragging = false, pinching = false;
     let lastX = 0, lastY = 0;
-    let pinchStartDistance = 0;
-    let pinchStartScale = size;
+    let pinchStartDistance = 0, pinchStartScale = size;
     let rafId = null;
 
     function redraw() { svg.selectAll("path").attr("d", path); }
-
     function autoRotate() {
         if (signal.aborted) return;
         if (!dragging && !pinching) {
@@ -1253,96 +1069,67 @@ async function createPreviewGlobe(containerId, svgId, selected) {
         rafId = requestAnimationFrame(autoRotate);
     }
     rafId = requestAnimationFrame(autoRotate);
+    signal.addEventListener("abort", () => { if (rafId) cancelAnimationFrame(rafId); });
 
-    signal.addEventListener("abort", () => {
-        if (rafId) cancelAnimationFrame(rafId);
-    });
-
-    const onMouseDown = event => {
-        dragging = true;
-        lastX = event.clientX;
-        lastY = event.clientY;
-    };
-    const onMouseUp = () => { dragging = false; };
-    const onMouseMove = event => {
+    svgElement.addEventListener("mousedown", e => { dragging = true; lastX = e.clientX; lastY = e.clientY; }, { signal });
+    window.addEventListener("mouseup", () => { dragging = false; }, { signal });
+    window.addEventListener("mousemove", e => {
         if (!dragging) return;
-        const dx = event.clientX - lastX;
-        const dy = event.clientY - lastY;
-        rotation[0] += dx * 0.5;
-        rotation[1] -= dy * 0.5;
+        rotation[0] += (e.clientX - lastX) * 0.5;
+        rotation[1] -= (e.clientY - lastY) * 0.5;
         rotation[1] = Math.max(-90, Math.min(90, rotation[1]));
-        projection.rotate(rotation);
-        redraw();
-        lastX = event.clientX;
-        lastY = event.clientY;
-    };
+        projection.rotate(rotation); redraw();
+        lastX = e.clientX; lastY = e.clientY;
+    }, { signal });
 
-    svgElement.addEventListener("mousedown", onMouseDown, { signal });
-    window.addEventListener("mouseup", onMouseUp, { signal });
-    window.addEventListener("mousemove", onMouseMove, { signal });
-
-    svgElement.addEventListener("wheel", event => {
-        event.preventDefault();
-        const current = projection.scale();
-        const next = current * (event.deltaY > 0 ? 0.9 : 1.1);
+    svgElement.addEventListener("wheel", e => {
+        e.preventDefault();
+        const next = projection.scale() * (e.deltaY > 0 ? 0.9 : 1.1);
         projection.scale(Math.max(minScale, Math.min(maxScale, next)));
         redraw();
     }, { passive: false, signal });
 
-    svgElement.addEventListener("touchstart", event => {
-        if (event.touches.length === 2) {
-            pinching = true;
-            dragging = false;
-            pinchStartDistance = getTouchDistance(event.touches);
+    svgElement.addEventListener("touchstart", e => {
+        if (e.touches.length === 2) {
+            pinching = true; dragging = false;
+            pinchStartDistance = getTouchDistance(e.touches);
             pinchStartScale = projection.scale();
             return;
         }
-        if (!event.touches.length) return;
+        if (!e.touches.length) return;
         dragging = true;
-        lastX = event.touches[0].clientX;
-        lastY = event.touches[0].clientY;
+        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
     }, { passive: true, signal });
 
-    svgElement.addEventListener("touchend", event => {
+    svgElement.addEventListener("touchend", e => {
         dragging = false;
-        if (event.touches.length < 2) pinching = false;
+        if (e.touches.length < 2) pinching = false;
     }, { passive: true, signal });
 
-    svgElement.addEventListener("touchmove", event => {
-        if (pinching && event.touches.length === 2) {
-            event.preventDefault();
-            const distance = getTouchDistance(event.touches);
-            const ratio = distance / pinchStartDistance;
-            const next = pinchStartScale * ratio;
-            projection.scale(Math.max(minScale, Math.min(maxScale, next)));
-            redraw();
-            return;
+    svgElement.addEventListener("touchmove", e => {
+        if (pinching && e.touches.length === 2) {
+            e.preventDefault();
+            const ratio = getTouchDistance(e.touches) / pinchStartDistance;
+            projection.scale(Math.max(minScale, Math.min(maxScale, pinchStartScale * ratio)));
+            redraw(); return;
         }
-        if (!dragging || !event.touches.length) return;
-        const dx = event.touches[0].clientX - lastX;
-        const dy = event.touches[0].clientY - lastY;
-        rotation[0] += dx * 0.5;
-        rotation[1] -= dy * 0.5;
+        if (!dragging || !e.touches.length) return;
+        rotation[0] += (e.touches[0].clientX - lastX) * 0.5;
+        rotation[1] -= (e.touches[0].clientY - lastY) * 0.5;
         rotation[1] = Math.max(-90, Math.min(90, rotation[1]));
-        projection.rotate(rotation);
-        redraw();
-        lastX = event.touches[0].clientX;
-        lastY = event.touches[0].clientY;
-        event.preventDefault();
+        projection.rotate(rotation); redraw();
+        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+        e.preventDefault();
     }, { passive: false, signal });
 }
 
 
 /* =========================================================
-   نقشه جهان
+   نقشه
 ========================================================= */
 
-let mapProjection = null;
-let mapPath = null;
-let mapSvg = null;
-let mapSize = 0;
-let mapMinScale = 0;
-let mapMaxScale = 0;
+let mapProjection = null, mapPath = null, mapSvg = null;
+let mapSize = 0, mapMinScale = 0, mapMaxScale = 0;
 let mapRotation = [0, 0];
 let mapInitialized = false;
 let mapAbort = null;
@@ -1352,15 +1139,10 @@ async function initWorldMap() {
     const svgElement = document.getElementById("map-globe");
     if (!box || !svgElement) return;
 
-    if (mapInitialized) {
-        updateMapColors();
-        redrawMap();
-        return;
-    }
+    if (mapInitialized) { updateMapColors(); redrawMap(); return; }
 
     const width = box.clientWidth || 320;
     const height = box.clientHeight || 300;
-
     mapSize = Math.min(width, height) * 0.46;
     mapMinScale = mapSize * 0.8;
     mapMaxScale = mapSize * 6;
@@ -1373,58 +1155,41 @@ async function initWorldMap() {
     const land = topojson.feature(world, world.objects.countries);
 
     mapProjection = d3.geoOrthographic()
-        .scale(mapSize)
-        .translate([width / 2, height / 2])
-        .rotate(mapRotation)
-        .clipAngle(90);
+        .scale(mapSize).translate([width / 2, height / 2])
+        .rotate(mapRotation).clipAngle(90);
 
     mapPath = d3.geoPath(mapProjection);
     mapSvg = d3.select(svgElement).attr("viewBox", `0 0 ${width} ${height}`);
     mapSvg.selectAll("*").remove();
 
-    mapSvg.append("path")
-        .datum({ type: "Sphere" })
-        .attr("class", "globe-water")
-        .attr("d", mapPath);
+    mapSvg.append("path").datum({ type: "Sphere" }).attr("class", "globe-water").attr("d", mapPath);
 
     mapSvg.selectAll(".map-country")
-        .data(land.features)
-        .enter()
-        .append("path")
-        .attr("class", "map-country")
-        .attr("d", mapPath)
+        .data(land.features).enter().append("path")
+        .attr("class", "map-country").attr("d", mapPath)
         .attr("data-country-id", d => d.id)
-        .on("click", (event, d) => { event.stopPropagation(); showCountryInfo(d); });
+        .on("click", (e, d) => { e.stopPropagation(); showCountryInfo(d); });
 
     mapSvg.selectAll(".map-country-label")
         .data(land.features.filter(d => Object.values(COUNTRY_IDS).includes(Number(d.id))))
-        .enter()
-        .append("text")
-        .attr("class", "map-country-label")
-        .attr("text-anchor", "middle")
+        .enter().append("text")
+        .attr("class", "map-country-label").attr("text-anchor", "middle")
         .text(d => {
             const entry = Object.entries(COUNTRY_IDS).find(([, id]) => id === Number(d.id));
             return entry ? COUNTRY_NAMES[entry[0]] : "";
         });
 
     mapSvg.selectAll(".map-ocean-label")
-        .data(OCEAN_LABELS)
-        .enter()
-        .append("text")
-        .attr("class", "map-ocean-label")
-        .attr("text-anchor", "middle")
+        .data(OCEAN_LABELS).enter().append("text")
+        .attr("class", "map-ocean-label").attr("text-anchor", "middle")
         .text(d => d[2]);
 
     mapSvg.selectAll(".map-strait-dot")
-        .data(STRAITS)
-        .enter()
-        .append("circle")
-        .attr("class", "map-strait-dot")
-        .attr("r", 2.6)
-        .on("click", (event, d) => { event.stopPropagation(); showStraitInfo(d); });
+        .data(STRAITS).enter().append("circle")
+        .attr("class", "map-strait-dot").attr("r", 2.6)
+        .on("click", (e, d) => { e.stopPropagation(); showStraitInfo(d); });
 
-    updateMapColors();
-    redrawMap();
+    updateMapColors(); redrawMap();
     attachMapInteractions(svgElement);
 
     document.getElementById("map-zoom-in").addEventListener("click", () => zoomMap(1.35));
@@ -1443,8 +1208,7 @@ async function initWorldMap() {
 }
 
 function zoomMap(factor) {
-    const current = mapProjection.scale();
-    const next = current * factor;
+    const next = mapProjection.scale() * factor;
     mapProjection.scale(Math.max(mapMinScale, Math.min(mapMaxScale, next)));
     redrawMap();
 }
@@ -1454,91 +1218,65 @@ function attachMapInteractions(svgElement) {
     mapAbort = new AbortController();
     const signal = mapAbort.signal;
 
-    let dragging = false;
-    let pinching = false;
+    let dragging = false, pinching = false;
     let lastX = 0, lastY = 0;
-    let pinchStartDistance = 0;
-    let pinchStartScale = mapSize;
+    let pinchStartDistance = 0, pinchStartScale = mapSize;
 
-    const onMouseDown = event => {
-        dragging = true;
-        lastX = event.clientX;
-        lastY = event.clientY;
-    };
-    const onMouseUp = () => { dragging = false; };
-    const onMouseMove = event => {
+    svgElement.addEventListener("mousedown", e => { dragging = true; lastX = e.clientX; lastY = e.clientY; }, { signal });
+    window.addEventListener("mouseup", () => { dragging = false; }, { signal });
+    window.addEventListener("mousemove", e => {
         if (!dragging) return;
-        const dx = event.clientX - lastX;
-        const dy = event.clientY - lastY;
-        mapRotation[0] += dx * 0.4;
-        mapRotation[1] -= dy * 0.4;
+        mapRotation[0] += (e.clientX - lastX) * 0.4;
+        mapRotation[1] -= (e.clientY - lastY) * 0.4;
         mapRotation[1] = Math.max(-90, Math.min(90, mapRotation[1]));
-        mapProjection.rotate(mapRotation);
-        redrawMap();
-        lastX = event.clientX;
-        lastY = event.clientY;
-    };
+        mapProjection.rotate(mapRotation); redrawMap();
+        lastX = e.clientX; lastY = e.clientY;
+    }, { signal });
 
-    svgElement.addEventListener("mousedown", onMouseDown, { signal });
-    window.addEventListener("mouseup", onMouseUp, { signal });
-    window.addEventListener("mousemove", onMouseMove, { signal });
-
-    svgElement.addEventListener("wheel", event => {
-        event.preventDefault();
-        zoomMap(event.deltaY > 0 ? 0.9 : 1.1);
+    svgElement.addEventListener("wheel", e => {
+        e.preventDefault();
+        zoomMap(e.deltaY > 0 ? 0.9 : 1.1);
     }, { passive: false, signal });
 
-    svgElement.addEventListener("touchstart", event => {
-        if (event.touches.length === 2) {
-            pinching = true;
-            dragging = false;
-            pinchStartDistance = getTouchDistance(event.touches);
-            pinchStartScale = mapProjection.scale();
-            return;
+    svgElement.addEventListener("touchstart", e => {
+        if (e.touches.length === 2) {
+            pinching = true; dragging = false;
+            pinchStartDistance = getTouchDistance(e.touches);
+            pinchStartScale = mapProjection.scale(); return;
         }
-        if (!event.touches.length) return;
+        if (!e.touches.length) return;
         dragging = true;
-        lastX = event.touches[0].clientX;
-        lastY = event.touches[0].clientY;
+        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
     }, { passive: true, signal });
 
-    svgElement.addEventListener("touchend", event => {
+    svgElement.addEventListener("touchend", e => {
         dragging = false;
-        if (event.touches.length < 2) pinching = false;
+        if (e.touches.length < 2) pinching = false;
     }, { passive: true, signal });
 
-    svgElement.addEventListener("touchmove", event => {
-        if (pinching && event.touches.length === 2) {
-            event.preventDefault();
-            const distance = getTouchDistance(event.touches);
-            const ratio = distance / pinchStartDistance;
-            const next = pinchStartScale * ratio;
-            mapProjection.scale(Math.max(mapMinScale, Math.min(mapMaxScale, next)));
-            redrawMap();
-            return;
+    svgElement.addEventListener("touchmove", e => {
+        if (pinching && e.touches.length === 2) {
+            e.preventDefault();
+            const ratio = getTouchDistance(e.touches) / pinchStartDistance;
+            mapProjection.scale(Math.max(mapMinScale, Math.min(mapMaxScale, pinchStartScale * ratio)));
+            redrawMap(); return;
         }
-        if (!dragging || !event.touches.length) return;
-        const dx = event.touches[0].clientX - lastX;
-        const dy = event.touches[0].clientY - lastY;
-        mapRotation[0] += dx * 0.4;
-        mapRotation[1] -= dy * 0.4;
+        if (!dragging || !e.touches.length) return;
+        mapRotation[0] += (e.touches[0].clientX - lastX) * 0.4;
+        mapRotation[1] -= (e.touches[0].clientY - lastY) * 0.4;
         mapRotation[1] = Math.max(-90, Math.min(90, mapRotation[1]));
-        mapProjection.rotate(mapRotation);
-        redrawMap();
-        lastX = event.touches[0].clientX;
-        lastY = event.touches[0].clientY;
-        event.preventDefault();
+        mapProjection.rotate(mapRotation); redrawMap();
+        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+        e.preventDefault();
     }, { passive: false, signal });
 }
 
 function redrawMap() {
     if (!mapSvg || !mapProjection) return;
-
     const rotation = mapProjection.rotate();
     const zoomRatio = mapProjection.scale() / mapSize;
 
     mapSvg.selectAll("path.globe-water, path.map-country").attr("d", mapPath);
-
     const oceanFontSize = Math.min(11, 6.5 * (1 + (zoomRatio - 1) * 0.25));
 
     mapSvg.selectAll(".map-ocean-label")
@@ -1571,18 +1309,13 @@ function updateMapColors() {
             if (info?.taken) return "#3978b7";
             return "#1c2733";
         })
-        .attr("stroke", d => {
-            const countryId = Number(d.id);
-            const isGameCountry = Object.values(COUNTRY_IDS).includes(countryId);
-            return isGameCountry ? "#2d3a48" : "#141c25";
-        })
+        .attr("stroke", d => Object.values(COUNTRY_IDS).includes(Number(d.id)) ? "#2d3a48" : "#141c25")
         .attr("stroke-width", .6);
 }
 
 function showCountryInfo(feature) {
     const countryId = Number(feature.id);
     const gameEntry = Object.entries(COUNTRY_IDS).find(([, id]) => id === countryId);
-
     const panel = document.getElementById("map-info-panel");
     const flagEl = document.getElementById("map-info-flag");
     const nameEl = document.getElementById("map-info-name");
@@ -1593,14 +1326,13 @@ function showCountryInfo(feature) {
         flagEl.textContent = "🏳️";
         nameEl.textContent = "منطقه غیرقابل‌بازی";
         statusEl.textContent = "بی‌صاحب";
-        descEl.textContent = "این منطقه در حال حاضر توسط هیچ بازیکنی کنترل نمی‌شود.";
+        descEl.textContent = "این منطقه تحت کنترل هیچ بازیکنی نیست.";
         panel.classList.remove("hidden");
         return;
     }
 
     const [countryKey] = gameEntry;
     const info = countries[countryKey];
-
     flagEl.textContent = COUNTRY_FLAGS[countryKey];
     nameEl.textContent = COUNTRY_NAMES[countryKey];
 
@@ -1612,9 +1344,8 @@ function showCountryInfo(feature) {
         descEl.textContent = "این کشور توسط بازیکن دیگری انتخاب شده است.";
     } else {
         statusEl.textContent = "بی‌صاحب";
-        descEl.textContent = "هنوز هیچ بازیکنی این کشور را انتخاب نکرده است.";
+        descEl.textContent = "هنوز بازیکنی این کشور را انتخاب نکرده است.";
     }
-
     panel.classList.remove("hidden");
 }
 
@@ -1633,18 +1364,16 @@ function showStraitInfo(strait) {
 
 (async function init() {
     showOnly("loading");
-
     const startTime = Date.now();
+
+    console.log("[init] userId:", userId, "hasInitData:", !!initData);
 
     await loadCountries();
     await loadPlayer();
     await loadArmyCatalog();
 
     const elapsed = Date.now() - startTime;
-    const minDuration = 1000;
-    if (elapsed < minDuration) {
-        await new Promise(r => setTimeout(r, minDuration - elapsed));
-    }
+    if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
 
     if (player?.country) {
         selectedCountry = player.country;
