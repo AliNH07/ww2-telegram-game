@@ -301,7 +301,7 @@ function updateHomeStats() {
     const photo = document.getElementById("home-card-photo");
     if (photo) photo.style.backgroundImage = `url(${countryImageUrl(selectedCountry)})`;
     document.getElementById("home-money").textContent = formatMoney(player.money);
-    document.getElementById("home-income").textContent = formatMoney(player.daily_income) + " / روز";
+    document.getElementById("home-income").textContent = formatMoney(player.daily_income);
     document.getElementById("home-manpower").textContent = formatNumber(player.manpower);
     document.getElementById("home-manpower-production").textContent = formatNumber(player.manpower_production);
     document.getElementById("home-power").textContent = formatNumber(player.power_capacity);
@@ -359,25 +359,40 @@ document.querySelectorAll(".sub-back-button").forEach(b => {
 });
 
 /* =========================================================
-   Infra
+   Infra (تب‌بندی شده)
 ========================================================= */
 
-function openInfrastructureMenu() { showGamePage("infrastructure"); }
+async function openInfrastructureMenu() {
+    showGamePage("infrastructure");
+    await refreshPlayer();
+    renderInfraTab("power");
+}
 
-document.querySelectorAll("[data-infra-section]").forEach(tile => {
-    tile.addEventListener("click", async () => {
-        const s = tile.dataset.infraSection;
-        await refreshPlayer();
-        if (s === "power") { renderInfraList("infra-power-list", "power"); showGamePage("infra-power"); }
-        else if (s === "manpower") { renderInfraList("infra-manpower-list", "manpower"); showGamePage("infra-manpower"); }
-        else if (s === "resource") { renderInfraList("infra-resource-list", "resource"); showGamePage("infra-resource"); }
-        else if (s === "military") {
-            renderInfraList("infra-land-list", "land");
-            renderInfraList("infra-naval-list", "naval");
-            renderInfraList("infra-air-list", "air");
-            showGamePage("infra-military");
-        }
-    });
+function renderInfraTab(tab) {
+    document.querySelectorAll(".infra-panel").forEach(p => p.classList.add("hidden"));
+    document.querySelectorAll(".infra-tab").forEach(t => t.classList.remove("active"));
+    const btn = document.querySelector(`[data-infra-tab="${tab}"]`);
+    if (btn) btn.classList.add("active");
+    const panel = document.getElementById(`infra-panel-${tab}`);
+    if (panel) panel.classList.remove("hidden");
+
+    if (tab === "power")
+        renderInfraList("infra-power-list", i => i.group === "power");
+    else if (tab === "manpower")
+        renderInfraList("infra-manpower-list", i => i.group === "manpower");
+    else if (tab === "food")
+        renderInfraList("infra-food-list", i => i.group === "resource" && i.resource_key === "food");
+    else if (tab === "resource")
+        renderInfraList("infra-resource-list", i => i.group === "resource" && i.resource_key !== "food");
+    else if (tab === "military") {
+        renderInfraList("infra-land-list", i => i.group === "land");
+        renderInfraList("infra-naval-list", i => i.group === "naval");
+        renderInfraList("infra-air-list", i => i.group === "air");
+    }
+}
+
+document.querySelectorAll(".infra-tab").forEach(tab => {
+    tab.addEventListener("click", () => renderInfraTab(tab.dataset.infraTab));
 });
 
 function infraEffectText(item) {
@@ -398,12 +413,12 @@ function infraEffectText(item) {
     return t;
 }
 
-function renderInfraList(cid, group) {
+function renderInfraList(cid, filterFn) {
     const c = document.getElementById(cid);
     if (!c || !player?.infra) return;
     c.innerHTML = "";
     Object.entries(player.infra).forEach(([iid, item]) => {
-        if (item.group !== group) return;
+        if (!filterFn(item)) return;
         const card = document.createElement("div");
         card.className = "infra-card";
         card.innerHTML = `
@@ -427,17 +442,8 @@ async function upgradeInfra(iid) {
         const d = await apiPost("/api/upgrade-infra", { category: iid });
         if (!d.success) { showToast(d.message || "امکان ارتقا نیست."); return; }
         player = d.player; updateHomeStats();
-        const ap = document.querySelector(".game-page:not(.hidden)");
-        if (!ap) return;
-        const pid = ap.id;
-        if (pid === "infra-power") renderInfraList("infra-power-list", "power");
-        else if (pid === "infra-manpower") renderInfraList("infra-manpower-list", "manpower");
-        else if (pid === "infra-resource") renderInfraList("infra-resource-list", "resource");
-        else if (pid === "infra-military") {
-            renderInfraList("infra-land-list", "land");
-            renderInfraList("infra-naval-list", "naval");
-            renderInfraList("infra-air-list", "air");
-        }
+        const activeTab = document.querySelector(".infra-tab.active")?.dataset.infraTab || "power";
+        renderInfraTab(activeTab);
     } catch (e) { showToast("خطا."); }
 }
 
@@ -551,7 +557,7 @@ function renderArmyUnits() {
                     <span class="unit-card-count">${formatNumber(count)}</span>
                 </div>
                 <div class="unit-card-detail">
-                    حمله: ${u.attack} | دفاع: ${u.defense} | برق: ${u.power_required}<br>
+                    حمله: ${u.attack} | دفاع: ${u.defense}<br>
                     ${unitCostText(u)}<br>${statusText}
                 </div>
                 <div class="unit-buttons">
@@ -614,7 +620,7 @@ function renderWarTargets() {
         const occText = occupied ? ` (اشغال توسط ${COUNTRY_NAMES[occupied] || occupied})` : "";
         card.innerHTML = `
             <div class="war-target-top">
-                <img class="war-target-flag" src="${countryImageUrl(cid)}" alt="">
+                <div class="flag-wrap"><img class="flag-img" src="${countryImageUrl(cid)}" alt=""></div>
                 <span class="war-target-name">${COUNTRY_NAMES[cid]}${occText}</span>
             </div>
             <button class="war-attack-button" data-declare="${cid}">⚔️ اعلام جنگ</button>`;
@@ -651,7 +657,6 @@ async function loadWarData() {
                 div.innerHTML = `
                     <h4>${COUNTRY_NAMES[w.attacker]} → ${COUNTRY_NAMES[w.defender]}</h4>
                     <p>${statusText}${w.penalty ? ` — جریمه اتحاد: ${formatMoney(w.penalty)}` : ""}</p>`;
-                // اگه مهاجم خودم و نبرد آماده
                 if (w.status === "battle" && w.attacker === selectedCountry) {
                     const btn = document.createElement("button");
                     btn.className = "infra-upgrade-button";
@@ -1293,7 +1298,6 @@ async function initWorldMap() {
         .attr("class", "map-ocean-label").attr("text-anchor", "middle")
         .text(d => d[2]);
 
-    // سایت‌ها (سکو/معدن/تنگه)
     await loadMapSites();
     mapSitesSvg = mapSvg.append("g").attr("class", "map-sites-layer");
     renderMapSites();
@@ -1422,7 +1426,6 @@ function updateMapColors() {
             if (!e) return "#151b21";
             const [key] = e;
             const info = countries[key];
-            // اگه خودمون اشغال کردیم (سبز)، یا دیگران (بنفش)
             if (info?.occupier) {
                 if (info.occupier === selectedCountry) return "#2fa360";
                 if (info.taken && key === selectedCountry) return "#2fa360";
