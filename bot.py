@@ -505,15 +505,22 @@ def verify_init_data(init_data: str):
         logging.error("verify_init_data: %s", e); return None
 
 def get_auth_user_id(request):
+    # اول از initData تلگرام تلاش کن (حالت واقعی WebApp)
+    init_data = request.headers.get("X-Telegram-Init-Data") or request.query.get("init_data")
+    if init_data:
+        user = verify_init_data(init_data)
+        if user and user.get("id"):
+            return int(user["id"])
+
+    # fallback فقط برای توسعه/تست (وقتی AUTH_REQUIRED=0)
     if not AUTH_REQUIRED:
         uid = request.query.get("user_id")
         if uid:
-            try: return int(uid)
-            except: return None
-        return None
-    init_data = request.headers.get("X-Telegram-Init-Data") or request.query.get("init_data")
-    user = verify_init_data(init_data)
-    if user and user.get("id"): return int(user["id"])
+            try:
+                return int(uid)
+            except:
+                return None
+
     return None
 
 async def read_json(request):
@@ -1092,7 +1099,6 @@ async def get_union(request):
     for u in unions.values():
         if cid in u.get("members", []):
             return web.json_response({"union": u, "is_leader": u["leader_country"] == cid})
-    # اگه دعوت داره
     invites = []
     for u in unions.values():
         if cid in u.get("invites", []):
