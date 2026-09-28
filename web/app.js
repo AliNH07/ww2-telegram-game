@@ -1,5 +1,13 @@
 const tg = window.Telegram?.WebApp;
-if (tg) { tg.ready(); tg.expand(); }
+if (tg) {
+    tg.ready();
+    tg.expand();
+    try {
+        tg.setHeaderColor('#06101c');
+        tg.setBackgroundColor('#06101c');
+        tg.setBottomBarColor('#06101c');
+    } catch (e) {}
+}
 
 const userId = tg?.initDataUnsafe?.user?.id || null;
 const initData = tg?.initData || "";
