@@ -63,6 +63,21 @@ DAYS_PER_SEASON = 2
 
 SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
 
+# موجودی اولیه منابع برای همه کشورها
+STARTING_RESOURCES = {
+    "food": 150_000,
+    "steel": 150_000,
+    "uranium": 150_000,
+    "oil": 150_000,
+}
+
+RESOURCE_NAMES = {
+    "food": "غذا",
+    "steel": "فولاد",
+    "uranium": "اورانیوم",
+    "oil": "نفت",
+}
+
 
 # =========================================================
 # زیرساخت‌ها (برق / نیروی انسانی / نظامی)
@@ -149,11 +164,37 @@ INFRASTRUCTURE = {
         "name": "نیروگاه هسته‌ای",
         "group": "power",
         "levels": [
-            {"cost": 1_500_000, "capacity": 35},
-            {"cost": 4_000_000, "capacity": 85},
-            {"cost": 10_000_000, "capacity": 180},
-            {"cost": 24_000_000, "capacity": 340},
-            {"cost": 55_000_000, "capacity": 600},
+            {"cost": 1_500_000, "capacity": 35, "resources": {"uranium": 5_000}},
+            {"cost": 4_000_000, "capacity": 85, "resources": {"uranium": 12_000}},
+            {"cost": 10_000_000, "capacity": 180, "resources": {"uranium": 25_000}},
+            {"cost": 24_000_000, "capacity": 340, "resources": {"uranium": 50_000}},
+            {"cost": 55_000_000, "capacity": 600, "resources": {"uranium": 90_000}},
+        ],
+    },
+
+    # ------------------ غذا ------------------
+
+    "food_farm": {
+        "name": "مجتمع تولید غذا",
+        "group": "food",
+        "levels": [
+            {"cost": 150_000, "production": 1_500},
+            {"cost": 400_000, "production": 4_000},
+            {"cost": 1_000_000, "production": 10_000},
+            {"cost": 2_500_000, "production": 24_000},
+            {"cost": 6_000_000, "production": 55_000},
+        ],
+    },
+
+    "food_silo": {
+        "name": "کشت صنعتی و سیلو",
+        "group": "food",
+        "levels": [
+            {"cost": 300_000, "production": 3_000},
+            {"cost": 800_000, "production": 8_000},
+            {"cost": 2_000_000, "production": 20_000},
+            {"cost": 5_000_000, "production": 46_000},
+            {"cost": 12_000_000, "production": 105_000},
         ],
     },
 
@@ -254,6 +295,18 @@ INFRASTRUCTURE = {
             {"cost": 2_500_000, "capacity": 18},
             {"cost": 6_000_000, "capacity": 35},
             {"cost": 15_000_000, "capacity": 60},
+        ],
+    },
+
+    "land_tank_factory": {
+        "name": "کارخانه تانک‌سازی",
+        "group": "land",
+        "levels": [
+            {"cost": 450_000, "capacity": 3},
+            {"cost": 1_200_000, "capacity": 8},
+            {"cost": 3_000_000, "capacity": 16},
+            {"cost": 7_500_000, "capacity": 30},
+            {"cost": 18_000_000, "capacity": 55},
         ],
     },
 
@@ -409,32 +462,83 @@ ECONOMY = {
 
 ARMY_UNITS = {
 
-    "land": {
-        "name": "گردان زمینی",
+    "infantry": {
+        "name": "پیاده‌نظام",
         "group": "land",
+        "requires": "land_barracks",
         "cost": 50_000,
         "manpower": 300,
+        "resources": {"food": 100},
         "power_required": 5,
-        "army_power": 15,
+        "attack": 20,
+        "defense": 10,
     },
 
-    "air": {
-        "name": "اسکادران هوایی",
-        "group": "air",
-        "cost": 200_000,
-        "manpower": 150,
-        "power_required": 15,
-        "army_power": 40,
+    "tank": {
+        "name": "تانک",
+        "group": "land",
+        "requires": "land_tank_factory",
+        "cost": 150_000,
+        "manpower": 250,
+        "resources": {"steel": 300, "food": 100},
+        "power_required": 12,
+        "attack": 50,
+        "defense": 25,
     },
 
-    "navy": {
+    "ship": {
         "name": "ناو دریایی",
         "group": "naval",
+        "requires": "naval_port",
         "cost": 250_000,
         "manpower": 200,
+        "resources": {"oil": 250, "food": 150},
         "power_required": 15,
-        "army_power": 35,
+        "attack": 50,
+        "defense": 60,
     },
+
+    "submarine": {
+        "name": "زیردریایی",
+        "group": "naval",
+        "requires": "naval_shipyard",
+        "cost": 200_000,
+        "manpower": 120,
+        "resources": {"oil": 200, "steel": 150},
+        "power_required": 15,
+        "attack": 45,
+        "defense": 25,
+    },
+
+    "fighter": {
+        "name": "جنگنده",
+        "group": "air",
+        "requires": "air_airport",
+        "cost": 200_000,
+        "manpower": 150,
+        "resources": {"oil": 200, "steel": 100},
+        "power_required": 15,
+        "attack": 45,
+        "defense": 40,
+    },
+
+    "bomber": {
+        "name": "بمب‌افکن",
+        "group": "air",
+        "requires": "air_arsenal",
+        "cost": 250_000,
+        "manpower": 180,
+        "resources": {"oil": 300, "steel": 150},
+        "power_required": 18,
+        "attack": 60,
+        "defense": 15,
+    },
+}
+
+GROUP_NAMES = {
+    "land": "زمینی",
+    "naval": "دریایی",
+    "air": "هوایی",
 }
 
 
@@ -575,6 +679,43 @@ def get_group_capacity(player, group):
     return total
 
 
+def get_group_units(player, group):
+
+    total = 0
+
+    for unit_id, unit in ARMY_UNITS.items():
+
+        if unit["group"] == group:
+            total += player.get("units", {}).get(unit_id, 0)
+
+    return total
+
+
+def recompute_army(player):
+
+    total = 0
+
+    for unit_id, unit in ARMY_UNITS.items():
+
+        count = player.get("units", {}).get(unit_id, 0)
+        total += count * (unit["attack"] + unit["defense"])
+
+    player["army"] = total
+
+
+def ensure_player_fields(player):
+
+    player.setdefault("resources", dict(STARTING_RESOURCES))
+
+    units = player.setdefault("units", {})
+
+    for unit_id in ARMY_UNITS:
+        units.setdefault(unit_id, 0)
+
+    for stale in [key for key in units if key not in ARMY_UNITS]:
+        del units[stale]
+
+
 def compute_rates(player):
 
     power_capacity = get_power_total(player)
@@ -594,6 +735,20 @@ def compute_rates(player):
                 item["levels"][level - 1]["production"]
             )
 
+    resource_production = {key: 0 for key in RESOURCE_NAMES}
+
+    for item_id, item in INFRASTRUCTURE.items():
+
+        if item.get("group") != "food":
+            continue
+
+        level = get_infra_level(player, item_id)
+
+        if level > 0:
+            resource_production["food"] += (
+                item["levels"][level - 1]["production"]
+            )
+
     income = BASE_DAILY_INCOME
 
     for item_id, item in ECONOMY.items():
@@ -609,6 +764,7 @@ def compute_rates(player):
         "power_capacity": power_capacity,
         "power_consumption": power_consumption,
         "manpower_production": manpower_production,
+        "resource_production": resource_production,
     }
 
 
@@ -635,6 +791,13 @@ def accrue_player(player):
         player.get("manpower", STARTING_MANPOWER) +
         rates["manpower_production"] * fraction_of_day
     )
+
+    ensure_player_fields(player)
+
+    for key, amount in rates["resource_production"].items():
+        player["resources"][key] = (
+            player["resources"].get(key, 0) + amount * fraction_of_day
+        )
 
     player["last_update"] = now.isoformat()
 
@@ -691,11 +854,15 @@ def build_catalog_status(player, catalog):
 
 def serialize_player(player):
 
+    ensure_player_fields(player)
     accrue_player(player)
+    recompute_army(player)
     rates = compute_rates(player)
 
     data = dict(player)
     data.update(get_game_time(player))
+
+    data["resource_production"] = rates["resource_production"]
 
     data["power_capacity"] = rates["power_capacity"]
     data["power_consumption"] = rates["power_consumption"]
@@ -726,7 +893,8 @@ def create_player(user_id):
         "army": 0,
         "manpower": STARTING_MANPOWER,
         "infra_levels": {},
-        "units": {"land": 0, "air": 0, "navy": 0},
+        "units": {unit_id: 0 for unit_id in ARMY_UNITS},
+        "resources": dict(STARTING_RESOURCES),
         "year": 1939,
         "started_at": None,
         "last_update": None,
@@ -1055,6 +1223,7 @@ async def upgrade_infra(request):
         }, status=400)
 
     cost = levels[current_level]["cost"]
+    resource_cost = levels[current_level].get("resources", {})
 
     if player.get("money", 0) < cost:
         return web.json_response({
@@ -1063,7 +1232,22 @@ async def upgrade_infra(request):
             "message": "پول کافی ندارید."
         }, status=400)
 
+    ensure_player_fields(player)
+
+    for key, amount in resource_cost.items():
+
+        if player["resources"].get(key, 0) < amount:
+
+            return web.json_response({
+                "success": False,
+                "error": "not_enough_resource",
+                "message": f"{RESOURCE_NAMES[key]} کافی ندارید."
+            }, status=400)
+
     player["money"] -= cost
+
+    for key, amount in resource_cost.items():
+        player["resources"][key] -= amount
 
     player.setdefault("infra_levels", {})
     player["infra_levels"][item_id] = current_level + 1
@@ -1182,6 +1366,13 @@ async def train_unit(request):
             {"success": False, "error": "invalid_unit"}, status=400
         )
 
+    try:
+        count = int(request.query.get("count", "1"))
+    except (TypeError, ValueError):
+        count = 1
+
+    count = max(1, min(count, 50))
+
     if user_id not in players:
         players[user_id] = create_player(user_id)
 
@@ -1194,76 +1385,108 @@ async def train_unit(request):
             "message": "ابتدا وارد بازی شوید."
         }, status=400)
 
+    ensure_player_fields(player)
     accrue_player(player)
 
     unit = ARMY_UNITS[unit_id]
     group = unit["group"]
+    requires = unit["requires"]
 
-    capacity = get_group_capacity(player, group)
-
-    if capacity <= 0:
-        group_name = {
-            "land": "زمینی",
-            "air": "هوایی",
-            "naval": "دریایی",
-        }.get(group, group)
-
+    if get_infra_level(player, requires) <= 0:
         return web.json_response({
             "success": False,
             "error": "no_infra",
             "message": (
-                f"ابتدا زیرساخت نظامی {group_name} "
-                "را در بخش زیرساخت بسازید."
+                f"برای ساخت {unit['name']} ابتدا "
+                f"«{INFRASTRUCTURE[requires]['name']}» را "
+                "در بخش زیرساخت بسازید."
             )
         }, status=400)
 
-    current_count = player.get("units", {}).get(unit_id, 0)
+    capacity = get_group_capacity(player, group)
+    used = get_group_units(player, group)
 
-    if current_count >= capacity:
+    if used >= capacity:
         return web.json_response({
             "success": False,
             "error": "capacity_full",
-            "message": "ظرفیت این بخش پر است؛ زیرساخت را ارتقا دهید."
+            "message": (
+                f"ظرفیت نیروی {GROUP_NAMES[group]} پر است؛ "
+                "زیرساخت مربوطه را ارتقا دهید."
+            )
         }, status=400)
 
-    power_total = get_power_total(player)
+    count = min(count, capacity - used)
 
-    if power_total < unit["power_required"]:
+    if get_power_total(player) < unit["power_required"]:
         return web.json_response({
             "success": False,
             "error": "not_enough_power",
-            "message": "ظرفیت برق شما کافی نیست."
+            "message": (
+                f"ظرفیت برق شما برای ساخت {unit['name']} کافی نیست "
+                f"(حداقل {unit['power_required']} لازم است)."
+            )
         }, status=400)
 
-    if player.get("money", 0) < unit["cost"]:
+    total_cost = unit["cost"] * count
+
+    if player.get("money", 0) < total_cost:
         return web.json_response({
             "success": False,
             "error": "not_enough_money",
             "message": "پول کافی ندارید."
         }, status=400)
 
-    if player.get("manpower", 0) < unit["manpower"]:
+    total_manpower = unit["manpower"] * count
+
+    if player.get("manpower", 0) < total_manpower:
         return web.json_response({
             "success": False,
             "error": "not_enough_manpower",
             "message": "نیروی انسانی کافی ندارید."
         }, status=400)
 
-    player["money"] -= unit["cost"]
-    player["manpower"] -= unit["manpower"]
+    for key, amount in unit["resources"].items():
 
-    player.setdefault("units", {"land": 0, "air": 0, "navy": 0})
-    player["units"][unit_id] = current_count + 1
+        if player["resources"].get(key, 0) < amount * count:
 
-    player["army"] = player.get("army", 0) + unit["army_power"]
+            return web.json_response({
+                "success": False,
+                "error": "not_enough_resource",
+                "message": f"{RESOURCE_NAMES[key]} کافی ندارید."
+            }, status=400)
+
+    player["money"] -= total_cost
+    player["manpower"] -= total_manpower
+
+    for key, amount in unit["resources"].items():
+        player["resources"][key] -= amount * count
+
+    player["units"][unit_id] = player["units"].get(unit_id, 0) + count
+
+    recompute_army(player)
 
     logging.info(
-        "UNIT TRAINED | user_id=%s | unit=%s", user_id, unit_id
+        "UNIT TRAINED | user_id=%s | unit=%s | count=%s",
+        user_id, unit_id, count
     )
 
     return web.json_response({
         "success": True,
         "player": serialize_player(player)
+    })
+
+
+# =========================================================
+# API - کاتالوگ یگان‌ها و منابع
+# =========================================================
+
+async def get_army_units(request):
+
+    return web.json_response({
+        "units": ARMY_UNITS,
+        "resources": RESOURCE_NAMES,
+        "groups": GROUP_NAMES,
     })
 
 
@@ -1555,6 +1778,7 @@ async def create_web_app():
     app.router.add_get("/api/upgrade-infra", upgrade_infra)
     app.router.add_get("/api/upgrade-economy", upgrade_economy)
     app.router.add_get("/api/train-unit", train_unit)
+    app.router.add_get("/api/army-units", get_army_units)
     app.router.add_get("/api/attack", attack)
 
     app.router.add_get("/api/propose-treaty", propose_treaty)
