@@ -81,7 +81,9 @@
 <!-- ==================== پیش‌نمایش کشور ==================== -->
 <section id="country-preview" class="screen hidden">
     <header class="game-header">
-        <div class="header-right"><img id="selected-country-flag" class="selected-country-flag" src="" alt=""></div>
+        <div class="header-right">
+            <div class="flag-wrap"><img id="selected-country-flag" class="flag-img" src="" alt=""></div>
+        </div>
         <div class="header-center"><div class="game-title">WW2 STRATEGY</div></div>
         <div class="header-left">
             <button class="header-button">🔔</button>
@@ -110,7 +112,9 @@
 <section id="game" class="screen hidden">
 
     <header class="game-header">
-        <div class="header-right"><img id="game-country-flag" class="selected-country-flag" src="" alt=""></div>
+        <div class="header-right">
+            <div class="flag-wrap"><img id="game-country-flag" class="flag-img" src="" alt=""></div>
+        </div>
         <div class="header-center"><div class="game-title">WW2 STRATEGY</div></div>
         <div class="header-left">
             <button class="header-button" id="game-notification-button">🔔</button>
@@ -125,38 +129,49 @@
                 <span class="world-chip">🌐 World 1</span>
                 <span class="home-country-chip">
                     <span id="home-country-name">—</span>
-                    <img id="home-country-flag" class="home-country-flag" src="" alt="">
+                    <div class="flag-wrap flag-wrap-sm"><img id="home-country-flag" class="flag-img" src="" alt=""></div>
                 </span>
             </div>
             <div class="home-card-photo" id="home-card-photo"></div>
             <div class="home-card-body">
-                <div class="treasury-row">
-                    <span class="treasury-label">🪙 موجودی خزانه</span>
-                    <strong id="home-money" class="treasury-value">$0</strong>
-                    <span class="income-label">درآمد روزانه: <span id="home-income">$0</span></span>
-                </div>
-                <div class="manpower-row">
-                    <div class="manpower-main">
-                        <span class="mini-label">👥 نیروی انسانی</span>
-                        <strong id="home-manpower" class="mini-value">0</strong>
+                <div class="home-stats-grid">
+
+                    <div class="home-stat" style="background-image: url('/images/stats/money.jpg');">
+                        <div class="home-stat-overlay">
+                            <span class="home-stat-label">🪙 خزانه</span>
+                            <strong class="home-stat-value" id="home-money">$0</strong>
+                            <span class="home-stat-sub">درآمد: <span id="home-income">$0</span></span>
+                        </div>
                     </div>
-                    <span class="manpower-production">تولید روزانه: <span id="home-manpower-production">0</span> نفر</span>
-                </div>
-                <div class="power-army-row">
-                    <div class="power-block">
-                        <span class="mini-label">⚡ برق</span>
-                        <strong id="home-power" class="mini-value">0</strong>
-                        <span class="mini-sub" id="home-power-sub">مصرف: 0</span>
+
+                    <div class="home-stat" style="background-image: url('/images/stats/manpower.jpg');">
+                        <div class="home-stat-overlay">
+                            <span class="home-stat-label">👥 نیروی انسانی</span>
+                            <strong class="home-stat-value" id="home-manpower">0</strong>
+                            <span class="home-stat-sub">تولید: <span id="home-manpower-production">0</span> /روز</span>
+                        </div>
                     </div>
-                    <div class="army-block">
-                        <span class="mini-label">قدرت نظامی ⚔️</span>
-                        <strong id="home-army" class="mini-value">0</strong>
+
+                    <div class="home-stat" style="background-image: url('/images/stats/power.jpg');">
+                        <div class="home-stat-overlay">
+                            <span class="home-stat-label">⚡ برق</span>
+                            <strong class="home-stat-value" id="home-power">0</strong>
+                            <span class="home-stat-sub" id="home-power-sub">مصرف: 0</span>
+                        </div>
                     </div>
+
+                    <div class="home-stat" style="background-image: url('/images/stats/army.jpg');">
+                        <div class="home-stat-overlay">
+                            <span class="home-stat-label">⚔️ قدرت نظامی</span>
+                            <strong class="home-stat-value" id="home-army">0</strong>
+                        </div>
+                    </div>
+
                 </div>
-                <div class="season-end-row"><span id="home-season-end">—</span></div>
-                <div class="season-current-row">
+
+                <div class="season-bar">
+                    <span id="home-season-end">—</span>
                     <span class="season-tag">🕐 <span id="home-season">بهار</span></span>
-                    <span class="no-effect-tag">بدون اثر بر اقتصاد</span>
                 </div>
             </div>
         </div>
@@ -206,72 +221,47 @@
         <div id="rankings-list" class="rankings-list"></div>
     </main>
 
-    <!-- ==================== منوی زیرساخت ==================== -->
+    <!-- ==================== زیرساخت (تب‌بندی شده) ==================== -->
     <main id="infrastructure" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
         <div class="page-title"><span>ساخت و توسعه</span><h1>زیرساخت</h1></div>
         <div class="resource-bar"></div>
-        <div class="infra-menu-grid">
-            <button class="infra-menu-tile" data-infra-section="power">
-                <div class="infra-menu-icon">⚡</div>
-                <div class="infra-menu-text"><h3>برق</h3><p>نیروگاه‌های تولید انرژی</p></div>
-                <span class="infra-menu-arrow">‹</span>
-            </button>
-            <button class="infra-menu-tile" data-infra-section="manpower">
-                <div class="infra-menu-icon">👥</div>
-                <div class="infra-menu-text"><h3>نیروی انسانی</h3><p>مراکز آموزش و تولید نیرو</p></div>
-                <span class="infra-menu-arrow">‹</span>
-            </button>
-            <button class="infra-menu-tile" data-infra-section="resource">
-                <div class="infra-menu-icon">🌾</div>
-                <div class="infra-menu-text"><h3>منابع</h3><p>غذا، نفت، فولاد و اورانیوم</p></div>
-                <span class="infra-menu-arrow">‹</span>
-            </button>
-            <button class="infra-menu-tile" data-infra-section="military">
-                <div class="infra-menu-icon">🪖</div>
-                <div class="infra-menu-text"><h3>نظامی</h3><p>زمینی، دریایی و هوایی</p></div>
-                <span class="infra-menu-arrow">‹</span>
-            </button>
+
+        <div class="infra-tabs">
+            <button class="infra-tab active" data-infra-tab="power">⚡ برق</button>
+            <button class="infra-tab" data-infra-tab="manpower">👥 نیرو</button>
+            <button class="infra-tab" data-infra-tab="food">🌾 غذا</button>
+            <button class="infra-tab" data-infra-tab="resource">🛢️ منابع</button>
+            <button class="infra-tab" data-infra-tab="military">🪖 نظامی</button>
         </div>
-    </main>
 
-    <!-- برق -->
-    <main id="infra-power" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="infrastructure">→ بازگشت</button></div>
-        <div class="page-title"><span>تولید انرژی</span><h1>برق</h1></div>
-        <div id="infra-power-list" class="infra-card-list"></div>
-    </main>
-
-    <!-- نیروی انسانی -->
-    <main id="infra-manpower" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="infrastructure">→ بازگشت</button></div>
-        <div class="page-title"><span>مراکز تولید نیرو</span><h1>نیروی انسانی</h1></div>
-        <div id="infra-manpower-list" class="infra-card-list"></div>
-    </main>
-
-    <!-- منابع -->
-    <main id="infra-resource" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="infrastructure">→ بازگشت</button></div>
-        <div class="page-title"><span>تولید منابع</span><h1>منابع</h1></div>
-        <div class="resource-bar"></div>
-        <div id="infra-resource-list" class="infra-card-list"></div>
-    </main>
-
-    <!-- نظامی -->
-    <main id="infra-military" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="infrastructure">→ بازگشت</button></div>
-        <div class="page-title"><span>تأسیسات نظامی</span><h1>نظامی</h1></div>
-        <div class="infra-section">
-            <h2 class="infra-section-title">🪖 زمینی</h2>
-            <div id="infra-land-list" class="infra-card-list"></div>
-        </div>
-        <div class="infra-section">
-            <h2 class="infra-section-title">⚓ دریایی</h2>
-            <div id="infra-naval-list" class="infra-card-list"></div>
-        </div>
-        <div class="infra-section">
-            <h2 class="infra-section-title">✈️ هوایی</h2>
-            <div id="infra-air-list" class="infra-card-list"></div>
+        <div class="infra-panels">
+            <div id="infra-panel-power" class="infra-panel">
+                <div id="infra-power-list" class="infra-card-list"></div>
+            </div>
+            <div id="infra-panel-manpower" class="infra-panel hidden">
+                <div id="infra-manpower-list" class="infra-card-list"></div>
+            </div>
+            <div id="infra-panel-food" class="infra-panel hidden">
+                <div id="infra-food-list" class="infra-card-list"></div>
+            </div>
+            <div id="infra-panel-resource" class="infra-panel hidden">
+                <div id="infra-resource-list" class="infra-card-list"></div>
+            </div>
+            <div id="infra-panel-military" class="infra-panel hidden">
+                <div class="infra-section">
+                    <h2 class="infra-section-title">🪖 زمینی</h2>
+                    <div id="infra-land-list" class="infra-card-list"></div>
+                </div>
+                <div class="infra-section">
+                    <h2 class="infra-section-title">⚓ دریایی</h2>
+                    <div id="infra-naval-list" class="infra-card-list"></div>
+                </div>
+                <div class="infra-section">
+                    <h2 class="infra-section-title">✈️ هوایی</h2>
+                    <div id="infra-air-list" class="infra-card-list"></div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -394,7 +384,6 @@
             <button class="comm-tab" data-tab="comm-contacts">پیام خصوصی</button>
         </div>
 
-        <!-- بیانیه‌ها -->
         <div id="comm-announcements" class="comm-panel">
             <div class="ann-form">
                 <textarea id="ann-text" class="ann-input" maxlength="500" placeholder="بیانیه خود را بنویسید..."></textarea>
@@ -404,17 +393,14 @@
             <div id="ann-list" class="ann-list"></div>
         </div>
 
-        <!-- اتحادیه -->
         <div id="comm-unions" class="comm-panel hidden">
             <div id="union-content"></div>
         </div>
 
-        <!-- اخبار -->
         <div id="comm-news" class="comm-panel hidden">
             <div id="news-list" class="news-list"></div>
         </div>
 
-        <!-- پیام خصوصی -->
         <div id="comm-contacts" class="comm-panel hidden">
             <div id="contact-list" class="contact-list"></div>
 
