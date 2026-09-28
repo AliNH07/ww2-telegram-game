@@ -5,6 +5,7 @@ import hashlib
 import uuid
 import logging
 import random
+import asyncio
 from datetime import datetime, timezone, timedelta
 from urllib.parse import parse_qsl
 
@@ -12,6 +13,7 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.client.default import DefaultBotProperties
 from dotenv import load_dotenv
 
 
@@ -24,7 +26,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://ww2-telegram-game.onrender.com")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "0") == "1"   # در رندر 1 کن
+AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "0") == "1"
 DATA_DIR = os.getenv("DATA_DIR", "data")
 STATE_FILE = os.path.join(DATA_DIR, "state.json")
 
@@ -193,7 +195,7 @@ INFRASTRUCTURE = {
                    {"cost": 3_800_000, "capacity": 14}, {"cost": 9_000_000, "capacity": 25},
                    {"cost": 22_000_000, "capacity": 45}]},
 
-    # ------------------ منابع (پایه: 50k در روز در سطح ۱) ------------------
+    # ------------------ منابع ------------------
     "resource_farm":         {"name": "مجتمع کشاورزی", "group": "resource", "resource_key": "food",
         "levels": [{"cost": 200_000, "production": 50_000}, {"cost": 600_000, "production": 130_000},
                    {"cost": 1_600_000, "production": 300_000}, {"cost": 4_000_000, "production": 700_000},
@@ -276,7 +278,7 @@ ARMY_UNITS = {
 
 
 # =========================================================
-# منابع روی نقشه (سکو و معدن) — مصرف در فاز ۴
+# منابع روی نقشه
 # =========================================================
 
 MAP_RESOURCES = {
@@ -375,17 +377,14 @@ def get_power_total(player):
 
 
 def get_power_used(player):
-    """مصرف برق: اقتصاد + یگان‌های نظامی"""
     total = 0
     for item_id, item in ECONOMY.items():
         level = get_infra_level(player, item_id)
         if level > 0:
             total += item["power_required"] * level
-
     for unit_id, unit in ARMY_UNITS.items():
         count = player.get("units", {}).get(unit_id, 0)
         total += unit["power_required"] * count
-
     return total
 
 
@@ -428,7 +427,7 @@ def ensure_player_fields(player):
         del units[stale]
 
     player.setdefault("infra_levels", {})
-    player.setdefault("map_holdings", {})  # سکوها/معدن‌ها/تنگه‌های گرفته‌شده
+    player.setdefault("map_holdings", {})
 
 
 def compute_rates(player):
@@ -458,7 +457,6 @@ def compute_rates(player):
         if level > 0:
             income += item["levels"][level - 1]["income"]
 
-    # درآمد سکوهای گرفته‌شده
     for key, owner in player.get("map_holdings", {}).items():
         if owner == player.get("country"):
             res = MAP_RESOURCES.get(key)
@@ -540,13 +538,13 @@ def serialize_player(player):
 
 
 # =========================================================
-# State + Persistence
+# State
 # =========================================================
 
 players = {}
 diplomacy_proposals = {}
 active_treaties = []
-map_holdings = {}  # { "oil_gulf": "germany", ... }
+map_holdings = {}
 
 
 def create_player(user_id):
@@ -597,7 +595,6 @@ def load_state():
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             state = json.load(f)
-
         for k, v in state.get("players", {}).items():
             players[int(k)] = v
         diplomacy_proposals = state.get("diplomacy_proposals", {})
@@ -641,9 +638,7 @@ def verify_init_data(init_data: str):
 
 
 def get_auth_user_id(request):
-    """user_id معتبر، یا None"""
     if not AUTH_REQUIRED:
-        # حالت توسعه: از query یا body
         uid = request.query.get("user_id")
         if uid:
             try:
@@ -670,10 +665,30 @@ async def read_json(request):
 
 
 # =========================================================
+# CORS Middleware
+# =========================================================
+
+@web.middleware
+async def cors_middleware(request, handler):
+    if request.method == "OPTIONS":
+        response = web.Response()
+    else:
+        try:
+            response = await handler(request)
+        except web.HTTPException as ex:
+            response = ex
+
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Init-Data"
+    response.headers["Access-Control-Max-Age"] = "3600"
+    return response
+
+
+# =========================================================
 # Bot
 # =========================================================
 
-from aiogram.client.default import DefaultBotProperties
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=None))
 dp = Dispatcher()
 
@@ -738,18 +753,16 @@ async def handle_treaty_callback(callback: types.CallbackQuery):
 
 
 # =========================================================
-# API — Player
+# API
 # =========================================================
 
 async def get_player(request):
     user_id = get_auth_user_id(request)
     if not user_id:
         return web.json_response({"error": "unauthorized"}, status=401)
-
     if user_id not in players:
         players[user_id] = create_player(user_id)
         save_state()
-
     return web.json_response(serialize_player(players[user_id]))
 
 
@@ -799,10 +812,6 @@ async def select_country(request):
     return web.json_response({"success": True, "player": serialize_player(player)})
 
 
-# =========================================================
-# API — ارتقا زیرساخت
-# =========================================================
-
 async def upgrade_infra(request):
     user_id = get_auth_user_id(request)
     if not user_id:
@@ -818,13 +827,11 @@ async def upgrade_infra(request):
         players[user_id] = create_player(user_id)
 
     player = players[user_id]
-
     if not player.get("country"):
         return web.json_response({"success": False, "error": "no_country",
                                   "message": "ابتدا وارد بازی شوید."}, status=400)
 
     accrue_player(player)
-
     item = INFRASTRUCTURE[item_id]
     current_level = get_infra_level(player, item_id)
     levels = item["levels"]
@@ -852,13 +859,8 @@ async def upgrade_infra(request):
 
     player["infra_levels"][item_id] = current_level + 1
     save_state()
-
     return web.json_response({"success": True, "player": serialize_player(player)})
 
-
-# =========================================================
-# API — ارتقا اقتصاد
-# =========================================================
 
 async def upgrade_economy(request):
     user_id = get_auth_user_id(request)
@@ -875,13 +877,11 @@ async def upgrade_economy(request):
         players[user_id] = create_player(user_id)
 
     player = players[user_id]
-
     if not player.get("country"):
         return web.json_response({"success": False, "error": "no_country",
                                   "message": "ابتدا وارد بازی شوید."}, status=400)
 
     accrue_player(player)
-
     item = ECONOMY[item_id]
     current_level = get_infra_level(player, item_id)
     levels = item["levels"]
@@ -891,7 +891,6 @@ async def upgrade_economy(request):
                                   "message": "به حداکثر سطح رسیده است."}, status=400)
 
     cost = levels[current_level]["cost"]
-
     if player.get("money", 0) < cost:
         return web.json_response({"success": False, "error": "not_enough_money",
                                   "message": "پول کافی ندارید."}, status=400)
@@ -902,18 +901,13 @@ async def upgrade_economy(request):
 
     if power_total < power_used + required_power:
         return web.json_response({"success": False, "error": "not_enough_power",
-                                  "message": "برق کافی برای راه‌اندازی این بخش ندارید. ابتدا نیروگاه بسازید."}, status=400)
+                                  "message": "برق کافی ندارید. ابتدا نیروگاه بسازید."}, status=400)
 
     player["money"] -= cost
     player["infra_levels"][item_id] = current_level + 1
     save_state()
-
     return web.json_response({"success": True, "player": serialize_player(player)})
 
-
-# =========================================================
-# API — آموزش یگان (با اصلاح باگ برق)
-# =========================================================
 
 async def train_unit(request):
     user_id = get_auth_user_id(request)
@@ -935,7 +929,6 @@ async def train_unit(request):
         players[user_id] = create_player(user_id)
 
     player = players[user_id]
-
     if not player.get("country"):
         return web.json_response({"success": False, "error": "no_country",
                                   "message": "ابتدا وارد بازی شوید."}, status=400)
@@ -949,18 +942,17 @@ async def train_unit(request):
 
     if get_infra_level(player, requires) <= 0:
         return web.json_response({"success": False, "error": "no_infra",
-                                  "message": f"برای ساخت {unit['name']} ابتدا «{INFRASTRUCTURE[requires]['name']}» را بسازید."}, status=400)
+                                  "message": f"ابتدا «{INFRASTRUCTURE[requires]['name']}» را بسازید."}, status=400)
 
     capacity = get_group_capacity(player, group)
     used = get_group_units(player, group)
 
     if used >= capacity:
         return web.json_response({"success": False, "error": "capacity_full",
-                                  "message": f"ظرفیت نیروی {GROUP_NAMES[group]} پر است؛ زیرساخت را ارتقا دهید."}, status=400)
+                                  "message": f"ظرفیت {GROUP_NAMES[group]} پر است."}, status=400)
 
     count = min(count, capacity - used)
 
-    # ==== اصلاح باگ برق: مصرف فعلی + مصرف جدید باید <= ظرفیت باشد ====
     power_capacity = get_power_total(player)
     power_used = get_power_used(player)
     new_power = unit["power_required"] * count
@@ -968,7 +960,7 @@ async def train_unit(request):
     if power_used + new_power > power_capacity:
         available = max(0, power_capacity - power_used)
         return web.json_response({"success": False, "error": "not_enough_power",
-                                  "message": f"برق کافی ندارید. برق آزاد: {available}، نیاز: {new_power}."}, status=400)
+                                  "message": f"برق کافی ندارید. آزاد: {available}، نیاز: {new_power}."}, status=400)
 
     total_cost = unit["cost"] * count
     total_manpower = unit["manpower"] * count
@@ -994,7 +986,6 @@ async def train_unit(request):
 
     recompute_army(player)
     save_state()
-
     return web.json_response({"success": True, "player": serialize_player(player)})
 
 
@@ -1007,20 +998,11 @@ async def get_army_units(request):
 
 
 async def get_map_resources(request):
-    """لیست منابع روی نقشه + مالکیت فعلی"""
     result = []
     for key, info in MAP_RESOURCES.items():
-        result.append({
-            **info,
-            "id": key,
-            "owner": map_holdings.get(key),
-        })
+        result.append({**info, "id": key, "owner": map_holdings.get(key)})
     return web.json_response(result)
 
-
-# =========================================================
-# API — حمله (فعلاً stub — فاز ۳ کامل می‌شود)
-# =========================================================
 
 async def attack(request):
     user_id = get_auth_user_id(request)
@@ -1038,24 +1020,17 @@ async def attack(request):
         players[user_id] = create_player(user_id)
 
     player = players[user_id]
-
     if not player.get("country"):
         return web.json_response({"success": False, "error": "no_country",
                                   "message": "ابتدا وارد بازی شوید."}, status=400)
-
     if target == player.get("country"):
         return web.json_response({"success": False, "error": "self_attack"}, status=400)
 
     type_name = ATTACK_TYPE_NAMES.get(attack_type, attack_type)
     target_name = COUNTRIES[target]["name"]
-
     return web.json_response({"success": True,
-                              "message": f"عملیات {type_name} علیه {target_name} آغاز شد. (منطق جنگ در فاز بعدی)"})
+                              "message": f"عملیات {type_name} علیه {target_name} آغاز شد."})
 
-
-# =========================================================
-# API — دیپلماسی
-# =========================================================
 
 async def propose_treaty(request):
     user_id = get_auth_user_id(request)
@@ -1129,7 +1104,7 @@ async def propose_treaty(request):
 
     if not sent:
         return web.json_response({"success": True,
-                                  "message": "پیشنهاد داخل بازی ثبت شد (کاربر پیام تلگرام را دریافت نکرد)."})
+                                  "message": "پیشنهاد ثبت شد (کاربر پیام تلگرام را دریافت نکرد)."})
     return web.json_response({"success": True,
                               "message": "پیشنهاد ارسال شد و منتظر تأیید طرف مقابل است."})
 
@@ -1157,7 +1132,6 @@ async def get_diplomacy(request):
 
 
 async def respond_treaty(request):
-    """پاسخ به پیشنهاد داخل بازی (به‌جای دکمه تلگرام)"""
     user_id = get_auth_user_id(request)
     if not user_id:
         return web.json_response({"success": False, "error": "unauthorized"}, status=401)
@@ -1188,14 +1162,10 @@ async def respond_treaty(request):
     return web.json_response({"success": True})
 
 
-# =========================================================
-# API — News
-# =========================================================
-
 async def get_news(request):
     news = [
-        {"title": "سال ۱۹۳۹", "text": "اروپا در آستانه یک بحران بزرگ قرار دارد. تصمیمات فرماندهان سرنوشت جهان را تغییر خواهد داد."},
-        {"title": "فرماندهی آغاز شد", "text": "کشور خود را انتخاب کنید و برای توسعه اقتصاد، ارتش و روابط خارجی آماده شوید."},
+        {"title": "سال ۱۹۳۹", "text": "اروپا در آستانه یک بحران بزرگ قرار دارد."},
+        {"title": "فرماندهی آغاز شد", "text": "کشور خود را انتخاب کنید و آماده شوید."},
     ]
     return web.json_response(news)
 
@@ -1204,8 +1174,28 @@ async def health(request):
     return web.json_response({"status": "ok", "players": len(players)})
 
 
+async def debug_auth(request):
+    init_data = (
+        request.headers.get("X-Telegram-Init-Data")
+        or request.query.get("init_data")
+        or ""
+    )
+    user = verify_init_data(init_data)
+    return web.json_response({
+        "auth_required": AUTH_REQUIRED,
+        "got_init_data": bool(init_data),
+        "init_data_len": len(init_data),
+        "init_data_preview": init_data[:80] + "..." if init_data else "",
+        "verified": user is not None,
+        "user": user,
+        "bot_token_set": bool(BOT_TOKEN),
+        "bot_token_len": len(BOT_TOKEN) if BOT_TOKEN else 0,
+        "players_count": len(players),
+    })
+
+
 # =========================================================
-# فایل‌های Web App
+# Web Server
 # =========================================================
 
 WEB_DIR = os.path.join("web")
@@ -1220,27 +1210,25 @@ async def app_js(request):
     return web.FileResponse(os.path.join(WEB_DIR, "app.js"))
 
 
-# =========================================================
-# ساخت Web Server
-# =========================================================
-
 async def create_web_app():
-    app = web.Application()
+    app = web.Application(middlewares=[cors_middleware])
+
     app.router.add_get("/", index)
     app.router.add_get("/style.css", style)
     app.router.add_get("/app.js", app_js)
     app.router.add_static("/images/", path=os.path.join(WEB_DIR, "images"), name="images")
 
-    # GET endpoints (خواندنی)
+    # GET
     app.router.add_get("/api/player", get_player)
     app.router.add_get("/api/countries", get_countries)
     app.router.add_get("/api/army-units", get_army_units)
     app.router.add_get("/api/diplomacy", get_diplomacy)
     app.router.add_get("/api/news", get_news)
     app.router.add_get("/api/map-resources", get_map_resources)
+    app.router.add_get("/api/debug-auth", debug_auth)
     app.router.add_get("/health", health)
 
-    # POST endpoints (نوشتنی)
+    # POST
     app.router.add_post("/api/select-country", select_country)
     app.router.add_post("/api/upgrade-infra", upgrade_infra)
     app.router.add_post("/api/upgrade-economy", upgrade_economy)
@@ -1248,6 +1236,9 @@ async def create_web_app():
     app.router.add_post("/api/attack", attack)
     app.router.add_post("/api/propose-treaty", propose_treaty)
     app.router.add_post("/api/respond-treaty", respond_treaty)
+
+    # OPTIONS (پیش‌پرواز CORS)
+    app.router.add_route("OPTIONS", "/{tail:.*}", lambda r: web.Response())
 
     return app
 
@@ -1273,12 +1264,14 @@ async def main():
     asyncio.create_task(autosave_loop())
 
     await start_web_server()
+
+    # حذف آپدیت‌های معلق و شروع polling
+    await bot.delete_webhook(drop_pending_updates=True)
     logging.info("BOT POLLING STARTED")
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, drop_pending_updates=True, handle_signals=False)
 
 
 if __name__ == "__main__":
-    import asyncio
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
