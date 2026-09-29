@@ -412,17 +412,17 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 .action-card h3 { font-size: 15px; color: #fff; margin-bottom: 4px; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
 .action-card p { font-size: 10.5px; color: rgba(255,255,255,0.8); line-height: 1.6; }
-.action-army           { background-color: #16233f; background-image: linear-gradient(150deg, rgba(58,79,168,.55) 0%, rgba(13,16,36,.85) 75%), url('/images/categories/army.jfif'); background-size: cover; background-position: center; }
+.action-army           { background-color: #16233f; background-image: linear-gradient(150deg, rgba(58,79,168,.55) 0%, rgba(13,16,36,.85) 75%), url('/images/categories/army.png'); background-size: cover; background-position: center; }
 .action-army .action-icon { background: var(--c-army); color: #fff; }
-.action-war             { background-color: #3a1512; background-image: linear-gradient(150deg, rgba(122,44,40,.55) 0%, rgba(24,10,9,.85) 75%), url('/images/categories/war.jfif'); background-size: cover; background-position: center; }
+.action-war             { background-color: #3a1512; background-image: linear-gradient(150deg, rgba(122,44,40,.55) 0%, rgba(24,10,9,.85) 75%), url('/images/categories/war.jpg'); background-size: cover; background-position: center; }
 .action-war .action-icon { background: var(--c-war); color: #fff; }
-.action-diplomacy      { background-color: #241835; background-image: linear-gradient(150deg, rgba(90,58,134,.55) 0%, rgba(18,10,30,.85) 75%), url('/images/categories/diplomacy.jfif'); background-size: cover; background-position: center; }
+.action-diplomacy      { background-color: #241835; background-image: linear-gradient(150deg, rgba(90,58,134,.55) 0%, rgba(18,10,30,.85) 75%), url('/images/categories/diplomacy.png'); background-size: cover; background-position: center; }
 .action-diplomacy .action-icon { background: var(--c-diplomacy); color: #fff; }
-.action-economy         { background-color: #0e2c1e; background-image: linear-gradient(150deg, rgba(37,122,84,.55) 0%, rgba(8,26,18,.85) 75%), url('/images/categories/economy.jfif'); background-size: cover; background-position: center; }
+.action-economy         { background-color: #0e2c1e; background-image: linear-gradient(150deg, rgba(37,122,84,.55) 0%, rgba(8,26,18,.85) 75%), url('/images/categories/economy.jpg'); background-size: cover; background-position: center; }
 .action-economy .action-icon { background: var(--c-economy); color: #fff; }
-.action-infrastructure { background-color: #0d2b29; background-image: linear-gradient(150deg, rgba(29,122,118,.55) 0%, rgba(7,24,22,.85) 75%), url('/images/categories/infrastructure.jfif'); background-size: cover; background-position: center; }
+.action-infrastructure { background-color: #0d2b29; background-image: linear-gradient(150deg, rgba(29,122,118,.55) 0%, rgba(7,24,22,.85) 75%), url('/images/categories/infrastructure.png'); background-size: cover; background-position: center; }
 .action-infrastructure .action-icon { background: var(--c-infra); color: #fff; }
-.action-market          { background-color: #4a3512; background-image: linear-gradient(150deg, rgba(168,122,46,.55) 0%, rgba(28,20,8,.85) 75%), url('/images/categories/market.jfif'); background-size: cover; background-position: center; }
+.action-market          { background-color: #4a3512; background-image: linear-gradient(150deg, rgba(168,122,46,.55) 0%, rgba(28,20,8,.85) 75%), url('/images/categories/market.png'); background-size: cover; background-position: center; }
 .action-market .action-icon { background: var(--c-market); color: #241a05; }
 
 /* ==================== تب‌های زیرساخت ==================== */
