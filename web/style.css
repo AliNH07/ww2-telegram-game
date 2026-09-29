@@ -1,14 +1,30 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 :root {
-    --brand: #3b82f6;
-    --brand-dark: #2563eb;
-    --brand-rgb: 59, 130, 246;
-    --brand-glow: rgba(59, 130, 246, 0.35);
-    --bg-deep: #06101c;
-    --bg-card: rgba(10, 18, 30, 0.78);
+    --brand: #e8b355;
+    --brand-dark: #c98a2e;
+    --brand-rgb: 232, 179, 85;
+    --brand-glow: rgba(232, 179, 85, 0.35);
+    --bg-deep: #0a0d14;
+    --bg-card: rgba(16, 20, 30, 0.78);
     --green: #4ade80;
     --red: #f87171;
+    --c-army: #4d8fe0;
+    --c-army-rgb: 77, 143, 224;
+    --c-war: #e5544f;
+    --c-war-rgb: 229, 84, 79;
+    --c-diplomacy: #9d6fe0;
+    --c-diplomacy-rgb: 157, 111, 224;
+    --c-economy: #4ecb8a;
+    --c-economy-rgb: 78, 203, 138;
+    --c-infra: #33b4b0;
+    --c-infra-rgb: 51, 180, 176;
+    --c-market: #e8b355;
+    --c-market-rgb: 232, 179, 85;
+    --c-money: #e8b355;
+    --c-manpower: #4d8fe0;
+    --c-power: #33c9c4;
+    --c-armypower: #e5544f;
 }
 
 html, body {
@@ -29,10 +45,12 @@ body::before {
     inset: 0;
     z-index: -1;
     background:
+        radial-gradient(ellipse 900px 500px at 50% -10%,
+            rgba(232, 179, 85, 0.16) 0%, rgba(232, 179, 85, 0) 60%),
         linear-gradient(180deg,
-            rgba(6, 16, 28, 0.72) 0%,
-            rgba(6, 16, 28, 0.82) 50%,
-            rgba(4, 8, 16, 0.92) 100%),
+            rgba(10, 13, 20, 0.68) 0%,
+            rgba(10, 13, 20, 0.82) 50%,
+            rgba(6, 8, 13, 0.94) 100%),
         url("/images/background.jfif") center / cover no-repeat;
     pointer-events: none;
 }
@@ -315,26 +333,35 @@ img { -webkit-user-drag: none; user-select: none; }
     border-radius: 14px;
     overflow: hidden;
     background-color: rgba(6, 16, 28, 0.55);
-    border: 1px solid rgba(59, 130, 246, 0.18);
+    background-size: cover;
+    background-position: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 }
+.home-stat:nth-of-type(1) { background-color: #7a5a1e; background-image: linear-gradient(150deg, #c9922f 0%, #3d2a0f 78%); }
+.home-stat:nth-of-type(2) { background-color: #1e4a7a; background-image: linear-gradient(150deg, #2f6fc9 0%, #0f1f3d 78%); }
+.home-stat:nth-of-type(3) { background-color: #1e6e6a; background-image: linear-gradient(150deg, #2fb8b3 0%, #0f2e2c 78%); }
+.home-stat:nth-of-type(4) { background-color: #7a2620; background-image: linear-gradient(150deg, #d5453d 0%, #3d1210 78%); }
 .home-stat-overlay {
     position: absolute; inset: 0;
     display: flex; flex-direction: column;
     justify-content: flex-end; align-items: flex-end;
     text-align: right; padding: 10px 12px;
     background: linear-gradient(180deg,
-        rgba(6, 16, 28, 0.25) 0%,
-        rgba(6, 16, 28, 0.88) 100%);
+        rgba(6, 10, 18, 0.05) 0%,
+        rgba(6, 10, 18, 0.82) 100%);
 }
 .home-stat-label {
-    font-size: 10.5px; color: #c3cad3; margin-bottom: 2px;
+    font-size: 10.5px; color: rgba(255, 255, 255, 0.85); margin-bottom: 2px;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, .5);
 }
 .home-stat-value {
-    font-size: 18px; color: var(--brand);
+    font-size: 19px; color: #fff;
     font-weight: bold; line-height: 1.1;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .5);
 }
 .home-stat-sub {
     font-size: 10px; color: #a0a8b3; margin-top: 2px;
@@ -357,14 +384,14 @@ img { -webkit-user-drag: none; user-select: none; }
 /* ==================== باکس‌های اقدام ==================== */
 .action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .action-card {
-    position: relative; border-radius: 18px; overflow: hidden; min-height: 130px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    transition: all 0.25s ease; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    position: relative; border-radius: 18px; overflow: hidden; min-height: 132px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.25s ease; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
 }
 .action-card:hover {
     transform: translateY(-3px);
-    border-color: rgba(var(--brand-rgb), 0.35);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
 }
 .action-card:active { transform: scale(0.97); }
 .action-overlay {
@@ -377,20 +404,26 @@ img { -webkit-user-drag: none; user-select: none; }
     backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
 }
 .action-icon {
-    position: absolute; top: 12px; left: 12px; font-size: 18px;
-    background: rgba(10, 18, 30, 0.7);
-    width: 34px; height: 34px; border-radius: 50%;
+    position: absolute; top: 12px; left: 12px; font-size: 17px;
+    width: 36px; height: 36px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
-.action-card h3 { font-size: 15px; color: #f4f6f9; margin-bottom: 4px; }
-.action-card p { font-size: 10.5px; color: #a0a8b3; line-height: 1.6; }
-.action-army           { background: linear-gradient(140deg, #1a2436 0%, #0c1220 100%); }
-.action-war            { background: linear-gradient(140deg, #2a1620 0%, #14080d 100%); }
-.action-diplomacy      { background: linear-gradient(140deg, #1a2a1e 0%, #0a140e 100%); }
-.action-economy        { background: linear-gradient(140deg, #2a2212 0%, #14100a 100%); }
-.action-infrastructure { background: linear-gradient(140deg, #1a2236 0%, #0c1424 100%); }
-.action-market         { background: linear-gradient(140deg, #122430 0%, #08141c 100%); }
+.action-card h3 { font-size: 15px; color: #fff; margin-bottom: 4px; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.action-card p { font-size: 10.5px; color: rgba(255,255,255,0.8); line-height: 1.6; }
+.action-army           { background: linear-gradient(150deg, #2c4a78 0%, #0c1220 75%); }
+.action-army .action-icon { background: var(--c-army); color: #fff; }
+.action-war             { background: linear-gradient(150deg, #7a2c28 0%, #180a09 75%); }
+.action-war .action-icon { background: var(--c-war); color: #fff; }
+.action-diplomacy      { background: linear-gradient(150deg, #5a3a86 0%, #120a1e 75%); }
+.action-diplomacy .action-icon { background: var(--c-diplomacy); color: #fff; }
+.action-economy         { background: linear-gradient(150deg, #257a54 0%, #081a12 75%); }
+.action-economy .action-icon { background: var(--c-economy); color: #fff; }
+.action-infrastructure { background: linear-gradient(150deg, #1d7a76 0%, #071816 75%); }
+.action-infrastructure .action-icon { background: var(--c-infra); color: #fff; }
+.action-market          { background: linear-gradient(150deg, #a87a2e 0%, #1c1408 75%); }
+.action-market .action-icon { background: var(--c-market); color: #241a05; }
 
 /* ==================== تب‌های زیرساخت ==================== */
 .infra-tabs {
