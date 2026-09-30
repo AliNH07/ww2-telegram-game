@@ -34,6 +34,7 @@ DAYS_PER_SEASON = 3
 GAME_TOTAL_DAYS = 12
 SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
 
+# اثر هر فصل روی تولید غذا و نفت (ضریب)
 SEASON_FOOD_OIL_MULT = {
     "بهار":   1.00,
     "تابستان": 0.90,
@@ -64,6 +65,7 @@ def L(**kw):
     return kw
 
 INFRASTRUCTURE = {
+    # ==================== برق ====================
     "power_coal": {
         "name": "نیروگاه زغال‌سنگ", "group": "power", "icon": "⚡",
         "desc": "ارزان‌ترین نیروگاه، اما آلودگی و هزینهٔ نگهداری بیشتری دارد.",
@@ -106,6 +108,7 @@ INFRASTRUCTURE = {
         ],
     },
 
+    # ==================== نیروی انسانی ====================
     "manpower_camp": {
         "name": "اردوگاه آموزشی", "group": "manpower", "icon": "👥",
         "desc": "پایگاه آموزش نیرو. هر سطح نیروی بیشتری تربیت می‌کند.",
@@ -137,6 +140,7 @@ INFRASTRUCTURE = {
         "levels": [L(cost=430_000, production=450), L(cost=900_000, production=1100), L(cost=1_800_000, production=2400), L(cost=3_400_000, production=5000), L(cost=6_000_000, production=10000)],
     },
 
+    # ==================== غذا (۳ آیتم) ====================
     "resource_farm": {
         "name": "مجتمع کشاورزی", "group": "resource", "resource_key": "food", "icon": "🌾",
         "desc": "غذا تولید می‌کند. از کشاورزی ارزان‌تر است و سریع‌تر ساخته می‌شود.",
@@ -153,6 +157,7 @@ INFRASTRUCTURE = {
         "levels": [L(cost=200_000, production=40_000), L(cost=480_000, production=110_000), L(cost=1_100_000, production=260_000), L(cost=2_200_000, production=600_000), L(cost=4_200_000, production=1_300_000)],
     },
 
+    # ==================== منابع ====================
     "resource_oil_well": {
         "name": "چاه نفت", "group": "resource", "resource_key": "oil", "icon": "🛢️",
         "desc": "نفت خام استخراج می‌کند. برای پالایشگاه و ارتش ضروری است.",
@@ -169,6 +174,7 @@ INFRASTRUCTURE = {
         "levels": [L(cost=380_000, production=50_000), L(cost=850_000, production=130_000), L(cost=1_900_000, production=300_000), L(cost=3_700_000, production=700_000), L(cost=7_000_000, production=1_500_000)],
     },
 
+    # ==================== نظامی ====================
     "land_barracks": {
         "name": "پادگان", "group": "land", "icon": "🪖",
         "desc": "محل استقرار پیاده‌نظام. هر سطح ظرفیت را ۱۰۰۰ نفر بیشتر می‌کند.",
@@ -419,6 +425,7 @@ def compute_rates(player):
 
     country = player.get("country")
 
+    # ----- منابع تصرف‌شده روی نقشه (باگ قبلی: از دیکشنری گلوبال می‌خوانیم) -----
     for key, owner in map_holdings.items():
         if owner != country: continue
         res = MAP_RESOURCES.get(key)
@@ -439,6 +446,7 @@ def compute_rates(player):
         if occupier == country:
             income += 500_000
 
+    # ----- اثر فصل روی غذا/نفت -----
     season = get_game_time(player)["season"]
     mult = SEASON_FOOD_OIL_MULT.get(season, 1.0)
     if mult < 1.0:
@@ -975,10 +983,12 @@ async def check_wars_tick():
                 active_wars[wid] = w
                 push_news("جنگ آغاز شد",
                     f"مذاکره بین {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} بی‌نتیجه ماند.")
+    # پیمان‌های منقضی را پاک کن
     active_treaties[:] = [
         t for t in active_treaties
         if not (parse_dt(t.get("expires_at")) and parse_dt(t.get("expires_at")) <= now)
     ]
+    # جنگ‌های تمام‌شده را از active_wars حذف کن
     for wid in list(active_wars.keys()):
         if active_wars[wid].get("resolved"):
             del active_wars[wid]
@@ -1018,6 +1028,7 @@ async def perform_battle(request):
 
     for front in ["air", "naval", "land"]:
         atk_attack = 0
+        # بدون ناو هواپیمابر، هیچ حملهٔ هوایی ممکن نیست
         if front == "air" and not has_carrier:
             dfd_def = def_power(dfd, front) * 1.10
             dfd_final = dfd_def * (1 + random.uniform(-0.08, 0.08))
@@ -1414,45 +1425,17 @@ def compute_rankings():
         cid = p.get("country")
         if not cid: continue
         ensure_player_fields(p); recompute_army(p); rates = compute_rates(p)
-
-        eco = rates["net_income"] // 1000
-        mil = p.get("army", 0)
+        eco = rates["net_income"] // 1000; mil = p.get("army", 0)
         dip = 0
-        my_treaties = 0
         for t in active_treaties:
-            if t["country_a"] == cid or t["country_b"] == cid:
-                dip += 100; my_treaties += 1
-        in_union = any(cid in u.get("members", []) for u in unions.values())
-        if in_union: dip += 150
+            if t["country_a"] == cid or t["country_b"] == cid: dip += 100
+        for u in unions.values():
+            if cid in u.get("members", []): dip += 150
         dev = sum(p.get("infra_levels", {}).values()) * 50
         total = eco + mil + dip + dev
-
-        occ = sum(1 for c, o in occupied_countries.items() if o == cid)
-        mh  = sum(1 for k, o in map_holdings.items() if o == cid)
-        sh  = sum(1 for k, o in strait_holdings.items() if o == cid)
-
-        rows.append({
-            "country": cid, "name": COUNTRIES[cid]["name"], "flag": COUNTRIES[cid]["flag"],
-            "overall": total, "economy": eco, "military": mil,
-            "diplomacy": dip, "development": dev,
-            "is_eliminated": p.get("is_eliminated", False),
-            "detail": {
-                "money": round(p.get("money", 0)),
-                "daily_income": rates["net_income"],
-                "manpower": round(p.get("manpower", 0)),
-                "army_power": p.get("army", 0),
-                "units_total": sum(p.get("units", {}).values()),
-                "infra_total": sum(p.get("infra_levels", {}).values()),
-                "power_capacity": rates["power_capacity"],
-                "power_consumption": rates["power_consumption"],
-                "resources": {k: round(v) for k, v in p.get("resources", {}).items()},
-                "treaties": my_treaties,
-                "in_union": in_union,
-                "occupied": occ,
-                "map_holdings": mh,
-                "strait_holdings": sh,
-            }
-        })
+        rows.append({"country": cid, "name": COUNTRIES[cid]["name"], "flag": COUNTRIES[cid]["flag"],
+                     "overall": total, "economy": eco, "military": mil, "diplomacy": dip,
+                     "development": dev, "is_eliminated": p.get("is_eliminated", False)})
     rows.sort(key=lambda x: x["overall"], reverse=True)
     for i, r in enumerate(rows): r["rank"] = i + 1
     return rows
