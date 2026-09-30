@@ -14,8 +14,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://ww2-telegram-game.onrender.com")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "0") == "1"
-DATA_DIR = os.getenv("DATA_DIR", "data")
-STATE_FILE = os.path.join(DATA_DIR, "state.json")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 
@@ -44,8 +42,14 @@ NEGOTIATION_HOURS = 24
 DEFAULT_COST = 150_000
 DEFAULT_TIME = 0
 
+# ظرفیت یگان‌ها فقط از این ساختمون‌ها گرفته می‌شه
+CAPACITY_PROVIDERS = {
+    "land": "land_barracks",
+    "naval": "naval_port",
+    "air": "air_airport",
+}
+
 def L(**kw):
-    """ساخت یک سطح با هزینهٔ ثابت"""
     kw.setdefault("cost", DEFAULT_COST)
     kw.setdefault("time", DEFAULT_TIME)
     return kw
@@ -126,14 +130,12 @@ INFRASTRUCTURE = {
         "levels": [L(cost=430_000, production=450), L(cost=900_000, production=1100), L(cost=1_800_000, production=2400), L(cost=3_400_000, production=5000), L(cost=6_000_000, production=10000)],
     },
 
-    # ==================== غذا ====================
+    # ==================== منابع ====================
     "resource_farm": {
         "name": "مجتمع کشاورزی", "group": "resource", "resource_key": "food", "icon": "🌾",
         "desc": "غذا تولید می‌کند. از کشاورزی ارزان‌تر است و سریع‌تر ساخته می‌شود.",
         "levels": [L(cost=150_000, production=50_000), L(cost=350_000, production=130_000), L(cost=800_000, production=300_000), L(cost=1_600_000, production=700_000), L(cost=3_000_000, production=1_500_000)],
     },
-
-    # ==================== منابع ====================
     "resource_oil_well": {
         "name": "چاه نفت", "group": "resource", "resource_key": "oil", "icon": "🛢️",
         "desc": "نفت خام استخراج می‌کند. برای پالایشگاه و ارتش ضروری است.",
@@ -254,50 +256,56 @@ ARMY_UNITS = {
         "attack": 60, "defense": 15},
 }
 
+# naval_capturable: فقط با ناو می‌شه گرفت
 MAP_RESOURCES = {
-    "oil_gulf": {"type": "oil", "name": "سکوی نفتی خلیج فارس", "lon": 51.5, "lat": 27.0, "production": 5_000_000},
-    "oil_caspian": {"type": "oil", "name": "سکوی نفتی خزر", "lon": 51.0, "lat": 41.5, "production": 3_000_000},
-    "oil_northsea": {"type": "oil", "name": "سکوی نفتی دریای شمال", "lon": 2.0, "lat": 56.5, "production": 4_000_000},
-    "oil_texas": {"type": "oil", "name": "میدان نفتی تگزاس", "lon": -100.0, "lat": 31.0, "production": 4_000_000},
-    "steel_ural": {"type": "steel", "name": "معدن فولاد اورال", "lon": 60.0, "lat": 58.0, "production": 3_000_000},
-    "steel_ruhr": {"type": "steel", "name": "معدن فولاد رور", "lon": 7.0, "lat": 51.4, "production": 4_000_000},
-    "steel_brazil": {"type": "steel", "name": "معدن فولاد برزیل", "lon": -50.0, "lat": -15.0, "production": 3_500_000},
-    "uranium_kazakh": {"type": "uranium", "name": "معدن اورانیوم قزاقستان", "lon": 68.0, "lat": 48.0, "production": 2_500_000},
-    "uranium_canada": {"type": "uranium", "name": "معدن اورانیوم کانادا", "lon": -105.0, "lat": 58.0, "production": 2_000_000},
-    "uranium_aussie": {"type": "uranium", "name": "معدن اورانیوم استرالیا", "lon": 134.0, "lat": -25.0, "production": 2_200_000},
-    "food_ukraine": {"type": "food", "name": "دشت‌های کشاورزی اوکراین", "lon": 32.0, "lat": 49.0, "production": 2_500_000},
-    "food_india": {"type": "food", "name": "دشت‌های هند", "lon": 78.0, "lat": 22.0, "production": 2_500_000},
+    "oil_gulf":      {"type": "oil",     "name": "سکوی نفتی خلیج فارس",       "lon": 51.5,  "lat": 27.0,  "production": 5_000_000, "naval_capturable": True},
+    "oil_caspian":   {"type": "oil",     "name": "سکوی نفتی خزر",             "lon": 51.0,  "lat": 41.5,  "production": 3_000_000, "naval_capturable": True},
+    "oil_northsea":  {"type": "oil",     "name": "سکوی نفتی دریای شمال",      "lon": 2.0,   "lat": 56.5,  "production": 4_000_000, "naval_capturable": True},
+    "oil_texas":     {"type": "oil",     "name": "میدان نفتی تگزاس",           "lon": -100.0,"lat": 31.0,  "production": 4_000_000, "naval_capturable": False},
+    "steel_ural":    {"type": "steel",   "name": "معدن فولاد اورال",           "lon": 60.0,  "lat": 58.0,  "production": 3_000_000, "naval_capturable": False},
+    "steel_ruhr":    {"type": "steel",   "name": "معدن فولاد رور",             "lon": 7.0,   "lat": 51.4,  "production": 4_000_000, "naval_capturable": False},
+    "steel_brazil":  {"type": "steel",   "name": "معدن فولاد برزیل",           "lon": -50.0, "lat": -15.0, "production": 3_500_000, "naval_capturable": False},
+    "uranium_kazakh":{"type": "uranium", "name": "معدن اورانیوم قزاقستان",     "lon": 68.0,  "lat": 48.0,  "production": 2_500_000, "naval_capturable": False},
+    "uranium_canada":{"type": "uranium", "name": "معدن اورانیوم کانادا",       "lon": -105.0,"lat": 58.0,  "production": 2_000_000, "naval_capturable": False},
+    "uranium_aussie":{"type": "uranium", "name": "معدن اورانیوم استرالیا",     "lon": 134.0, "lat": -25.0, "production": 2_200_000, "naval_capturable": False},
+    "food_ukraine":  {"type": "food",    "name": "دشت‌های کشاورزی اوکراین",    "lon": 32.0,  "lat": 49.0,  "production": 2_500_000, "naval_capturable": False},
+    "food_india":    {"type": "food",    "name": "دشت‌های هند",                "lon": 78.0,  "lat": 22.0,  "production": 2_500_000, "naval_capturable": False},
 }
 
 STRAITS_DATA = {
     "gibraltar": {"name": "تنگه جبل‌الطارق", "lon": -5.6, "lat": 35.9, "income": 20_000},
-    "bosporus": {"name": "تنگه بسفر", "lon": 29.0, "lat": 41.1, "income": 20_000},
-    "hormuz": {"name": "تنگه هرمز", "lon": 56.3, "lat": 26.6, "income": 20_000},
+    "bosporus":  {"name": "تنگه بسفر",       "lon": 29.0, "lat": 41.1, "income": 20_000},
+    "hormuz":    {"name": "تنگه هرمز",       "lon": 56.3, "lat": 26.6, "income": 20_000},
     "babmandeb": {"name": "تنگه باب‌المندب", "lon": 43.3, "lat": 12.6, "income": 20_000},
-    "suez": {"name": "کانال سوئز", "lon": 32.3, "lat": 30.6, "income": 20_000},
-    "dover": {"name": "تنگه دوور", "lon": 1.4, "lat": 50.9, "income": 20_000},
-    "panama": {"name": "کانال پاناما", "lon": -79.6, "lat": 9.1, "income": 20_000},
-    "malacca": {"name": "تنگه مالاکا", "lon": 103.8, "lat": 1.3, "income": 20_000},
-    "taiwan": {"name": "تنگه تایوان", "lon": 121.0, "lat": 24.0, "income": 20_000},
-    "korea": {"name": "تنگه کره", "lon": 129.9, "lat": 34.0, "income": 20_000},
+    "suez":      {"name": "کانال سوئز",      "lon": 32.3, "lat": 30.6, "income": 20_000},
+    "dover":     {"name": "تنگه دوور",       "lon": 1.4,  "lat": 50.9, "income": 20_000},
+    "panama":    {"name": "کانال پاناما",    "lon": -79.6,"lat": 9.1,  "income": 20_000},
+    "malacca":   {"name": "تنگه مالاکا",     "lon": 103.8,"lat": 1.3,  "income": 20_000},
+    "taiwan":    {"name": "تنگه تایوان",     "lon": 121.0,"lat": 24.0, "income": 20_000},
+    "korea":     {"name": "تنگه کره",        "lon": 129.9,"lat": 34.0, "income": 20_000},
 }
 
-def utcnow(): return datetime.now(timezone.utc)
+def utcnow():
+    return datetime.now(timezone.utc)
 
 def parse_dt(s):
-    if not s: return None
+    if not s:
+        return None
     try:
         dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
         return dt
-    except: return None
+    except Exception:
+        return None
 
 def get_game_time(player):
     started_at = player.get("started_at")
     if not started_at:
         return {"day": 1, "season": SEASONS[0], "season_days_left": DAYS_PER_SEASON,
                 "season_hours_left": 0, "next_season": SEASONS[1]}
-    started = parse_dt(started_at); now = utcnow()
+    started = parse_dt(started_at)
+    now = utcnow()
     elapsed_days = max(0, (now - started).total_seconds() / 86400)
     day = min(GAME_TOTAL_DAYS, int(elapsed_days) + 1)
     si = ((day - 1) // DAYS_PER_SEASON) % len(SEASONS)
@@ -305,7 +313,8 @@ def get_game_time(player):
     game_end = started + timedelta(days=GAME_TOTAL_DAYS)
     season_end = min(season_end, game_end)
     remaining = season_end - now
-    if remaining.total_seconds() < 0: remaining = timedelta(0)
+    if remaining.total_seconds() < 0:
+        remaining = timedelta(0)
     return {"day": day, "season": SEASONS[si], "season_days_left": remaining.days,
             "season_hours_left": remaining.seconds // 3600,
             "next_season": SEASONS[(si + 1) % len(SEASONS)]}
@@ -314,32 +323,38 @@ def get_infra_level(player, item_id):
     return player.get("infra_levels", {}).get(item_id, 0)
 
 def get_item_info(catalog, item_id, level):
-    if level <= 0: return None
+    if level <= 0:
+        return None
     levels = catalog[item_id]["levels"]
     return levels[min(level, len(levels)) - 1]
 
 def get_power_total(player):
     total = 0
     for item_id, item in INFRASTRUCTURE.items():
-        if item.get("group") != "power": continue
+        if item.get("group") != "power":
+            continue
         lv = get_infra_level(player, item_id)
-        if lv > 0: total += item["levels"][lv - 1]["capacity"]
+        if lv > 0:
+            total += item["levels"][lv - 1]["capacity"]
     return total
 
 def get_power_used(player):
     total = 0
     for item_id, item in ECONOMY.items():
         lv = get_infra_level(player, item_id)
-        if lv > 0: total += item["power_required"] * lv
+        if lv > 0:
+            total += item["power_required"] * lv
     return total
 
 def get_group_capacity(player, group):
-    total = 0
-    for item_id, item in INFRASTRUCTURE.items():
-        if item.get("group") != group: continue
-        lv = get_infra_level(player, item_id)
-        if lv > 0: total += item["levels"][lv - 1]["capacity"]
-    return total
+    """ظرفیت یگان‌های یک گروه — فقط از ساختمون اصلی گروه."""
+    provider = CAPACITY_PROVIDERS.get(group)
+    if not provider:
+        return 0
+    lv = get_infra_level(player, provider)
+    if lv <= 0:
+        return 0
+    return INFRASTRUCTURE[provider]["levels"][lv - 1].get("capacity", 0)
 
 def get_group_units(player, group):
     total = 0
@@ -356,10 +371,13 @@ def recompute_army(player):
 
 def ensure_player_fields(player):
     player.setdefault("resources", dict(STARTING_RESOURCES))
-    for k in RESOURCE_NAMES: player["resources"].setdefault(k, 0)
+    for k in RESOURCE_NAMES:
+        player["resources"].setdefault(k, 0)
     units = player.setdefault("units", {})
-    for uid_ in ARMY_UNITS: units.setdefault(uid_, 0)
-    for stale in [k for k in units if k not in ARMY_UNITS]: del units[stale]
+    for uid_ in ARMY_UNITS:
+        units.setdefault(uid_, 0)
+    for stale in [k for k in units if k not in ARMY_UNITS]:
+        del units[stale]
     player.setdefault("infra_levels", {})
     player.setdefault("map_holdings", {})
     player.setdefault("strait_holdings", {})
@@ -377,16 +395,20 @@ def compute_rates(player):
     for item_id, item in INFRASTRUCTURE.items():
         group = item.get("group")
         lv = get_infra_level(player, item_id)
-        if lv <= 0: continue
+        if lv <= 0:
+            continue
         lvl = item["levels"][lv - 1]
-        if group == "manpower": manpower_production += lvl["production"]
+        if group == "manpower":
+            manpower_production += lvl["production"]
         elif group == "resource":
             key = item.get("resource_key")
-            if key: resource_production[key] += lvl["production"]
+            if key:
+                resource_production[key] += lvl["production"]
 
     for item_id, item in ECONOMY.items():
         lv = get_infra_level(player, item_id)
-        if lv > 0: income += item["levels"][lv - 1]["income"]
+        if lv > 0:
+            income += item["levels"][lv - 1]["income"]
 
     country = player.get("country")
     for key, owner in player.get("map_holdings", {}).items():
@@ -396,14 +418,18 @@ def compute_rates(player):
                 if res["type"] == "oil":
                     income += res["production"] // 10
                     resource_production["oil"] += res["production"] // 5
-                elif res["type"] == "food": resource_production["food"] += res["production"] // 5
-                elif res["type"] == "steel": resource_production["steel"] += res["production"] // 5
-                elif res["type"] == "uranium": resource_production["uranium"] += res["production"] // 5
+                elif res["type"] == "food":
+                    resource_production["food"] += res["production"] // 5
+                elif res["type"] == "steel":
+                    resource_production["steel"] += res["production"] // 5
+                elif res["type"] == "uranium":
+                    resource_production["uranium"] += res["production"] // 5
 
     for key, owner in player.get("strait_holdings", {}).items():
         if owner == country:
             s = STRAITS_DATA.get(key)
-            if s: income += s["income"]
+            if s:
+                income += s["income"]
 
     for target_country, occupier in occupied_countries.items():
         if occupier == country:
@@ -416,10 +442,12 @@ def compute_rates(player):
             "resource_consumption": resource_consumption}
 
 def accrue_player(player):
-    if not player.get("started_at") or player.get("is_eliminated"): return
+    if not player.get("started_at") or player.get("is_eliminated"):
+        return
     now = utcnow()
     last = parse_dt(player.get("last_update")) or parse_dt(player["started_at"])
-    if not last: return
+    if not last:
+        return
     elapsed = max(0, (now - last).total_seconds())
     rates = compute_rates(player)
     f = elapsed / 86400
@@ -444,15 +472,19 @@ def build_catalog_status(player, catalog):
             "desc": item.get("desc", ""),
             "resource_key": item.get("resource_key"),
             "power_required": item.get("power_required"),
+            "is_capacity_provider": item_id in CAPACITY_PROVIDERS.values(),
             "level": lv, "max_level": len(levels),
             "current": current, "next": next_info,
         }
     return result
 
 def serialize_player(player):
-    ensure_player_fields(player); accrue_player(player); recompute_army(player)
+    ensure_player_fields(player)
+    accrue_player(player)
+    recompute_army(player)
     rates = compute_rates(player)
-    data = dict(player); data.update(get_game_time(player))
+    data = dict(player)
+    data.update(get_game_time(player))
     data["resource_production"] = rates["resource_production"]
     data["resource_consumption"] = rates["resource_consumption"]
     data["power_capacity"] = rates["power_capacity"]
@@ -464,7 +496,7 @@ def serialize_player(player):
     return data
 
 # =========================================================
-# State
+# State (in-memory only — با ری‌استارت صفر می‌شه)
 # =========================================================
 players = {}
 diplomacy_proposals = {}
@@ -490,80 +522,102 @@ def create_player(user_id):
 
 def get_player_by_country(country_id):
     for uid_, p in players.items():
-        if p.get("country") == country_id: return uid_, p
+        if p.get("country") == country_id:
+            return uid_, p
     return None, None
 
 def push_news(title, text, kind="info"):
     news_feed.append({"id": str(uuid.uuid4()), "title": title, "text": text,
                       "kind": kind, "at": utcnow().isoformat()})
-    if len(news_feed) > 200: del news_feed[:50]
+    if len(news_feed) > 200:
+        del news_feed[:50]
 
-def save_state():
-    try:
-        os.makedirs(DATA_DIR, exist_ok=True)
-        state = {"players": {str(k): v for k, v in players.items()},
-                 "diplomacy_proposals": diplomacy_proposals, "active_treaties": active_treaties,
-                 "map_holdings": map_holdings, "strait_holdings": strait_holdings,
-                 "occupied_countries": occupied_countries, "war_declarations": war_declarations,
-                 "active_wars": active_wars, "war_reports": war_reports[-50:],
-                 "announcements": announcements[-100:], "unions": unions,
-                 "private_messages": private_messages, "market_listings": market_listings,
-                 "news_feed": news_feed[-200:]}
-        tmp = STATE_FILE + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(state, f, ensure_ascii=False)
-        os.replace(tmp, STATE_FILE)
-    except Exception as e:
-        logging.error("save_state failed: %s", e)
+# =========================================================
+# Cleanup (in-memory)
+# =========================================================
+def cleanup_old_data():
+    now = utcnow()
 
-def load_state():
-    global diplomacy_proposals, active_treaties, map_holdings, strait_holdings
-    global occupied_countries, war_declarations, active_wars, war_reports
-    global announcements, unions, private_messages, market_listings, news_feed
-    if not os.path.exists(STATE_FILE):
-        logging.info("No state, fresh start."); return
-    try:
-        with open(STATE_FILE, "r", encoding="utf-8") as f: state = json.load(f)
-        for k, v in state.get("players", {}).items(): players[int(k)] = v
-        diplomacy_proposals = state.get("diplomacy_proposals", {})
-        active_treaties = state.get("active_treaties", [])
-        map_holdings = state.get("map_holdings", {})
-        strait_holdings = state.get("strait_holdings", {})
-        occupied_countries = state.get("occupied_countries", {})
-        war_declarations = state.get("war_declarations", {})
-        active_wars = state.get("active_wars", {})
-        war_reports = state.get("war_reports", [])
-        announcements = state.get("announcements", [])
-        unions = state.get("unions", {})
-        private_messages = state.get("private_messages", {})
-        market_listings = state.get("market_listings", {})
-        news_feed = state.get("news_feed", [])
-        logging.info("State loaded: %d players", len(players))
-    except Exception as e:
-        logging.error("load_state failed: %s", e)
+    # جنگ‌های resolve‌شده
+    resolved_ids = set()
+    for wid, w in war_declarations.items():
+        if w.get("status") == "resolved":
+            resolved_at = parse_dt(w.get("resolved_at"))
+            if not resolved_at or (now - resolved_at).total_seconds() > 3600:
+                resolved_ids.add(wid)
+        elif w.get("status") == "rejected":
+            resolved_ids.add(wid)
+        elif w.get("status") == "pending_admin":
+            created = parse_dt(w.get("created_at"))
+            if created and (now - created).total_seconds() > 86400 * 2:
+                resolved_ids.add(wid)
+    for wid in resolved_ids:
+        war_declarations.pop(wid, None)
+        active_wars.pop(wid, None)
 
-async def autosave_loop():
+    # پیشنهادهای دیپلماسی
+    stale_pids = []
+    for pid, p in diplomacy_proposals.items():
+        if p["status"] in ("rejected", "accepted"):
+            stale_pids.append(pid)
+        elif p["status"] == "pending":
+            created = parse_dt(p.get("created_at"))
+            if created and (now - created).total_seconds() > 86400 * 3:
+                stale_pids.append(pid)
+    for pid in stale_pids:
+        diplomacy_proposals.pop(pid, None)
+
+    # پیمان‌های منقضی
+    for t in list(active_treaties):
+        exp = parse_dt(t.get("expires_at"))
+        if exp and now >= exp:
+            active_treaties.remove(t)
+
+    # سفارش‌های بازار — حذف resolve‌شده‌ها و یتیم‌ها
+    for lid, l in list(market_listings.items()):
+        if l.get("status") != "open":
+            del market_listings[lid]
+            continue
+        _, seller = get_player_by_country(l["seller"])
+        if not seller:
+            del market_listings[lid]
+            continue
+
+    # گزارش‌های جنگ
+    if len(war_reports) > 100:
+        del war_reports[:50]
+
+async def cleanup_loop():
     while True:
-        await asyncio.sleep(60); save_state()
+        await asyncio.sleep(300)
+        try:
+            cleanup_old_data()
+        except Exception as e:
+            logging.error("cleanup: %s", e)
 
 # =========================================================
 # Auth
 # =========================================================
 def verify_init_data(init_data: str):
-    if not init_data: return None
+    if not init_data:
+        return None
     try:
         parsed = dict(parse_qsl(init_data, keep_blank_values=True))
         rh = parsed.pop("hash", None)
-        if not rh: return None
+        if not rh:
+            return None
         dcs = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
         secret = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
         computed = hmac.new(secret, dcs.encode(), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(computed, rh): return None
+        if not hmac.compare_digest(computed, rh):
+            return None
         u = parsed.get("user")
-        if u: return json.loads(u)
+        if u:
+            return json.loads(u)
         return None
     except Exception as e:
-        logging.error("verify_init_data: %s", e); return None
+        logging.error("verify_init_data: %s", e)
+        return None
 
 def get_auth_user_id(request):
     init_data = request.headers.get("X-Telegram-Init-Data") or request.query.get("init_data")
@@ -574,20 +628,27 @@ def get_auth_user_id(request):
     if not AUTH_REQUIRED:
         uid = request.query.get("user_id")
         if uid:
-            try: return int(uid)
-            except: return None
+            try:
+                return int(uid)
+            except Exception:
+                return None
     return None
 
 async def read_json(request):
-    try: return await request.json()
-    except: return {}
+    try:
+        return await request.json()
+    except Exception:
+        return {}
 
 @web.middleware
 async def cors_middleware(request, handler):
-    if request.method == "OPTIONS": response = web.Response()
+    if request.method == "OPTIONS":
+        response = web.Response()
     else:
-        try: response = await handler(request)
-        except web.HTTPException as ex: response = ex
+        try:
+            response = await handler(request)
+        except web.HTTPException as ex:
+            response = ex
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Init-Data"
@@ -604,7 +665,7 @@ dp = Dispatcher()
 async def start_command(message: types.Message):
     user_id = message.from_user.id
     if user_id not in players:
-        players[user_id] = create_player(user_id); save_state()
+        players[user_id] = create_player(user_id)
     kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🌍 ورود به بازی", web_app=WebAppInfo(url=WEB_APP_URL))]])
     if players[user_id]["country"]:
@@ -615,16 +676,26 @@ async def start_command(message: types.Message):
     await message.answer(text, reply_markup=kb)
 
 async def notify_admin(text, keyboard=None):
-    if ADMIN_ID:
-        try: await bot.send_message(ADMIN_ID, text, reply_markup=keyboard)
-        except Exception as e: logging.warning("admin notify: %s", e)
+    if not ADMIN_ID:
+        return
+    async def _send():
+        try:
+            await bot.send_message(ADMIN_ID, text, reply_markup=keyboard)
+        except Exception as e:
+            logging.warning("admin notify: %s", e)
+    asyncio.create_task(_send())
 
 @dp.callback_query(F.data.startswith("treaty:"))
 async def treaty_cb(cb: types.CallbackQuery):
-    _, action, pid = cb.data.split(":")
+    try:
+        _, action, pid = cb.data.split(":")
+    except ValueError:
+        await cb.answer("داده نامعتبر"); return
     p = diplomacy_proposals.get(pid)
-    if not p or p["status"] != "pending": await cb.answer("منقضی"); return
-    if cb.from_user.id != p["to_user"]: await cb.answer("برای شما نیست."); return
+    if not p or p["status"] != "pending":
+        await cb.answer("منقضی"); return
+    if cb.from_user.id != p["to_user"]:
+        await cb.answer("برای شما نیست."); return
     tn = TREATY_TYPE_NAMES[p["treaty_type"]]
     if action == "accept":
         p["status"] = "accepted"
@@ -634,31 +705,40 @@ async def treaty_cb(cb: types.CallbackQuery):
         await cb.message.edit_text(f"✅ {tn} پذیرفته شد.")
         push_news("پیمان جدید", f"{COUNTRIES[p['from_country']]['name']} و {COUNTRIES[p['to_country']]['name']} {tn} بستند.")
     else:
-        p["status"] = "rejected"; await cb.message.edit_text(f"❌ {tn} رد شد.")
-    save_state(); await cb.answer()
+        p["status"] = "rejected"
+        await cb.message.edit_text(f"❌ {tn} رد شد.")
+    await cb.answer()
 
 @dp.callback_query(F.data.startswith("war:"))
 async def war_cb(cb: types.CallbackQuery):
-    _, action, wid = cb.data.split(":")
-    if cb.from_user.id != ADMIN_ID: await cb.answer("دسترسی ندارید."); return
+    try:
+        _, action, wid = cb.data.split(":")
+    except ValueError:
+        await cb.answer("داده نامعتبر"); return
+    if cb.from_user.id != ADMIN_ID:
+        await cb.answer("دسترسی ندارید."); return
     w = war_declarations.get(wid)
-    if not w or w["status"] != "pending_admin": await cb.answer("منقضی"); return
+    if not w or w["status"] != "pending_admin":
+        await cb.answer("منقضی"); return
     if action == "approve":
         w["status"] = "negotiation"
         w["negotiation_ends"] = (utcnow() + timedelta(hours=NEGOTIATION_HOURS)).isoformat()
         await cb.message.edit_text("✅ تأیید شد. ۲۴ ساعت مذاکره آغاز شد.")
         push_news("اعلام جنگ", f"{COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} اعلام جنگ کرد.")
     else:
-        w["status"] = "rejected"; await cb.message.edit_text("❌ رد شد.")
-    save_state(); await cb.answer()
+        w["status"] = "rejected"
+        await cb.message.edit_text("❌ رد شد.")
+    await cb.answer()
 
 # =========================================================
 # API Player / Countries
 # =========================================================
 async def get_player(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
-    if uid not in players: players[uid] = create_player(uid); save_state()
+    if not uid:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    if uid not in players:
+        players[uid] = create_player(uid)
     return web.json_response(serialize_player(players[uid]))
 
 async def get_countries(request):
@@ -671,14 +751,18 @@ async def get_countries(request):
 
 async def select_country(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); cid = data.get("country")
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    cid = data.get("country")
     if cid not in COUNTRIES:
         return web.json_response({"success": False, "error": "invalid_country"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
+    if uid not in players:
+        players[uid] = create_player(uid)
     p = players[uid]
     if p["country"]:
-        if p["country"] == cid: return web.json_response({"success": True, "player": serialize_player(p)})
+        if p["country"] == cid:
+            return web.json_response({"success": True, "player": serialize_player(p)})
         return web.json_response({"success": False, "error": "already_has_country"}, status=409)
     if cid in occupied_countries:
         return web.json_response({"success": False, "error": "occupied",
@@ -688,8 +772,9 @@ async def select_country(request):
         return web.json_response({"success": False, "error": "country_taken"}, status=409)
     p["country"] = cid
     if not p.get("started_at"):
-        now = utcnow().isoformat(); p["started_at"] = now; p["last_update"] = now
-    save_state()
+        now = utcnow().isoformat()
+        p["started_at"] = now
+        p["last_update"] = now
     return web.json_response({"success": True, "player": serialize_player(p)})
 
 # =========================================================
@@ -697,19 +782,25 @@ async def select_country(request):
 # =========================================================
 async def upgrade_infra(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); item_id = data.get("category")
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    item_id = data.get("category")
     if item_id not in INFRASTRUCTURE:
         return web.json_response({"success": False, "error": "invalid_category"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
+    if uid not in players:
+        players[uid] = create_player(uid)
     p = players[uid]
     if not p.get("country") or p.get("is_eliminated"):
         return web.json_response({"success": False, "error": "invalid_state"}, status=400)
     accrue_player(p)
-    item = INFRASTRUCTURE[item_id]; lv = get_infra_level(p, item_id); levels = item["levels"]
+    item = INFRASTRUCTURE[item_id]
+    lv = get_infra_level(p, item_id)
+    levels = item["levels"]
     if lv >= len(levels):
         return web.json_response({"success": False, "error": "max_level"}, status=400)
-    cost = levels[lv]["cost"]; res_cost = levels[lv].get("resources", {})
+    cost = levels[lv]["cost"]
+    res_cost = levels[lv].get("resources", {})
     if p.get("money", 0) < cost:
         return web.json_response({"success": False, "error": "not_enough_money",
                                   "message": "پول کافی ندارید."}, status=400)
@@ -719,23 +810,28 @@ async def upgrade_infra(request):
             return web.json_response({"success": False, "error": "not_enough_resource",
                                       "message": f"{RESOURCE_NAMES[k]} کافی ندارید."}, status=400)
     p["money"] -= cost
-    for k, a in res_cost.items(): p["resources"][k] -= a
+    for k, a in res_cost.items():
+        p["resources"][k] -= a
     p["infra_levels"][item_id] = lv + 1
-    save_state()
     return web.json_response({"success": True, "player": serialize_player(p)})
 
 async def upgrade_economy(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); item_id = data.get("category")
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    item_id = data.get("category")
     if item_id not in ECONOMY:
         return web.json_response({"success": False, "error": "invalid_category"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
+    if uid not in players:
+        players[uid] = create_player(uid)
     p = players[uid]
     if not p.get("country") or p.get("is_eliminated"):
         return web.json_response({"success": False, "error": "invalid_state"}, status=400)
     accrue_player(p)
-    item = ECONOMY[item_id]; lv = get_infra_level(p, item_id); levels = item["levels"]
+    item = ECONOMY[item_id]
+    lv = get_infra_level(p, item_id)
+    levels = item["levels"]
     if lv >= len(levels):
         return web.json_response({"success": False, "error": "max_level"}, status=400)
     cost = levels[lv]["cost"]
@@ -745,34 +841,45 @@ async def upgrade_economy(request):
     if get_power_total(p) < get_power_used(p) + req_power:
         return web.json_response({"success": False, "error": "not_enough_power",
                                   "message": "برق کافی ندارید. ابتدا نیروگاه بسازید."}, status=400)
-    p["money"] -= cost; p["infra_levels"][item_id] = lv + 1
-    save_state()
+    p["money"] -= cost
+    p["infra_levels"][item_id] = lv + 1
     return web.json_response({"success": True, "player": serialize_player(p)})
 
 async def train_unit(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); unit_id = data.get("unit_id")
-    try: count = int(data.get("count", 1))
-    except: count = 1
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    unit_id = data.get("unit_id")
+    try:
+        count = int(data.get("count", 1))
+    except Exception:
+        count = 1
     count = max(1, min(count, 50))
     if unit_id not in ARMY_UNITS:
         return web.json_response({"success": False, "error": "invalid_unit"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
+    if uid not in players:
+        players[uid] = create_player(uid)
     p = players[uid]
     if not p.get("country") or p.get("is_eliminated"):
         return web.json_response({"success": False, "error": "invalid_state"}, status=400)
-    ensure_player_fields(p); accrue_player(p)
-    unit = ARMY_UNITS[unit_id]; group = unit["group"]; req = unit["requires"]
+    ensure_player_fields(p)
+    accrue_player(p)
+    unit = ARMY_UNITS[unit_id]
+    group = unit["group"]
+    req = unit["requires"]
     if get_infra_level(p, req) <= 0:
         return web.json_response({"success": False, "error": "no_infra",
                                   "message": f"ابتدا «{INFRASTRUCTURE[req]['name']}» را بسازید."}, status=400)
-    cap = get_group_capacity(p, group); used = get_group_units(p, group)
+    cap = get_group_capacity(p, group)
+    used = get_group_units(p, group)
     if used >= cap:
         return web.json_response({"success": False, "error": "capacity_full",
                                   "message": f"ظرفیت {GROUP_NAMES[group]} پر است."}, status=400)
+    requested = count
     count = min(count, cap - used)
-    total_cost = unit["cost"] * count; total_mp = unit["manpower"] * count
+    total_cost = unit["cost"] * count
+    total_mp = unit["manpower"] * count
     if p.get("money", 0) < total_cost:
         return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
     if p.get("manpower", 0) < total_mp:
@@ -781,11 +888,16 @@ async def train_unit(request):
         if p["resources"].get(k, 0) < a * count:
             return web.json_response({"success": False, "error": "not_enough_resource",
                                       "message": f"{RESOURCE_NAMES[k]} کافی ندارید."}, status=400)
-    p["money"] -= total_cost; p["manpower"] -= total_mp
-    for k, a in unit["resources"].items(): p["resources"][k] -= a * count
+    p["money"] -= total_cost
+    p["manpower"] -= total_mp
+    for k, a in unit["resources"].items():
+        p["resources"][k] -= a * count
     p["units"][unit_id] = p["units"].get(unit_id, 0) + count
-    recompute_army(p); save_state()
-    return web.json_response({"success": True, "player": serialize_player(p)})
+    recompute_army(p)
+    return web.json_response({"success": True,
+                              "trained": count,
+                              "requested": requested,
+                              "player": serialize_player(p)})
 
 async def get_army_units(request):
     return web.json_response({"units": ARMY_UNITS, "resources": RESOURCE_NAMES, "groups": GROUP_NAMES})
@@ -795,18 +907,26 @@ async def get_army_units(request):
 # =========================================================
 async def propose_treaty(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
     data = await read_json(request)
-    target = data.get("target"); ttype = data.get("type")
-    try: dur = int(data.get("duration_days", 10))
-    except: dur = 10
+    target = data.get("target")
+    ttype = data.get("type")
+    try:
+        dur = int(data.get("duration_days", 10))
+    except Exception:
+        dur = 10
     dur = max(1, min(dur, 30))
     if target not in COUNTRIES or ttype not in TREATY_TYPE_NAMES:
         return web.json_response({"success": False, "error": "invalid"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]; fc = p.get("country")
-    if not fc: return web.json_response({"success": False, "error": "no_country"}, status=400)
-    if target == fc: return web.json_response({"success": False, "error": "self"}, status=400)
+    if uid not in players:
+        players[uid] = create_player(uid)
+    p = players[uid]
+    fc = p.get("country")
+    if not fc:
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
+    if target == fc:
+        return web.json_response({"success": False, "error": "self"}, status=400)
     tuid, _ = get_player_by_country(target)
     if tuid is None:
         return web.json_response({"success": False, "error": "unowned"}, status=400)
@@ -821,15 +941,18 @@ async def propose_treaty(request):
         await bot.send_message(tuid,
             f"📜 پیشنهاد {TREATY_TYPE_NAMES[ttype]}\nاز {COUNTRIES[fc]['name']} به مدت {dur} روز",
             reply_markup=kb)
-    except Exception as e: logging.warning("treaty msg: %s", e)
-    save_state()
+    except Exception as e:
+        logging.warning("treaty msg: %s", e)
     return web.json_response({"success": True, "message": "پیشنهاد ثبت شد."})
 
 async def get_diplomacy(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
-    if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]; accrue_player(p)
+    if not uid:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    if uid not in players:
+        players[uid] = create_player(uid)
+    p = players[uid]
+    accrue_player(p)
     cid = p.get("country")
     sent = [x for x in diplomacy_proposals.values() if x["from_user"] == uid and x["status"] == "pending"]
     recv = [x for x in diplomacy_proposals.values() if x["to_user"] == uid and x["status"] == "pending"]
@@ -838,8 +961,11 @@ async def get_diplomacy(request):
 
 async def respond_treaty(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); pid = data.get("proposal_id"); accept = bool(data.get("accept"))
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    pid = data.get("proposal_id")
+    accept = bool(data.get("accept"))
     p = diplomacy_proposals.get(pid)
     if not p or p["status"] != "pending":
         return web.json_response({"success": False, "error": "invalid"}, status=400)
@@ -852,13 +978,14 @@ async def respond_treaty(request):
             "expires_at": (utcnow() + timedelta(days=p["duration_days"])).isoformat()})
         push_news("پیمان جدید",
             f"{COUNTRIES[p['from_country']]['name']} و {COUNTRIES[p['to_country']]['name']} {TREATY_TYPE_NAMES[p['treaty_type']]} بستند.")
-    else: p["status"] = "rejected"
-    save_state()
+    else:
+        p["status"] = "rejected"
     return web.json_response({"success": True})
 
 def have_treaty(a, b, kind):
     for t in active_treaties:
-        if t["treaty_type"] != kind: continue
+        if t["treaty_type"] != kind:
+            continue
         if (t["country_a"] == a and t["country_b"] == b) or (t["country_a"] == b and t["country_b"] == a):
             return True
     return False
@@ -868,11 +995,14 @@ def have_treaty(a, b, kind):
 # =========================================================
 async def declare_war(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); target = data.get("target")
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    target = data.get("target")
     if target not in COUNTRIES:
         return web.json_response({"success": False, "error": "invalid_target"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
+    if uid not in players:
+        players[uid] = create_player(uid)
     p = players[uid]
     if not p.get("country") or p.get("is_eliminated"):
         return web.json_response({"success": False, "error": "invalid_state"}, status=400)
@@ -883,7 +1013,8 @@ async def declare_war(request):
         return web.json_response({"success": False, "error": "no_units",
                                   "message": "هیچ یگانی ندارید."}, status=400)
     tuid, tp = get_player_by_country(target)
-    if tuid is None: return web.json_response({"success": False, "error": "unowned"}, status=400)
+    if tuid is None:
+        return web.json_response({"success": False, "error": "unowned"}, status=400)
     if target in occupied_countries:
         return web.json_response({"success": False, "error": "already_occupied"}, status=400)
     if have_treaty(attacker, target, "non_aggression"):
@@ -903,16 +1034,17 @@ async def declare_war(request):
     await notify_admin(
         f"⚔️ اعلام جنگ\n{COUNTRIES[attacker]['name']} → {COUNTRIES[target]['name']}\n"
         f"جریمه اتحاد: {penalty}\nتأیید؟", kb)
-    save_state()
     return web.json_response({"success": True, "message": "اعلام جنگ به سازمان ملل ارسال شد."})
 
 async def get_wars(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
-    if uid not in players: players[uid] = create_player(uid)
+    if not uid:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    if uid not in players:
+        players[uid] = create_player(uid)
     cid = players[uid].get("country")
     pend = [w for w in war_declarations.values() if w["status"] in ("pending_admin", "negotiation")]
-    active = list(active_wars.values())
+    active = [w for w in active_wars.values() if not w.get("resolved")]
     mine = [r for r in war_reports if r.get("attacker") == cid or r.get("defender") == cid][-10:]
     return web.json_response({"pending": pend, "active": active, "reports": mine,
                               "occupied": occupied_countries})
@@ -930,23 +1062,29 @@ async def check_wars_tick():
 
 async def perform_battle(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
     data = await read_json(request)
     wid = data.get("war_id")
     fronts = data.get("fronts", {})
     w = active_wars.get(wid)
-    if not w: return web.json_response({"success": False, "error": "no_war"}, status=400)
-    if w["attacker_user"] != uid: return web.json_response({"success": False, "error": "not_attacker"}, status=403)
-    if w.get("resolved"): return web.json_response({"success": False, "error": "resolved"}, status=400)
+    if not w:
+        return web.json_response({"success": False, "error": "no_war"}, status=400)
+    if w["attacker_user"] != uid:
+        return web.json_response({"success": False, "error": "not_attacker"}, status=403)
+    if w.get("resolved"):
+        return web.json_response({"success": False, "error": "resolved"}, status=400)
 
     atk = players[w["attacker_user"]]
     duid, dfd = get_player_by_country(w["defender"])
-    if not dfd: return web.json_response({"success": False, "error": "defender_gone"}, status=400)
+    if not dfd:
+        return web.json_response({"success": False, "error": "defender_gone"}, status=400)
 
     def def_power(player, side_kind):
         p = 0
         for uid_, u in ARMY_UNITS.items():
-            if u["group"] != side_kind: continue
+            if u["group"] != side_kind:
+                continue
             p += player.get("units", {}).get(uid_, 0) * u["defense"]
         return p
 
@@ -955,42 +1093,76 @@ async def perform_battle(request):
                 for uid_, u in ARMY_UNITS.items() if u["group"] == side_kind}
 
     sent_atk = {k: max(0, int(fronts.get(k, 0) or 0)) for k in ["land", "air", "naval"]}
+    if sum(sent_atk.values()) == 0:
+        return web.json_response({"success": False, "error": "no_units_sent",
+                                  "message": "هیچ یگانی به جبهه‌ها نفرستادید."}, status=400)
+
     report = {"attacker": w["attacker"], "defender": w["defender"], "fronts": {},
               "at": utcnow().isoformat(), "winner": None}
-    attacker_wins = 0; defender_wins = 0; air_winner = None
+    attacker_wins = 0
+    defender_wins = 0
+    air_winner = None
 
     for front in ["air", "naval", "land"]:
-        atk_attack = 0
         available = total_units(atk, front)
-        requested = sent_atk.get(front, 0)
         total_available = sum(available.values())
+        requested = sent_atk.get(front, 0)
+
+        # یگان‌های اعزامی از این جبهه (نسبت به کل موجودی همون گروه)
+        committed = {}
         if total_available > 0 and requested > 0:
             ratio = min(1.0, requested / total_available)
-            for uid_, count in available.items():
-                u = ARMY_UNITS[uid_]
-                sent = int(count * ratio)
-                atk_attack += sent * u["attack"]
-                atk["units"][uid_] -= sent
+            for uid_, cnt in available.items():
+                sent = int(cnt * ratio)
+                if sent > 0:
+                    committed[uid_] = sent
+
+        atk_attack = sum(committed[uid_] * ARMY_UNITS[uid_]["attack"] for uid_ in committed)
         dfd_def = def_power(dfd, front) * 1.10
-        if air_winner == w["attacker"] and front in ["naval", "land"]: atk_attack *= 1.15
-        elif air_winner == w["defender"] and front in ["naval", "land"]: dfd_def *= 1.15
+
+        # بونوس برتری هوایی
+        if air_winner == w["attacker"] and front in ("naval", "land"):
+            atk_attack *= 1.15
+        elif air_winner == w["defender"] and front in ("naval", "land"):
+            dfd_def *= 1.15
+
         atk_final = atk_attack * (1 + random.uniform(-0.08, 0.08))
         dfd_final = dfd_def * (1 + random.uniform(-0.08, 0.08))
 
         if atk_final > dfd_final and atk_attack > 0:
-            fw = "attacker"; attacker_wins += 1
-            if front == "air": air_winner = w["attacker"]
-            for uid_, c in total_units(dfd, front).items(): dfd["units"][uid_] = int(c * 0.7)
-            for uid_, c in total_units(atk, front).items(): atk["units"][uid_] = int(c * 0.9)
+            fw = "attacker"
+            attacker_wins += 1
+            if front == "air":
+                air_winner = w["attacker"]
+            # برنده: ۱۰٪ تلفات از یگان‌های اعزامی
+            for uid_, sent in committed.items():
+                survivors = int(sent * 0.9)
+                losses = sent - survivors
+                atk["units"][uid_] = max(0, atk["units"].get(uid_, 0) - losses)
+            # مدافع: ۳۰٪ تلفات از کل یگان‌های همون گروه
+            for uid_, c in total_units(dfd, front).items():
+                dfd["units"][uid_] = int(c * 0.7)
         else:
-            fw = "defender"; defender_wins += 1
-            if front == "air": air_winner = w["defender"]
-            for uid_, c in total_units(atk, front).items(): atk["units"][uid_] = int(c * 0.7)
-            for uid_, c in total_units(dfd, front).items(): dfd["units"][uid_] = int(c * 0.9)
+            fw = "defender"
+            defender_wins += 1
+            if front == "air":
+                air_winner = w["defender"]
+            # بازنده (مهاجم): ۳۰٪ تلفات از یگان‌های اعزامی
+            for uid_, sent in committed.items():
+                survivors = int(sent * 0.7)
+                losses = sent - survivors
+                atk["units"][uid_] = max(0, atk["units"].get(uid_, 0) - losses)
+            # مدافع (برنده): ۱۰٪ تلفات
+            for uid_, c in total_units(dfd, front).items():
+                dfd["units"][uid_] = int(c * 0.9)
 
-        report["fronts"][front] = {"attacker_power": int(atk_final), "defender_power": int(dfd_final),
+        report["fronts"][front] = {"attacker_power": int(atk_final),
+                                   "defender_power": int(dfd_final),
+                                   "attacker_sent": sum(committed.values()),
                                    "winner": fw}
-    report["attacker_wins"] = attacker_wins; report["defender_wins"] = defender_wins
+
+    report["attacker_wins"] = attacker_wins
+    report["defender_wins"] = defender_wins
 
     if attacker_wins >= 2:
         report["winner"] = "attacker"
@@ -998,12 +1170,19 @@ async def perform_battle(request):
         transfer_mp = int(dfd.get("manpower", 0) * 0.4)
         dfd["manpower"] = int(dfd.get("manpower", 0) * 0.6)
         atk["manpower"] = atk.get("manpower", 0) + transfer_mp
-        if w["penalty"] > 0: atk["money"] = max(0, atk.get("money", 0) - w["penalty"])
+        if w["penalty"] > 0:
+            atk["money"] = max(0, atk.get("money", 0) - w["penalty"])
         for k, owner in list(map_holdings.items()):
-            if owner == w["defender"]: map_holdings[k] = w["attacker"]
+            if owner == w["defender"]:
+                map_holdings[k] = w["attacker"]
         for k, owner in list(strait_holdings.items()):
-            if owner == w["defender"]: strait_holdings[k] = w["attacker"]
+            if owner == w["defender"]:
+                strait_holdings[k] = w["attacker"]
         dfd["is_eliminated"] = True
+        # پاک‌سازی سفارش‌های بازار کشور اشغال‌شده
+        for lid, l in list(market_listings.items()):
+            if l["seller"] == w["defender"]:
+                del market_listings[lid]
         push_news("اشغال کشور",
             f"{COUNTRIES[w['attacker']]['name']} کشور {COUNTRIES[w['defender']]['name']} را اشغال کرد.")
     else:
@@ -1013,9 +1192,13 @@ async def perform_battle(request):
 
     report["id"] = str(uuid.uuid4())
     war_reports.append(report)
-    if len(war_reports) > 100: del war_reports[:50]
-    w["resolved"] = True; w["status"] = "resolved"
-    save_state()
+    if len(war_reports) > 100:
+        del war_reports[:50]
+    w["resolved"] = True
+    w["status"] = "resolved"
+    w["resolved_at"] = utcnow().isoformat()
+    recompute_army(atk)
+    recompute_army(dfd)
     return web.json_response({"success": True, "report": report})
 
 # =========================================================
@@ -1033,13 +1216,17 @@ async def get_map_sites(request):
 
 async def capture_site(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); site_id = data.get("site_id")
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    site_id = data.get("site_id")
     if site_id not in MAP_RESOURCES and site_id not in STRAITS_DATA:
         return web.json_response({"success": False, "error": "invalid_site"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
+    if uid not in players:
+        players[uid] = create_player(uid)
     p = players[uid]
-    if not p.get("country"): return web.json_response({"success": False, "error": "no_country"}, status=400)
+    if not p.get("country"):
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
     if p.get("units", {}).get("ship", 0) < 1 and p.get("units", {}).get("submarine", 0) < 1:
         return web.json_response({"success": False, "error": "no_navy",
                                   "message": "برای تصرف به ناو نیاز دارید."}, status=400)
@@ -1047,15 +1234,26 @@ async def capture_site(request):
     current = map_holdings.get(site_id) or strait_holdings.get(site_id)
     if current == country:
         return web.json_response({"success": False, "error": "already_own"}, status=400)
-    if p["units"].get("ship", 0) > 0: p["units"]["ship"] -= 1
-    else: p["units"]["submarine"] -= 1
+
+    # فقط سایت‌های دریایی با ناو قابل تصرفن
+    if site_id in MAP_RESOURCES:
+        info = MAP_RESOURCES[site_id]
+        if not info.get("naval_capturable"):
+            return web.json_response({"success": False, "error": "inland_site",
+                                      "message": "این منبع در خشکی است و با ناو قابل تصرف نیست."}, status=400)
+
+    if p["units"].get("ship", 0) > 0:
+        p["units"]["ship"] -= 1
+    else:
+        p["units"]["submarine"] -= 1
+    recompute_army(p)
+
     if site_id in MAP_RESOURCES:
         map_holdings[site_id] = country
         push_news("تصرف منبع", f"{COUNTRIES[country]['name']} {MAP_RESOURCES[site_id]['name']} را تصرف کرد.")
     else:
         strait_holdings[site_id] = country
         push_news("تصرف تنگه", f"{COUNTRIES[country]['name']} {STRAITS_DATA[site_id]['name']} را تصرف کرد.")
-    save_state()
     return web.json_response({"success": True, "message": "تصرف موفق."})
 
 # =========================================================
@@ -1067,22 +1265,31 @@ async def get_announcements(request):
         reactions = a.get("reactions", {})
         support = [c for c, r in reactions.items() if r == "support"]
         accuse = [c for c, r in reactions.items() if r == "accuse"]
+        comments = a.get("comments", [])
         result.append({"id": a["id"], "from_country": a["from_country"], "text": a["text"],
                        "created_at": a["created_at"], "support": support, "accuse": accuse,
-                       "comments_count": len(a.get("comments", []))})
+                       "comments": comments,
+                       "comments_count": len(comments)})
     result.reverse()
     return web.json_response(result)
 
 async def create_announcement(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); text = (data.get("text") or "").strip()[:500]
-    if not text: return web.json_response({"success": False, "error": "empty"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]; cid = p.get("country")
-    if not cid: return web.json_response({"success": False, "error": "no_country"}, status=400)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    text = (data.get("text") or "").strip()[:500]
+    if not text:
+        return web.json_response({"success": False, "error": "empty"}, status=400)
+    if uid not in players:
+        players[uid] = create_player(uid)
+    p = players[uid]
+    cid = p.get("country")
+    if not cid:
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
     today = utcnow().strftime("%Y-%m-%d")
-    anns = p.setdefault("announcements", {}); today_list = anns.get(today, [])
+    anns = p.setdefault("announcements", {})
+    today_list = anns.get(today, [])
     if len(today_list) >= 4:
         return web.json_response({"success": False, "error": "daily_limit",
                                   "message": "سهمیه امروز تمام است."}, status=400)
@@ -1097,45 +1304,59 @@ async def create_announcement(request):
         return web.json_response({"success": False, "error": "not_enough_money",
                                   "message": f"هزینه {cost} دلار."}, status=400)
     p["money"] -= cost
-    today_list.append(utcnow().isoformat()); anns[today] = today_list
+    today_list.append(utcnow().isoformat())
+    anns[today] = today_list
     ann = {"id": str(uuid.uuid4()), "from_country": cid, "text": text,
            "created_at": utcnow().isoformat(), "reactions": {}, "comments": []}
     announcements.append(ann)
     push_news("بیانیه", f"{COUNTRIES[cid]['name']}: {text[:80]}")
-    save_state()
     return web.json_response({"success": True, "announcement": ann})
 
 async def react_announcement(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); ann_id = data.get("announcement_id"); r = data.get("reaction")
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    ann_id = data.get("announcement_id")
+    r = data.get("reaction")
     if r not in ("support", "accuse"):
         return web.json_response({"success": False, "error": "invalid"}, status=400)
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if uid not in players:
+        return web.json_response({"success": False, "error": "no_player"}, status=400)
     cid = players[uid].get("country")
+    if not cid:
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
     for a in announcements:
         if a["id"] == ann_id:
             a.setdefault("reactions", {})[cid] = r
-            save_state(); return web.json_response({"success": True})
+            return web.json_response({"success": True})
     return web.json_response({"success": False, "error": "not_found"}, status=404)
 
 async def comment_announcement(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); ann_id = data.get("announcement_id"); text = (data.get("text") or "").strip()[:300]
-    if not text: return web.json_response({"success": False, "error": "empty"}, status=400)
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    ann_id = data.get("announcement_id")
+    text = (data.get("text") or "").strip()[:300]
+    if not text:
+        return web.json_response({"success": False, "error": "empty"}, status=400)
+    if uid not in players:
+        return web.json_response({"success": False, "error": "no_player"}, status=400)
     cid = players[uid].get("country")
+    if not cid:
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
     for a in announcements:
         if a["id"] == ann_id:
             a.setdefault("comments", []).append({"from_country": cid, "text": text, "at": utcnow().isoformat()})
-            save_state(); return web.json_response({"success": True})
+            return web.json_response({"success": True})
     return web.json_response({"success": False, "error": "not_found"}, status=404)
 
 async def get_announcement_detail(request):
     aid = request.query.get("id")
     for a in announcements:
-        if a["id"] == aid: return web.json_response(a)
+        if a["id"] == aid:
+            return web.json_response(a)
     return web.json_response({"error": "not_found"}, status=404)
 
 # =========================================================
@@ -1143,9 +1364,13 @@ async def get_announcement_detail(request):
 # =========================================================
 async def get_union(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
-    if uid not in players: return web.json_response({"union": None})
+    if not uid:
+        return web.json_response({"error": "unauthorized"}, status=401)
+    if uid not in players:
+        return web.json_response({"union": None, "invites": []})
     cid = players[uid].get("country")
+    if not cid:
+        return web.json_response({"union": None, "invites": []})
     for u in unions.values():
         if cid in u.get("members", []):
             return web.json_response({"union": u, "is_leader": u["leader_country"] == cid})
@@ -1157,12 +1382,17 @@ async def get_union(request):
 
 async def create_union(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); name = (data.get("name") or "").strip()[:40]
-    if not name: return web.json_response({"success": False, "error": "no_name"}, status=400)
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    name = (data.get("name") or "").strip()[:40]
+    if not name:
+        return web.json_response({"success": False, "error": "no_name"}, status=400)
+    if uid not in players:
+        return web.json_response({"success": False, "error": "no_player"}, status=400)
     cid = players[uid].get("country")
-    if not cid: return web.json_response({"success": False, "error": "no_country"}, status=400)
+    if not cid:
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
     for u in unions.values():
         if cid in u.get("members", []):
             return web.json_response({"success": False, "error": "already_member"}, status=400)
@@ -1170,65 +1400,91 @@ async def create_union(request):
     unions[u_id] = {"id": u_id, "name": name, "leader_country": cid, "members": [cid],
                     "messages": [], "invites": [], "created_at": utcnow().isoformat()}
     push_news("اتحادیه", f"{COUNTRIES[cid]['name']} اتحادیه «{name}» را ساخت.")
-    save_state()
     return web.json_response({"success": True, "union_id": u_id})
 
 async def invite_union(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); u_id = data.get("union_id"); target = data.get("target")
-    if target not in COUNTRIES: return web.json_response({"success": False, "error": "invalid"}, status=400)
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    u_id = data.get("union_id")
+    target = data.get("target")
+    if target not in COUNTRIES:
+        return web.json_response({"success": False, "error": "invalid"}, status=400)
+    if uid not in players:
+        return web.json_response({"success": False, "error": "no_player"}, status=400)
     cid = players[uid].get("country")
     u = unions.get(u_id)
-    if not u: return web.json_response({"success": False, "error": "no_union"}, status=404)
-    if u["leader_country"] != cid: return web.json_response({"success": False, "error": "not_leader"}, status=403)
-    if target in u["members"]: return web.json_response({"success": False, "error": "already_member"}, status=400)
-    if target not in u["invites"]: u["invites"].append(target)
-    save_state()
+    if not u:
+        return web.json_response({"success": False, "error": "no_union"}, status=404)
+    if u["leader_country"] != cid:
+        return web.json_response({"success": False, "error": "not_leader"}, status=403)
+    if target in u["members"]:
+        return web.json_response({"success": False, "error": "already_member"}, status=400)
+    if target not in u["invites"]:
+        u["invites"].append(target)
     return web.json_response({"success": True})
 
 async def respond_union_invite(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); u_id = data.get("union_id"); accept = bool(data.get("accept"))
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    u_id = data.get("union_id")
+    accept = bool(data.get("accept"))
+    if uid not in players:
+        return web.json_response({"success": False, "error": "no_player"}, status=400)
     cid = players[uid].get("country")
+    if not cid:
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
     u = unions.get(u_id)
     if not u or cid not in u.get("invites", []):
         return web.json_response({"success": False, "error": "no_invite"}, status=400)
-    u["invites"].remove(cid)
+    # چک عضویت در اتحادیه دیگه — قبل از حذف دعوت
     for other in unions.values():
         if other["id"] != u_id and cid in other.get("members", []):
             return web.json_response({"success": False, "error": "in_other"}, status=400)
-    if accept: u["members"].append(cid)
-    save_state()
+    u["invites"].remove(cid)
+    if accept:
+        u["members"].append(cid)
     return web.json_response({"success": True})
 
 async def leave_union(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    if uid not in players:
+        return web.json_response({"success": False, "error": "no_player"}, status=400)
     cid = players[uid].get("country")
+    if not cid:
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
     for u in list(unions.values()):
         if cid in u.get("members", []):
             u["members"].remove(cid)
-            if not u["members"]: del unions[u["id"]]
-            save_state(); return web.json_response({"success": True})
+            if not u["members"]:
+                del unions[u["id"]]
+            return web.json_response({"success": True})
     return web.json_response({"success": False, "error": "not_member"}, status=400)
 
 async def send_union_message(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); text = (data.get("text") or "").strip()[:500]
-    if not text: return web.json_response({"success": False, "error": "empty"}, status=400)
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    text = (data.get("text") or "").strip()[:500]
+    if not text:
+        return web.json_response({"success": False, "error": "empty"}, status=400)
+    if uid not in players:
+        return web.json_response({"success": False, "error": "no_player"}, status=400)
     cid = players[uid].get("country")
+    if not cid:
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
     for u in unions.values():
         if cid in u.get("members", []):
             u.setdefault("messages", []).append({"from_country": cid, "text": text, "at": utcnow().isoformat()})
-            if len(u["messages"]) > 200: del u["messages"][:50]
-            save_state(); return web.json_response({"success": True})
+            if len(u["messages"]) > 200:
+                del u["messages"][:50]
+            return web.json_response({"success": True})
     return web.json_response({"success": False, "error": "not_member"}, status=400)
 
 # =========================================================
@@ -1236,27 +1492,40 @@ async def send_union_message(request):
 # =========================================================
 async def send_pm(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); target = data.get("target"); text = (data.get("text") or "").strip()[:500]
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    target = data.get("target")
+    text = (data.get("text") or "").strip()[:500]
     if target not in COUNTRIES or not text:
         return web.json_response({"success": False, "error": "invalid"}, status=400)
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if uid not in players:
+        return web.json_response({"success": False, "error": "no_player"}, status=400)
     cid = players[uid].get("country")
     if not cid or target == cid:
         return web.json_response({"success": False, "error": "invalid"}, status=400)
     msg = {"from": cid, "to": target, "text": text, "at": utcnow().isoformat()}
-    private_messages.setdefault(cid, {}).setdefault(target, []).append(msg)
-    private_messages.setdefault(target, {}).setdefault(cid, []).append(msg)
-    save_state()
+    conv_a = private_messages.setdefault(cid, {}).setdefault(target, [])
+    conv_b = private_messages.setdefault(target, {}).setdefault(cid, [])
+    conv_a.append(msg)
+    conv_b.append(msg)
+    # محدودسازی
+    if len(conv_a) > 200:
+        del conv_a[:50]
+    if len(conv_b) > 200:
+        del conv_b[:50]
     return web.json_response({"success": True})
 
 async def get_pm(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    if not uid:
+        return web.json_response({"error": "unauthorized"}, status=401)
     target = request.query.get("target")
-    if uid not in players: return web.json_response({"messages": []})
+    if uid not in players:
+        return web.json_response({"messages": [], "conversations": []})
     cid = players[uid].get("country")
-    if not cid: return web.json_response({"messages": []})
+    if not cid:
+        return web.json_response({"messages": [], "conversations": []})
     if target:
         return web.json_response({"messages": private_messages.get(cid, {}).get(target, []), "with": target})
     return web.json_response({"conversations": list(private_messages.get(cid, {}).keys())})
@@ -1269,96 +1538,140 @@ async def get_market(request):
 
 async def create_listing(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
     data = await read_json(request)
-    sr = data.get("sell_resource"); wr = data.get("want_resource")
-    try: sa = int(data.get("sell_amount", 0)); wa = int(data.get("want_amount", 0))
-    except: return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
-    if sr not in RESOURCE_NAMES: return web.json_response({"success": False, "error": "invalid_res"}, status=400)
+    sr = data.get("sell_resource")
+    wr = data.get("want_resource")
+    try:
+        sa = int(data.get("sell_amount", 0))
+        wa = int(data.get("want_amount", 0))
+    except Exception:
+        return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
+    if sr not in RESOURCE_NAMES:
+        return web.json_response({"success": False, "error": "invalid_res"}, status=400)
     if wr != "money" and wr not in RESOURCE_NAMES:
         return web.json_response({"success": False, "error": "invalid_want"}, status=400)
-    if sa <= 0 or wa <= 0: return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
+    if sa <= 0 or wa <= 0:
+        return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
+    if uid not in players:
+        players[uid] = create_player(uid)
     p = players[uid]
-    if not p.get("country"): return web.json_response({"success": False, "error": "no_country"}, status=400)
+    if not p.get("country"):
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
     if p["resources"].get(sr, 0) < sa:
         return web.json_response({"success": False, "error": "not_enough_res"}, status=400)
+    # Escrow: منابع بلوکه می‌شن
+    p["resources"][sr] -= sa
     lid = str(uuid.uuid4())
     market_listings[lid] = {"id": lid, "seller": p["country"], "sell_resource": sr,
                             "sell_amount": sa, "want_resource": wr, "want_amount": wa,
                             "status": "open", "created_at": utcnow().isoformat()}
-    save_state()
     return web.json_response({"success": True, "listing_id": lid})
 
 async def cancel_listing(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); lid = data.get("listing_id")
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    lid = data.get("listing_id")
+    if uid not in players:
+        return web.json_response({"success": False, "error": "no_player"}, status=400)
     cid = players[uid].get("country")
     l = market_listings.get(lid)
-    if not l: return web.json_response({"success": False, "error": "not_found"}, status=404)
-    if l["seller"] != cid: return web.json_response({"success": False, "error": "not_owner"}, status=403)
-    del market_listings[lid]; save_state()
+    if not l:
+        return web.json_response({"success": False, "error": "not_found"}, status=404)
+    if l["status"] != "open":
+        return web.json_response({"success": False, "error": "not_open"}, status=400)
+    if l["seller"] != cid:
+        return web.json_response({"success": False, "error": "not_owner"}, status=403)
+    # بازگرداندن منابع بلوکه‌شده
+    seller = players[uid]
+    seller["resources"][l["sell_resource"]] = seller["resources"].get(l["sell_resource"], 0) + l["sell_amount"]
+    del market_listings[lid]
     return web.json_response({"success": True})
 
 async def accept_listing(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); lid = data.get("listing_id")
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
-    buyer = players[uid]; bcid = buyer.get("country")
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    lid = data.get("listing_id")
+    if uid not in players:
+        return web.json_response({"success": False, "error": "no_player"}, status=400)
+    buyer = players[uid]
+    bcid = buyer.get("country")
+    if not bcid:
+        return web.json_response({"success": False, "error": "no_country"}, status=400)
     l = market_listings.get(lid)
     if not l or l["status"] != "open":
         return web.json_response({"success": False, "error": "closed"}, status=400)
-    if l["seller"] == bcid: return web.json_response({"success": False, "error": "self_buy"}, status=400)
+    if l["seller"] == bcid:
+        return web.json_response({"success": False, "error": "self_buy"}, status=400)
     suid, seller = get_player_by_country(l["seller"])
-    if not seller: return web.json_response({"success": False, "error": "seller_gone"}, status=400)
+    if not seller:
+        return web.json_response({"success": False, "error": "seller_gone"}, status=400)
+
+    # چک کامل قبل از هر تغییری
     if l["want_resource"] == "money":
         if buyer.get("money", 0) < l["want_amount"]:
             return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
-        buyer["money"] -= l["want_amount"]; seller["money"] = seller.get("money", 0) + l["want_amount"]
     else:
         if buyer["resources"].get(l["want_resource"], 0) < l["want_amount"]:
             return web.json_response({"success": False, "error": "not_enough_res"}, status=400)
+
+    # انجام تراکنش
+    if l["want_resource"] == "money":
+        buyer["money"] -= l["want_amount"]
+        seller["money"] = seller.get("money", 0) + l["want_amount"]
+    else:
         buyer["resources"][l["want_resource"]] -= l["want_amount"]
         seller["resources"][l["want_resource"]] = seller["resources"].get(l["want_resource"], 0) + l["want_amount"]
-    if seller["resources"].get(l["sell_resource"], 0) < l["sell_amount"]:
-        return web.json_response({"success": False, "error": "seller_no_res"}, status=400)
-    seller["resources"][l["sell_resource"]] -= l["sell_amount"]
+
+    # منابع escrow‌شده به خریدار منتقل می‌شن
     buyer["resources"][l["sell_resource"]] = buyer["resources"].get(l["sell_resource"], 0) + l["sell_amount"]
-    l["status"] = "filled"; l["buyer"] = bcid
+    l["status"] = "filled"
+    l["buyer"] = bcid
     push_news("معامله", f"{COUNTRIES[bcid]['name']} از {COUNTRIES[l['seller']]['name']} "
                         f"{l['sell_amount']} {RESOURCE_NAMES[l['sell_resource']]} خرید.")
-    save_state()
     return web.json_response({"success": True})
 
 # =========================================================
 # API News / Rankings
 # =========================================================
 async def get_news(request):
-    return web.json_response(list(reversed(news_feed[-30:])) or [
-        {"title": "سال ۱۹۳۹", "text": "اروپا در آستانه یک بحران بزرگ قرار دارد."}])
+    if not news_feed:
+        return web.json_response([
+            {"title": "سال ۱۹۳۹", "text": "اروپا در آستانه یک بحران بزرگ قرار دارد."}
+        ])
+    return web.json_response(list(reversed(news_feed[-30:])))
 
 def compute_rankings():
     rows = []
     for uid, p in players.items():
         cid = p.get("country")
-        if not cid: continue
-        ensure_player_fields(p); recompute_army(p); rates = compute_rates(p)
-        eco = rates["net_income"] // 1000; mil = p.get("army", 0)
+        if not cid:
+            continue
+        ensure_player_fields(p)
+        recompute_army(p)
+        rates = compute_rates(p)
+        eco = rates["net_income"] // 1000
+        mil = p.get("army", 0)
         dip = 0
         for t in active_treaties:
-            if t["country_a"] == cid or t["country_b"] == cid: dip += 100
+            if t["country_a"] == cid or t["country_b"] == cid:
+                dip += 100
         for u in unions.values():
-            if cid in u.get("members", []): dip += 150
+            if cid in u.get("members", []):
+                dip += 150
         dev = sum(p.get("infra_levels", {}).values()) * 50
         total = eco + mil + dip + dev
         rows.append({"country": cid, "name": COUNTRIES[cid]["name"], "flag": COUNTRIES[cid]["flag"],
                      "overall": total, "economy": eco, "military": mil, "diplomacy": dip,
                      "development": dev, "is_eliminated": p.get("is_eliminated", False)})
     rows.sort(key=lambda x: x["overall"], reverse=True)
-    for i, r in enumerate(rows): r["rank"] = i + 1
+    for i, r in enumerate(rows):
+        r["rank"] = i + 1
     return rows
 
 async def get_rankings(request):
@@ -1382,9 +1695,14 @@ async def debug_auth(request):
 # =========================================================
 WEB_DIR = os.path.join("web")
 
-async def index(request): return web.FileResponse(os.path.join(WEB_DIR, "index.html"))
-async def style(request): return web.FileResponse(os.path.join(WEB_DIR, "style.css"))
-async def app_js(request): return web.FileResponse(os.path.join(WEB_DIR, "app.js"))
+async def index(request):
+    return web.FileResponse(os.path.join(WEB_DIR, "index.html"))
+
+async def style(request):
+    return web.FileResponse(os.path.join(WEB_DIR, "style.css"))
+
+async def app_js(request):
+    return web.FileResponse(os.path.join(WEB_DIR, "app.js"))
 
 async def create_web_app():
     app = web.Application(middlewares=[cors_middleware])
@@ -1424,21 +1742,24 @@ async def create_web_app():
 
 async def start_web_server():
     app = await create_web_app()
-    runner = web.AppRunner(app); await runner.setup()
+    runner = web.AppRunner(app)
+    await runner.setup()
     port = int(os.getenv("PORT", "10000"))
-    site = web.TCPSite(runner, "0.0.0.0", port); await site.start()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
     logging.info("WEB SERVER STARTED | port=%s", port)
 
 async def war_tick_loop():
     while True:
         await asyncio.sleep(30)
-        try: await check_wars_tick()
-        except Exception as e: logging.error("war tick: %s", e)
+        try:
+            await check_wars_tick()
+        except Exception as e:
+            logging.error("war tick: %s", e)
 
 async def main():
-    logging.info("WW2 GAME STARTING...")
-    load_state()
-    asyncio.create_task(autosave_loop())
+    logging.info("WW2 GAME STARTING... (in-memory, no persistence)")
+    asyncio.create_task(cleanup_loop())
     asyncio.create_task(war_tick_loop())
     await start_web_server()
     await bot.delete_webhook(drop_pending_updates=True)
@@ -1446,5 +1767,7 @@ async def main():
     await dp.start_polling(bot, drop_pending_updates=True, handle_signals=False)
 
 if __name__ == "__main__":
-    try: asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit): save_state()
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        pass
