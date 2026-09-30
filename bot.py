@@ -55,42 +55,42 @@ INFRASTRUCTURE = {
     "power_coal": {
         "name": "نیروگاه زغال‌سنگ", "group": "power", "icon": "⚡",
         "desc": "ارزان‌ترین نیروگاه، اما آلودگی و هزینهٔ نگهداری بیشتری دارد.",
-        "levels": [L(capacity=10), L(capacity=25), L(capacity=55), L(capacity=100), L(capacity=180)],
+        "levels": [L(cost=250_000, capacity=10), L(cost=550_000, capacity=25), L(cost=1_300_000, capacity=55), L(cost=2_600_000, capacity=100), L(cost=4_800_000, capacity=180)],
     },
     "power_gas": {
         "name": "نیروگاه گازی", "group": "power", "icon": "⚡",
         "desc": "برق بیشتری از زغال‌سنگ تولید می‌کند اما سوخت بیشتری می‌خواهد.",
-        "levels": [L(capacity=15), L(capacity=35), L(capacity=70), L(capacity=130), L(capacity=230)],
+        "levels": [L(cost=380_000, capacity=15), L(cost=820_000, capacity=35), L(cost=1_900_000, capacity=70), L(cost=3_700_000, capacity=130), L(cost=6_600_000, capacity=230)],
     },
     "power_wind": {
         "name": "نیروگاه بادی", "group": "power", "icon": "⚡",
         "desc": "ارزان‌ترین نیروگاه با کمترین هزینهٔ نگهداری. هر سطح برق بیشتری تولید می‌کند.",
-        "levels": [L(capacity=9), L(capacity=22), L(capacity=48), L(capacity=95), L(capacity=165)],
+        "levels": [L(cost=200_000, capacity=9), L(cost=460_000, capacity=22), L(cost=1_050_000, capacity=48), L(cost=2_100_000, capacity=95), L(cost=3_800_000, capacity=165)],
     },
     "power_solar": {
         "name": "نیروگاه خورشیدی", "group": "power", "icon": "⚡",
         "desc": "برقی بیشتر از نیروگاه بادی، با قیمتی کمتر از برق‌آبی.",
-        "levels": [L(capacity=12), L(capacity=28), L(capacity=62), L(capacity=120), L(capacity=210)],
+        "levels": [L(cost=260_000, capacity=12), L(cost=580_000, capacity=28), L(cost=1_300_000, capacity=62), L(cost=2_500_000, capacity=120), L(cost=4_500_000, capacity=210)],
     },
     "power_hydro": {
         "name": "نیروگاه برق‌آبی", "group": "power", "icon": "⚡",
         "desc": "برقی بیشتر از خورشیدی، اما ساختش طولانی‌تر است.",
-        "levels": [L(capacity=18), L(capacity=40), L(capacity=85), L(capacity=160), L(capacity=280)],
+        "levels": [L(cost=420_000, capacity=18), L(cost=900_000, capacity=40), L(cost=2_000_000, capacity=85), L(cost=3_800_000, capacity=160), L(cost=6_700_000, capacity=280)],
     },
     "power_geothermal": {
         "name": "نیروگاه زمین‌گرمایی", "group": "power", "icon": "⚡",
         "desc": "تولید پایدار در همه فصل‌ها.",
-        "levels": [L(capacity=22), L(capacity=50), L(capacity=105), L(capacity=195), L(capacity=340)],
+        "levels": [L(cost=520_000, capacity=22), L(cost=1_050_000, capacity=50), L(cost=2_200_000, capacity=105), L(cost=4_000_000, capacity=195), L(cost=6_800_000, capacity=340)],
     },
     "power_nuclear": {
         "name": "نیروگاه هسته‌ای", "group": "power", "icon": "⚡",
         "desc": "پر بازده‌ترین نیروگاه. هزینهٔ نگهداری ندارد اما اورانیوم مصرف می‌کند.",
         "levels": [
-            L(capacity=35, resources={"uranium": 5_000}),
-            L(capacity=85, resources={"uranium": 12_000}),
-            L(capacity=180, resources={"uranium": 25_000}),
-            L(capacity=340, resources={"uranium": 50_000}),
-            L(capacity=600, resources={"uranium": 90_000}),
+            L(cost=1_400_000, capacity=35, resources={"uranium": 5_000}),
+            L(cost=3_000_000, capacity=85, resources={"uranium": 12_000}),
+            L(cost=6_000_000, capacity=180, resources={"uranium": 25_000}),
+            L(cost=10_500_000, capacity=340, resources={"uranium": 50_000}),
+            L(cost=17_500_000, capacity=600, resources={"uranium": 90_000}),
         ],
     },
 
@@ -98,93 +98,93 @@ INFRASTRUCTURE = {
     "manpower_camp": {
         "name": "اردوگاه آموزشی", "group": "manpower", "icon": "👥",
         "desc": "پایگاه آموزش نیرو. هر سطح نیروی بیشتری تربیت می‌کند.",
-        "levels": [L(production=200), L(production=500), L(production=1200), L(production=2500), L(production=5000)],
+        "levels": [L(cost=220_000, production=200), L(cost=480_000, production=500), L(cost=1_050_000, production=1200), L(cost=2_000_000, production=2500), L(cost=3_600_000, production=5000)],
     },
     "manpower_barracks_training": {
         "name": "پادگان آموزشی", "group": "manpower", "icon": "👥",
         "desc": "پادگان تخصصی آموزش سرباز.",
-        "levels": [L(production=300), L(production=700), L(production=1600), L(production=3400), L(production=6800)],
+        "levels": [L(cost=300_000, production=300), L(cost=650_000, production=700), L(cost=1_400_000, production=1600), L(cost=2_700_000, production=3400), L(cost=4_900_000, production=6800)],
     },
     "manpower_volunteer": {
         "name": "پایگاه داوطلبان", "group": "manpower", "icon": "👥",
         "desc": "داوطلبان داوطلبانه ثبت‌نام می‌کنند.",
-        "levels": [L(production=240), L(production=560), L(production=1300), L(production=2800), L(production=5500)],
+        "levels": [L(cost=180_000, production=240), L(cost=430_000, production=560), L(cost=1_050_000, production=1300), L(cost=2_300_000, production=2800), L(cost=4_600_000, production=5500)],
     },
     "manpower_medical": {
         "name": "مرکز پزشکی", "group": "manpower", "icon": "👥",
         "desc": "سلامت سربازان را تأمین می‌کند و تولید نیرو را بالا می‌برد.",
-        "levels": [L(production=260), L(production=620), L(production=1400), L(production=3000), L(production=6000)],
+        "levels": [L(cost=260_000, production=260), L(cost=560_000, production=620), L(cost=1_250_000, production=1400), L(cost=2_500_000, production=3000), L(cost=4_700_000, production=6000)],
     },
     "manpower_mobilization": {
         "name": "مرکز بسیج", "group": "manpower", "icon": "👥",
         "desc": "در زمان جنگ نیروهای بیشتری جذب می‌کند.",
-        "levels": [L(production=380), L(production=900), L(production=2000), L(production=4200), L(production=8500)],
+        "levels": [L(cost=340_000, production=380), L(cost=720_000, production=900), L(cost=1_500_000, production=2000), L(cost=2_900_000, production=4200), L(cost=5_300_000, production=8500)],
     },
     "manpower_academy": {
         "name": "آکادمی نظامی", "group": "manpower", "icon": "👥",
         "desc": "افسران کارآزموده پرورش می‌دهد.",
-        "levels": [L(production=450), L(production=1100), L(production=2400), L(production=5000), L(production=10000)],
+        "levels": [L(cost=430_000, production=450), L(cost=900_000, production=1100), L(cost=1_800_000, production=2400), L(cost=3_400_000, production=5000), L(cost=6_000_000, production=10000)],
     },
 
     # ==================== غذا ====================
     "resource_farm": {
         "name": "مجتمع کشاورزی", "group": "resource", "resource_key": "food", "icon": "🌾",
         "desc": "غذا تولید می‌کند. از کشاورزی ارزان‌تر است و سریع‌تر ساخته می‌شود.",
-        "levels": [L(production=50_000), L(production=130_000), L(production=300_000), L(production=700_000), L(production=1_500_000)],
+        "levels": [L(cost=150_000, production=50_000), L(cost=350_000, production=130_000), L(cost=800_000, production=300_000), L(cost=1_600_000, production=700_000), L(cost=3_000_000, production=1_500_000)],
     },
 
     # ==================== منابع ====================
     "resource_oil_well": {
         "name": "چاه نفت", "group": "resource", "resource_key": "oil", "icon": "🛢️",
         "desc": "نفت خام استخراج می‌کند. برای پالایشگاه و ارتش ضروری است.",
-        "levels": [L(production=50_000), L(production=130_000), L(production=300_000), L(production=700_000), L(production=1_500_000)],
+        "levels": [L(cost=220_000, production=50_000), L(cost=500_000, production=130_000), L(cost=1_100_000, production=300_000), L(cost=2_200_000, production=700_000), L(cost=4_200_000, production=1_500_000)],
     },
     "resource_steel_mill": {
         "name": "کارخانه فولاد", "group": "resource", "resource_key": "steel", "icon": "⚙️",
         "desc": "فولاد تولید می‌کند. پایهٔ صنعت و ساخت تانک است.",
-        "levels": [L(production=50_000), L(production=130_000), L(production=300_000), L(production=700_000), L(production=1_500_000)],
+        "levels": [L(cost=240_000, production=50_000), L(cost=540_000, production=130_000), L(cost=1_200_000, production=300_000), L(cost=2_400_000, production=700_000), L(cost=4_500_000, production=1_500_000)],
     },
     "resource_uranium_mine": {
         "name": "معدن اورانیوم", "group": "resource", "resource_key": "uranium", "icon": "☢️",
         "desc": "اورانیوم استخراج می‌کند. تنها نیروگاه هسته‌ای مصرفش می‌کند.",
-        "levels": [L(production=50_000), L(production=130_000), L(production=300_000), L(production=700_000), L(production=1_500_000)],
+        "levels": [L(cost=380_000, production=50_000), L(cost=850_000, production=130_000), L(cost=1_900_000, production=300_000), L(cost=3_700_000, production=700_000), L(cost=7_000_000, production=1_500_000)],
     },
 
     # ==================== نظامی ====================
     "land_barracks": {
         "name": "پادگان", "group": "land", "icon": "🪖",
         "desc": "محل استقرار پیاده‌نظام. هر سطح ظرفیت را ۱۰۰۰ نفر بیشتر می‌کند.",
-        "levels": [L(capacity=1000), L(capacity=2000), L(capacity=3000), L(capacity=4000), L(capacity=5000)],
+        "levels": [L(cost=200_000, capacity=1000), L(cost=450_000, capacity=2000), L(cost=950_000, capacity=3000), L(cost=1_800_000, capacity=4000), L(cost=3_200_000, capacity=5000)],
     },
     "land_hq": {
         "name": "ستاد فرماندهی", "group": "land", "icon": "🪖",
         "desc": "پیاده‌نظام اینجا تولید می‌شود. هر سطح ۱۰٪ به دفاع کشور در برابر حملات مستقیم اضافه می‌کند.",
-        "levels": [L(capacity=3), L(capacity=8), L(capacity=18), L(capacity=35), L(capacity=60)],
+        "levels": [L(cost=500_000, capacity=3), L(cost=1_100_000, capacity=8), L(cost=2_300_000, capacity=18), L(cost=4_300_000, capacity=35), L(cost=7_500_000, capacity=60)],
     },
     "land_tank_factory": {
         "name": "کارخانه تانک", "group": "land", "icon": "🪖",
         "desc": "تانک و لانچر تولید می‌کند. هر سطح تولید را سریع‌تر و دفاع تانک‌ها را قوی‌تر می‌کند.",
-        "levels": [L(capacity=3), L(capacity=8), L(capacity=16), L(capacity=30), L(capacity=55)],
+        "levels": [L(cost=600_000, capacity=3), L(cost=1_300_000, capacity=8), L(cost=2_800_000, capacity=16), L(cost=5_200_000, capacity=30), L(cost=9_000_000, capacity=55)],
     },
     "naval_port": {
         "name": "بندر", "group": "naval", "icon": "⚓",
         "desc": "محل پهلو گرفتن ناوگان. هر سطح ظرفیت بندر را بیشتر می‌کند.",
-        "levels": [L(capacity=3), L(capacity=8), L(capacity=18), L(capacity=30), L(capacity=55)],
+        "levels": [L(cost=550_000, capacity=3), L(cost=1_200_000, capacity=8), L(cost=2_600_000, capacity=18), L(cost=4_800_000, capacity=30), L(cost=8_500_000, capacity=55)],
     },
     "naval_shipyard": {
         "name": "کارخانه کشتی‌سازی", "group": "naval", "icon": "⚓",
         "desc": "زیردریایی، ناوشکن، ناو ترابری و ناو هواپیمابر تولید می‌کند.",
-        "levels": [L(capacity=2), L(capacity=6), L(capacity=14), L(capacity=25), L(capacity=45)],
+        "levels": [L(cost=900_000, capacity=2), L(cost=1_900_000, capacity=6), L(cost=4_000_000, capacity=14), L(cost=7_300_000, capacity=25), L(cost=12_500_000, capacity=45)],
     },
     "air_airport": {
         "name": "فرودگاه نظامی", "group": "air", "icon": "✈️",
         "desc": "محل استقرار جنگنده، بمب‌افکن، بالگرد و هواپیمای سوخت‌رسان.",
-        "levels": [L(capacity=3), L(capacity=8), L(capacity=18), L(capacity=30), L(capacity=55)],
+        "levels": [L(cost=650_000, capacity=3), L(cost=1_400_000, capacity=8), L(cost=2_900_000, capacity=18), L(cost=5_400_000, capacity=30), L(cost=9_300_000, capacity=55)],
     },
     "air_arsenal": {
         "name": "کارخانه ادوات هوایی", "group": "air", "icon": "✈️",
         "desc": "جنگنده، بمب‌افکن و بالگرد تولید می‌کند. هر سطح تولید را سریع‌تر می‌کند.",
-        "levels": [L(capacity=2), L(capacity=6), L(capacity=14), L(capacity=25), L(capacity=45)],
+        "levels": [L(cost=950_000, capacity=2), L(cost=2_000_000, capacity=6), L(cost=4_200_000, capacity=14), L(cost=7_600_000, capacity=25), L(cost=13_000_000, capacity=45)],
     },
 }
 
@@ -193,43 +193,43 @@ ECONOMY = {
         "name": "کشاورزی و دامداری", "group": "eco", "icon": "🌾",
         "desc": "پایهٔ اقتصاد. غذای اضافی می‌فروشد و درآمد می‌دهد.",
         "power_required": 5,
-        "levels": [L(income=30_000), L(income=80_000), L(income=190_000), L(income=420_000), L(income=850_000)],
+        "levels": [L(cost=90_000, income=30_000), L(cost=220_000, income=80_000), L(cost=500_000, income=190_000), L(cost=1_050_000, income=420_000), L(cost=2_100_000, income=850_000)],
     },
     "eco_textile": {
         "name": "کارخانه نساجی", "group": "eco", "icon": "🧵",
         "desc": "پوشاک و منسوجات تولید می‌کند.",
         "power_required": 8,
-        "levels": [L(income=45_000), L(income=115_000), L(income=270_000), L(income=600_000), L(income=1_200_000)],
+        "levels": [L(cost=160_000, income=45_000), L(cost=400_000, income=115_000), L(cost=920_000, income=270_000), L(cost=1_950_000, income=600_000), L(cost=3_900_000, income=1_200_000)],
     },
     "eco_mining": {
         "name": "معدن‌کاری", "group": "eco", "icon": "⛏️",
         "desc": "مواد معدنی استخراج و صادر می‌کند.",
         "power_required": 12,
-        "levels": [L(income=70_000), L(income=180_000), L(income=420_000), L(income=920_000), L(income=1_850_000)],
+        "levels": [L(cost=280_000, income=70_000), L(cost=700_000, income=180_000), L(cost=1_600_000, income=420_000), L(cost=3_400_000, income=920_000), L(cost=6_800_000, income=1_850_000)],
     },
     "eco_steel": {
         "name": "کارخانه فولاد", "group": "eco", "icon": "⚙️",
         "desc": "فولاد را به محصولات صنعتی تبدیل می‌کند.",
         "power_required": 18,
-        "levels": [L(income=100_000), L(income=260_000), L(income=600_000), L(income=1_300_000), L(income=2_600_000)],
+        "levels": [L(cost=420_000, income=100_000), L(cost=1_050_000, income=260_000), L(cost=2_400_000, income=600_000), L(cost=5_100_000, income=1_300_000), L(cost=10_200_000, income=2_600_000)],
     },
     "eco_trade": {
         "name": "تجارت بین‌الملل", "group": "eco", "icon": "🚢",
         "desc": "شبکهٔ تجاری کشور را گسترش می‌دهد.",
         "power_required": 20,
-        "levels": [L(income=130_000), L(income=330_000), L(income=760_000), L(income=1_600_000), L(income=3_200_000)],
+        "levels": [L(cost=700_000, income=130_000), L(cost=1_750_000, income=330_000), L(cost=4_000_000, income=760_000), L(cost=8_400_000, income=1_600_000), L(cost=16_800_000, income=3_200_000)],
     },
     "eco_oil": {
         "name": "پالایشگاه نفت", "group": "eco", "icon": "🛢️",
         "desc": "نفت خام را پالایش و صادر می‌کند.",
         "power_required": 25,
-        "levels": [L(income=140_000), L(income=360_000), L(income=820_000), L(income=1_750_000), L(income=3_500_000)],
+        "levels": [L(cost=800_000, income=140_000), L(cost=2_000_000, income=360_000), L(cost=4_500_000, income=820_000), L(cost=9_500_000, income=1_750_000), L(cost=19_000_000, income=3_500_000)],
     },
     "eco_bank": {
         "name": "بانک مرکزی", "group": "eco", "icon": "🏦",
         "desc": "سیستم مالی کشور را مدیریت می‌کند.",
         "power_required": 30,
-        "levels": [L(income=180_000), L(income=460_000), L(income=1_050_000), L(income=2_200_000), L(income=4_400_000)],
+        "levels": [L(cost=1_600_000, income=180_000), L(cost=4_000_000, income=460_000), L(cost=9_200_000, income=1_050_000), L(cost=19_500_000, income=2_200_000), L(cost=39_000_000, income=4_400_000)],
     },
 }
 
