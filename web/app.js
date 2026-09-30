@@ -52,17 +52,12 @@ function getApiUrl(path, params = {}) {
     return url.toString();
 }
 
-async function apiGet(path, params = {}, externalSignal = null) {
+async function apiGet(path, params = {}) {
     const url = getApiUrl(path, params);
     const headers = {};
     if (initData) headers["X-Telegram-Init-Data"] = initData;
     const controller = new AbortController();
     const to = setTimeout(() => controller.abort(), 15000);
-    // اگر signal خارجی داده شده، به abort داخلی وصلش کن
-    if (externalSignal) {
-        if (externalSignal.aborted) controller.abort();
-        else externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
-    }
     try {
         const r = await fetch(url, { headers, signal: controller.signal });
         const text = await r.text();
@@ -91,7 +86,6 @@ async function apiPost(path, body = {}) {
 ========================================================= */
 
 function countryImageUrl(cid) {
-    if (!cid) return "";
     return `/images/countries/${cid}.${COUNTRY_IMAGE_EXT[cid] || "jpg"}`;
 }
 
@@ -136,6 +130,31 @@ function showToast(msg, kind) {
     toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
 }
 
+function askText(title, placeholder) {
+    return new Promise(resolve => {
+        const ov = document.createElement("div");
+        ov.className = "modal-overlay";
+        ov.innerHTML = `
+            <div class="modal-box">
+                <div class="modal-title"></div>
+                <textarea class="modal-input" maxlength="500"></textarea>
+                <div class="modal-actions">
+                    <button class="modal-cancel">انصراف</button>
+                    <button class="modal-ok">ارسال</button>
+                </div>
+            </div>`;
+        ov.querySelector(".modal-title").textContent = title;
+        ov.querySelector(".modal-input").placeholder = placeholder || "";
+        const close = v => { ov.remove(); resolve(v); };
+        ov.querySelector(".modal-cancel").onclick = () => close(null);
+        ov.querySelector(".modal-ok").onclick = () => {
+            close(ov.querySelector(".modal-input").value.trim() || null);
+        };
+        document.body.appendChild(ov);
+        ov.querySelector(".modal-input").focus();
+    });
+}
+
 async function loadArmyCatalog() {
     try { ARMY_UNITS = (await apiGet("/api/army-units")).units || {}; }
     catch (e) { console.error("Army catalog:", e); }
@@ -170,16 +189,9 @@ function renderResourceBars() {
 
 async function loadWorldAtlas() {
     if (worldData) return worldData;
-    try {
-        const r = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        worldData = await r.json();
-        return worldData;
-    } catch (e) {
-        console.error("World atlas load failed:", e);
-        showToast("خطا در بارگذاری نقشه. اتصال اینترنت را بررسی کنید.", "error");
-        throw e;
-    }
+    const r = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
+    worldData = await r.json();
+    return worldData;
 }
 
 /* =========================================================
@@ -200,7 +212,7 @@ async function refreshPlayer() {
     if (refreshController) refreshController.abort();
     refreshController = new AbortController();
     try {
-        player = await apiGet("/api/player", {}, refreshController.signal);
+        player = await apiGet("/api/player");
         updateHomeStats();
     } catch (e) { if (e.name !== "AbortError") console.error(e); }
 }
@@ -306,7 +318,7 @@ function updateHomeStats() {
     document.getElementById("home-country-flag").src = countryImageUrl(selectedCountry);
     document.getElementById("home-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     const photo = document.getElementById("home-card-photo");
-    if (photo && selectedCountry) photo.style.backgroundImage = `url(${countryImageUrl(selectedCountry)})`;
+    if (photo) photo.style.backgroundImage = `url(${countryImageUrl(selectedCountry)})`;
     document.getElementById("home-money").textContent = formatMoney(player.money);
     document.getElementById("home-income").textContent = formatMoney(player.daily_income);
     document.getElementById("home-manpower").textContent = formatNumber(player.manpower);
@@ -453,10 +465,8 @@ function renderInfraList(cid, filterFn) {
 
         const isBuilt = item.level > 0;
         const statusText = isBuilt ? `سطح ${item.level}` : "ساخته نشده";
-        // اگر ساخته شده: آمار سطح فعلی؛ اگر نشده: آمار سطحی که با ساخت به دست می‌آید
-        const shownLevel = isBuilt ? item.current : item.next;
+        const shownLevel = item.next || item.current;
         const statsHtml = buildStatsHtml(item, shownLevel);
-        const statsNote = isBuilt ? "آمار فعلی" : "آمار پس از ساخت";
 
         const btnText = !item.next
             ? "حداکثر سطح"
@@ -469,7 +479,7 @@ function renderInfraList(cid, filterFn) {
                 <div class="infra-card-icon">${item.icon || "🏗️"}</div>
                 <div class="infra-card-titles">
                     <div class="infra-card-name">${item.name}</div>
-                    <div class="infra-card-status">${statusText} · ${statsNote}</div>
+                    <div class="infra-card-status">${statusText}</div>
                 </div>
             </div>
             <div class="infra-card-desc">${item.desc || ""}</div>
@@ -511,9 +521,8 @@ function renderEconomyList() {
 
         const isBuilt = item.level > 0;
         const statusText = isBuilt ? `سطح ${item.level}` : "ساخته نشده";
-        const shownLevel = isBuilt ? item.current : item.next;
+        const shownLevel = item.next || item.current;
         const statsHtml = buildStatsHtml(item, shownLevel);
-        const statsNote = isBuilt ? "آمار فعلی" : "آمار پس از ساخت";
 
         const btnText = !item.next
             ? "حداکثر سطح"
@@ -526,7 +535,7 @@ function renderEconomyList() {
                 <div class="infra-card-icon">${item.icon || "💰"}</div>
                 <div class="infra-card-titles">
                     <div class="infra-card-name">${item.name}</div>
-                    <div class="infra-card-status">${statusText} · ${statsNote}</div>
+                    <div class="infra-card-status">${statusText}</div>
                 </div>
             </div>
             <div class="infra-card-desc">${item.desc || ""}</div>
@@ -673,6 +682,14 @@ function unitLevelDots(count, max = 6) {
     }
     html += "</div>";
     return html;
+}
+
+function unitCostText(u) {
+    let t = `${formatMoney(u.cost)} | ${formatNumber(u.manpower)} نفر`;
+    Object.entries(u.resources || {}).forEach(([k, a]) => {
+        t += ` | ${formatNumber(a)} ${RESOURCE_NAMES[k]}`;
+    });
+    return t;
 }
 
 function renderArmyUnitsNew() {
@@ -1097,12 +1114,6 @@ async function loadAnnouncements() {
             div.className = "ann-card";
             const supportFlags = a.support.map(c => COUNTRY_FLAGS[c] || c).join(" ");
             const accuseFlags = a.accuse.map(c => COUNTRY_FLAGS[c] || c).join(" ");
-            const commentsHtml = (a.comments || []).map(cm => `
-                <div class="ann-comment">
-                    <span class="ann-comment-flag">${COUNTRY_FLAGS[cm.from_country] || ""}</span>
-                    <span class="ann-comment-name">${escapeHtml(COUNTRY_NAMES[cm.from_country] || cm.from_country)}</span>
-                    <span class="ann-comment-text">${escapeHtml(cm.text)}</span>
-                </div>`).join("");
             div.innerHTML = `
                 <div class="ann-header">
                     <span class="ann-flag">${COUNTRY_FLAGS[a.from_country] || ""}</span>
@@ -1117,7 +1128,7 @@ async function loadAnnouncements() {
                     ${supportFlags ? `<div class="ann-flags-row"><span>✅</span> ${supportFlags}</div>` : ""}
                     ${accuseFlags ? `<div class="ann-flags-row"><span>❌</span> ${accuseFlags}</div>` : ""}
                 </div>
-                <div class="ann-comments" id="ann-comments-${a.id}">${commentsHtml}</div>
+                <div class="ann-comments" id="ann-comments-${a.id}"></div>
                 <div class="ann-comment-row">
                     <input class="ann-comment-input" data-ann="${a.id}" placeholder="کامنت...">
                     <button class="ann-comment-send" data-ann="${a.id}">ارسال</button>
