@@ -20,8 +20,6 @@ let statsInterval = null;
 let currentPMTarget = null;
 let currentArmyTab = "land";
 
-const COUNTRY_IMAGE_EXT = { germany: "jpg", britain: "jfif", ussr: "jfif", usa: "jfif",
-    france: "jfif", italy: "jfif", china: "jfif", japan: "jfif" };
 const COUNTRY_FLAGS = { germany: "🇩🇪", britain: "🇬🇧", ussr: "☭", usa: "🇺🇸",
     france: "🇫🇷", italy: "🇮🇹", china: "🇨🇳", japan: "🇯🇵" };
 const COUNTRY_NAMES = { germany: "آلمان", britain: "بریتانیا", ussr: "شوروی", usa: "آمریکا",
@@ -85,9 +83,7 @@ async function apiPost(path, body = {}) {
    ابزارها
 ========================================================= */
 
-function countryImageUrl(cid) {
-    return `/images/countries/${cid}.${COUNTRY_IMAGE_EXT[cid] || "jpg"}`;
-}
+function countryFlag(cid) { return COUNTRY_FLAGS[cid] || "🏳️"; }
 
 function showOnly(id) {
     document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
@@ -168,16 +164,13 @@ function renderResourceBars() {
             const amt = player.resources[key] ?? 0;
             const rate = player.resource_production?.[key] ?? 0;
             const use = player.resource_consumption?.[key] ?? 0;
+            const net = rate - use;
             const chip = document.createElement("div");
             chip.className = "resource-chip";
             let rateLine = "";
-            if (rate > 0) {
-                rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>`;
-            } else if (use > 0) {
-                rateLine = `<div class="resource-chip-rate down">▼ ${formatNumber(use)} /روز</div>`;
-            } else {
-                rateLine = `<div class="resource-chip-rate zero">بدون تولید</div>`;
-            }
+            if (net > 0) rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(net)} /روز</div>`;
+            else if (net < 0) rateLine = `<div class="resource-chip-rate down">▼ ${formatNumber(Math.abs(net))} /روز</div>`;
+            else rateLine = `<div class="resource-chip-rate zero">بدون تولید</div>`;
             chip.innerHTML = `
                 <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span></div>
                 <div class="resource-chip-value">${formatNumber(amt)}</div>
@@ -269,7 +262,7 @@ function showMessage(msg) {
 function showCountryPreview() {
     if (!selectedCountry) { showCountrySelection(); return; }
     showOnly("country-preview");
-    document.getElementById("selected-country-flag").src = countryImageUrl(selectedCountry);
+    document.getElementById("selected-country-flag").textContent = countryFlag(selectedCountry);
     document.getElementById("preview-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     createPreviewGlobe("preview-globe-container", "preview-globe", selectedCountry);
 }
@@ -306,19 +299,34 @@ function showGame() {
 }
 
 function updateGameHeader() {
-    document.getElementById("game-country-flag").src = countryImageUrl(selectedCountry);
+    document.getElementById("game-country-flag").textContent = countryFlag(selectedCountry);
 }
 
 /* =========================================================
    Home
 ========================================================= */
 
+function updateNotificationBadge(count) {
+    const badge = document.getElementById("notif-badge");
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count > 99 ? "99+" : String(count);
+        badge.classList.remove("hidden");
+    } else {
+        badge.classList.add("hidden");
+    }
+}
+
 function updateHomeStats() {
     if (!player) return;
-    document.getElementById("home-country-flag").src = countryImageUrl(selectedCountry);
+    document.getElementById("home-country-flag").textContent = countryFlag(selectedCountry);
     document.getElementById("home-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     const photo = document.getElementById("home-card-photo");
-    if (photo) photo.style.backgroundImage = `url(${countryImageUrl(selectedCountry)})`;
+    if (photo) {
+        photo.style.backgroundImage = "none";
+        photo.style.background =
+            "radial-gradient(circle at 30% 20%, rgba(232,179,85,.18), rgba(6,16,28,.98) 70%)";
+    }
     document.getElementById("home-money").textContent = formatMoney(player.money);
     document.getElementById("home-income").textContent = formatMoney(player.daily_income);
     document.getElementById("home-manpower").textContent = formatNumber(player.manpower);
@@ -329,9 +337,21 @@ function updateHomeStats() {
     document.getElementById("home-season").textContent = player.season ?? "بهار";
     document.getElementById("home-season-end").textContent =
         `پایان فصل تا ${player.season_days_left ?? 0} روز و ${player.season_hours_left ?? 0} ساعت`;
+
+    const eff = document.getElementById("home-season-effect");
+    if (eff) {
+        const season = player.season ?? "بهار";
+        let txt = "";
+        if (season === "تابستان") txt = " • مصرف کم";
+        else if (season === "پاییز") txt = " • مصرف متوسط";
+        else if (season === "زمستان") txt = " • مصرف زیاد";
+        eff.textContent = txt;
+    }
+
     const mm = document.getElementById("map-money");
     if (mm) mm.textContent = formatMoney(player.money);
     renderResourceBars();
+    updateNotificationBadge(player.notification_count || 0);
 }
 
 async function loadRankings() {
@@ -378,7 +398,7 @@ document.querySelectorAll(".sub-back-button").forEach(b => {
 });
 
 /* =========================================================
-   Infra (تب‌بندی شده)
+   Infra
 ========================================================= */
 
 async function openInfrastructureMenu() {
@@ -446,7 +466,7 @@ function buildStatsHtml(item, levelData) {
     if (levelData.income !== undefined) {
         boxes.push(statBox("💰", "+" + formatMoney(levelData.income), "در روز"));
     }
-    if (levelData.time !== undefined) {
+    if (levelData.time !== undefined && levelData.time > 0) {
         boxes.push(statBox("⏱️", formatDuration(levelData.time), "زمان"));
     }
 
@@ -558,7 +578,7 @@ async function upgradeEconomy(iid) {
 }
 
 /* =========================================================
-   Army — طرح جدید
+   Army
 ========================================================= */
 
 async function openArmyPage() {
@@ -570,7 +590,6 @@ async function openArmyPage() {
     renderArmyUnitsNew();
 }
 
-// تب‌های ارتش
 document.querySelectorAll(".army-tab").forEach(tab => {
     tab.addEventListener("click", () => {
         document.querySelectorAll(".army-tab").forEach(t => t.classList.remove("active"));
@@ -597,18 +616,15 @@ function getGroupUsed(group) {
     return t;
 }
 
-// کارت خلاصه (قدرت کل)
 function renderArmySummary() {
     const el = document.getElementById("army-total-power");
     if (!el || !player) return;
     el.textContent = formatNumber(player.army);
 }
 
-// ۴ کارت پایگاه 2x2
 function renderBaseCards() {
     if (!player?.infra) return;
 
-    // پادگان (land_barracks)
     const barracks = player.infra["land_barracks"];
     const bv = document.getElementById("base-barracks-value");
     const bm = document.getElementById("base-barracks-max");
@@ -625,7 +641,6 @@ function renderBaseCards() {
         if (bf) bf.style.width = "0%";
     }
 
-    // فرودگاه (air_airport)
     const airport = player.infra["air_airport"];
     const as = document.getElementById("base-airport-status");
     if (airport && airport.current) {
@@ -638,7 +653,6 @@ function renderBaseCards() {
         as.classList.add("base-card-empty");
     }
 
-    // بندر (naval_port)
     const port = player.infra["naval_port"];
     const pv = document.getElementById("base-port-value");
     const pm = document.getElementById("base-port-max");
@@ -655,7 +669,6 @@ function renderBaseCards() {
         if (pf) pf.style.width = "0%";
     }
 
-    // پایگاه موشکی — فعلاً ساخته نشده
     const ms = document.getElementById("base-missile-status");
     if (ms) {
         ms.textContent = "ساخته نشده";
@@ -663,7 +676,6 @@ function renderBaseCards() {
     }
 }
 
-// شمارنده تب‌ها
 function renderArmyTabsCounts() {
     if (!player) return;
     const set = (id, n) => { const e = document.getElementById(id); if (e) e.textContent = formatNumber(n); };
@@ -673,7 +685,6 @@ function renderArmyTabsCounts() {
     set("army-count-missile", 0);
 }
 
-// استایل "درجه" (dots) براساس سطح یگان
 function unitLevelDots(count, max = 6) {
     const filled = count > 0 ? Math.min(max, Math.max(1, Math.ceil(Math.log10(count + 1) * 1.5))) : 0;
     let html = '<div class="unit-card-new-dots">';
@@ -682,14 +693,6 @@ function unitLevelDots(count, max = 6) {
     }
     html += "</div>";
     return html;
-}
-
-function unitCostText(u) {
-    let t = `${formatMoney(u.cost)} | ${formatNumber(u.manpower)} نفر`;
-    Object.entries(u.resources || {}).forEach(([k, a]) => {
-        t += ` | ${formatNumber(a)} ${RESOURCE_NAMES[k]}`;
-    });
-    return t;
 }
 
 function renderArmyUnitsNew() {
@@ -728,6 +731,9 @@ function renderArmyUnitsNew() {
             statusText = "آماده آموزش";
         }
 
+        const extra = u.carry ? `<div class="unit-chip"><span>🚚 ظرفیت</span><span class="unit-chip-value">${formatNumber(u.carry)}</span></div>` : "";
+        const carrierNote = u.needed_for_air ? `<div class="unit-card-note">برای عملیات هوایی در جنگ لازم است.</div>` : "";
+
         const card = document.createElement("div");
         card.className = "unit-card-new" + (disabled ? " locked" : "");
 
@@ -741,37 +747,18 @@ function renderArmyUnitsNew() {
                     ${formatNumber(totalPower)}
                 </div>
             </div>
-
             <div class="unit-card-new-stats">
-                <div class="unit-chip">
-                    <span>⚔️ حمله</span>
-                    <span class="unit-chip-value">${u.attack}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>🛡️ دفاع</span>
-                    <span class="unit-chip-value">${u.defense}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>تعداد</span>
-                    <span class="unit-chip-value">${formatNumber(count)}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>💰</span>
-                    <span class="unit-chip-value">${formatMoney(u.cost)}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>👥</span>
-                    <span class="unit-chip-value">${formatNumber(u.manpower)}</span>
-                </div>
+                <div class="unit-chip"><span>⚔️ حمله</span><span class="unit-chip-value">${u.attack}</span></div>
+                <div class="unit-chip"><span>🛡️ دفاع</span><span class="unit-chip-value">${u.defense}</span></div>
+                <div class="unit-chip"><span>تعداد</span><span class="unit-chip-value">${formatNumber(count)}</span></div>
+                <div class="unit-chip"><span>💰</span><span class="unit-chip-value">${formatMoney(u.cost)}</span></div>
+                <div class="unit-chip"><span>👥</span><span class="unit-chip-value">${formatNumber(u.manpower)}</span></div>
+                ${extra}
             </div>
-
+            ${carrierNote}
             <div class="unit-card-new-action">
-                <button class="unit-produce-btn" data-unit="${uid_}" data-count="1" ${disabled ? "disabled" : ""}>
-                    ⚙️ تولید
-                </button>
-                <button class="unit-produce-btn" data-unit="${uid_}" data-count="10" ${disabled ? "disabled" : ""}>
-                    ⚙️ ×۱۰
-                </button>
+                <button class="unit-produce-btn" data-unit="${uid_}" data-count="1" ${disabled ? "disabled" : ""}>⚙️ تولید</button>
+                <button class="unit-produce-btn" data-unit="${uid_}" data-count="10" ${disabled ? "disabled" : ""}>⚙️ ×۱۰</button>
                 <span class="unit-status-text">${statusText}</span>
             </div>
         `;
@@ -838,7 +825,7 @@ function renderWarTargets() {
         const occText = occupied ? ` (اشغال توسط ${COUNTRY_NAMES[occupied] || occupied})` : "";
         card.innerHTML = `
             <div class="war-target-top">
-                <div class="flag-wrap"><img class="flag-img" src="${countryImageUrl(cid)}" alt=""></div>
+                <div class="flag-wrap"><span class="flag-emoji">${countryFlag(cid)}</span></div>
                 <span class="war-target-name">${COUNTRY_NAMES[cid]}${occText}</span>
             </div>
             <button class="war-attack-button" data-declare="${cid}">⚔️ اعلام جنگ</button>`;
@@ -898,8 +885,9 @@ async function loadWarData() {
                 ["air", "naval", "land"].forEach(f => {
                     if (!r.fronts[f]) return;
                     const label = f === "air" ? "✈️ هوا" : f === "naval" ? "⚓ دریا" : "🪖 زمین";
+                    const blocked = r.fronts[f].blocked ? " (بدون ناو هواپیمابر)" : "";
                     fronts += `<div class="front-item">
-                        <div class="front-label">${label}</div>
+                        <div class="front-label">${label}${blocked}</div>
                         <div class="front-values">
                             <span class="front-atk">${formatNumber(r.fronts[f].attacker_power)}</span> /
                             <span class="front-def">${formatNumber(r.fronts[f].defender_power)}</span>
@@ -917,6 +905,7 @@ async function loadWarData() {
 }
 
 function openBattleModal(wid) {
+    const hasCarrier = (player?.units?.carrier || 0) > 0;
     const ov = document.createElement("div");
     ov.className = "modal-overlay";
     ov.innerHTML = `
@@ -926,8 +915,8 @@ function openBattleModal(wid) {
             <input id="bt-land" class="diplomacy-input" type="number" value="0" min="0">
             <label class="diplomacy-label">⚓ دریایی (تعداد)</label>
             <input id="bt-naval" class="diplomacy-input" type="number" value="0" min="0">
-            <label class="diplomacy-label">✈️ هوایی (تعداد)</label>
-            <input id="bt-air" class="diplomacy-input" type="number" value="0" min="0">
+            <label class="diplomacy-label">✈️ هوایی (تعداد)${hasCarrier ? "" : " — بدون ناو هواپیمابر غیرفعال است"}</label>
+            <input id="bt-air" class="diplomacy-input" type="number" value="0" min="0" ${hasCarrier ? "" : "disabled"}>
             <div class="modal-actions">
                 <button class="modal-cancel">انصراف</button>
                 <button class="modal-ok">اجرای نبرد</button>
@@ -938,7 +927,7 @@ function openBattleModal(wid) {
         const fronts = {
             land: Number(ov.querySelector("#bt-land").value) || 0,
             naval: Number(ov.querySelector("#bt-naval").value) || 0,
-            air: Number(ov.querySelector("#bt-air").value) || 0,
+            air: hasCarrier ? (Number(ov.querySelector("#bt-air").value) || 0) : 0,
         };
         if (!fronts.land && !fronts.naval && !fronts.air) {
             showToast("حداقل یک جبهه را پر کنید."); return;
@@ -1068,7 +1057,7 @@ document.querySelectorAll(".nav-item").forEach(item => {
 });
 
 /* =========================================================
-   Communications — Tabs
+   Communications
 ========================================================= */
 
 document.querySelectorAll(".comm-tab").forEach(tab => {
@@ -1085,10 +1074,6 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
         else if (tid === "comm-contacts") renderContactList();
     });
 });
-
-/* =========================================================
-   Announcements
-========================================================= */
 
 document.getElementById("ann-submit").addEventListener("click", async () => {
     const ta = document.getElementById("ann-text");
@@ -1457,7 +1442,7 @@ async function loadMyListings() {
 }
 
 /* =========================================================
-   Map — World globe
+   Map
 ========================================================= */
 
 let mapProjection = null, mapPath = null, mapSvg = null;
@@ -1735,7 +1720,7 @@ async function captureSite(siteId) {
 }
 
 /* =========================================================
-   Helpers for Globe
+   Helpers
 ========================================================= */
 
 function getTouchDistance(t) {
@@ -1851,6 +1836,22 @@ async function createPreviewGlobe(containerId, svgId, selected) {
         lx = e.touches[0].clientX; ly = e.touches[0].clientY;
         e.preventDefault();
     }, { passive: false, signal });
+}
+
+/* =========================================================
+   Menu Button — Notification
+========================================================= */
+
+const notifBtn = document.getElementById("game-notification-button");
+if (notifBtn) {
+    notifBtn.addEventListener("click", () => {
+        showGamePage("communications");
+        document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+        const commNav = document.querySelector('.nav-item[data-page="communications"]');
+        if (commNav) commNav.classList.add("active");
+        const contactsTab = document.querySelector('.comm-tab[data-tab="comm-contacts"]');
+        if (contactsTab) contactsTab.click();
+    });
 }
 
 /* =========================================================
