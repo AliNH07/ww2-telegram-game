@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>WW2 Strategy</title>
+<title>FRONT-LINE 1993</title>
 <link rel="stylesheet" href="/style.css">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
@@ -84,7 +84,7 @@
         <div class="header-right">
             <div class="flag-wrap"><img id="selected-country-flag" class="flag-img" src="" alt=""></div>
         </div>
-        <div class="header-center"><div class="game-title">WW2 STRATEGY</div></div>
+        <div class="header-center"><div class="game-title">FRONT-LINE 1993</div></div>
         <div class="header-left">
             <button class="header-button">🔔</button>
             <button class="header-button">☰</button>
@@ -115,9 +115,11 @@
         <div class="header-right">
             <div class="flag-wrap"><img id="game-country-flag" class="flag-img" src="" alt=""></div>
         </div>
-        <div class="header-center"><div class="game-title">WW2 STRATEGY</div></div>
+        <div class="header-center"><div class="game-title">FRONT-LINE 1993</div></div>
         <div class="header-left">
-            <button class="header-button" id="game-notification-button">🔔</button>
+            <button class="header-button" id="game-notification-button">
+                🔔<span id="notif-badge" class="notif-badge hidden">0</span>
+            </button>
             <button class="header-button" id="game-menu-button">☰</button>
         </div>
     </header>
@@ -172,6 +174,7 @@
                 <div class="season-bar">
                     <span id="home-season-end">—</span>
                     <span class="season-tag">🕐 <span id="home-season">بهار</span></span>
+                    <span class="season-hint" id="home-season-hint"></span>
                 </div>
             </div>
         </div>
@@ -488,6 +491,7 @@
 
     <!-- ==================== بازار جهانی ==================== -->
     <main id="market" class="game-page hidden">
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
         <div class="page-title"><span>معاملات بین‌المللی</span><h1>بازار جهانی</h1></div>
 
         <div class="market-tabs">
