@@ -14,6 +14,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://ww2-telegram-game.onrender.com")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "0") == "1"
+DATA_DIR = os.getenv("DATA_DIR", "data")
+STATE_FILE = os.path.join(DATA_DIR, "state.json")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 
@@ -290,12 +292,6 @@ def parse_dt(s):
         return dt
     except: return None
 
-def _is_expired(t, now=None):
-    """آیا پیمان منقضی شده است؟"""
-    now = now or utcnow()
-    exp = parse_dt(t.get("expires_at"))
-    return exp is not None and now >= exp
-
 def get_game_time(player):
     started_at = player.get("started_at")
     if not started_at:
@@ -304,17 +300,15 @@ def get_game_time(player):
     started = parse_dt(started_at); now = utcnow()
     elapsed_days = max(0, (now - started).total_seconds() / 86400)
     day = min(GAME_TOTAL_DAYS, int(elapsed_days) + 1)
-    # آخرین فصل تا پایان بازی ادامه دارد؛ در روز ۲۹-۳۱ دیگه به بهار برنمی‌گردیم
-    si = min(len(SEASONS) - 1, (day - 1) // DAYS_PER_SEASON)
-    if si == len(SEASONS) - 1:
-        season_end = started + timedelta(days=GAME_TOTAL_DAYS)
-    else:
-        season_end = started + timedelta(days=(si + 1) * DAYS_PER_SEASON)
+    si = ((day - 1) // DAYS_PER_SEASON) % len(SEASONS)
+    season_end = started + timedelta(days=(si + 1) * DAYS_PER_SEASON)
+    game_end = started + timedelta(days=GAME_TOTAL_DAYS)
+    season_end = min(season_end, game_end)
     remaining = season_end - now
     if remaining.total_seconds() < 0: remaining = timedelta(0)
     return {"day": day, "season": SEASONS[si], "season_days_left": remaining.days,
             "season_hours_left": remaining.seconds // 3600,
-            "next_season": SEASONS[si + 1] if si < len(SEASONS) - 1 else SEASONS[si]}
+            "next_season": SEASONS[(si + 1) % len(SEASONS)]}
 
 def get_infra_level(player, item_id):
     return player.get("infra_levels", {}).get(item_id, 0)
@@ -470,8 +464,7 @@ def serialize_player(player):
     return data
 
 # =========================================================
-# State — حالت توسعه: هیچ ذخیره‌سازی روی دیسک انجام نمی‌شود
-# با هر ری‌استارت، بازی از صفر شروع می‌شود.
+# State
 # =========================================================
 players = {}
 diplomacy_proposals = {}
@@ -487,14 +480,6 @@ unions = {}
 private_messages = {}
 market_listings = {}
 news_feed = []
-
-def save_state():
-    """در حالت توسعه، ذخیره‌سازی غیرفعال است."""
-    return
-
-def load_state():
-    """در حالت توسعه، بارگذاری غیرفعال است."""
-    return
 
 def create_player(user_id):
     return {"user_id": user_id, "country": None, "money": STARTING_MONEY, "army": 0,
@@ -513,24 +498,53 @@ def push_news(title, text, kind="info"):
                       "kind": kind, "at": utcnow().isoformat()})
     if len(news_feed) > 200: del news_feed[:50]
 
-def cleanup_expired_data():
-    """پاک‌سازی دوره‌ای داده‌های منقضی/مصرف‌شده برای جلوگیری از رشد حافظه."""
-    global active_treaties
-    now = utcnow()
-    # پیمان‌های منقضی
-    active_treaties[:] = [t for t in active_treaties if not _is_expired(t, now)]
-    # سفارش‌های بسته‌شده بازار
-    for lid in [k for k, v in market_listings.items() if v.get("status") != "open"]:
-        del market_listings[lid]
-    # جنگ‌های حل‌شده
-    for wid in [k for k, v in war_declarations.items() if v.get("status") in ("resolved", "rejected")]:
-        del war_declarations[wid]
-    for wid in [k for k, v in active_wars.items() if v.get("resolved")]:
-        del active_wars[wid]
-    # چرخش لیست‌های بلند
-    if len(war_reports) > 100: del war_reports[:50]
-    if len(news_feed) > 200: del news_feed[:50]
-    if len(announcements) > 100: del announcements[:50]
+def save_state():
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        state = {"players": {str(k): v for k, v in players.items()},
+                 "diplomacy_proposals": diplomacy_proposals, "active_treaties": active_treaties,
+                 "map_holdings": map_holdings, "strait_holdings": strait_holdings,
+                 "occupied_countries": occupied_countries, "war_declarations": war_declarations,
+                 "active_wars": active_wars, "war_reports": war_reports[-50:],
+                 "announcements": announcements[-100:], "unions": unions,
+                 "private_messages": private_messages, "market_listings": market_listings,
+                 "news_feed": news_feed[-200:]}
+        tmp = STATE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False)
+        os.replace(tmp, STATE_FILE)
+    except Exception as e:
+        logging.error("save_state failed: %s", e)
+
+def load_state():
+    global diplomacy_proposals, active_treaties, map_holdings, strait_holdings
+    global occupied_countries, war_declarations, active_wars, war_reports
+    global announcements, unions, private_messages, market_listings, news_feed
+    if not os.path.exists(STATE_FILE):
+        logging.info("No state, fresh start."); return
+    try:
+        with open(STATE_FILE, "r", encoding="utf-8") as f: state = json.load(f)
+        for k, v in state.get("players", {}).items(): players[int(k)] = v
+        diplomacy_proposals = state.get("diplomacy_proposals", {})
+        active_treaties = state.get("active_treaties", [])
+        map_holdings = state.get("map_holdings", {})
+        strait_holdings = state.get("strait_holdings", {})
+        occupied_countries = state.get("occupied_countries", {})
+        war_declarations = state.get("war_declarations", {})
+        active_wars = state.get("active_wars", {})
+        war_reports = state.get("war_reports", [])
+        announcements = state.get("announcements", [])
+        unions = state.get("unions", {})
+        private_messages = state.get("private_messages", {})
+        market_listings = state.get("market_listings", {})
+        news_feed = state.get("news_feed", [])
+        logging.info("State loaded: %d players", len(players))
+    except Exception as e:
+        logging.error("load_state failed: %s", e)
+
+async def autosave_loop():
+    while True:
+        await asyncio.sleep(60); save_state()
 
 # =========================================================
 # Auth
@@ -819,9 +833,7 @@ async def get_diplomacy(request):
     cid = p.get("country")
     sent = [x for x in diplomacy_proposals.values() if x["from_user"] == uid and x["status"] == "pending"]
     recv = [x for x in diplomacy_proposals.values() if x["to_user"] == uid and x["status"] == "pending"]
-    # فقط پیمان‌های فعال (منقضی‌نشده) را برگردان
-    tr = [t for t in active_treaties
-          if cid and (t["country_a"] == cid or t["country_b"] == cid) and not _is_expired(t)]
+    tr = [t for t in active_treaties if cid and (t["country_a"] == cid or t["country_b"] == cid)]
     return web.json_response({"sent": sent, "received": recv, "treaties": tr})
 
 async def respond_treaty(request):
@@ -847,7 +859,6 @@ async def respond_treaty(request):
 def have_treaty(a, b, kind):
     for t in active_treaties:
         if t["treaty_type"] != kind: continue
-        if _is_expired(t): continue
         if (t["country_a"] == a and t["country_b"] == b) or (t["country_a"] == b and t["country_b"] == a):
             return True
     return False
@@ -1056,11 +1067,9 @@ async def get_announcements(request):
         reactions = a.get("reactions", {})
         support = [c for c, r in reactions.items() if r == "support"]
         accuse = [c for c, r in reactions.items() if r == "accuse"]
-        comments = a.get("comments", [])
         result.append({"id": a["id"], "from_country": a["from_country"], "text": a["text"],
                        "created_at": a["created_at"], "support": support, "accuse": accuse,
-                       "comments_count": len(comments),
-                       "comments": comments[-20:]})
+                       "comments_count": len(a.get("comments", []))})
     result.reverse()
     return web.json_response(result)
 
@@ -1204,14 +1213,8 @@ async def leave_union(request):
     for u in list(unions.values()):
         if cid in u.get("members", []):
             u["members"].remove(cid)
-            if not u["members"]:
-                # آخرین عضو خارج شد → اتحادیه منحل می‌شود
-                del unions[u["id"]]
-            elif u["leader_country"] == cid:
-                # رهبر خارج شد → اولین عضو باقی‌مانده رهبر می‌شود
-                u["leader_country"] = u["members"][0]
-            save_state()
-            return web.json_response({"success": True})
+            if not u["members"]: del unions[u["id"]]
+            save_state(); return web.json_response({"success": True})
     return web.json_response({"success": False, "error": "not_member"}, status=400)
 
 async def send_union_message(request):
@@ -1311,25 +1314,17 @@ async def accept_listing(request):
     if l["seller"] == bcid: return web.json_response({"success": False, "error": "self_buy"}, status=400)
     suid, seller = get_player_by_country(l["seller"])
     if not seller: return web.json_response({"success": False, "error": "seller_gone"}, status=400)
-    ensure_player_fields(buyer); ensure_player_fields(seller)
-
-    # === همه چک‌ها قبل از هر انتقالی ===
-    if seller["resources"].get(l["sell_resource"], 0) < l["sell_amount"]:
-        return web.json_response({"success": False, "error": "seller_no_res"}, status=400)
     if l["want_resource"] == "money":
         if buyer.get("money", 0) < l["want_amount"]:
             return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
+        buyer["money"] -= l["want_amount"]; seller["money"] = seller.get("money", 0) + l["want_amount"]
     else:
         if buyer["resources"].get(l["want_resource"], 0) < l["want_amount"]:
             return web.json_response({"success": False, "error": "not_enough_res"}, status=400)
-
-    # === انتقال‌ها ===
-    if l["want_resource"] == "money":
-        buyer["money"] -= l["want_amount"]
-        seller["money"] = seller.get("money", 0) + l["want_amount"]
-    else:
         buyer["resources"][l["want_resource"]] -= l["want_amount"]
         seller["resources"][l["want_resource"]] = seller["resources"].get(l["want_resource"], 0) + l["want_amount"]
+    if seller["resources"].get(l["sell_resource"], 0) < l["sell_amount"]:
+        return web.json_response({"success": False, "error": "seller_no_res"}, status=400)
     seller["resources"][l["sell_resource"]] -= l["sell_amount"]
     buyer["resources"][l["sell_resource"]] = buyer["resources"].get(l["sell_resource"], 0) + l["sell_amount"]
     l["status"] = "filled"; l["buyer"] = bcid
@@ -1354,7 +1349,6 @@ def compute_rankings():
         eco = rates["net_income"] // 1000; mil = p.get("army", 0)
         dip = 0
         for t in active_treaties:
-            if _is_expired(t): continue
             if t["country_a"] == cid or t["country_b"] == cid: dip += 100
         for u in unions.values():
             if cid in u.get("members", []): dip += 150
@@ -1436,19 +1430,15 @@ async def start_web_server():
     logging.info("WEB SERVER STARTED | port=%s", port)
 
 async def war_tick_loop():
-    """هر ۳۰ ثانیه: چک مذاکره‌ها + پاک‌سازی داده‌های منقضی."""
     while True:
         await asyncio.sleep(30)
-        try:
-            await check_wars_tick()
-            cleanup_expired_data()
-        except Exception as e:
-            logging.error("war tick: %s", e)
+        try: await check_wars_tick()
+        except Exception as e: logging.error("war tick: %s", e)
 
 async def main():
-    logging.info("WW2 GAME STARTING (dev mode — no persistence)...")
-    # توجه: در حالت توسعه، هیچ state ذخیره/بارگذاری نمی‌شود.
-    # با هر ری‌استارت Render، بازی از صفر شروع می‌شود.
+    logging.info("WW2 GAME STARTING...")
+    load_state()
+    asyncio.create_task(autosave_loop())
     asyncio.create_task(war_tick_loop())
     await start_web_server()
     await bot.delete_webhook(drop_pending_updates=True)
@@ -1457,4 +1447,4 @@ async def main():
 
 if __name__ == "__main__":
     try: asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit): pass
+    except (KeyboardInterrupt, SystemExit): save_state()
