@@ -20,6 +20,8 @@ let statsInterval = null;
 let currentPMTarget = null;
 let currentArmyTab = "land";
 
+const COUNTRY_IMAGE_EXT = { germany: "jpg", britain: "jfif", ussr: "jfif", usa: "jfif",
+    france: "jfif", italy: "jfif", china: "jfif", japan: "jfif" };
 const COUNTRY_FLAGS = { germany: "🇩🇪", britain: "🇬🇧", ussr: "☭", usa: "🇺🇸",
     france: "🇫🇷", italy: "🇮🇹", china: "🇨🇳", japan: "🇯🇵" };
 const COUNTRY_NAMES = { germany: "آلمان", britain: "بریتانیا", ussr: "شوروی", usa: "آمریکا",
@@ -50,12 +52,17 @@ function getApiUrl(path, params = {}) {
     return url.toString();
 }
 
-async function apiGet(path, params = {}) {
+async function apiGet(path, params = {}, externalSignal = null) {
     const url = getApiUrl(path, params);
     const headers = {};
     if (initData) headers["X-Telegram-Init-Data"] = initData;
     const controller = new AbortController();
     const to = setTimeout(() => controller.abort(), 15000);
+    // اگر signal خارجی داده شده، به abort داخلی وصلش کن
+    if (externalSignal) {
+        if (externalSignal.aborted) controller.abort();
+        else externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
     try {
         const r = await fetch(url, { headers, signal: controller.signal });
         const text = await r.text();
@@ -83,7 +90,10 @@ async function apiPost(path, body = {}) {
    ابزارها
 ========================================================= */
 
-function countryFlag(cid) { return COUNTRY_FLAGS[cid] || "🏳️"; }
+function countryImageUrl(cid) {
+    if (!cid) return "";
+    return `/images/countries/${cid}.${COUNTRY_IMAGE_EXT[cid] || "jpg"}`;
+}
 
 function showOnly(id) {
     document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
@@ -126,31 +136,6 @@ function showToast(msg, kind) {
     toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
 }
 
-function askText(title, placeholder) {
-    return new Promise(resolve => {
-        const ov = document.createElement("div");
-        ov.className = "modal-overlay";
-        ov.innerHTML = `
-            <div class="modal-box">
-                <div class="modal-title"></div>
-                <textarea class="modal-input" maxlength="500"></textarea>
-                <div class="modal-actions">
-                    <button class="modal-cancel">انصراف</button>
-                    <button class="modal-ok">ارسال</button>
-                </div>
-            </div>`;
-        ov.querySelector(".modal-title").textContent = title;
-        ov.querySelector(".modal-input").placeholder = placeholder || "";
-        const close = v => { ov.remove(); resolve(v); };
-        ov.querySelector(".modal-cancel").onclick = () => close(null);
-        ov.querySelector(".modal-ok").onclick = () => {
-            close(ov.querySelector(".modal-input").value.trim() || null);
-        };
-        document.body.appendChild(ov);
-        ov.querySelector(".modal-input").focus();
-    });
-}
-
 async function loadArmyCatalog() {
     try { ARMY_UNITS = (await apiGet("/api/army-units")).units || {}; }
     catch (e) { console.error("Army catalog:", e); }
@@ -164,13 +149,16 @@ function renderResourceBars() {
             const amt = player.resources[key] ?? 0;
             const rate = player.resource_production?.[key] ?? 0;
             const use = player.resource_consumption?.[key] ?? 0;
-            const net = rate - use;
             const chip = document.createElement("div");
             chip.className = "resource-chip";
             let rateLine = "";
-            if (net > 0) rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(net)} /روز</div>`;
-            else if (net < 0) rateLine = `<div class="resource-chip-rate down">▼ ${formatNumber(Math.abs(net))} /روز</div>`;
-            else rateLine = `<div class="resource-chip-rate zero">بدون تولید</div>`;
+            if (rate > 0) {
+                rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>`;
+            } else if (use > 0) {
+                rateLine = `<div class="resource-chip-rate down">▼ ${formatNumber(use)} /روز</div>`;
+            } else {
+                rateLine = `<div class="resource-chip-rate zero">بدون تولید</div>`;
+            }
             chip.innerHTML = `
                 <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span></div>
                 <div class="resource-chip-value">${formatNumber(amt)}</div>
@@ -182,9 +170,16 @@ function renderResourceBars() {
 
 async function loadWorldAtlas() {
     if (worldData) return worldData;
-    const r = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
-    worldData = await r.json();
-    return worldData;
+    try {
+        const r = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        worldData = await r.json();
+        return worldData;
+    } catch (e) {
+        console.error("World atlas load failed:", e);
+        showToast("خطا در بارگذاری نقشه. اتصال اینترنت را بررسی کنید.", "error");
+        throw e;
+    }
 }
 
 /* =========================================================
@@ -205,7 +200,7 @@ async function refreshPlayer() {
     if (refreshController) refreshController.abort();
     refreshController = new AbortController();
     try {
-        player = await apiGet("/api/player");
+        player = await apiGet("/api/player", {}, refreshController.signal);
         updateHomeStats();
     } catch (e) { if (e.name !== "AbortError") console.error(e); }
 }
@@ -262,7 +257,7 @@ function showMessage(msg) {
 function showCountryPreview() {
     if (!selectedCountry) { showCountrySelection(); return; }
     showOnly("country-preview");
-    document.getElementById("selected-country-flag").textContent = countryFlag(selectedCountry);
+    document.getElementById("selected-country-flag").src = countryImageUrl(selectedCountry);
     document.getElementById("preview-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     createPreviewGlobe("preview-globe-container", "preview-globe", selectedCountry);
 }
@@ -299,34 +294,19 @@ function showGame() {
 }
 
 function updateGameHeader() {
-    document.getElementById("game-country-flag").textContent = countryFlag(selectedCountry);
+    document.getElementById("game-country-flag").src = countryImageUrl(selectedCountry);
 }
 
 /* =========================================================
    Home
 ========================================================= */
 
-function updateNotificationBadge(count) {
-    const badge = document.getElementById("notif-badge");
-    if (!badge) return;
-    if (count > 0) {
-        badge.textContent = count > 99 ? "99+" : String(count);
-        badge.classList.remove("hidden");
-    } else {
-        badge.classList.add("hidden");
-    }
-}
-
 function updateHomeStats() {
     if (!player) return;
-    document.getElementById("home-country-flag").textContent = countryFlag(selectedCountry);
+    document.getElementById("home-country-flag").src = countryImageUrl(selectedCountry);
     document.getElementById("home-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     const photo = document.getElementById("home-card-photo");
-    if (photo) {
-        photo.style.backgroundImage = "none";
-        photo.style.background =
-            "radial-gradient(circle at 30% 20%, rgba(232,179,85,.18), rgba(6,16,28,.98) 70%)";
-    }
+    if (photo && selectedCountry) photo.style.backgroundImage = `url(${countryImageUrl(selectedCountry)})`;
     document.getElementById("home-money").textContent = formatMoney(player.money);
     document.getElementById("home-income").textContent = formatMoney(player.daily_income);
     document.getElementById("home-manpower").textContent = formatNumber(player.manpower);
@@ -337,21 +317,9 @@ function updateHomeStats() {
     document.getElementById("home-season").textContent = player.season ?? "بهار";
     document.getElementById("home-season-end").textContent =
         `پایان فصل تا ${player.season_days_left ?? 0} روز و ${player.season_hours_left ?? 0} ساعت`;
-
-    const eff = document.getElementById("home-season-effect");
-    if (eff) {
-        const season = player.season ?? "بهار";
-        let txt = "";
-        if (season === "تابستان") txt = " • مصرف کم";
-        else if (season === "پاییز") txt = " • مصرف متوسط";
-        else if (season === "زمستان") txt = " • مصرف زیاد";
-        eff.textContent = txt;
-    }
-
     const mm = document.getElementById("map-money");
     if (mm) mm.textContent = formatMoney(player.money);
     renderResourceBars();
-    updateNotificationBadge(player.notification_count || 0);
 }
 
 async function loadRankings() {
@@ -398,7 +366,7 @@ document.querySelectorAll(".sub-back-button").forEach(b => {
 });
 
 /* =========================================================
-   Infra
+   Infra (تب‌بندی شده)
 ========================================================= */
 
 async function openInfrastructureMenu() {
@@ -466,7 +434,7 @@ function buildStatsHtml(item, levelData) {
     if (levelData.income !== undefined) {
         boxes.push(statBox("💰", "+" + formatMoney(levelData.income), "در روز"));
     }
-    if (levelData.time !== undefined && levelData.time > 0) {
+    if (levelData.time !== undefined) {
         boxes.push(statBox("⏱️", formatDuration(levelData.time), "زمان"));
     }
 
@@ -485,8 +453,10 @@ function renderInfraList(cid, filterFn) {
 
         const isBuilt = item.level > 0;
         const statusText = isBuilt ? `سطح ${item.level}` : "ساخته نشده";
-        const shownLevel = item.next || item.current;
+        // اگر ساخته شده: آمار سطح فعلی؛ اگر نشده: آمار سطحی که با ساخت به دست می‌آید
+        const shownLevel = isBuilt ? item.current : item.next;
         const statsHtml = buildStatsHtml(item, shownLevel);
+        const statsNote = isBuilt ? "آمار فعلی" : "آمار پس از ساخت";
 
         const btnText = !item.next
             ? "حداکثر سطح"
@@ -499,7 +469,7 @@ function renderInfraList(cid, filterFn) {
                 <div class="infra-card-icon">${item.icon || "🏗️"}</div>
                 <div class="infra-card-titles">
                     <div class="infra-card-name">${item.name}</div>
-                    <div class="infra-card-status">${statusText}</div>
+                    <div class="infra-card-status">${statusText} · ${statsNote}</div>
                 </div>
             </div>
             <div class="infra-card-desc">${item.desc || ""}</div>
@@ -541,8 +511,9 @@ function renderEconomyList() {
 
         const isBuilt = item.level > 0;
         const statusText = isBuilt ? `سطح ${item.level}` : "ساخته نشده";
-        const shownLevel = item.next || item.current;
+        const shownLevel = isBuilt ? item.current : item.next;
         const statsHtml = buildStatsHtml(item, shownLevel);
+        const statsNote = isBuilt ? "آمار فعلی" : "آمار پس از ساخت";
 
         const btnText = !item.next
             ? "حداکثر سطح"
@@ -555,7 +526,7 @@ function renderEconomyList() {
                 <div class="infra-card-icon">${item.icon || "💰"}</div>
                 <div class="infra-card-titles">
                     <div class="infra-card-name">${item.name}</div>
-                    <div class="infra-card-status">${statusText}</div>
+                    <div class="infra-card-status">${statusText} · ${statsNote}</div>
                 </div>
             </div>
             <div class="infra-card-desc">${item.desc || ""}</div>
@@ -578,7 +549,7 @@ async function upgradeEconomy(iid) {
 }
 
 /* =========================================================
-   Army
+   Army — طرح جدید
 ========================================================= */
 
 async function openArmyPage() {
@@ -590,6 +561,7 @@ async function openArmyPage() {
     renderArmyUnitsNew();
 }
 
+// تب‌های ارتش
 document.querySelectorAll(".army-tab").forEach(tab => {
     tab.addEventListener("click", () => {
         document.querySelectorAll(".army-tab").forEach(t => t.classList.remove("active"));
@@ -616,15 +588,18 @@ function getGroupUsed(group) {
     return t;
 }
 
+// کارت خلاصه (قدرت کل)
 function renderArmySummary() {
     const el = document.getElementById("army-total-power");
     if (!el || !player) return;
     el.textContent = formatNumber(player.army);
 }
 
+// ۴ کارت پایگاه 2x2
 function renderBaseCards() {
     if (!player?.infra) return;
 
+    // پادگان (land_barracks)
     const barracks = player.infra["land_barracks"];
     const bv = document.getElementById("base-barracks-value");
     const bm = document.getElementById("base-barracks-max");
@@ -641,6 +616,7 @@ function renderBaseCards() {
         if (bf) bf.style.width = "0%";
     }
 
+    // فرودگاه (air_airport)
     const airport = player.infra["air_airport"];
     const as = document.getElementById("base-airport-status");
     if (airport && airport.current) {
@@ -653,6 +629,7 @@ function renderBaseCards() {
         as.classList.add("base-card-empty");
     }
 
+    // بندر (naval_port)
     const port = player.infra["naval_port"];
     const pv = document.getElementById("base-port-value");
     const pm = document.getElementById("base-port-max");
@@ -669,6 +646,7 @@ function renderBaseCards() {
         if (pf) pf.style.width = "0%";
     }
 
+    // پایگاه موشکی — فعلاً ساخته نشده
     const ms = document.getElementById("base-missile-status");
     if (ms) {
         ms.textContent = "ساخته نشده";
@@ -676,6 +654,7 @@ function renderBaseCards() {
     }
 }
 
+// شمارنده تب‌ها
 function renderArmyTabsCounts() {
     if (!player) return;
     const set = (id, n) => { const e = document.getElementById(id); if (e) e.textContent = formatNumber(n); };
@@ -685,6 +664,7 @@ function renderArmyTabsCounts() {
     set("army-count-missile", 0);
 }
 
+// استایل "درجه" (dots) براساس سطح یگان
 function unitLevelDots(count, max = 6) {
     const filled = count > 0 ? Math.min(max, Math.max(1, Math.ceil(Math.log10(count + 1) * 1.5))) : 0;
     let html = '<div class="unit-card-new-dots">';
@@ -731,9 +711,6 @@ function renderArmyUnitsNew() {
             statusText = "آماده آموزش";
         }
 
-        const extra = u.carry ? `<div class="unit-chip"><span>🚚 ظرفیت</span><span class="unit-chip-value">${formatNumber(u.carry)}</span></div>` : "";
-        const carrierNote = u.needed_for_air ? `<div class="unit-card-note">برای عملیات هوایی در جنگ لازم است.</div>` : "";
-
         const card = document.createElement("div");
         card.className = "unit-card-new" + (disabled ? " locked" : "");
 
@@ -747,18 +724,37 @@ function renderArmyUnitsNew() {
                     ${formatNumber(totalPower)}
                 </div>
             </div>
+
             <div class="unit-card-new-stats">
-                <div class="unit-chip"><span>⚔️ حمله</span><span class="unit-chip-value">${u.attack}</span></div>
-                <div class="unit-chip"><span>🛡️ دفاع</span><span class="unit-chip-value">${u.defense}</span></div>
-                <div class="unit-chip"><span>تعداد</span><span class="unit-chip-value">${formatNumber(count)}</span></div>
-                <div class="unit-chip"><span>💰</span><span class="unit-chip-value">${formatMoney(u.cost)}</span></div>
-                <div class="unit-chip"><span>👥</span><span class="unit-chip-value">${formatNumber(u.manpower)}</span></div>
-                ${extra}
+                <div class="unit-chip">
+                    <span>⚔️ حمله</span>
+                    <span class="unit-chip-value">${u.attack}</span>
+                </div>
+                <div class="unit-chip">
+                    <span>🛡️ دفاع</span>
+                    <span class="unit-chip-value">${u.defense}</span>
+                </div>
+                <div class="unit-chip">
+                    <span>تعداد</span>
+                    <span class="unit-chip-value">${formatNumber(count)}</span>
+                </div>
+                <div class="unit-chip">
+                    <span>💰</span>
+                    <span class="unit-chip-value">${formatMoney(u.cost)}</span>
+                </div>
+                <div class="unit-chip">
+                    <span>👥</span>
+                    <span class="unit-chip-value">${formatNumber(u.manpower)}</span>
+                </div>
             </div>
-            ${carrierNote}
+
             <div class="unit-card-new-action">
-                <button class="unit-produce-btn" data-unit="${uid_}" data-count="1" ${disabled ? "disabled" : ""}>⚙️ تولید</button>
-                <button class="unit-produce-btn" data-unit="${uid_}" data-count="10" ${disabled ? "disabled" : ""}>⚙️ ×۱۰</button>
+                <button class="unit-produce-btn" data-unit="${uid_}" data-count="1" ${disabled ? "disabled" : ""}>
+                    ⚙️ تولید
+                </button>
+                <button class="unit-produce-btn" data-unit="${uid_}" data-count="10" ${disabled ? "disabled" : ""}>
+                    ⚙️ ×۱۰
+                </button>
                 <span class="unit-status-text">${statusText}</span>
             </div>
         `;
@@ -825,7 +821,7 @@ function renderWarTargets() {
         const occText = occupied ? ` (اشغال توسط ${COUNTRY_NAMES[occupied] || occupied})` : "";
         card.innerHTML = `
             <div class="war-target-top">
-                <div class="flag-wrap"><span class="flag-emoji">${countryFlag(cid)}</span></div>
+                <div class="flag-wrap"><img class="flag-img" src="${countryImageUrl(cid)}" alt=""></div>
                 <span class="war-target-name">${COUNTRY_NAMES[cid]}${occText}</span>
             </div>
             <button class="war-attack-button" data-declare="${cid}">⚔️ اعلام جنگ</button>`;
@@ -885,9 +881,8 @@ async function loadWarData() {
                 ["air", "naval", "land"].forEach(f => {
                     if (!r.fronts[f]) return;
                     const label = f === "air" ? "✈️ هوا" : f === "naval" ? "⚓ دریا" : "🪖 زمین";
-                    const blocked = r.fronts[f].blocked ? " (بدون ناو هواپیمابر)" : "";
                     fronts += `<div class="front-item">
-                        <div class="front-label">${label}${blocked}</div>
+                        <div class="front-label">${label}</div>
                         <div class="front-values">
                             <span class="front-atk">${formatNumber(r.fronts[f].attacker_power)}</span> /
                             <span class="front-def">${formatNumber(r.fronts[f].defender_power)}</span>
@@ -905,7 +900,6 @@ async function loadWarData() {
 }
 
 function openBattleModal(wid) {
-    const hasCarrier = (player?.units?.carrier || 0) > 0;
     const ov = document.createElement("div");
     ov.className = "modal-overlay";
     ov.innerHTML = `
@@ -915,8 +909,8 @@ function openBattleModal(wid) {
             <input id="bt-land" class="diplomacy-input" type="number" value="0" min="0">
             <label class="diplomacy-label">⚓ دریایی (تعداد)</label>
             <input id="bt-naval" class="diplomacy-input" type="number" value="0" min="0">
-            <label class="diplomacy-label">✈️ هوایی (تعداد)${hasCarrier ? "" : " — بدون ناو هواپیمابر غیرفعال است"}</label>
-            <input id="bt-air" class="diplomacy-input" type="number" value="0" min="0" ${hasCarrier ? "" : "disabled"}>
+            <label class="diplomacy-label">✈️ هوایی (تعداد)</label>
+            <input id="bt-air" class="diplomacy-input" type="number" value="0" min="0">
             <div class="modal-actions">
                 <button class="modal-cancel">انصراف</button>
                 <button class="modal-ok">اجرای نبرد</button>
@@ -927,7 +921,7 @@ function openBattleModal(wid) {
         const fronts = {
             land: Number(ov.querySelector("#bt-land").value) || 0,
             naval: Number(ov.querySelector("#bt-naval").value) || 0,
-            air: hasCarrier ? (Number(ov.querySelector("#bt-air").value) || 0) : 0,
+            air: Number(ov.querySelector("#bt-air").value) || 0,
         };
         if (!fronts.land && !fronts.naval && !fronts.air) {
             showToast("حداقل یک جبهه را پر کنید."); return;
@@ -1057,7 +1051,7 @@ document.querySelectorAll(".nav-item").forEach(item => {
 });
 
 /* =========================================================
-   Communications
+   Communications — Tabs
 ========================================================= */
 
 document.querySelectorAll(".comm-tab").forEach(tab => {
@@ -1074,6 +1068,10 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
         else if (tid === "comm-contacts") renderContactList();
     });
 });
+
+/* =========================================================
+   Announcements
+========================================================= */
 
 document.getElementById("ann-submit").addEventListener("click", async () => {
     const ta = document.getElementById("ann-text");
@@ -1099,6 +1097,12 @@ async function loadAnnouncements() {
             div.className = "ann-card";
             const supportFlags = a.support.map(c => COUNTRY_FLAGS[c] || c).join(" ");
             const accuseFlags = a.accuse.map(c => COUNTRY_FLAGS[c] || c).join(" ");
+            const commentsHtml = (a.comments || []).map(cm => `
+                <div class="ann-comment">
+                    <span class="ann-comment-flag">${COUNTRY_FLAGS[cm.from_country] || ""}</span>
+                    <span class="ann-comment-name">${escapeHtml(COUNTRY_NAMES[cm.from_country] || cm.from_country)}</span>
+                    <span class="ann-comment-text">${escapeHtml(cm.text)}</span>
+                </div>`).join("");
             div.innerHTML = `
                 <div class="ann-header">
                     <span class="ann-flag">${COUNTRY_FLAGS[a.from_country] || ""}</span>
@@ -1113,7 +1117,7 @@ async function loadAnnouncements() {
                     ${supportFlags ? `<div class="ann-flags-row"><span>✅</span> ${supportFlags}</div>` : ""}
                     ${accuseFlags ? `<div class="ann-flags-row"><span>❌</span> ${accuseFlags}</div>` : ""}
                 </div>
-                <div class="ann-comments" id="ann-comments-${a.id}"></div>
+                <div class="ann-comments" id="ann-comments-${a.id}">${commentsHtml}</div>
                 <div class="ann-comment-row">
                     <input class="ann-comment-input" data-ann="${a.id}" placeholder="کامنت...">
                     <button class="ann-comment-send" data-ann="${a.id}">ارسال</button>
@@ -1442,7 +1446,7 @@ async function loadMyListings() {
 }
 
 /* =========================================================
-   Map
+   Map — World globe
 ========================================================= */
 
 let mapProjection = null, mapPath = null, mapSvg = null;
@@ -1720,7 +1724,7 @@ async function captureSite(siteId) {
 }
 
 /* =========================================================
-   Helpers
+   Helpers for Globe
 ========================================================= */
 
 function getTouchDistance(t) {
@@ -1836,22 +1840,6 @@ async function createPreviewGlobe(containerId, svgId, selected) {
         lx = e.touches[0].clientX; ly = e.touches[0].clientY;
         e.preventDefault();
     }, { passive: false, signal });
-}
-
-/* =========================================================
-   Menu Button — Notification
-========================================================= */
-
-const notifBtn = document.getElementById("game-notification-button");
-if (notifBtn) {
-    notifBtn.addEventListener("click", () => {
-        showGamePage("communications");
-        document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-        const commNav = document.querySelector('.nav-item[data-page="communications"]');
-        if (commNav) commNav.classList.add("active");
-        const contactsTab = document.querySelector('.comm-tab[data-tab="comm-contacts"]');
-        if (contactsTab) contactsTab.click();
-    });
 }
 
 /* =========================================================
