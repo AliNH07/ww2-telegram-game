@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 
 COUNTRIES = {
     "germany": {"name": "آلمان", "flag": "🇩🇪"}, "britain": {"name": "بریتانیا", "flag": "🇬🇧"},
-    "ussr": {"name": "شوروی", "flag": "🇷🇺"}, "usa": {"name": "آمریکا", "flag": "🇺🇸"},
+    "ussr": {"name": "شوروی", "flag": "☭"}, "usa": {"name": "آمریکا", "flag": "🇺🇸"},
     "france": {"name": "فرانسه", "flag": "🇫🇷"}, "italy": {"name": "ایتالیا", "flag": "🇮🇹"},
     "china": {"name": "چین", "flag": "🇨🇳"}, "japan": {"name": "ژاپن", "flag": "🇯🇵"},
 }
@@ -33,9 +33,9 @@ BASE_MANPOWER_PRODUCTION = 500
 GAME_TOTAL_DAYS = 31
 DAYS_PER_SEASON = 3
 SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
+
 STARTING_RESOURCES = {"food": 5_000, "steel": 0, "uranium": 0, "oil": 5_000}
 RESOURCE_NAMES = {"food": "غذا", "steel": "فولاد", "uranium": "اورانیوم", "oil": "نفت"}
-SEASON_CONSUMPTION_MULTIPLIER = {"بهار": 0.0, "تابستان": 0.5, "پاییز": 1.0, "زمستان": 2.0}
 GROUP_NAMES = {"land": "زمینی", "naval": "دریایی", "air": "هوایی",
                "power": "برق", "manpower": "نیروی انسانی", "resource": "منابع"}
 TREATY_TYPE_NAMES = {"alliance": "پیمان اتحاد", "non_aggression": "پیمان عدم تجاوز"}
@@ -45,8 +45,12 @@ NEGOTIATION_HOURS = 24
 DEFAULT_COST = 150_000
 DEFAULT_TIME = 0
 
+# ← ضریب اثر فصل روی مصرف غذا و نفت (به ازای هر یگان)
+SEASON_MULT = {"بهار": 0.0, "تابستان": 0.06, "پاییز": 0.14, "زمستان": 0.30}
+SEASON_LABEL = {"بهار": "مصرف عادی", "تابستان": "مصرف کم",
+                "پاییز": "مصرف متوسط", "زمستان": "مصرف زیاد"}
+
 def L(**kw):
-    """ساخت یک سطح با هزینهٔ ثابت"""
     kw.setdefault("cost", DEFAULT_COST)
     kw.setdefault("time", DEFAULT_TIME)
     return kw
@@ -127,21 +131,21 @@ INFRASTRUCTURE = {
         "levels": [L(cost=430_000, production=450), L(cost=900_000, production=1100), L(cost=1_800_000, production=2400), L(cost=3_400_000, production=5000), L(cost=6_000_000, production=10000)],
     },
 
-    # ==================== غذا ====================
+    # ==================== غذا (۳ آیتم) ====================
     "resource_farm": {
         "name": "مجتمع کشاورزی", "group": "resource", "resource_key": "food", "icon": "🌾",
         "desc": "غذا تولید می‌کند. از کشاورزی ارزان‌تر است و سریع‌تر ساخته می‌شود.",
         "levels": [L(cost=150_000, production=50_000), L(cost=350_000, production=130_000), L(cost=800_000, production=300_000), L(cost=1_600_000, production=700_000), L(cost=3_000_000, production=1_500_000)],
     },
-    "resource_granary": {
-        "name": "مزرعه غلات", "group": "resource", "resource_key": "food", "icon": "🌾",
-        "desc": "مزرعه تخصصی غلات با تولید پایدار غذا.",
-        "levels": [L(cost=130_000, production=40_000), L(cost=320_000, production=110_000), L(cost=760_000, production=260_000), L(cost=1_500_000, production=600_000), L(cost=2_800_000, production=1_300_000)],
+    "resource_wheat": {
+        "name": "گندمزار", "group": "resource", "resource_key": "food", "icon": "🌾",
+        "desc": "گندم تولید می‌کند؛ پایهٔ اصلی غذای کشور.",
+        "levels": [L(cost=180_000, production=60_000), L(cost=400_000, production=150_000), L(cost=880_000, production=340_000), L(cost=1_750_000, production=780_000), L(cost=3_300_000, production=1_700_000)],
     },
-    "resource_fishery": {
-        "name": "شیلات و آبزی‌پروری", "group": "resource", "resource_key": "food", "icon": "🐟",
-        "desc": "منبع دوم تولید غذا؛ با توسعه زیرساخت تولید آن بیشتر می‌شود.",
-        "levels": [L(cost=170_000, production=35_000), L(cost=390_000, production=100_000), L(cost=850_000, production=240_000), L(cost=1_700_000, production=560_000), L(cost=3_100_000, production=1_200_000)],
+    "resource_livestock": {
+        "name": "دامداری", "group": "resource", "resource_key": "food", "icon": "🐄",
+        "desc": "گوشت و لبنیات تولید می‌کند.",
+        "levels": [L(cost=210_000, production=70_000), L(cost=460_000, production=170_000), L(cost=980_000, production=380_000), L(cost=1_900_000, production=860_000), L(cost=3_600_000, production=1_850_000)],
     },
 
     # ==================== منابع ====================
@@ -200,48 +204,27 @@ INFRASTRUCTURE = {
 }
 
 ECONOMY = {
-    "eco_agriculture": {
-        "name": "کشاورزی و دامداری", "group": "eco", "icon": "🌾",
-        "desc": "پایهٔ اقتصاد. غذای اضافی می‌فروشد و درآمد می‌دهد.",
-        "power_required": 5,
-        "levels": [L(cost=90_000, income=30_000), L(cost=220_000, income=80_000), L(cost=500_000, income=190_000), L(cost=1_050_000, income=420_000), L(cost=2_100_000, income=850_000)],
-    },
-    "eco_textile": {
-        "name": "کارخانه نساجی", "group": "eco", "icon": "🧵",
-        "desc": "پوشاک و منسوجات تولید می‌کند.",
-        "power_required": 8,
-        "levels": [L(cost=160_000, income=45_000), L(cost=400_000, income=115_000), L(cost=920_000, income=270_000), L(cost=1_950_000, income=600_000), L(cost=3_900_000, income=1_200_000)],
-    },
-    "eco_mining": {
-        "name": "معدن‌کاری", "group": "eco", "icon": "⛏️",
-        "desc": "مواد معدنی استخراج و صادر می‌کند.",
-        "power_required": 12,
-        "levels": [L(cost=280_000, income=70_000), L(cost=700_000, income=180_000), L(cost=1_600_000, income=420_000), L(cost=3_400_000, income=920_000), L(cost=6_800_000, income=1_850_000)],
-    },
-    "eco_steel": {
-        "name": "کارخانه فولاد", "group": "eco", "icon": "⚙️",
-        "desc": "فولاد را به محصولات صنعتی تبدیل می‌کند.",
-        "power_required": 18,
-        "levels": [L(cost=420_000, income=100_000), L(cost=1_050_000, income=260_000), L(cost=2_400_000, income=600_000), L(cost=5_100_000, income=1_300_000), L(cost=10_200_000, income=2_600_000)],
-    },
-    "eco_trade": {
-        "name": "تجارت بین‌الملل", "group": "eco", "icon": "🚢",
-        "desc": "شبکهٔ تجاری کشور را گسترش می‌دهد.",
-        "power_required": 20,
-        "levels": [L(cost=700_000, income=130_000), L(cost=1_750_000, income=330_000), L(cost=4_000_000, income=760_000), L(cost=8_400_000, income=1_600_000), L(cost=16_800_000, income=3_200_000)],
-    },
-    "eco_oil": {
-        "name": "پالایشگاه نفت", "group": "eco", "icon": "🛢️",
-        "desc": "نفت خام را پالایش و صادر می‌کند.",
-        "power_required": 25,
-        "levels": [L(cost=800_000, income=140_000), L(cost=2_000_000, income=360_000), L(cost=4_500_000, income=820_000), L(cost=9_500_000, income=1_750_000), L(cost=19_000_000, income=3_500_000)],
-    },
-    "eco_bank": {
-        "name": "بانک مرکزی", "group": "eco", "icon": "🏦",
-        "desc": "سیستم مالی کشور را مدیریت می‌کند.",
-        "power_required": 30,
-        "levels": [L(cost=1_600_000, income=180_000), L(cost=4_000_000, income=460_000), L(cost=9_200_000, income=1_050_000), L(cost=19_500_000, income=2_200_000), L(cost=39_000_000, income=4_400_000)],
-    },
+    "eco_agriculture": {"name": "کشاورزی و دامداری", "group": "eco", "icon": "🌾",
+        "desc": "پایهٔ اقتصاد. غذای اضافی می‌فروشد و درآمد می‌دهد.", "power_required": 5,
+        "levels": [L(cost=90_000, income=30_000), L(cost=220_000, income=80_000), L(cost=500_000, income=190_000), L(cost=1_050_000, income=420_000), L(cost=2_100_000, income=850_000)]},
+    "eco_textile": {"name": "کارخانه نساجی", "group": "eco", "icon": "🧵",
+        "desc": "پوشاک و منسوجات تولید می‌کند.", "power_required": 8,
+        "levels": [L(cost=160_000, income=45_000), L(cost=400_000, income=115_000), L(cost=920_000, income=270_000), L(cost=1_950_000, income=600_000), L(cost=3_900_000, income=1_200_000)]},
+    "eco_mining": {"name": "معدن‌کاری", "group": "eco", "icon": "⛏️",
+        "desc": "مواد معدنی استخراج و صادر می‌کند.", "power_required": 12,
+        "levels": [L(cost=280_000, income=70_000), L(cost=700_000, income=180_000), L(cost=1_600_000, income=420_000), L(cost=3_400_000, income=920_000), L(cost=6_800_000, income=1_850_000)]},
+    "eco_steel": {"name": "کارخانه فولاد", "group": "eco", "icon": "⚙️",
+        "desc": "فولاد را به محصولات صنعتی تبدیل می‌کند.", "power_required": 18,
+        "levels": [L(cost=420_000, income=100_000), L(cost=1_050_000, income=260_000), L(cost=2_400_000, income=600_000), L(cost=5_100_000, income=1_300_000), L(cost=10_200_000, income=2_600_000)]},
+    "eco_trade": {"name": "تجارت بین‌الملل", "group": "eco", "icon": "🚢",
+        "desc": "شبکهٔ تجاری کشور را گسترش می‌دهد.", "power_required": 20,
+        "levels": [L(cost=700_000, income=130_000), L(cost=1_750_000, income=330_000), L(cost=4_000_000, income=760_000), L(cost=8_400_000, income=1_600_000), L(cost=16_800_000, income=3_200_000)]},
+    "eco_oil": {"name": "پالایشگاه نفت", "group": "eco", "icon": "🛢️",
+        "desc": "نفت خام را پالایش و صادر می‌کند.", "power_required": 25,
+        "levels": [L(cost=800_000, income=140_000), L(cost=2_000_000, income=360_000), L(cost=4_500_000, income=820_000), L(cost=9_500_000, income=1_750_000), L(cost=19_000_000, income=3_500_000)]},
+    "eco_bank": {"name": "بانک مرکزی", "group": "eco", "icon": "🏦",
+        "desc": "سیستم مالی کشور را مدیریت می‌کند.", "power_required": 30,
+        "levels": [L(cost=1_600_000, income=180_000), L(cost=4_000_000, income=460_000), L(cost=9_200_000, income=1_050_000), L(cost=19_500_000, income=2_200_000), L(cost=39_000_000, income=4_400_000)]},
 }
 
 ARMY_UNITS = {
@@ -257,21 +240,21 @@ ARMY_UNITS = {
     "submarine": {"name": "زیردریایی", "group": "naval", "requires": "naval_shipyard",
         "cost": 200_000, "manpower": 120, "resources": {"oil": 200, "steel": 150},
         "attack": 45, "defense": 25},
+    "carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": "naval_shipyard",
+        "cost": 500_000, "manpower": 400, "resources": {"steel": 500, "oil": 300},
+        "attack": 70, "defense": 80, "needed_for_air": True},
+    "transport": {"name": "ناو ترابری", "group": "naval", "requires": "naval_port",
+        "cost": 180_000, "manpower": 100, "resources": {"steel": 200, "oil": 150},
+        "attack": 10, "defense": 30, "carry": 1000},
     "fighter": {"name": "جنگنده", "group": "air", "requires": "air_airport",
         "cost": 200_000, "manpower": 150, "resources": {"oil": 200, "steel": 100},
         "attack": 45, "defense": 40},
     "bomber": {"name": "بمب‌افکن", "group": "air", "requires": "air_arsenal",
         "cost": 250_000, "manpower": 180, "resources": {"oil": 300, "steel": 150},
         "attack": 60, "defense": 15},
-    "helicopter": {"name": "بالگرد", "group": "air", "requires": "air_arsenal",
-        "cost": 180_000, "manpower": 120, "resources": {"oil": 180, "steel": 80},
-        "attack": 35, "defense": 30},
-    "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": "naval_shipyard",
-        "cost": 900_000, "manpower": 500, "resources": {"oil": 700, "steel": 1_200},
-        "attack": 120, "defense": 100, "carrier": True},
-    "transport_ship": {"name": "ناو ترابری", "group": "naval", "requires": "naval_shipyard",
-        "cost": 350_000, "manpower": 220, "resources": {"oil": 350, "steel": 500},
-        "attack": 10, "defense": 25, "transport_capacity": 1000, "transport_upgrade": 500},
+    "helicopter": {"name": "بالگرد", "group": "air", "requires": "air_airport",
+        "cost": 120_000, "manpower": 80, "resources": {"oil": 100, "steel": 60},
+        "attack": 30, "defense": 25},
 }
 
 MAP_RESOURCES = {
@@ -368,12 +351,6 @@ def get_group_units(player, group):
             total += player.get("units", {}).get(unit_id, 0)
     return total
 
-def get_transport_capacity_per_ship(player):
-    lv = get_infra_level(player, "naval_shipyard")
-    base = ARMY_UNITS.get("transport_ship", {}).get("transport_capacity", 0)
-    upgrade = ARMY_UNITS.get("transport_ship", {}).get("transport_upgrade", 0)
-    return base + max(0, lv - 1) * upgrade
-
 def recompute_army(player):
     total = 0
     for unit_id, unit in ARMY_UNITS.items():
@@ -435,20 +412,22 @@ def compute_rates(player):
         if occupier == country:
             income += 500_000
 
-    # مصرف فصلی: بهار بدون مصرف، تابستان کم، پاییز بیشتر و زمستان بسیار بیشتر.
-    game_time = get_game_time(player)
-    season_multiplier = SEASON_CONSUMPTION_MULTIPLIER.get(game_time["season"], 0.0)
-    base_food = max(5_000, int(player.get("manpower", 0) * 0.10))
+    # ← اثر فصل روی مصرف غذا و نفت
+    season = get_game_time(player).get("season", "بهار")
+    season_mult = SEASON_MULT.get(season, 0.0)
     total_units = sum(player.get("units", {}).values())
-    base_oil = max(2_000, total_units * 20)
-    resource_consumption["food"] = int(base_food * season_multiplier)
-    resource_consumption["oil"] = int(base_oil * season_multiplier)
+    if season_mult > 0 and total_units > 0:
+        resource_consumption["food"] += int(total_units * 800 * season_mult)
+        resource_consumption["oil"]  += int(total_units * 500 * season_mult)
 
     return {"gross_income": income, "net_income": income,
             "power_capacity": power_capacity, "power_consumption": power_consumption,
             "manpower_production": manpower_production,
             "resource_production": resource_production,
-            "resource_consumption": resource_consumption}
+            "resource_consumption": resource_consumption,
+            "season": season,
+            "season_mult": season_mult,
+            "season_label": SEASON_LABEL.get(season, "")}
 
 def accrue_player(player):
     if not player.get("started_at") or player.get("is_eliminated"): return
@@ -461,10 +440,11 @@ def accrue_player(player):
     player["money"] = player.get("money", STARTING_MONEY) + rates["net_income"] * f
     player["manpower"] = player.get("manpower", STARTING_MANPOWER) + rates["manpower_production"] * f
     ensure_player_fields(player)
-    for key, amount in rates["resource_production"].items():
-        player["resources"][key] = player["resources"].get(key, 0) + amount * f
-    for key, amount in rates["resource_consumption"].items():
-        player["resources"][key] = max(0, player["resources"].get(key, 0) - amount * f)
+    for key in RESOURCE_NAMES:
+        prod = rates["resource_production"].get(key, 0)
+        use  = rates["resource_consumption"].get(key, 0)
+        net  = prod - use
+        player["resources"][key] = max(0, player["resources"].get(key, 0) + net * f)
     player["last_update"] = now.isoformat()
 
 def build_catalog_status(player, catalog):
@@ -486,6 +466,16 @@ def build_catalog_status(player, catalog):
         }
     return result
 
+def compute_notifications(player):
+    """تعداد اعلان‌های خوانده‌نشده برای این بازیکن."""
+    country = player.get("country")
+    if not country: return 0
+    count = 0
+    # PMهای دریافتی
+    for src, msgs in private_messages.get(country, {}).items():
+        count += len([m for m in msgs if m.get("to") == country])
+    return count
+
 def serialize_player(player):
     ensure_player_fields(player); accrue_player(player); recompute_army(player)
     rates = compute_rates(player)
@@ -496,10 +486,11 @@ def serialize_player(player):
     data["power_consumption"] = rates["power_consumption"]
     data["manpower_production"] = rates["manpower_production"]
     data["daily_income"] = rates["net_income"]
-    data["transport_capacity_per_ship"] = get_transport_capacity_per_ship(player)
-    data["transport_capacity_total"] = player.get("units", {}).get("transport_ship", 0) * get_transport_capacity_per_ship(player)
+    data["season_mult"] = rates.get("season_mult", 0)
+    data["season_label"] = rates.get("season_label", "")
     data["infra"] = build_catalog_status(player, INFRASTRUCTURE)
     data["economy"] = build_catalog_status(player, ECONOMY)
+    data["notification_count"] = compute_notifications(player)
     return data
 
 # =========================================================
@@ -650,7 +641,7 @@ async def start_command(message: types.Message):
         c = COUNTRIES[players[user_id]["country"]]
         text = f"⚔️ کشور شما: {c['flag']} {c['name']}\n\nبرای ورود روی دکمه بزنید."
     else:
-        text = "⚔️ به جنگ جهانی دوم خوش آمدید.\nابتدا کشور خود را انتخاب کنید."
+        text = "⚔️ به FRONT-LINE 1993 خوش آمدید.\nابتدا کشور خود را انتخاب کنید."
     await message.answer(text, reply_markup=kb)
 
 async def notify_admin(text, keyboard=None):
@@ -994,22 +985,22 @@ async def perform_battle(request):
                 for uid_, u in ARMY_UNITS.items() if u["group"] == side_kind}
 
     sent_atk = {k: max(0, int(fronts.get(k, 0) or 0)) for k in ["land", "air", "naval"]}
-    if sent_atk["air"] > 0 and atk.get("units", {}).get("aircraft_carrier", 0) <= 0:
-        return web.json_response({"success": False, "error": "carrier_required",
-                                  "message": "برای اعزام نیروی هوایی به جنگ حداقل یک ناو هواپیمابر لازم است."}, status=400)
-    transport_capacity = atk.get("units", {}).get("transport_ship", 0) * get_transport_capacity_per_ship(atk)
-    land_unit_count = sum(atk.get("units", {}).get(uid_, 0) for uid_, u in ARMY_UNITS.items() if u["group"] == "land")
-    land_manpower = sum(atk.get("units", {}).get(uid_, 0) * u.get("manpower", 0)
-                        for uid_, u in ARMY_UNITS.items() if u["group"] == "land")
-    requested_land_manpower = int(land_manpower * min(1.0, sent_atk["land"] / land_unit_count)) if land_unit_count else 0
-    if requested_land_manpower > transport_capacity:
-        return web.json_response({"success": False, "error": "transport_capacity",
-                                  "message": f"ظرفیت ناوهای ترابری برای انتقال نیرو کافی نیست. نیاز: {requested_land_manpower} نفر، ظرفیت فعلی: {transport_capacity} نفر."}, status=400)
     report = {"attacker": w["attacker"], "defender": w["defender"], "fronts": {},
               "at": utcnow().isoformat(), "winner": None}
     attacker_wins = 0; defender_wins = 0; air_winner = None
 
     for front in ["air", "naval", "land"]:
+        # ← بدون ناو هواپیمابر، جبههٔ هوایی غیرفعال
+        if front == "air":
+            carrier_count = atk.get("units", {}).get("carrier", 0)
+            if carrier_count < 1:
+                report["fronts"]["air"] = {"attacker_power": 0, "defender_power": 0,
+                                           "winner": "defender", "blocked": True,
+                                           "reason": "no_carrier"}
+                defender_wins += 1
+                air_winner = w["defender"]
+                continue
+
         atk_attack = 0
         available = total_units(atk, front)
         requested = sent_atk.get(front, 0)
@@ -1486,7 +1477,7 @@ async def war_tick_loop():
         except Exception as e: logging.error("war tick: %s", e)
 
 async def main():
-    logging.info("WW2 GAME STARTING...")
+    logging.info("FRONT-LINE 1993 STARTING...")
     load_state()
     asyncio.create_task(autosave_loop())
     asyncio.create_task(war_tick_loop())
