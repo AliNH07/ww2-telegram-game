@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 
 COUNTRIES = {
     "germany": {"name": "آلمان", "flag": "🇩🇪"}, "britain": {"name": "بریتانیا", "flag": "🇬🇧"},
-    "ussr": {"name": "شوروی", "flag": "☭"}, "usa": {"name": "آمریکا", "flag": "🇺🇸"},
+    "ussr": {"name": "شوروی", "flag": "🇷🇺"}, "usa": {"name": "آمریکا", "flag": "🇺🇸"},
     "france": {"name": "فرانسه", "flag": "🇫🇷"}, "italy": {"name": "ایتالیا", "flag": "🇮🇹"},
     "china": {"name": "چین", "flag": "🇨🇳"}, "japan": {"name": "ژاپن", "flag": "🇯🇵"},
 }
@@ -31,10 +31,11 @@ STARTING_MANPOWER = 50_000
 BASE_DAILY_INCOME = 100_000
 BASE_MANPOWER_PRODUCTION = 500
 GAME_TOTAL_DAYS = 31
-DAYS_PER_SEASON = 7
+DAYS_PER_SEASON = 3
 SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
-STARTING_RESOURCES = {"food": 150_000, "steel": 150_000, "uranium": 150_000, "oil": 150_000}
+STARTING_RESOURCES = {"food": 5_000, "steel": 0, "uranium": 0, "oil": 5_000}
 RESOURCE_NAMES = {"food": "غذا", "steel": "فولاد", "uranium": "اورانیوم", "oil": "نفت"}
+SEASON_CONSUMPTION_MULTIPLIER = {"بهار": 0.0, "تابستان": 0.5, "پاییز": 1.0, "زمستان": 2.0}
 GROUP_NAMES = {"land": "زمینی", "naval": "دریایی", "air": "هوایی",
                "power": "برق", "manpower": "نیروی انسانی", "resource": "منابع"}
 TREATY_TYPE_NAMES = {"alliance": "پیمان اتحاد", "non_aggression": "پیمان عدم تجاوز"}
@@ -131,6 +132,16 @@ INFRASTRUCTURE = {
         "name": "مجتمع کشاورزی", "group": "resource", "resource_key": "food", "icon": "🌾",
         "desc": "غذا تولید می‌کند. از کشاورزی ارزان‌تر است و سریع‌تر ساخته می‌شود.",
         "levels": [L(cost=150_000, production=50_000), L(cost=350_000, production=130_000), L(cost=800_000, production=300_000), L(cost=1_600_000, production=700_000), L(cost=3_000_000, production=1_500_000)],
+    },
+    "resource_granary": {
+        "name": "مزرعه غلات", "group": "resource", "resource_key": "food", "icon": "🌾",
+        "desc": "مزرعه تخصصی غلات با تولید پایدار غذا.",
+        "levels": [L(cost=130_000, production=40_000), L(cost=320_000, production=110_000), L(cost=760_000, production=260_000), L(cost=1_500_000, production=600_000), L(cost=2_800_000, production=1_300_000)],
+    },
+    "resource_fishery": {
+        "name": "شیلات و آبزی‌پروری", "group": "resource", "resource_key": "food", "icon": "🐟",
+        "desc": "منبع دوم تولید غذا؛ با توسعه زیرساخت تولید آن بیشتر می‌شود.",
+        "levels": [L(cost=170_000, production=35_000), L(cost=390_000, production=100_000), L(cost=850_000, production=240_000), L(cost=1_700_000, production=560_000), L(cost=3_100_000, production=1_200_000)],
     },
 
     # ==================== منابع ====================
@@ -252,6 +263,15 @@ ARMY_UNITS = {
     "bomber": {"name": "بمب‌افکن", "group": "air", "requires": "air_arsenal",
         "cost": 250_000, "manpower": 180, "resources": {"oil": 300, "steel": 150},
         "attack": 60, "defense": 15},
+    "helicopter": {"name": "بالگرد", "group": "air", "requires": "air_arsenal",
+        "cost": 180_000, "manpower": 120, "resources": {"oil": 180, "steel": 80},
+        "attack": 35, "defense": 30},
+    "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": "naval_shipyard",
+        "cost": 900_000, "manpower": 500, "resources": {"oil": 700, "steel": 1_200},
+        "attack": 120, "defense": 100, "carrier": True},
+    "transport_ship": {"name": "ناو ترابری", "group": "naval", "requires": "naval_shipyard",
+        "cost": 350_000, "manpower": 220, "resources": {"oil": 350, "steel": 500},
+        "attack": 10, "defense": 25, "transport_capacity": 1000, "transport_upgrade": 500},
 }
 
 MAP_RESOURCES = {
@@ -348,6 +368,12 @@ def get_group_units(player, group):
             total += player.get("units", {}).get(unit_id, 0)
     return total
 
+def get_transport_capacity_per_ship(player):
+    lv = get_infra_level(player, "naval_shipyard")
+    base = ARMY_UNITS.get("transport_ship", {}).get("transport_capacity", 0)
+    upgrade = ARMY_UNITS.get("transport_ship", {}).get("transport_upgrade", 0)
+    return base + max(0, lv - 1) * upgrade
+
 def recompute_army(player):
     total = 0
     for unit_id, unit in ARMY_UNITS.items():
@@ -409,6 +435,15 @@ def compute_rates(player):
         if occupier == country:
             income += 500_000
 
+    # مصرف فصلی: بهار بدون مصرف، تابستان کم، پاییز بیشتر و زمستان بسیار بیشتر.
+    game_time = get_game_time(player)
+    season_multiplier = SEASON_CONSUMPTION_MULTIPLIER.get(game_time["season"], 0.0)
+    base_food = max(5_000, int(player.get("manpower", 0) * 0.10))
+    total_units = sum(player.get("units", {}).values())
+    base_oil = max(2_000, total_units * 20)
+    resource_consumption["food"] = int(base_food * season_multiplier)
+    resource_consumption["oil"] = int(base_oil * season_multiplier)
+
     return {"gross_income": income, "net_income": income,
             "power_capacity": power_capacity, "power_consumption": power_consumption,
             "manpower_production": manpower_production,
@@ -428,6 +463,8 @@ def accrue_player(player):
     ensure_player_fields(player)
     for key, amount in rates["resource_production"].items():
         player["resources"][key] = player["resources"].get(key, 0) + amount * f
+    for key, amount in rates["resource_consumption"].items():
+        player["resources"][key] = max(0, player["resources"].get(key, 0) - amount * f)
     player["last_update"] = now.isoformat()
 
 def build_catalog_status(player, catalog):
@@ -459,6 +496,8 @@ def serialize_player(player):
     data["power_consumption"] = rates["power_consumption"]
     data["manpower_production"] = rates["manpower_production"]
     data["daily_income"] = rates["net_income"]
+    data["transport_capacity_per_ship"] = get_transport_capacity_per_ship(player)
+    data["transport_capacity_total"] = player.get("units", {}).get("transport_ship", 0) * get_transport_capacity_per_ship(player)
     data["infra"] = build_catalog_status(player, INFRASTRUCTURE)
     data["economy"] = build_catalog_status(player, ECONOMY)
     return data
@@ -955,6 +994,17 @@ async def perform_battle(request):
                 for uid_, u in ARMY_UNITS.items() if u["group"] == side_kind}
 
     sent_atk = {k: max(0, int(fronts.get(k, 0) or 0)) for k in ["land", "air", "naval"]}
+    if sent_atk["air"] > 0 and atk.get("units", {}).get("aircraft_carrier", 0) <= 0:
+        return web.json_response({"success": False, "error": "carrier_required",
+                                  "message": "برای اعزام نیروی هوایی به جنگ حداقل یک ناو هواپیمابر لازم است."}, status=400)
+    transport_capacity = atk.get("units", {}).get("transport_ship", 0) * get_transport_capacity_per_ship(atk)
+    land_unit_count = sum(atk.get("units", {}).get(uid_, 0) for uid_, u in ARMY_UNITS.items() if u["group"] == "land")
+    land_manpower = sum(atk.get("units", {}).get(uid_, 0) * u.get("manpower", 0)
+                        for uid_, u in ARMY_UNITS.items() if u["group"] == "land")
+    requested_land_manpower = int(land_manpower * min(1.0, sent_atk["land"] / land_unit_count)) if land_unit_count else 0
+    if requested_land_manpower > transport_capacity:
+        return web.json_response({"success": False, "error": "transport_capacity",
+                                  "message": f"ظرفیت ناوهای ترابری برای انتقال نیرو کافی نیست. نیاز: {requested_land_manpower} نفر، ظرفیت فعلی: {transport_capacity} نفر."}, status=400)
     report = {"attacker": w["attacker"], "defender": w["defender"], "fronts": {},
               "at": utcnow().isoformat(), "winner": None}
     attacker_wins = 0; defender_wins = 0; air_winner = None
