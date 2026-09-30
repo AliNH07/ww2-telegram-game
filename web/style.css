@@ -1,252 +1,1367 @@
-/* ================= تنظیمات کلی و متغیرها ================= */
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
 :root {
-    --bg-color: #0b1016;
-    --card-bg: #131b26;
-    --text-gold: #e2b86b;
-    --text-white: #ffffff;
-    --text-gray: #a0aec0;
-    --border-color: rgba(255, 255, 255, 0.08);
+    --brand: #e8b355;
+    --brand-dark: #c98a2e;
+    --brand-rgb: 232, 179, 85;
+    --brand-glow: rgba(232, 179, 85, 0.35);
+    --bg-deep: #0a0d14;
+    --bg-card: rgba(16, 20, 30, 0.78);
+    --green: #4ade80;
+    --red: #f87171;
+    --c-army: #4a6fd4;
+    --c-army-rgb: 74, 111, 212;
+    --c-war: #e5544f;
+    --c-war-rgb: 229, 84, 79;
+    --c-diplomacy: #9d6fe0;
+    --c-diplomacy-rgb: 157, 111, 224;
+    --c-economy: #4ecb8a;
+    --c-economy-rgb: 78, 203, 138;
+    --c-infra: #33b4b0;
+    --c-infra-rgb: 51, 180, 176;
+    --c-market: #e8b355;
+    --c-market-rgb: 232, 179, 85;
+    --c-money: #e8b355;
+    --c-manpower: #4d8fe0;
+    --c-power: #33c9c4;
+    --c-armypower: #e5544f;
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: 'Tahoma', 'Vazirmatn', sans-serif;
-    user-select: none;
+html, body {
+    width: 100%; height: 100%; overflow: hidden;
 }
 
 body {
-    background-color: var(--bg-color);
-    color: var(--text-white);
-    display: flex;
-    justify-content: center;
+    font-family: Tahoma, Arial, sans-serif;
+    color: #f4f6f9;
+    direction: rtl;
     min-height: 100vh;
-    padding-bottom: 90px; /* ایجاد فضا برای فوتر فیکس شده */
+    background: var(--bg-deep);
 }
 
-.app-container {
-    width: 100%;
-    max-width: 480px;
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-/* ================= ۱. هدر و پرچم ================= */
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-}
-
-.header-left, .header-right {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.header-title {
-    font-size: 1.1rem;
-    font-weight: bold;
-    color: var(--text-white);
-}
-
-.icon-btn {
-    background: #1a2332;
-    border: 1px solid var(--border-color);
-    color: var(--text-white);
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 1.2rem;
-    cursor: pointer;
-}
-
-/* رفع باگ پرچم: این کلاس‌ها رو دقیقا برای کانتینر پرچم استفاده کنید */
-.flag-container {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    overflow: hidden;
-    border: 2px solid #2a3a4a;
-    background-color: #1a2332;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.flag-container img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* باعث میشه عکس پرچم بدون کشیدگی پر کنه */
-}
-
-/* ================= ۲. کارت‌های آماری ================= */
-.stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-}
-
-.stat-card {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.stat-card.treasury { background: linear-gradient(135deg, #1a1a10, #131b26); border-color: #4a3f1f; }
-.stat-card.power { background: linear-gradient(135deg, #2a1010, #131b26); border-color: #5c2020; }
-.stat-card.electricity { background: linear-gradient(135deg, #0d2a26, #131b26); border-color: #1f4a44; }
-
-.stat-title { font-size: 0.8rem; color: var(--text-gray); }
-.stat-value { font-size: 1.4rem; font-weight: bold; color: var(--text-white); }
-.stat-subtitle { font-size: 0.75rem; color: #48bb78; }
-
-/* بنر فصل */
-.season-banner {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
-    padding: 12px 15px;
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.85rem;
-    color: var(--text-gray);
-}
-
-/* ================= ۳. کارت‌های منو (پس‌زمینه‌دار) ================= */
-.menu-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-}
-
-.menu-card {
-    position: relative;
-    border-radius: 16px;
-    padding: 15px;
-    min-height: 130px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    overflow: hidden;
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-    transition: transform 0.2s; 
-    background-size: cover;
-    background-position: center;
-}
-
-.menu-card:active { transform: scale(0.97); }
-
-/* رفع باگ خوانایی متن: لایه تیره روی عکس */
-.menu-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: linear-gradient(to top, rgba(11, 16, 22, 0.95) 10%, rgba(11, 16, 22, 0.4) 100%);
-    z-index: 1;
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+        radial-gradient(ellipse 900px 500px at 50% -10%,
+            rgba(232, 179, 85, 0.16) 0%, rgba(232, 179, 85, 0) 60%),
+        linear-gradient(180deg,
+            rgba(10, 13, 20, 0.68) 0%,
+            rgba(10, 13, 20, 0.82) 50%,
+            rgba(6, 8, 13, 0.94) 100%),
+        url("/images/background.jfif") center / cover no-repeat;
     pointer-events: none;
 }
 
-/* اینجا آدرس عکس‌های جنگ و ارتش خودتون رو بذارید */
-.card-war {
-    background-image: url('عکس-جنگ-شما.jpg'); 
+button {
+    font-family: inherit;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: inherit;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
 }
-.card-army {
-    background-image: url('عکس-ارتش-شما.jpg'); 
-}
-.card-economy {
-    background-image: linear-gradient(135deg, #1a2e1a, #131b26);
-}
-.card-diplomacy {
-    background-image: linear-gradient(135deg, #2e1a2e, #131b26);
+button:focus,
+button:focus-visible,
+button:active {
+    outline: none;
 }
 
-.card-icon {
-    width: 45px;
-    height: 45px;
-    border-radius: 50%;
+img { -webkit-user-drag: none; user-select: none; }
+.hidden { display: none !important; }
+
+.screen { width: 100%; height: 100vh; min-height: 100vh; position: relative; background: transparent; }
+
+/* ==================== Flag Wrap ==================== */
+.flag-wrap {
+    width: 38px; height: 38px; border-radius: 50%;
+    overflow: hidden; flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: #0a1420;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+}
+.flag-wrap-sm { width: 26px; height: 26px; }
+.flag-img {
+    width: 130%; height: 130%;
+    object-fit: cover; object-position: center;
+    display: block; pointer-events: none;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* ==================== لودینگ ==================== */
+.loading-screen { display: flex; align-items: center; justify-content: center; padding: 20px; }
+.loading-box {
+    width: min(320px, 85%); background: rgba(10, 18, 30, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px;
+    padding: 22px 24px; text-align: center;
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.loading-bar {
+    width: 100%; height: 3px; background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px; overflow: hidden; margin-bottom: 14px; position: relative;
+}
+.loading-bar::after {
+    content: ""; position: absolute; top: 0; right: 0; height: 100%; width: 35%;
+    background: linear-gradient(90deg, transparent, var(--brand), transparent);
+    border-radius: 2px; animation: loadingSlide 1.4s ease-in-out infinite;
+}
+@keyframes loadingSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
+.loading-text { color: #a0a8b3; font-size: 12.5px; letter-spacing: 0.4px; }
+
+/* ==================== انتخاب کشور ==================== */
+.country-screen { overflow-y: auto; padding: 35px 18px 30px; }
+.country-header { text-align: center; margin-bottom: 25px; }
+.country-header h1 { font-size: 26px; font-weight: bold; margin-bottom: 8px; color: #f4f6f9; letter-spacing: 0.5px; }
+.country-header p { color: #a0a8b3; font-size: 13px; }
+.country-message { text-align: center; color: var(--brand); font-size: 13px; min-height: 22px; margin-bottom: 10px; }
+.country-grid {
+    width: min(900px, 100%); margin: auto;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;
+}
+.country-card {
+    min-height: 145px; padding: 18px; border-radius: 18px;
+    background: rgba(10, 18, 30, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.08); color: #f4f6f9;
+    display: flex; align-items: center; gap: 15px; text-align: right;
+    transition: all 0.25s ease;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.country-card:hover {
+    border-color: rgba(var(--brand-rgb), 0.5); transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(var(--brand-rgb), 0.12);
+}
+.country-card:active { transform: scale(0.98); }
+.country-card.taken { opacity: 0.35; filter: grayscale(1); pointer-events: none; }
+.country-photo {
+    width: 58px; height: 58px; flex-shrink: 0; border-radius: 50%;
+    background: #1a1f29; border: 1px solid rgba(255, 255, 255, 0.1);
+    object-fit: cover; object-position: center;
+}
+.country-info { min-width: 0; flex: 1; }
+.country-info h2 { font-size: 17px; margin-bottom: 3px; color: #f4f6f9; }
+.country-info > span { color: #6b7480; font-size: 11px; }
+.country-facts { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.country-facts span { font-size: 10px; color: #a0a8b3; line-height: 1.5; }
+
+/* ==================== هدر ==================== */
+.game-header {
+    height: 64px; width: 100%;
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center; padding: 0 14px;
+    background: transparent;
+    border-bottom: none;
+    position: relative; z-index: 20;
+}
+.header-right { display: flex; justify-content: flex-start; align-items: center; }
+.header-left { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.header-center { text-align: center; }
+.game-title {
+    font-size: 13px; font-weight: bold; letter-spacing: 2px;
+    color: #f4f6f9; opacity: 0.9;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+.header-button {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: rgba(6, 16, 28, 0.7); color: #f4f6f9;
+    font-size: 16px; border: 1px solid rgba(255, 255, 255, 0.12);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.header-button:active { transform: scale(0.92); background: rgba(var(--brand-rgb), 0.2); }
+
+/* ==================== دکمه بازگشت ==================== */
+.back-bar {
+    display: flex; align-items: center; padding: 8px 14px;
+    background: rgba(6, 16, 28, 0.55);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.12);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.back-button {
+    background: transparent; color: var(--brand); font-size: 13px;
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 10px; transition: all 0.2s ease;
+}
+.back-button:active { background: rgba(var(--brand-rgb), 0.1); }
+
+.sub-back-bar {
     display: flex;
-    justify-content: center;
+    margin-bottom: 12px;
+}
+.sub-back-button {
+    width: 100%;
+    background: rgba(var(--brand-rgb), 0.1);
+    color: var(--brand);
+    font-size: 12.5px;
+    padding: 11px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(var(--brand-rgb), 0.28);
+    transition: all 0.2s ease;
+    text-align: right;
+    display: flex;
     align-items: center;
-    font-size: 1.3rem;
+    justify-content: flex-start;
+    gap: 6px;
+    font-weight: 500;
+}
+.sub-back-button:active {
+    transform: scale(0.98);
+    background: rgba(var(--brand-rgb), 0.2);
+}
+
+/* ==================== پیش‌نمایش کشور ==================== */
+.preview-content {
+    height: calc(100vh - 64px - 46px);
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 20px 15px 30px; gap: 22px;
+}
+.preview-title { text-align: center; }
+.preview-title span { color: #6b7480; font-size: 12px; }
+.preview-title h1 { font-size: 28px; margin: 5px 0; color: #f4f6f9; }
+.preview-title p { color: #a0a8b3; font-size: 12px; }
+.globe-card {
+    width: min(300px, 78vw); height: min(300px, 36vh);
+    border-radius: 20px; background: rgba(10, 18, 30, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden; position: relative;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.globe-container {
+    position: relative; display: flex; justify-content: center;
+    align-items: center; touch-action: none; width: 100%; height: 100%;
+}
+#preview-globe { width: 100%; height: 100%; overflow: visible; }
+.primary-game-button {
+    width: min(320px, 85%); height: 52px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+    color: #06101c; font-size: 15px; font-weight: bold;
+    box-shadow: 0 8px 24px rgba(var(--brand-rgb), 0.3);
+    transition: all 0.2s ease; letter-spacing: 0.5px;
+}
+.primary-game-button:active { transform: scale(0.97); box-shadow: 0 4px 14px rgba(var(--brand-rgb), 0.4); }
+
+/* ==================== بازی ==================== */
+.game-screen { overflow: hidden; }
+.game-page {
+    height: calc(100vh - 64px - 78px);
+    overflow-y: auto; padding: 16px 15px 96px;
+}
+.game-page::-webkit-scrollbar { width: 4px; }
+.game-page::-webkit-scrollbar-track { background: transparent; }
+.game-page::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 4px; }
+.page-title { margin-bottom: 15px; }
+.page-title span { color: #6b7480; font-size: 11px; }
+.page-title h1 { font-size: 24px; margin-top: 4px; color: #f4f6f9; }
+
+/* ==================== کارت خانه ==================== */
+.home-card {
+    background: #06101c;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 20px; overflow: hidden; margin-bottom: 18px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.home-card-top {
     position: relative;
     z-index: 2;
-    margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px;
+    background: rgba(6, 16, 28, 0.85);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.12);
+}
+.world-chip {
+    background: rgba(6, 16, 28, 0.7);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: #a0a8b3; font-size: 11px; padding: 5px 12px; border-radius: 20px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.home-country-chip {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: #f4f6f9;
+    background: rgba(6, 16, 28, 0.7);
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.home-card-body {
+    position: relative;
+    padding: 4px 0 0;
+    overflow: hidden;
+}
+.home-card-photo {
+    position: absolute;
+    inset: 0;
+    background-color: #06101c;
+    background-size: cover;
+    background-position: center;
+    z-index: 0;
+}
+.home-card-photo::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+        rgba(6, 16, 28, 0.6) 0%,
+        rgba(6, 16, 28, 0.85) 50%,
+        rgba(6, 16, 28, 0.95) 100%);
 }
 
-.icon-war { background: linear-gradient(135deg, #ef4444, #991b1b); }
-.icon-army { background: linear-gradient(135deg, #3b82f6, #1e3a8a); }
-.icon-economy { background: linear-gradient(135deg, #10b981, #064e3b); }
-.icon-diplomacy { background: linear-gradient(135deg, #a855f7, #4c1d95); }
+/* ============ کارت‌های آماری خانه ============ */
+.home-stats-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 8px 12px 12px;
+}
+.home-stat {
+    position: relative;
+    min-height: 96px;
+    border-radius: 14px;
+    overflow: hidden;
+    background-color: rgba(6, 16, 28, 0.55);
+    background-size: cover;
+    background-position: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+.home-stat:nth-of-type(1) { background-color: #7a5a1e; background-image: linear-gradient(150deg, #c9922f 0%, #3d2a0f 78%); }
+.home-stat:nth-of-type(2) { background-color: #7a4a1e; background-image: linear-gradient(150deg, #c98a3d 0%, #3d240f 78%); }
+.home-stat:nth-of-type(3) { background-color: #1e6e6a; background-image: linear-gradient(150deg, #2fb8b3 0%, #0f2e2c 78%); }
+.home-stat:nth-of-type(4) { background-color: #7a2620; background-image: linear-gradient(150deg, #d5453d 0%, #3d1210 78%); }
+.home-stat-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: flex-end; align-items: flex-end;
+    text-align: right; padding: 10px 12px;
+    background: linear-gradient(180deg,
+        rgba(6, 10, 18, 0.05) 0%,
+        rgba(6, 10, 18, 0.82) 100%);
+}
+.home-stat-label {
+    font-size: 10.5px; color: rgba(255, 255, 255, 0.85); margin-bottom: 2px;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, .5);
+}
+.home-stat-value {
+    font-size: 19px; color: #fff;
+    font-weight: bold; line-height: 1.1;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .5);
+}
+.home-stat-sub {
+    font-size: 10px; color: #a0a8b3; margin-top: 2px;
+}
+.home-stat-sub span { color: var(--green); }
 
-.card-text { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 4px; }
-.card-title { font-size: 1.1rem; font-weight: bold; color: var(--text-white); }
-.card-desc { font-size: 0.7rem; color: var(--text-gray); line-height: 1.4; }
+.season-bar {
+    position: relative;
+    z-index: 1;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px 16px;
+    border-top: 1px solid rgba(59, 130, 246, 0.15);
+    font-size: 12px; color: #c3cad3;
+    background: rgba(6, 16, 28, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.season-tag { font-size: 13px; color: #f4f6f9; }
 
-/* ================= ۴. فوتر و دکمه خانه (بزرگ شده) ================= */
+/* ==================== باکس‌های اقدام ==================== */
+.action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.action-card {
+    position: relative; border-radius: 18px; overflow: hidden; min-height: 132px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.25s ease; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+.action-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+}
+.action-card:active { transform: scale(0.97); }
+.action-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: flex-end; align-items: flex-end;
+    text-align: right; padding: 14px;
+    background: linear-gradient(180deg,
+        rgba(8, 12, 20, 0) 35%, rgba(8, 12, 20, 0.75) 100%);
+}
+.action-icon {
+    position: absolute; top: 12px; left: 12px; font-size: 17px;
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.action-card h3 { font-size: 15px; color: #fff; margin-bottom: 4px; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.action-card p { font-size: 10.5px; color: rgba(255,255,255,0.8); line-height: 1.6; }
+.action-army           { background-color: #16233f; background-image: linear-gradient(150deg, rgba(58,79,168,.30) 0%, rgba(13,16,36,.55) 75%), url('/images/categories/army.png'); background-size: cover; background-position: center; }
+.action-army .action-icon { background: var(--c-army); color: #fff; }
+.action-war             { background-color: #3a1512; background-image: linear-gradient(150deg, rgba(122,44,40,.30) 0%, rgba(24,10,9,.55) 75%), url('/images/categories/war.jpg'); background-size: cover; background-position: center; }
+.action-war .action-icon { background: var(--c-war); color: #fff; }
+.action-diplomacy      { background-color: #241835; background-image: linear-gradient(150deg, rgba(90,58,134,.30) 0%, rgba(18,10,30,.55) 75%), url('/images/categories/diplomacy.png'); background-size: cover; background-position: center; }
+.action-diplomacy .action-icon { background: var(--c-diplomacy); color: #fff; }
+.action-economy         { background-color: #0e2c1e; background-image: linear-gradient(150deg, rgba(37,122,84,.30) 0%, rgba(8,26,18,.55) 75%), url('/images/categories/economy.jpg'); background-size: cover; background-position: center; }
+.action-economy .action-icon { background: var(--c-economy); color: #fff; }
+.action-infrastructure { background-color: #0d2b29; background-image: linear-gradient(150deg, rgba(29,122,118,.30) 0%, rgba(7,24,22,.55) 75%), url('/images/categories/infrastructure.png'); background-size: cover; background-position: center; }
+.action-infrastructure .action-icon { background: var(--c-infra); color: #fff; }
+.action-market          { background-color: #4a3512; background-image: linear-gradient(150deg, rgba(168,122,46,.30) 0%, rgba(28,20,8,.55) 75%), url('/images/categories/market.png'); background-size: cover; background-position: center; }
+.action-market .action-icon { background: var(--c-market); color: #241a05; }
+
+/* ==================== تب‌های زیرساخت ==================== */
+.infra-tabs {
+    display: flex; gap: 6px; margin-bottom: 14px;
+    overflow-x: auto; padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+}
+.infra-tabs::-webkit-scrollbar { display: none; }
+.infra-tab {
+    flex: 0 0 auto; padding: 9px 14px; border-radius: 12px;
+    background: rgba(10, 18, 30, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #a0a8b3; font-size: 11.5px;
+    white-space: nowrap; transition: all 0.2s ease;
+}
+.infra-tab.active {
+    background: rgba(var(--brand-rgb), 0.15);
+    color: var(--brand);
+    border-color: rgba(var(--brand-rgb), 0.4);
+}
+.infra-panel.hidden { display: none; }
+
+/* ==================== کارت جدید زیرساخت/اقتصاد ==================== */
+.infra-card-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 10px; }
+.infra-card-new {
+    background: rgba(10, 18, 30, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 14px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.infra-card-head {
+    display: flex; align-items: center; gap: 12px;
+}
+.infra-card-icon {
+    width: 46px; height: 46px; flex-shrink: 0;
+    border-radius: 12px;
+    background: rgba(var(--brand-rgb), 0.12);
+    border: 1px solid rgba(var(--brand-rgb), 0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+}
+.infra-card-titles {
+    display: flex; flex-direction: column; gap: 3px;
+    min-width: 0; flex: 1;
+}
+.infra-card-titles .infra-card-name {
+    font-size: 14.5px; color: #f4f6f9; font-weight: bold;
+}
+.infra-card-status {
+    font-size: 11px; color: #a0a8b3;
+}
+.infra-card-desc {
+    font-size: 11.5px; color: #a0a8b3;
+    line-height: 1.8;
+    padding: 0 2px;
+}
+
+.stat-boxes-row {
+    display: flex; flex-wrap: wrap; gap: 6px;
+}
+.stat-box {
+    flex: 1 1 calc(33% - 6px);
+    min-width: 88px;
+    background: rgba(6, 16, 28, 0.65);
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    border-radius: 10px;
+    padding: 7px 8px;
+    display: flex; flex-direction: column;
+    align-items: flex-start; gap: 2px;
+    text-align: right;
+}
+.stat-box-icon { font-size: 12px; line-height: 1; }
+.stat-box-value { font-size: 12.5px; color: #f4f6f9; font-weight: bold; line-height: 1.2; }
+.stat-box-label { font-size: 9.5px; color: #7a8699; line-height: 1; }
+
+.infra-card-button {
+    width: 100%;
+    background: rgba(var(--brand-rgb), 0.14);
+    border: 1px solid rgba(var(--brand-rgb), 0.35);
+    color: var(--brand);
+    font-size: 12.5px;
+    font-weight: bold;
+    padding: 11px;
+    border-radius: 11px;
+    transition: all 0.2s ease;
+}
+.infra-card-button:active {
+    transform: scale(0.98);
+    background: rgba(var(--brand-rgb), 0.22);
+}
+.infra-card-button:disabled {
+    opacity: 0.4; color: #6b7480;
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.06);
+    cursor: not-allowed;
+}
+
+/* ==================== کارت‌های قدیمی ==================== */
+.infra-card, .war-target-card {
+    background: rgba(10, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px; padding: 14px 16px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); transition: all 0.2s ease;
+}
+.infra-card-top, .unit-card-top {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+}
+.infra-card-level, .unit-card-count {
+    font-size: 10.5px; color: #a0a8b3;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 3px 9px; border-radius: 10px;
+}
+.infra-card-detail {
+    font-size: 11px; color: #a0a8b3; margin-bottom: 10px; line-height: 1.8;
+}
+.infra-upgrade-button, .unit-train-button {
+    width: 100%; background: rgba(var(--brand-rgb), 0.12);
+    border: 1px solid rgba(var(--brand-rgb), 0.3);
+    color: var(--brand); font-size: 12.5px; padding: 10px;
+    border-radius: 10px; transition: all 0.2s ease; font-weight: 500;
+}
+.infra-upgrade-button:active, .unit-train-button:active {
+    transform: scale(0.97); background: rgba(var(--brand-rgb), 0.2);
+}
+.infra-upgrade-button:disabled, .unit-train-button:disabled {
+    opacity: 0.35; color: #6b7480;
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.06); cursor: not-allowed;
+}
+
+/* ================================================================
+   ================ صفحه ارتش ======================
+   ================================================================ */
+
+.army-summary-card {
+    position: relative;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.06));
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 14px;
+    overflow: hidden;
+}
+.army-summary-card::before {
+    content: "";
+    position: absolute;
+    top: -40%; right: -20%;
+    width: 220px; height: 220px;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, transparent 70%);
+    pointer-events: none;
+}
+.army-summary-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+    position: relative;
+}
+.army-summary-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: #c3cad3; font-weight: bold;
+}
+.army-info-btn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #a0a8b3; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+}
+.army-summary-power {
+    font-size: 42px; font-weight: bold;
+    color: #f4f6f9; line-height: 1;
+    position: relative;
+    direction: ltr; text-align: right;
+    padding-right: 4px;
+}
+.army-summary-sub {
+    font-size: 12px; color: #a0a8b3; margin-top: 6px;
+    position: relative;
+}
+
+.base-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.base-card {
+    background: rgba(10, 18, 30, 0.85);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 115px;
+}
+.base-card-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 8px;
+}
+.base-card-name {
+    font-size: 12.5px; color: #c3cad3;
+    line-height: 1.4;
+}
+.base-card-icon {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+}
+.base-card-value {
+    font-size: 22px; font-weight: bold;
+    color: #f4f6f9; line-height: 1;
+    margin-top: 4px;
+}
+.base-card-max {
+    font-size: 11px; color: #7a8699;
+}
+.base-card-empty {
+    font-size: 12px; color: #6b7480;
+    margin-top: auto;
+    padding-bottom: 6px;
+}
+.base-card-progress {
+    width: 100%; height: 5px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: auto;
+}
+.base-card-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--brand), var(--brand-dark));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.army-tabs {
+    display: flex; gap: 6px;
+    margin-bottom: 14px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+}
+.army-tabs::-webkit-scrollbar { display: none; }
+.army-tab {
+    flex: 0 0 auto;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(10, 18, 30, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #a0a8b3;
+    font-size: 11.5px;
+    white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s ease;
+}
+.army-tab.active {
+    background: rgba(var(--brand-rgb), 0.18);
+    color: var(--brand);
+    border-color: rgba(var(--brand-rgb), 0.45);
+}
+.army-tab-count {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 1px 7px;
+    border-radius: 8px;
+    font-size: 10px;
+    color: #c3cad3;
+}
+.army-tab.active .army-tab-count {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--brand);
+}
+
+.unit-card-list-new {
+    display: flex; flex-direction: column; gap: 10px;
+}
+.unit-card-new {
+    background: rgba(10, 18, 30, 0.85);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    border-radius: 16px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.unit-card-new.locked {
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(10, 18, 30, 0.5);
+}
+.unit-card-new-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+}
+.unit-card-new-name {
+    display: flex; flex-direction: column; gap: 6px;
+    flex: 1;
+}
+.unit-card-new-title {
+    font-size: 14.5px; font-weight: bold; color: #f4f6f9;
+}
+.unit-card-new-dots {
+    display: flex; gap: 4px;
+}
+.unit-card-new-dot {
+    width: 14px; height: 4px; border-radius: 2px;
+    background: rgba(255, 255, 255, 0.12);
+}
+.unit-card-new-dot.filled {
+    background: var(--brand);
+}
+.unit-card-new-power {
+    font-size: 26px; font-weight: bold;
+    color: var(--green); line-height: 1;
+    direction: ltr;
+}
+.unit-card-new-power.zero {
+    color: #6b7480;
+}
+.unit-card-new-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.unit-chip {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 5px 10px;
+    font-size: 11px;
+    color: #a0a8b3;
+    display: flex; align-items: center; gap: 5px;
+}
+.unit-chip-value {
+    color: #f4f6f9;
+    font-weight: bold;
+}
+.unit-card-new-action {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.unit-produce-btn {
+    flex: 1;
+    background: rgba(74, 222, 128, 0.12);
+    border: 1px solid rgba(74, 222, 128, 0.3);
+    color: var(--green);
+    padding: 11px;
+    border-radius: 11px;
+    font-size: 12.5px;
+    font-weight: bold;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all 0.2s ease;
+}
+.unit-produce-btn:active {
+    transform: scale(0.97);
+    background: rgba(74, 222, 128, 0.2);
+}
+.unit-produce-btn:disabled {
+    opacity: 0.4;
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.06);
+    color: #6b7480;
+    cursor: not-allowed;
+}
+.unit-status-text {
+    font-size: 10.5px;
+    color: #7a8699;
+    text-align: left;
+    flex-shrink: 0;
+    line-height: 1.4;
+    max-width: 42%;
+}
+
+/* ==================== منابع ==================== */
+.resource-bar {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px;
+}
+.resource-chip {
+    background: rgba(12, 22, 36, .82);
+    border: 1px solid #22334a; border-radius: 12px;
+    padding: 9px 12px; display: flex; flex-direction: column; gap: 3px;
+}
+.resource-chip-top {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11.5px; color: #9aa4b0;
+}
+.resource-chip-value { font-size: 15px; color: #eee; font-weight: bold; }
+.resource-chip-rate { font-size: 10px; }
+.resource-chip-rate.up { color: var(--green); }
+.resource-chip-rate.down { color: var(--red); }
+.resource-chip-rate.zero { color: #626d7b; }
+
+/* ==================== تب‌ها ==================== */
+.war-tabs, .market-tabs, .comm-tabs {
+    display: flex; gap: 6px; margin-bottom: 14px;
+}
+.war-tab, .market-tab, .comm-tab {
+    flex: 1; padding: 10px; border-radius: 12px;
+    background: rgba(10, 18, 30, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #a0a8b3; font-size: 11.5px; text-align: center;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.war-tab.active, .market-tab.active, .comm-tab.active {
+    background: rgba(var(--brand-rgb), 0.15); color: var(--brand);
+    border-color: rgba(var(--brand-rgb), 0.4);
+}
+.war-panel.hidden, .market-panel.hidden, .comm-panel.hidden { display: none; }
+
+/* ==================== جنگ ==================== */
+.war-target-list { display: flex; flex-direction: column; gap: 10px; }
+.war-target-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.war-target-name { font-size: 13.5px; color: #f4f6f9; }
+.war-attack-button {
+    flex: 1; background: rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.25);
+    color: var(--red); font-size: 11.5px; padding: 9px;
+    border-radius: 10px; transition: all 0.2s ease;
+    width: 100%;
+}
+.war-attack-button:active { transform: scale(0.96); background: rgba(248, 113, 113, 0.2); }
+
+.war-active-card, .war-report-card {
+    background: rgba(10, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px; padding: 14px; margin-bottom: 10px;
+}
+.war-active-card h4 { font-size: 13px; color: var(--red); margin-bottom: 8px; }
+.war-active-card p { font-size: 11px; color: #a0a8b3; line-height: 1.7; margin-bottom: 8px; }
+.war-report-card h4 { font-size: 13px; color: var(--brand); margin-bottom: 6px; }
+.war-report-card p { font-size: 11.5px; color: #a0a8b3; line-height: 1.7; margin-bottom: 8px; }
+.war-report-card strong { color: var(--green); }
+
+.front-bar {
+    display: flex; gap: 8px; margin-top: 10px;
+    background: rgba(0, 0, 0, 0.25); border-radius: 10px; padding: 8px;
+}
+.front-item { flex: 1; text-align: center; }
+.front-label { font-size: 10px; color: #626d7b; margin-bottom: 3px; }
+.front-values { font-size: 10px; }
+.front-atk { color: var(--red); }
+.front-def { color: var(--green); }
+
+/* ==================== دیپلماسی ==================== */
+.diplomacy-form {
+    background: rgba(10, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px; padding: 16px; margin-bottom: 20px;
+    display: flex; flex-direction: column; gap: 10px;
+}
+.diplomacy-label { font-size: 11.5px; color: #a0a8b3; }
+.diplomacy-select, .diplomacy-input {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #f4f6f9; font-size: 13px; padding: 10px 12px;
+    border-radius: 10px; font-family: inherit; outline: none;
+    transition: border-color 0.2s ease;
+}
+.diplomacy-select:focus, .diplomacy-input:focus { border-color: rgba(var(--brand-rgb), 0.5); }
+.diplomacy-select option { background: #0a1420; color: #f4f6f9; }
+.diplomacy-submit {
+    margin-top: 6px;
+    background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+    color: #06101c; font-weight: bold; font-size: 13px;
+    padding: 12px; border-radius: 12px; transition: all 0.2s ease;
+}
+.diplomacy-submit:active { transform: scale(0.97); }
+.diplomacy-list-title { font-size: 12px; color: #a0a8b3; margin: 14px 0 8px; }
+.diplomacy-list { display: flex; flex-direction: column; gap: 8px; }
+.diplomacy-item {
+    background: rgba(10, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px; padding: 10px 14px;
+    font-size: 11.5px; color: #f4f6f9;
+    display: flex; justify-content: space-between;
+    align-items: center; gap: 8px;
+    flex-wrap: wrap;
+}
+.diplomacy-item-empty { color: #6b7480; font-size: 11.5px; padding: 6px 2px; }
+
+/* ==================== نقشه ==================== */
+.map-top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.map-money { font-size: 18px; font-weight: bold; color: var(--brand); }
+.map-title { font-size: 13px; color: #f4f6f9; opacity: 0.85; }
+.map-box {
+    position: relative; width: 100%; height: 46vh;
+    border-radius: 18px; overflow: hidden;
+    background: rgba(8, 20, 34, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.map-box svg { width: 100%; height: 100%; display: block; cursor: grab; }
+.map-box svg:active { cursor: grabbing; }
+.globe-water { fill: #0a1622; }
+.map-country { transition: fill 0.3s ease; }
+.map-ocean-label { fill: #4a6a86; font-size: 6.5px; pointer-events: none; user-select: none; }
+.map-country-label { fill: #d9e0e8; font-size: 7px; pointer-events: none; user-select: none; }
+.map-site { stroke: #0a1622; stroke-width: 0.6px; cursor: pointer; }
+.map-site-oil { fill: #2d2a1a; stroke: var(--brand); stroke-width: 1.2; }
+.map-site-steel { fill: #1e2833; stroke: #94a8bc; stroke-width: 1.2; }
+.map-site-uranium { fill: #1a2d1f; stroke: var(--green); stroke-width: 1.2; }
+.map-site-food { fill: #2d2618; stroke: #d4a017; stroke-width: 1.2; }
+.map-site-strait { fill: var(--brand); stroke: #0a1622; stroke-width: 0.6; }
+.map-controls {
+    position: absolute; left: 12px; bottom: 12px;
+    display: flex; flex-direction: column; gap: 8px; z-index: 5;
+}
+.map-control-btn {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(10, 18, 30, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f4f6f9; font-size: 17px;
+    display: flex; align-items: center; justify-content: center;
+}
+.map-control-btn:active { transform: scale(0.92); }
+.map-reset-btn { font-size: 14px; }
+.map-legend {
+    display: flex; flex-wrap: wrap; gap: 10px 16px;
+    margin-top: 14px; font-size: 10.5px; color: #a0a8b3;
+}
+.map-legend div { display: flex; align-items: center; gap: 6px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.dot-own            { background: #f0b429; }
+.dot-own-occupied   { background: #2fa360; }
+.dot-other          { background: #3978b7; }
+.dot-other-occupied { background: #8e4ec6; }
+.dot-unowned        { background: #4a5460; }
+.dot-oil            { background: var(--brand); border: 1px solid #0a1622; }
+.dot-steel          { background: #94a8bc; border: 1px solid #0a1622; }
+.dot-uranium        { background: var(--green); border: 1px solid #0a1622; }
+.dot-food           { background: #d4a017; border: 1px solid #0a1622; }
+.dot-strait         { background: var(--brand); border: 2px solid #0a1622; }
+
+/* ==================== پنل اطلاعات نقشه ==================== */
+.map-info-panel {
+    position: relative; margin-top: 14px;
+    background: rgba(10, 18, 30, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px; padding: 16px;
+}
+.map-info-close {
+    position: absolute; top: 10px; left: 12px;
+    background: transparent; color: #a0a8b3;
+    font-size: 18px;
+}
+.map-info-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.map-info-flag { font-size: 20px; }
+.map-info-name { font-size: 15px; color: #f4f6f9; }
+.map-info-status {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #a0a8b3; font-size: 11px;
+    padding: 5px 12px; border-radius: 12px; margin-bottom: 8px;
+}
+.map-info-desc { color: #a0a8b3; font-size: 12px; line-height: 1.8; margin-bottom: 10px; }
+.map-info-action {
+    width: 100%; background: rgba(var(--brand-rgb), 0.15);
+    border: 1px solid rgba(var(--brand-rgb), 0.35);
+    color: var(--brand); font-size: 12.5px; padding: 10px;
+    border-radius: 10px;
+}
+
+/* ==================== بیانیه‌ها ==================== */
+.ann-form {
+    background: rgba(10, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px; padding: 12px; margin-bottom: 14px;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.ann-input {
+    background: #101a28; border: 1px solid #22334a;
+    color: #eee; font-family: inherit; font-size: 12.5px;
+    padding: 10px 12px; border-radius: 10px;
+    min-height: 70px; resize: none; outline: none;
+}
+.ann-input:focus { border-color: rgba(var(--brand-rgb), 0.4); }
+.ann-info { font-size: 10.5px; color: #626d7b; line-height: 1.7; }
+.ann-submit {
+    background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+    color: #06101c; font-weight: bold; font-size: 12.5px;
+    padding: 11px; border-radius: 10px;
+}
+.ann-list { display: flex; flex-direction: column; gap: 10px; }
+.ann-card {
+    background: rgba(10, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px; padding: 14px;
+}
+.ann-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px; padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.ann-flag { font-size: 18px; }
+.ann-name { font-size: 12.5px; color: #f4f6f9; font-weight: 500; }
+.ann-text { font-size: 12.5px; color: #e0e4e9; line-height: 1.8; margin-bottom: 10px; }
+.ann-reactions { display: flex; gap: 8px; margin-bottom: 8px; }
+.ann-react {
+    flex: 1; padding: 8px; border-radius: 10px;
+    font-size: 11.5px;
+}
+.ann-react.support {
+    background: rgba(74, 222, 128, 0.1);
+    border: 1px solid rgba(74, 222, 128, 0.3);
+    color: var(--green);
+}
+.ann-react.accuse {
+    background: rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    color: var(--red);
+}
+.ann-flags { margin-bottom: 8px; }
+.ann-flags-row { font-size: 11px; color: #a0a8b3; padding: 4px 0; line-height: 1.6; }
+.ann-comments {
+    margin-bottom: 8px;
+    display: flex; flex-direction: column; gap: 6px;
+}
+.ann-comment {
+    display: flex; align-items: flex-start; gap: 6px;
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 11.5px;
+    line-height: 1.6;
+    word-break: break-word;
+}
+.ann-comment-flag { font-size: 14px; flex-shrink: 0; }
+.ann-comment-name {
+    color: #c3cad3; font-weight: bold;
+    flex-shrink: 0;
+}
+.ann-comment-text { color: #e0e4e9; flex: 1; }
+.ann-comment-row { display: flex; gap: 6px; }
+.ann-comment-input {
+    flex: 1; background: #101a28;
+    border: 1px solid #22334a; color: #eee;
+    font-family: inherit; font-size: 11.5px;
+    padding: 8px 10px; border-radius: 10px; outline: none;
+}
+.ann-comment-send {
+    background: rgba(var(--brand-rgb), 0.15);
+    border: 1px solid rgba(var(--brand-rgb), 0.3);
+    color: var(--brand); font-size: 11.5px;
+    padding: 8px 14px; border-radius: 10px;
+}
+
+/* ==================== اخبار ==================== */
+.news-list { display: flex; flex-direction: column; gap: 10px; }
+.news-item {
+    background: rgba(10, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px; padding: 15px;
+}
+.news-item h3 { font-size: 14px; margin-bottom: 7px; color: #f4f6f9; }
+.news-item p { color: #a0a8b3; font-size: 12px; line-height: 1.8; }
+
+/* ==================== لیست تماس ==================== */
+.contact-list { display: flex; flex-direction: column; gap: 10px; }
+.contact-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(10, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px; padding: 12px 15px;
+}
+.contact-info { display: flex; align-items: center; gap: 10px; }
+.contact-flag { font-size: 22px; }
+.contact-name { font-size: 13px; color: #f4f6f9; }
+.message-button {
+    background: rgba(var(--brand-rgb), 0.12);
+    color: var(--brand);
+    border: 1px solid rgba(var(--brand-rgb), 0.3);
+    border-radius: 10px; padding: 7px 14px;
+    font-size: 12px;
+    margin-right: 4px;
+}
+
+/* ==================== پیام خصوصی ==================== */
+.pm-conversation {
+    display: flex; flex-direction: column;
+    height: calc(100vh - 64px - 78px - 160px);
+    background: rgba(10, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px; overflow: hidden;
+}
+.pm-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.2);
+}
+.pm-back {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--brand); font-size: 12px;
+    padding: 6px 12px; border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+#pm-target-name { font-size: 13px; color: #f4f6f9; font-weight: 500; }
+.pm-messages {
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.pm-msg {
+    max-width: 75%; padding: 9px 13px;
+    border-radius: 14px; font-size: 12px; line-height: 1.6;
+    word-break: break-word;
+}
+.pm-mine {
+    align-self: flex-end;
+    background: rgba(var(--brand-rgb), 0.2);
+    color: #f4f6f9;
+    border-bottom-left-radius: 4px;
+}
+.pm-other {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.06);
+    color: #e0e4e9;
+    border-bottom-right-radius: 4px;
+}
+.pm-input-row {
+    display: flex; gap: 6px; padding: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.2);
+}
+.pm-input {
+    flex: 1; background: #101a28;
+    border: 1px solid #22334a; color: #eee;
+    font-family: inherit; font-size: 12px;
+    padding: 8px 12px; border-radius: 10px;
+    min-height: 38px; resize: none; outline: none;
+}
+.pm-send {
+    background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+    color: #06101c; font-weight: bold; font-size: 12px;
+    padding: 8px 18px; border-radius: 10px;
+}
+
+/* ==================== رتبه‌بندی ==================== */
+.rankings-list { display: flex; flex-direction: column; gap: 8px; }
+.rank-row {
+    display: grid; grid-template-columns: 34px 1fr auto;
+    align-items: center; gap: 10px;
+    background: rgba(10, 18, 30, .75);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 12px; padding: 10px 14px;
+}
+.rank-row.rank-1 {
+    border-color: #f0b429;
+    background: rgba(240, 180, 41, .12);
+}
+.rank-row.rank-2 { border-color: #a8a8a8; }
+.rank-row.rank-3 { border-color: #a47148; }
+.rank-row.rank-elim { opacity: .5; }
+.rank-num { font-size: 15px; color: var(--brand); font-weight: bold; text-align: center; }
+.rank-name { font-size: 13px; color: #eee; margin-bottom: 3px; }
+.rank-score { font-size: 12px; color: #9aa4b0; font-weight: bold; }
+.rank-sub { font-size: 10px; color: #626d7b; letter-spacing: 0.5px; }
+
+/* ==================== اشتراک ==================== */
+.subscription-card {
+    background: rgba(10, 18, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 15px; padding: 20px;
+    color: #a0a8b3; text-align: center;
+}
+.subscription-card h2 { color: #f4f6f9; margin-bottom: 8px; }
+
+/* ==================== نوار پایین ==================== */
 .bottom-nav {
     position: fixed;
     bottom: 0;
+    right: 0;
     left: 0;
-    width: 100%;
-    height: 70px;
-    background-color: #0d131a;
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    overflow: visible; /* حیاتی: برای اینکه دکمه بزرگ از کادر بزنه بیرون */
-    z-index: 100;
+    height: 78px;
+    background: #06101c;
+    /* فقط خط بالا، با شعاع مدرن */
+    border: none;
+    border-top: 1px solid rgba(59, 130, 246, 0.28);
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    z-index: 30;
+    padding-bottom: env(safe-area-inset-bottom);
+    /* سایه نرم و مدرن */
+    box-shadow:
+        0 -6px 28px rgba(0, 0, 0, 0.55),
+        0 -1px 0 rgba(59, 130, 246, 0.08),
+        0 -12px 40px rgba(59, 130, 246, 0.08);
+    overflow: hidden;
 }
 
 .nav-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    color: var(--text-gray);
-    font-size: 0.65rem;
-    cursor: pointer;
-    width: 60px;
+    background: transparent; color: #6b7480;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px;
+    font-size: 10px; transition: color 0.25s ease;
+    position: relative; padding-top: 6px; border-radius: 0;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+}
+.nav-item:focus,
+.nav-item:active { outline: none; background: transparent; }
+
+.nav-item .nav-icon {
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.25s ease;
+}
+.nav-item .nav-icon svg {
+    width: 100%; height: 100%;
+    display: block;
+    transition: all 0.25s ease;
+}
+.nav-item small { font-size: 10px; }
+
+.nav-item.active { color: var(--brand); }
+.nav-item.active .nav-icon { transform: scale(1.15); }
+.nav-item.active small { color: var(--brand); font-weight: bold; }
+
+/* ============ خانه (وسط) — بزرگ‌تر ============ */
+.nav-home { padding-top: 0; }
+.nav-home .nav-icon {
+    width: 66px; height: 66px; border-radius: 50%;
+    background: linear-gradient(145deg, #1c2330, #0e131c);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    margin-top: -30px;
+    box-shadow:
+        0 10px 24px rgba(0, 0, 0, 0.65),
+        0 2px 6px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transition: all 0.3s ease;
+}
+.nav-home .nav-icon svg {
+    width: 30px; height: 30px;
+}
+.nav-home small { transform: translateY(-8px); margin-top: 2px; }
+.nav-home.active .nav-icon {
+    background: linear-gradient(145deg, var(--brand), var(--brand-dark));
+    color: #06101c;
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow:
+        0 12px 32px rgba(var(--brand-rgb), 0.55),
+        0 4px 10px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    transform: scale(1.06);
+}
+.nav-home.active small { color: var(--brand); font-weight: bold; }
+
+/* ==================== موبایل ==================== */
+@media (max-width: 600px) {
+    .country-screen { padding-top: 25px; }
+    .country-header h1 { font-size: 22px; }
+    .country-grid { gap: 10px; }
+    .country-card { min-height: 135px; padding: 13px; gap: 9px; }
+    .country-photo { width: 45px; height: 45px; }
+    .country-info h2 { font-size: 14px; }
+    .country-info > span { font-size: 9px; }
+    .country-facts span { font-size: 9px; }
+    .game-title { font-size: 11px; letter-spacing: 1px; }
+    .globe-card { height: 32vh; }
+    .action-card { min-height: 115px; }
+    .action-card h3 { font-size: 13px; }
+    .action-card p { font-size: 9.5px; }
+    .home-stat { min-height: 88px; }
+    .home-stat-value { font-size: 16px; }
+    .map-box { height: 42vh; }
+    .bottom-nav { height: 74px; }
+    .nav-home .nav-icon { width: 60px; height: 60px; margin-top: -28px; }
+    .nav-home .nav-icon svg { width: 28px; height: 28px; }
+    .nav-item .nav-icon { width: 22px; height: 22px; }
+    .stat-box { min-width: 80px; padding: 6px 7px; }
+    .stat-box-value { font-size: 11.5px; }
+    .army-summary-power { font-size: 36px; }
+    .base-card-value { font-size: 19px; }
 }
 
-.nav-item i { font-size: 1.4rem; }
-
-/* رفع باگ کوچیک بودن دکمه خانه */
-.home-btn-wrapper {
-    position: relative;
-    top: -25px; /* انتقال به بالا */
+/* ==================== Toast ==================== */
+.toast {
+    position: fixed; top: 78px; left: 50%;
+    transform: translate(-50%, -20px);
+    max-width: min(92vw, 420px);
+    background: #101a28;
+    border: 1px solid #22334a;
+    color: #eee; font-size: 12.5px; line-height: 1.7;
+    padding: 12px 16px; border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+    z-index: 999;
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    text-align: center;
 }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.error { border-color: #6a2b2b; color: #f3b0b0; }
+.toast.success { border-color: #2b6a45; color: #a8f0c6; }
 
-.home-btn {
-    width: 65px; /* بزرگتر شد */
-    height: 65px; /* بزرگتر شد */
-    border-radius: 50%;
-    background: linear-gradient(135deg, #e2b86b, #d4a34a);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 0 5px 15px rgba(226, 184, 107, 0.4);
-    border: 5px solid var(--bg-color); /* ایجاد افکت برش */
-    cursor: pointer;
-    transition: all 0.2s;
+/* ==================== Modal ==================== */
+.modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(4, 6, 10, .72);
+    z-index: 150;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
 }
-
-.home-btn i {
-    font-size: 1.8rem;
-    color: #0b1016;
+.modal-box {
+    width: min(360px, 100%);
+    background: #101a28;
+    border: 1px solid #22334a;
+    border-radius: 18px; padding: 18px;
+    display: flex; flex-direction: column; gap: 12px;
+    max-height: 85vh; overflow-y: auto;
 }
-
-.home-btn:active { transform: scale(0.9); }
+.modal-title { font-size: 14px; color: #eee; margin-bottom: 4px; }
+.modal-input {
+    background: #101a28; border: 1px solid #22334a;
+    color: #eee; font-family: inherit; font-size: 13px;
+    padding: 10px 12px; border-radius: 10px;
+    min-height: 90px; resize: none; outline: none;
+}
+.modal-actions { display: flex; gap: 8px; }
+.modal-actions button {
+    flex: 1; padding: 10px;
+    border-radius: 10px; font-size: 12.5px;
+}
+.modal-ok { background: var(--brand); color: #06101c; font-weight: bold; }
+.modal-cancel { background: #16233a; color: #c3cad3; border: 1px solid #22334a; }
