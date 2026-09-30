@@ -42,6 +42,9 @@ const OCEAN_LABELS = [
     [90, 65, "اقیانوس منجمد شمالی"], [20, -60, "اقیانوس منجمد جنوبی"]
 ];
 
+/* =========================================================
+   API Client
+========================================================= */
 function getApiUrl(path, params = {}) {
     const url = new URL(path, window.location.origin);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
@@ -77,6 +80,9 @@ async function apiPost(path, body = {}) {
     } finally { clearTimeout(to); }
 }
 
+/* =========================================================
+   Helpers
+========================================================= */
 function countryImageUrl(cid) {
     return `/images/countries/${cid}.${COUNTRY_IMAGE_EXT[cid] || "jpg"}`;
 }
@@ -128,6 +134,31 @@ function showToast(msg, kind) {
     toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
 }
 
+function askText(title, placeholder) {
+    return new Promise(resolve => {
+        const ov = document.createElement("div");
+        ov.className = "modal-overlay";
+        ov.innerHTML = `
+            <div class="modal-box">
+                <div class="modal-title"></div>
+                <textarea class="modal-input" maxlength="500"></textarea>
+                <div class="modal-actions">
+                    <button class="modal-cancel">انصراف</button>
+                    <button class="modal-ok">ارسال</button>
+                </div>
+            </div>`;
+        ov.querySelector(".modal-title").textContent = title;
+        ov.querySelector(".modal-input").placeholder = placeholder || "";
+        const close = v => { ov.remove(); resolve(v); };
+        ov.querySelector(".modal-cancel").onclick = () => close(null);
+        ov.querySelector(".modal-ok").onclick = () => {
+            close(ov.querySelector(".modal-input").value.trim() || null);
+        };
+        document.body.appendChild(ov);
+        ov.querySelector(".modal-input").focus();
+    });
+}
+
 async function loadArmyCatalog() {
     try { ARMY_UNITS = (await apiGet("/api/army-units")).units || {}; }
     catch (e) { console.error("Army catalog:", e); }
@@ -170,6 +201,9 @@ async function loadWorldAtlas() {
     return worldData;
 }
 
+/* =========================================================
+   Player / Countries
+========================================================= */
 async function loadPlayer() {
     if (!userId) return;
     try {
@@ -285,6 +319,9 @@ function updateGameHeader() {
     document.getElementById("game-country-flag").src = countryImageUrl(selectedCountry);
 }
 
+/* =========================================================
+   Notifications
+========================================================= */
 async function refreshNotificationBadge() {
     try {
         const news = await apiGet("/api/news");
@@ -311,6 +348,9 @@ document.getElementById("game-notification-button")?.addEventListener("click", (
     loadNews();
 });
 
+/* =========================================================
+   Home
+========================================================= */
 const SEASON_HINTS = {
     "بهار":    "🌱 هوا معتدل",
     "تابستان": "☀️ مصرف سوخت و غذا کمی بیشتر",
@@ -346,109 +386,28 @@ async function loadRankings() {
     try {
         const rows = await apiGet("/api/rankings");
         const box = document.getElementById("rankings-list");
-        if (box) {
-            box.innerHTML = "";
-            if (!rows.length) {
-                box.innerHTML = `<div class="diplomacy-item-empty">هنوز رتبه‌ای نیست.</div>`;
-            } else {
-                rows.forEach(r => {
-                    const div = document.createElement("div");
-                    const cls = r.rank === 1 ? "rank-1" : r.rank === 2 ? "rank-2" : r.rank === 3 ? "rank-3" : "";
-                    div.className = `rank-row ${cls} ${r.is_eliminated ? "rank-elim" : ""}`;
-                    div.innerHTML = `
-                        <div class="rank-num">${r.rank}</div>
-                        <div>
-                            <div class="rank-name">${flagInline(r.country, true)} ${r.name}</div>
-                            <div class="rank-sub">💰${r.economy} ⚔️${r.military} 🤝${r.diplomacy} 🏗️${r.development}</div>
-                        </div>
-                        <div class="rank-score">${formatNumber(r.overall)}</div>`;
-                    box.appendChild(div);
-                });
-            }
-        }
-        renderDetailedRankings(rows);
+        if (!box) return;
+        box.innerHTML = "";
+        if (!rows.length) { box.innerHTML = `<div class="diplomacy-item-empty">هنوز رتبه‌ای نیست.</div>`; return; }
+        rows.forEach(r => {
+            const div = document.createElement("div");
+            const cls = r.rank === 1 ? "rank-1" : r.rank === 2 ? "rank-2" : r.rank === 3 ? "rank-3" : "";
+            div.className = `rank-row ${cls} ${r.is_eliminated ? "rank-elim" : ""}`;
+            div.innerHTML = `
+                <div class="rank-num">${r.rank}</div>
+                <div>
+                    <div class="rank-name">${flagInline(r.country, true)} ${r.name}</div>
+                    <div class="rank-sub">💰${r.economy} ⚔️${r.military} 🤝${r.diplomacy} 🏗️${r.development}</div>
+                </div>
+                <div class="rank-score">${formatNumber(r.overall)}</div>`;
+            box.appendChild(div);
+        });
     } catch (e) { console.error(e); }
 }
 
-function renderDetailedRankings(rows) {
-    const box = document.getElementById("rankings-detailed");
-    if (!box) return;
-    box.innerHTML = "";
-    if (!rows || !rows.length) {
-        box.innerHTML = `<div class="diplomacy-item-empty">هنوز کشوری در بازی نیست.</div>`;
-        return;
-    }
-    const maxEco = Math.max(...rows.map(r => r.economy), 1);
-    const maxMil = Math.max(...rows.map(r => r.military), 1);
-    const maxDip = Math.max(...rows.map(r => r.diplomacy), 1);
-    const maxDev = Math.max(...rows.map(r => r.development), 1);
-
-    const list = document.createElement("div");
-    list.className = "rank-detailed-list";
-
-    rows.forEach(r => {
-        const d = r.detail || {};
-        const cls = r.rank === 1 ? "rank-1" : r.rank === 2 ? "rank-2" : r.rank === 3 ? "rank-3" : "";
-        const card = document.createElement("div");
-        card.className = `rank-detail-card ${cls} ${r.is_eliminated ? "rank-elim" : ""}`;
-
-        const ecoPct = Math.round((r.economy / maxEco) * 100);
-        const milPct = Math.round((r.military / maxMil) * 100);
-        const dipPct = Math.round((r.diplomacy / maxDip) * 100);
-        const devPct = Math.round((r.development / maxDev) * 100);
-
-        const elimTag = r.is_eliminated ? `<span style="color:#f87171;font-size:11px;">(اشغال‌شده)</span>` : "";
-
-        card.innerHTML = `
-            <div class="rank-detail-head">
-                <div class="rank-detail-left">
-                    <div class="rank-detail-badge">${r.rank}</div>
-                    <div class="rank-detail-name">
-                        ${flagInline(r.country, true)} ${r.name} ${elimTag}
-                    </div>
-                </div>
-                <div class="rank-detail-score">${formatNumber(r.overall)}</div>
-            </div>
-
-            <div class="rank-detail-bars">
-                <div class="rank-bar-item">
-                    <span class="rank-bar-label">💰 اقتصاد</span>
-                    <span class="rank-bar-value">${formatMoney(d.daily_income || 0)} /روز</span>
-                    <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${ecoPct}%"></div></div>
-                </div>
-                <div class="rank-bar-item">
-                    <span class="rank-bar-label">⚔️ قدرت نظامی</span>
-                    <span class="rank-bar-value">${formatNumber(d.army_power || 0)}</span>
-                    <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${milPct}%"></div></div>
-                </div>
-                <div class="rank-bar-item">
-                    <span class="rank-bar-label">🤝 دیپلماسی</span>
-                    <span class="rank-bar-value">${d.treaties || 0} پیمان${d.in_union ? " • عضو اتحادیه" : ""}</span>
-                    <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${dipPct}%"></div></div>
-                </div>
-                <div class="rank-bar-item">
-                    <span class="rank-bar-label">🏗️ توسعه</span>
-                    <span class="rank-bar-value">${formatNumber(d.infra_total || 0)} سطح</span>
-                    <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${devPct}%"></div></div>
-                </div>
-            </div>
-
-            <div class="rank-detail-meta">
-                <span class="rank-meta-chip">🪙 خزانه: <strong>${formatMoney(d.money || 0)}</strong></span>
-                <span class="rank-meta-chip">👥 نیرو: <strong>${formatNumber(d.manpower || 0)}</strong></span>
-                <span class="rank-meta-chip">🎖️ یگان: <strong>${formatNumber(d.units_total || 0)}</strong></span>
-                <span class="rank-meta-chip">⚡ برق: <strong>${formatNumber(d.power_capacity || 0)}</strong></span>
-                <span class="rank-meta-chip">🏴 تصرف کشور: <strong>${d.occupied || 0}</strong></span>
-                <span class="rank-meta-chip">🛢️ منابع نقشه: <strong>${d.map_holdings || 0}</strong></span>
-                <span class="rank-meta-chip">⚓ تنگه: <strong>${d.strait_holdings || 0}</strong></span>
-            </div>`;
-
-        list.appendChild(card);
-    });
-
-    box.appendChild(list);
-}
-
+/* =========================================================
+   Actions
+========================================================= */
 document.querySelectorAll(".action-card").forEach(card => {
     card.addEventListener("click", () => {
         const s = card.dataset.section;
@@ -465,6 +424,9 @@ document.querySelectorAll(".sub-back-button").forEach(b => {
     b.addEventListener("click", () => showGamePage(b.dataset.backTo || "home"));
 });
 
+/* =========================================================
+   Infra
+========================================================= */
 async function openInfrastructureMenu() {
     showGamePage("infrastructure");
     await refreshPlayer();
@@ -587,6 +549,9 @@ async function upgradeInfra(iid) {
     } catch (e) { showToast("خطا."); }
 }
 
+/* =========================================================
+   Economy
+========================================================= */
 async function openEconomyPage() {
     showGamePage("economy"); await refreshPlayer(); renderEconomyList();
 }
@@ -637,6 +602,9 @@ async function upgradeEconomy(iid) {
     } catch (e) { showToast("خطا."); }
 }
 
+/* =========================================================
+   Army
+========================================================= */
 async function openArmyPage() {
     showGamePage("army");
     await refreshPlayer();
@@ -681,6 +649,7 @@ function renderArmySummary() {
 function renderBaseCards() {
     if (!player?.infra) return;
 
+    // پادگان
     const barracks = player.infra["land_barracks"];
     const bv = document.getElementById("base-barracks-value");
     const bm = document.getElementById("base-barracks-max");
@@ -697,6 +666,7 @@ function renderBaseCards() {
         if (bf) bf.style.width = "0%";
     }
 
+    // فرودگاه
     const airport = player.infra["air_airport"];
     const as = document.getElementById("base-airport-status");
     if (airport && airport.current) {
@@ -709,6 +679,7 @@ function renderBaseCards() {
         as.classList.add("base-card-empty");
     }
 
+    // بندر
     const port = player.infra["naval_port"];
     const pv = document.getElementById("base-port-value");
     const pm = document.getElementById("base-port-max");
@@ -725,6 +696,7 @@ function renderBaseCards() {
         if (pf) pf.style.width = "0%";
     }
 
+    // موشکی
     const ms = document.getElementById("base-missile-status");
     if (ms) {
         ms.textContent = "ساخته نشده";
@@ -865,6 +837,9 @@ async function trainUnit(uid_, count) {
     } catch (e) { showToast("خطا."); }
 }
 
+/* =========================================================
+   War
+========================================================= */
 document.querySelectorAll(".war-tab").forEach(tab => {
     tab.addEventListener("click", () => {
         document.querySelectorAll(".war-tab").forEach(t => t.classList.remove("active"));
@@ -1019,6 +994,9 @@ function openBattleModal(wid) {
     document.body.appendChild(ov);
 }
 
+/* =========================================================
+   Diplomacy
+========================================================= */
 function openDiplomacyPage() {
     showGamePage("diplomacy");
     const sel = document.getElementById("diplomacy-target");
@@ -1109,6 +1087,9 @@ function renderSentProposals(list) {
     });
 }
 
+/* =========================================================
+   Bottom Nav
+========================================================= */
 document.querySelectorAll(".nav-item").forEach(item => {
     item.addEventListener("click", () => {
         const page = item.dataset.page;
@@ -1119,10 +1100,12 @@ document.querySelectorAll(".nav-item").forEach(item => {
         else if (page === "map") setTimeout(() => initWorldMap(), 30);
         else if (page === "communications") { loadAnnouncements(); loadUnion(); loadNews(); refreshNotificationBadge(); }
         else if (page === "market") { loadMarketListings(); loadMyListings(); }
-        else if (page === "rankings") { loadRankings(); }
     });
 });
 
+/* =========================================================
+   Communications — Tabs
+========================================================= */
 document.querySelectorAll(".comm-tab").forEach(tab => {
     tab.addEventListener("click", () => {
         const tid = tab.dataset.tab;
@@ -1138,6 +1121,9 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
     });
 });
 
+/* =========================================================
+   Announcements
+========================================================= */
 document.getElementById("ann-submit").addEventListener("click", async () => {
     const ta = document.getElementById("ann-text");
     const text = ta.value.trim();
@@ -1214,6 +1200,9 @@ function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+/* =========================================================
+   Unions
+========================================================= */
 async function loadUnion() {
     const c = document.getElementById("union-content");
     c.innerHTML = "";
@@ -1331,6 +1320,9 @@ async function respondInvite(u_id, accept) {
     loadUnion();
 }
 
+/* =========================================================
+   News
+========================================================= */
 async function loadNews() {
     const c = document.getElementById("news-list");
     if (!c) return;
@@ -1349,6 +1341,9 @@ async function loadNews() {
     }
 }
 
+/* =========================================================
+   Private Messages
+========================================================= */
 function renderContactList() {
     const c = document.getElementById("contact-list");
     if (!c) return;
@@ -1406,6 +1401,9 @@ async function loadPM(target) {
     } catch (e) { console.error(e); }
 }
 
+/* =========================================================
+   Market
+========================================================= */
 document.querySelectorAll(".market-tab").forEach(tab => {
     tab.addEventListener("click", () => {
         document.querySelectorAll(".market-tab").forEach(t => t.classList.remove("active"));
@@ -1492,6 +1490,9 @@ async function loadMyListings() {
     } catch (e) {}
 }
 
+/* =========================================================
+   Map — World globe
+========================================================= */
 let mapProjection = null, mapPath = null, mapSvg = null;
 let mapSize = 0, mapMinScale = 0, mapMaxScale = 0;
 let mapRotation = [0, -10];
@@ -1764,6 +1765,9 @@ async function captureSite(siteId) {
     } catch (e) { showToast("خطا."); }
 }
 
+/* =========================================================
+   Helpers for Globe
+========================================================= */
 function getTouchDistance(t) {
     return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
 }
@@ -1775,6 +1779,9 @@ function isPointVisible(lon, lat, rot) {
     return Math.sin(l1) * Math.sin(l2) + Math.cos(l1) * Math.cos(l2) * Math.cos(dl) > 0;
 }
 
+/* =========================================================
+   Preview Globe
+========================================================= */
 let previewGlobeAbort = null;
 
 async function createPreviewGlobe(containerId, svgId, selected) {
@@ -1875,6 +1882,9 @@ async function createPreviewGlobe(containerId, svgId, selected) {
     }, { passive: false, signal });
 }
 
+/* =========================================================
+   Init
+========================================================= */
 (async function init() {
     showOnly("loading");
     const t0 = Date.now();
