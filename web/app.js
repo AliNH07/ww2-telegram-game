@@ -29,6 +29,9 @@ const COUNTRY_NAMES = { germany: "آلمان", britain: "بریتانیا", ussr
 const COUNTRY_IDS = { germany: 276, britain: 826, ussr: 643, usa: 840,
     france: 250, italy: 380, china: 156, japan: 392 };
 
+// ظرفیت یگان — هماهنگ با CAPACITY_PROVIDERS در بک‌اند
+const CAPACITY_PROVIDERS = { land: "land_barracks", naval: "naval_port", air: "air_airport" };
+
 let ARMY_UNITS = {};
 
 const RESOURCE_NAMES = { food: "غذا", steel: "فولاد", uranium: "اورانیوم", oil: "نفت" };
@@ -87,6 +90,11 @@ async function apiPost(path, body = {}) {
 
 function countryImageUrl(cid) {
     return `/images/countries/${cid}.${COUNTRY_IMAGE_EXT[cid] || "jpg"}`;
+}
+
+function flagImgHtml(cid, className, extraAttrs = "") {
+    return `<img class="${className}" src="${countryImageUrl(cid)}" alt="" ${extraAttrs}
+        onerror="this.onerror=null;this.style.opacity=0.25;">`;
 }
 
 function showOnly(id) {
@@ -153,6 +161,12 @@ function askText(title, placeholder) {
         document.body.appendChild(ov);
         ov.querySelector(".modal-input").focus();
     });
+}
+
+function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
 }
 
 async function loadArmyCatalog() {
@@ -306,7 +320,11 @@ function showGame() {
 }
 
 function updateGameHeader() {
-    document.getElementById("game-country-flag").src = countryImageUrl(selectedCountry);
+    const img = document.getElementById("game-country-flag");
+    if (img) {
+        img.src = countryImageUrl(selectedCountry);
+        img.onerror = function () { this.onerror = null; this.style.opacity = 0.25; };
+    }
 }
 
 /* =========================================================
@@ -315,7 +333,11 @@ function updateGameHeader() {
 
 function updateHomeStats() {
     if (!player) return;
-    document.getElementById("home-country-flag").src = countryImageUrl(selectedCountry);
+    const homeFlag = document.getElementById("home-country-flag");
+    if (homeFlag) {
+        homeFlag.src = countryImageUrl(selectedCountry);
+        homeFlag.onerror = function () { this.onerror = null; this.style.opacity = 0.25; };
+    }
     document.getElementById("home-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     const photo = document.getElementById("home-card-photo");
     if (photo) photo.style.backgroundImage = `url(${countryImageUrl(selectedCountry)})`;
@@ -369,7 +391,7 @@ document.querySelectorAll(".action-card").forEach(card => {
         else if (s === "war") openWarPage();
         else if (s === "diplomacy") openDiplomacyPage();
         else if (s === "economy") openEconomyPage();
-        else if (s === "market") { showGamePage("market"); loadMarketListings(); }
+        else if (s === "market") { showGamePage("market"); loadMarketListings(); loadMyListings(); }
     });
 });
 
@@ -440,13 +462,14 @@ function buildStatsHtml(item, levelData) {
         const icon = RESOURCE_ICONS[item.resource_key] || "📦";
         boxes.push(statBox(icon, "+" + formatNumber(levelData.production), "در روز"));
     }
-    if ((g === "land" || g === "naval" || g === "air") && levelData.capacity !== undefined) {
+    // فقط از ساختمون‌هایی که واقعاً ظرفیت یگان می‌دن نشون بده
+    if (item.is_capacity_provider && levelData.capacity !== undefined) {
         boxes.push(statBox("📦", formatNumber(levelData.capacity), "ظرفیت"));
     }
     if (levelData.income !== undefined) {
         boxes.push(statBox("💰", "+" + formatMoney(levelData.income), "در روز"));
     }
-    if (levelData.time !== undefined) {
+    if (levelData.time !== undefined && levelData.time > 0) {
         boxes.push(statBox("⏱️", formatDuration(levelData.time), "زمان"));
     }
 
@@ -478,11 +501,11 @@ function renderInfraList(cid, filterFn) {
             <div class="infra-card-head">
                 <div class="infra-card-icon">${item.icon || "🏗️"}</div>
                 <div class="infra-card-titles">
-                    <div class="infra-card-name">${item.name}</div>
+                    <div class="infra-card-name">${escapeHtml(item.name)}</div>
                     <div class="infra-card-status">${statusText}</div>
                 </div>
             </div>
-            <div class="infra-card-desc">${item.desc || ""}</div>
+            <div class="infra-card-desc">${escapeHtml(item.desc || "")}</div>
             ${statsHtml}
             <button class="infra-card-button" ${btnDisabled}>${btnText}</button>`;
 
@@ -496,7 +519,7 @@ async function upgradeInfra(iid) {
     if (!userId) return;
     try {
         const d = await apiPost("/api/upgrade-infra", { category: iid });
-        if (!d.success) { showToast(d.message || "امکان ارتقا نیست."); return; }
+        if (!d.success) { showToast(d.message || "امکان ارتقا نیست.", "error"); return; }
         player = d.player; updateHomeStats();
         const activeTab = document.querySelector(".infra-tab.active")?.dataset.infraTab || "power";
         renderInfraTab(activeTab);
@@ -534,11 +557,11 @@ function renderEconomyList() {
             <div class="infra-card-head">
                 <div class="infra-card-icon">${item.icon || "💰"}</div>
                 <div class="infra-card-titles">
-                    <div class="infra-card-name">${item.name}</div>
+                    <div class="infra-card-name">${escapeHtml(item.name)}</div>
                     <div class="infra-card-status">${statusText}</div>
                 </div>
             </div>
-            <div class="infra-card-desc">${item.desc || ""}</div>
+            <div class="infra-card-desc">${escapeHtml(item.desc || "")}</div>
             ${statsHtml}
             <button class="infra-card-button" ${btnDisabled}>${btnText}</button>`;
 
@@ -552,13 +575,13 @@ async function upgradeEconomy(iid) {
     if (!userId) return;
     try {
         const d = await apiPost("/api/upgrade-economy", { category: iid });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
         player = d.player; updateHomeStats(); renderEconomyList();
     } catch (e) { showToast("خطا."); }
 }
 
 /* =========================================================
-   Army — طرح جدید
+   Army
 ========================================================= */
 
 async function openArmyPage() {
@@ -570,7 +593,6 @@ async function openArmyPage() {
     renderArmyUnitsNew();
 }
 
-// تب‌های ارتش
 document.querySelectorAll(".army-tab").forEach(tab => {
     tab.addEventListener("click", () => {
         document.querySelectorAll(".army-tab").forEach(t => t.classList.remove("active"));
@@ -580,13 +602,14 @@ document.querySelectorAll(".army-tab").forEach(tab => {
     });
 });
 
+// ظرفیت از ساختمون اصلی گروه گرفته می‌شه (نه HQ و کارخانه)
 function getGroupCapacity(group) {
     if (!player?.infra) return 0;
-    let t = 0;
-    Object.values(player.infra).forEach(i => {
-        if (i.group === group && i.current) t += i.current.capacity ?? 0;
-    });
-    return t;
+    const providerId = CAPACITY_PROVIDERS[group];
+    if (!providerId) return 0;
+    const provider = player.infra[providerId];
+    if (!provider || !provider.current) return 0;
+    return provider.current.capacity ?? 0;
 }
 
 function getGroupUsed(group) {
@@ -597,18 +620,16 @@ function getGroupUsed(group) {
     return t;
 }
 
-// کارت خلاصه (قدرت کل)
 function renderArmySummary() {
     const el = document.getElementById("army-total-power");
     if (!el || !player) return;
     el.textContent = formatNumber(player.army);
 }
 
-// ۴ کارت پایگاه 2x2
 function renderBaseCards() {
     if (!player?.infra) return;
 
-    // پادگان (land_barracks)
+    // پادگان (land_barracks) — ظرفیت زمینی
     const barracks = player.infra["land_barracks"];
     const bv = document.getElementById("base-barracks-value");
     const bm = document.getElementById("base-barracks-max");
@@ -625,7 +646,7 @@ function renderBaseCards() {
         if (bf) bf.style.width = "0%";
     }
 
-    // فرودگاه (air_airport)
+    // فرودگاه (air_airport) — ظرفیت هوایی
     const airport = player.infra["air_airport"];
     const as = document.getElementById("base-airport-status");
     if (airport && airport.current) {
@@ -638,7 +659,7 @@ function renderBaseCards() {
         as.classList.add("base-card-empty");
     }
 
-    // بندر (naval_port)
+    // بندر (naval_port) — ظرفیت دریایی
     const port = player.infra["naval_port"];
     const pv = document.getElementById("base-port-value");
     const pm = document.getElementById("base-port-max");
@@ -663,7 +684,6 @@ function renderBaseCards() {
     }
 }
 
-// شمارنده تب‌ها
 function renderArmyTabsCounts() {
     if (!player) return;
     const set = (id, n) => { const e = document.getElementById(id); if (e) e.textContent = formatNumber(n); };
@@ -673,7 +693,6 @@ function renderArmyTabsCounts() {
     set("army-count-missile", 0);
 }
 
-// استایل "درجه" (dots) براساس سطح یگان
 function unitLevelDots(count, max = 6) {
     const filled = count > 0 ? Math.min(max, Math.max(1, Math.ceil(Math.log10(count + 1) * 1.5))) : 0;
     let html = '<div class="unit-card-new-dots">';
@@ -682,14 +701,6 @@ function unitLevelDots(count, max = 6) {
     }
     html += "</div>";
     return html;
-}
-
-function unitCostText(u) {
-    let t = `${formatMoney(u.cost)} | ${formatNumber(u.manpower)} نفر`;
-    Object.entries(u.resources || {}).forEach(([k, a]) => {
-        t += ` | ${formatNumber(a)} ${RESOURCE_NAMES[k]}`;
-    });
-    return t;
 }
 
 function renderArmyUnitsNew() {
@@ -725,7 +736,7 @@ function renderArmyUnitsNew() {
             statusText = "ظرفیت پر است.";
             disabled = true;
         } else {
-            statusText = "آماده آموزش";
+            statusText = `ظرفیت: ${formatNumber(used)}/${formatNumber(cap)}`;
         }
 
         const card = document.createElement("div");
@@ -734,7 +745,7 @@ function renderArmyUnitsNew() {
         card.innerHTML = `
             <div class="unit-card-new-top">
                 <div class="unit-card-new-name">
-                    <div class="unit-card-new-title">${u.name}</div>
+                    <div class="unit-card-new-title">${escapeHtml(u.name)}</div>
                     ${unitLevelDots(count)}
                 </div>
                 <div class="unit-card-new-power ${totalPower === 0 ? "zero" : ""}">
@@ -792,6 +803,16 @@ async function trainUnit(uid_, count) {
         const d = await apiPost("/api/train-unit", { unit_id: uid_, count });
         if (!d.success) { showToast(d.message || "خطا", "error"); return; }
         player = d.player;
+
+        // اگه کمتر از درخواست ساخته شد، پیام دقیق بده
+        const trained = d.trained ?? count;
+        const requested = d.requested ?? count;
+        if (trained < requested) {
+            showToast(`فقط ${trained} از ${requested} یگان ساخته شد (ظرفیت پر شد).`, "success");
+        } else {
+            showToast(`${trained} یگان آموزش یافت.`, "success");
+        }
+
         updateHomeStats();
         renderArmySummary();
         renderBaseCards();
@@ -838,7 +859,8 @@ function renderWarTargets() {
         const occText = occupied ? ` (اشغال توسط ${COUNTRY_NAMES[occupied] || occupied})` : "";
         card.innerHTML = `
             <div class="war-target-top">
-                <div class="flag-wrap"><img class="flag-img" src="${countryImageUrl(cid)}" alt=""></div>
+                <div class="flag-wrap"><img class="flag-img" src="${countryImageUrl(cid)}" alt=""
+                    onerror="this.onerror=null;this.style.opacity=.25;"></div>
                 <span class="war-target-name">${COUNTRY_NAMES[cid]}${occText}</span>
             </div>
             <button class="war-attack-button" data-declare="${cid}">⚔️ اعلام جنگ</button>`;
@@ -851,8 +873,8 @@ async function declareWar(target) {
     if (!confirm(`اعلام جنگ به ${COUNTRY_NAMES[target]}؟\nاین درخواست به سازمان ملل (ادمین) می‌رود.`)) return;
     try {
         const d = await apiPost("/api/war/declare", { target });
-        if (!d.success) { showToast(d.message || "امکان اعلام جنگ نیست."); return; }
-        showToast(d.message || "اعلام جنگ ارسال شد.");
+        if (!d.success) { showToast(d.message || "امکان اعلام جنگ نیست.", "error"); return; }
+        showToast(d.message || "اعلام جنگ ارسال شد.", "success");
         loadWarData();
     } catch (e) { showToast("خطا."); }
 }
@@ -941,13 +963,14 @@ function openBattleModal(wid) {
             air: Number(ov.querySelector("#bt-air").value) || 0,
         };
         if (!fronts.land && !fronts.naval && !fronts.air) {
-            showToast("حداقل یک جبهه را پر کنید."); return;
+            showToast("حداقل یک جبهه را پر کنید.", "error"); return;
         }
         ov.remove();
         try {
             const d = await apiPost("/api/war/battle", { war_id: wid, fronts });
-            if (!d.success) { showToast(d.message || "خطا"); return; }
-            showToast(d.report?.winner === "attacker" ? "پیروزی!" : "شکست در نبرد.");
+            if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+            showToast(d.report?.winner === "attacker" ? "پیروزی!" : "شکست در نبرد.",
+                     d.report?.winner === "attacker" ? "success" : "error");
             await refreshPlayer();
             loadWarData();
             loadCountries();
@@ -980,8 +1003,9 @@ document.getElementById("diplomacy-propose-button").addEventListener("click", as
     const dur = document.getElementById("diplomacy-duration").value;
     try {
         const d = await apiPost("/api/propose-treaty", { target, type, duration_days: Number(dur) });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
-        showToast(d.message); loadDiplomacyStatus();
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        showToast(d.message || "پیشنهاد ثبت شد.", "success");
+        loadDiplomacyStatus();
     } catch (e) { showToast("خطا."); }
 });
 
@@ -1019,8 +1043,8 @@ function renderReceivedProposals(list) {
 async function respondTreaty(pid, accept) {
     try {
         const d = await apiPost("/api/respond-treaty", { proposal_id: pid, accept });
-        if (!d.success) { showToast("خطا"); return; }
-        showToast(accept ? "پذیرفته شد." : "رد شد.");
+        if (!d.success) { showToast("خطا", "error"); return; }
+        showToast(accept ? "پذیرفته شد." : "رد شد.", "success");
         loadDiplomacyStatus();
     } catch (e) { showToast("خطا."); }
 }
@@ -1096,9 +1120,9 @@ document.getElementById("ann-submit").addEventListener("click", async () => {
     if (!text) return;
     try {
         const d = await apiPost("/api/announcements/create", { text });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
         ta.value = "";
-        showToast("بیانیه ثبت شد.");
+        showToast("بیانیه ثبت شد.", "success");
         loadAnnouncements();
     } catch (e) { showToast("خطا."); }
 });
@@ -1114,6 +1138,14 @@ async function loadAnnouncements() {
             div.className = "ann-card";
             const supportFlags = a.support.map(c => COUNTRY_FLAGS[c] || c).join(" ");
             const accuseFlags = a.accuse.map(c => COUNTRY_FLAGS[c] || c).join(" ");
+
+            // کامنت‌ها — حالا از بک‌اند میان
+            const commentsHtml = (a.comments || []).map(cm => `
+                <div class="ann-flags-row">
+                    <span>${COUNTRY_FLAGS[cm.from_country] || ""} ${COUNTRY_NAMES[cm.from_country] || cm.from_country}:</span>
+                    ${escapeHtml(cm.text)}
+                </div>`).join("");
+
             div.innerHTML = `
                 <div class="ann-header">
                     <span class="ann-flag">${COUNTRY_FLAGS[a.from_country] || ""}</span>
@@ -1128,7 +1160,7 @@ async function loadAnnouncements() {
                     ${supportFlags ? `<div class="ann-flags-row"><span>✅</span> ${supportFlags}</div>` : ""}
                     ${accuseFlags ? `<div class="ann-flags-row"><span>❌</span> ${accuseFlags}</div>` : ""}
                 </div>
-                <div class="ann-comments" id="ann-comments-${a.id}"></div>
+                <div class="ann-comments">${commentsHtml}</div>
                 <div class="ann-comment-row">
                     <input class="ann-comment-input" data-ann="${a.id}" placeholder="کامنت...">
                     <button class="ann-comment-send" data-ann="${a.id}">ارسال</button>
@@ -1143,7 +1175,7 @@ async function loadAnnouncements() {
 async function reactAnn(id, reaction) {
     try {
         const d = await apiPost("/api/announcements/react", { announcement_id: id, reaction });
-        if (!d.success) { showToast("خطا"); return; }
+        if (!d.success) { showToast("خطا", "error"); return; }
         loadAnnouncements();
     } catch (e) {}
 }
@@ -1153,14 +1185,10 @@ async function commentAnn(id) {
     if (!inp || !inp.value.trim()) return;
     try {
         const d = await apiPost("/api/announcements/comment", { announcement_id: id, text: inp.value.trim() });
-        if (!d.success) { showToast("خطا"); return; }
+        if (!d.success) { showToast("خطا", "error"); return; }
         inp.value = "";
         loadAnnouncements();
     } catch (e) {}
-}
-
-function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 /* =========================================================
@@ -1182,8 +1210,8 @@ async function loadUnion() {
                 const name = document.getElementById("union-name").value.trim();
                 if (!name) return;
                 const r = await apiPost("/api/union/create", { name });
-                if (!r.success) { showToast("خطا"); return; }
-                showToast("اتحادیه ساخته شد."); loadUnion();
+                if (!r.success) { showToast("خطا", "error"); return; }
+                showToast("اتحادیه ساخته شد.", "success"); loadUnion();
             };
 
             if (d.invites?.length) {
@@ -1193,7 +1221,7 @@ async function loadUnion() {
                 d.invites.forEach(inv => {
                     const row = document.createElement("div");
                     row.className = "diplomacy-item";
-                    row.innerHTML = `<span>${inv.name} از ${COUNTRY_NAMES[inv.leader]}</span>
+                    row.innerHTML = `<span>${escapeHtml(inv.name)} از ${COUNTRY_NAMES[inv.leader]}</span>
                         <span>
                             <button class="message-button" data-invite-accept="${inv.union_id}" style="background:rgba(74,222,128,.15);color:#4ade80;">قبول</button>
                             <button class="message-button" data-invite-reject="${inv.union_id}">رد</button>
@@ -1213,7 +1241,7 @@ async function loadUnion() {
         header.className = "infra-card";
         header.innerHTML = `
             <div class="infra-card-top">
-                <span class="infra-card-name">${u.name}</span>
+                <span class="infra-card-name">${escapeHtml(u.name)}</span>
                 <span class="infra-card-level">${u.members.length} عضو</span>
             </div>
             <div class="infra-card-detail">
@@ -1235,8 +1263,8 @@ async function loadUnion() {
             document.getElementById("invite-submit").onclick = async () => {
                 const target = document.getElementById("invite-target").value;
                 const r = await apiPost("/api/union/invite", { union_id: u.id, target });
-                if (!r.success) { showToast("خطا"); return; }
-                showToast("دعوت ارسال شد.");
+                if (!r.success) { showToast("خطا", "error"); return; }
+                showToast("دعوت ارسال شد.", "success");
             };
         }
 
@@ -1280,7 +1308,8 @@ async function loadUnion() {
 }
 
 async function respondInvite(u_id, accept) {
-    await apiPost("/api/union/respond", { union_id: u_id, accept });
+    const r = await apiPost("/api/union/respond", { union_id: u_id, accept });
+    if (!r.success) { showToast("خطا", "error"); return; }
     loadUnion();
 }
 
@@ -1360,9 +1389,10 @@ async function loadPM(target) {
             const mine = m.from === selectedCountry;
             const div = document.createElement("div");
             div.className = `pm-msg ${mine ? "pm-mine" : "pm-other"}`;
-            div.textContent = m.text;
+            div.textContent = m.text;  // textContent امن‌تر از innerHTML
             c.appendChild(div);
         });
+        c.scrollTop = c.scrollHeight;
     } catch (e) { console.error(e); }
 }
 
@@ -1390,6 +1420,7 @@ async function loadMarketListings() {
         const d = await apiGet("/api/market");
         if (!d.listings?.length) { c.innerHTML = `<div class="diplomacy-item-empty">سفارشی نیست.</div>`; return; }
         d.listings.forEach(l => {
+            if (l.seller === selectedCountry) return;  // سفارش خودت رو تو لیست عمومی نشون نده
             const div = document.createElement("div");
             div.className = "infra-card";
             const wantText = l.want_resource === "money" ? formatMoney(l.want_amount)
@@ -1410,9 +1441,11 @@ async function loadMarketListings() {
 async function acceptListing(lid) {
     try {
         const d = await apiPost("/api/market/accept", { listing_id: lid });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
-        showToast("معامله انجام شد.");
-        loadMarketListings(); await refreshPlayer();
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        showToast("معامله انجام شد.", "success");
+        await refreshPlayer();
+        loadMarketListings();
+        loadMyListings();
     } catch (e) {}
 }
 
@@ -1424,9 +1457,11 @@ document.getElementById("mk-submit").onclick = async () => {
     try {
         const d = await apiPost("/api/market/create", { sell_resource: sr, sell_amount: sa,
             want_resource: wr, want_amount: wa });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
-        showToast("سفارش ثبت شد.");
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        showToast("سفارش ثبت شد (منابع بلوکه شد).", "success");
+        await refreshPlayer();
         loadMarketListings();
+        loadMyListings();
     } catch (e) {}
 };
 
@@ -1450,8 +1485,12 @@ async function loadMyListings() {
             c.appendChild(div);
         });
         c.querySelectorAll("[data-cancel]").forEach(b => b.onclick = async () => {
-            await apiPost("/api/market/cancel", { listing_id: b.dataset.cancel });
+            const r = await apiPost("/api/market/cancel", { listing_id: b.dataset.cancel });
+            if (!r.success) { showToast("خطا", "error"); return; }
+            showToast("سفارش لغو شد.", "success");
+            await refreshPlayer();
             loadMyListings();
+            loadMarketListings();
         });
     } catch (e) {}
 }
@@ -1713,8 +1752,14 @@ function showSiteInfo(site) {
     }
 
     if (site.owner !== selectedCountry) {
-        actionBtn.classList.remove("hidden");
-        actionBtn.onclick = () => captureSite(site.id);
+        // فقط اگه سایت دریایی یا تنگه باشه، دکمه تصرف نشون بده
+        const canCapture = site.kind === "strait" || site.naval_capturable === true;
+        if (canCapture) {
+            actionBtn.classList.remove("hidden");
+            actionBtn.onclick = () => captureSite(site.id);
+        } else {
+            actionBtn.classList.add("hidden");
+        }
     } else {
         actionBtn.classList.add("hidden");
     }
@@ -1725,8 +1770,8 @@ async function captureSite(siteId) {
     if (!confirm("۱ ناو برای تصرف فرستاده می‌شود. ادامه؟")) return;
     try {
         const d = await apiPost("/api/map/capture", { site_id: siteId });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
-        showToast(d.message);
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        showToast(d.message || "تصرف موفق.", "success");
         await loadMapSites();
         renderMapSites();
         updateMapSitePositions();
