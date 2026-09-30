@@ -1051,26 +1051,7 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 .ann-flags { margin-bottom: 8px; }
 .ann-flags-row { font-size: 11px; color: #a0a8b3; padding: 4px 0; line-height: 1.6; }
-.ann-comments {
-    margin-bottom: 8px;
-    display: flex; flex-direction: column; gap: 6px;
-}
-.ann-comment {
-    display: flex; align-items: flex-start; gap: 6px;
-    background: rgba(0, 0, 0, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
-    padding: 6px 10px;
-    font-size: 11.5px;
-    line-height: 1.6;
-    word-break: break-word;
-}
-.ann-comment-flag { font-size: 14px; flex-shrink: 0; }
-.ann-comment-name {
-    color: #c3cad3; font-weight: bold;
-    flex-shrink: 0;
-}
-.ann-comment-text { color: #e0e4e9; flex: 1; }
+.ann-comments { margin-bottom: 8px; }
 .ann-comment-row { display: flex; gap: 6px; }
 .ann-comment-input {
     flex: 1; background: #101a28;
