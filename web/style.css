@@ -315,63 +315,56 @@ img { -webkit-user-drag: none; user-select: none; }
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
 }
-.home-card-body { position: relative; padding: 4px 0 0; overflow: hidden; }
+/* بدنه: نسبت ۳:۴ مثل خود عکس تا کامل دیده شود */
+.home-card-body {
+    position: relative; overflow: hidden;
+    aspect-ratio: 3 / 4;
+    max-height: 600px; width: 100%;
+    display: flex; flex-direction: column; justify-content: flex-end;
+}
 .home-card-photo {
     position: absolute; inset: 0;
     background-color: #0b0e15;
     background-size: cover;
-    background-position: center;
+    background-position: center top;
     z-index: 0;
 }
+/* فقط پایین عکس تیره می‌شود تا نوشته‌ها خوانا باشند و بالا کاملاً دیده شود */
 .home-card-photo::after {
     content: ""; position: absolute; inset: 0;
     background: linear-gradient(180deg,
-        rgba(11, 14, 21, 0.6) 0%,
-        rgba(11, 14, 21, 0.85) 50%,
-        rgba(11, 14, 21, 0.95) 100%);
+        rgba(11, 14, 21, 0) 0%,
+        rgba(11, 14, 21, 0) 38%,
+        rgba(11, 14, 21, 0.6) 64%,
+        rgba(11, 14, 21, 0.94) 100%);
 }
 
-.home-stats-grid {
+/* آمار — بدون باکس، روی عکس */
+.home-stats {
     position: relative; z-index: 1;
-    display: grid; grid-template-columns: repeat(2, 1fr);
-    gap: 8px; padding: 8px 12px 12px;
+    display: flex; flex-direction: column; gap: 14px;
+    padding: 0 18px 16px; text-align: right;
 }
-.home-stat {
-    position: relative; min-height: 96px;
-    border-radius: 14px; overflow: hidden;
-    background-color: rgba(11, 14, 21, 0.55);
-    background-size: cover; background-position: center;
-    border: 1px solid rgba(var(--brand-rgb), 0.12);
-    display: flex;
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
-}
-.home-stat:nth-of-type(1) { background-image: linear-gradient(150deg, #a97a1f 0%, #2d1f08 78%); }
-.home-stat:nth-of-type(2) { background-image: linear-gradient(150deg, #b8862a 0%, #2d1f08 78%); }
-.home-stat:nth-of-type(3) { background-image: linear-gradient(150deg, #2fb8b3 0%, #0f2e2c 78%); }
-.home-stat:nth-of-type(4) { background-image: linear-gradient(150deg, #b03a35 0%, #2d0f0e 78%); }
-.home-stat-overlay {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    justify-content: flex-end; align-items: flex-end;
-    text-align: right; padding: 10px 12px;
-    background: linear-gradient(180deg,
-        rgba(6, 10, 18, 0.05) 0%,
-        rgba(6, 10, 18, 0.82) 100%);
-}
-.home-stat-label { font-size: 10.5px; color: rgba(255, 255, 255, 0.85); margin-bottom: 2px; text-shadow: 0 1px 4px rgba(0,0,0,.5); }
-.home-stat-value { font-size: 19px; color: #fff; font-weight: bold; line-height: 1.1; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
-.home-stat-sub { font-size: 10px; color: #a0a8b3; margin-top: 2px; }
-.home-stat-sub span { color: var(--green); }
+.hs-label { display: block; font-size: 12px; color: rgba(255,255,255,0.8); margin-bottom: 3px; text-shadow: 0 1px 5px rgba(0,0,0,.7); }
+.hs-value { display: block; color: #fff; font-weight: bold; line-height: 1.1; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+.hs-sub   { display: block; font-size: 11.5px; color: #c3cad3; margin-top: 4px; text-shadow: 0 1px 5px rgba(0,0,0,.7); }
+.hs-sub span { color: var(--green); font-weight: bold; }
+
+.hs-money .hs-value { font-size: 34px; color: var(--brand); }
+.hs-money .hs-sub   { font-size: 13px; }
+.hs-manpower .hs-value { font-size: 24px; }
+
+.hs-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.14); }
+.hs-duo .hs-value { font-size: 20px; }
 
 .season-bar {
     position: relative; z-index: 1;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 16px 16px;
+    padding: 12px 16px;
     border-top: 1px solid rgba(var(--brand-rgb), 0.15);
     font-size: 12px; color: #c3cad3;
-    background: rgba(11, 14, 21, 0.55);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    background: #0b0e15;
     gap: 10px;
     flex-wrap: wrap;
 }
@@ -395,19 +388,20 @@ img { -webkit-user-drag: none; user-select: none; }
     position: absolute; inset: 0;
     display: flex; flex-direction: column;
     justify-content: flex-end; align-items: flex-end;
-    text-align: right; padding: 14px;
+    text-align: right; padding: 14px 14px 15px;
     background: linear-gradient(180deg,
-        rgba(8, 12, 20, 0) 35%, rgba(8, 12, 20, 0.78) 100%);
+        rgba(8, 12, 20, 0) 30%, rgba(8, 12, 20, 0.82) 100%);
 }
 .action-icon {
     position: absolute; top: 12px; left: 12px; font-size: 17px;
-    width: 36px; height: 36px; border-radius: 50%;
+    width: 38px; height: 38px; border-radius: 50%; overflow: hidden;
     display: flex; align-items: center; justify-content: center;
     border: 1px solid rgba(255, 255, 255, 0.22);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
-.action-card h3 { font-size: 15px; color: #fff; margin-bottom: 4px; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
-.action-card p { font-size: 10.5px; color: rgba(255,255,255,0.8); line-height: 1.6; }
+.action-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.action-card h3 { font-size: 15px; color: #fff; margin-bottom: 8px; line-height: 1.3; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.action-card p { font-size: 10.5px; color: rgba(255,255,255,0.8); line-height: 1.75; }
 .action-army           { background-color: #1a2338; background-image: linear-gradient(150deg, rgba(74,79,168,.30) 0%, rgba(13,16,36,.55) 75%), url('/images/categories/army.png'); background-size: cover; background-position: center; }
 .action-army .action-icon { background: var(--c-army); color: #fff; }
 .action-war             { background-color: #381210; background-image: linear-gradient(150deg, rgba(122,44,40,.30) 0%, rgba(24,10,9,.55) 75%), url('/images/categories/war.jpg'); background-size: cover; background-position: center; }
@@ -1170,8 +1164,6 @@ img { -webkit-user-drag: none; user-select: none; }
     .action-card { min-height: 115px; }
     .action-card h3 { font-size: 13px; }
     .action-card p { font-size: 9.5px; }
-    .home-stat { min-height: 88px; }
-    .home-stat-value { font-size: 16px; }
     .map-box { height: 42vh; }
     .stat-box { min-width: 80px; padding: 6px 7px; }
     .stat-box-value { font-size: 11.5px; }
