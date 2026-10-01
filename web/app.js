@@ -87,6 +87,11 @@ function countryImageUrl(cid) {
     return `/images/countries/${cid}.${COUNTRY_IMAGE_EXT[cid] || "jpg"}`;
 }
 
+// تصویر پس‌زمینه کارت خانه (جدا از پرچم) — اگر فایل نبود، پرچم نمایش داده می‌شود
+function homeImageUrl(cid) {
+    return `/images/home/${cid}.jpg`;
+}
+
 function flagInline(cid, small) {
     if (!cid || !COUNTRY_IMAGE_EXT[cid]) return "";
     const cls = small ? "flag-inline flag-inline-sm" : "flag-inline";
@@ -363,7 +368,8 @@ function updateHomeStats() {
     document.getElementById("home-country-flag").src = countryImageUrl(selectedCountry);
     document.getElementById("home-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     const photo = document.getElementById("home-card-photo");
-    if (photo) photo.style.backgroundImage = `url(${countryImageUrl(selectedCountry)})`;
+    if (photo) photo.style.backgroundImage =
+        `url(${homeImageUrl(selectedCountry)}), url(${countryImageUrl(selectedCountry)})`;
     document.getElementById("home-money").textContent = formatMoney(player.money);
     document.getElementById("home-income").textContent = formatMoney(player.daily_income);
     document.getElementById("home-manpower").textContent = formatNumber(player.manpower);
