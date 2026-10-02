@@ -321,92 +321,54 @@ async function confirmCountrySelection() {
     } finally { enteringCountry = false; }
 }
 
-/* ---------- ورود به داشبورد: همه تصاویر لازم قبل از نمایش ---------- */
-const imagePreloadCache = new Map();
-
-function preloadImage(url, timeout = 8000) {
-    if (!url) return Promise.resolve(false);
-    if (imagePreloadCache.has(url)) return imagePreloadCache.get(url);
-
-    const promise = new Promise(resolve => {
+/* ---------- ورود به داشبورد: ابتدا عکس‌های اصلی خانه، سپس نمایش ---------- */
+function preloadImage(url, timeout = 3000) {
+    return new Promise(resolve => {
+        if (!url) { resolve(false); return; }
         const img = new Image();
-        let settled = false;
-        const timer = setTimeout(() => {
-            if (settled) return;
-            settled = true;
-            resolve(false);
-        }, timeout);
-
-        const done = ok => {
-            if (settled) return;
-            settled = true;
+        let doneOnce = false;
+        const finish = ok => {
+            if (doneOnce) return;
+            doneOnce = true;
             clearTimeout(timer);
             resolve(ok);
         };
-
+        const timer = setTimeout(() => finish(false), timeout);
         img.decoding = "async";
-        img.onload = () => done(true);
-        img.onerror = () => done(false);
+        img.onload = () => finish(true);
+        img.onerror = () => finish(false);
         img.src = url;
-
         if (img.complete) {
-            img.decode?.()
-                .then(() => done(img.naturalWidth > 0))
-                .catch(() => done(img.naturalWidth > 0));
+            if (img.naturalWidth > 0) finish(true);
+            else if (img.naturalWidth === 0) img.decode?.().catch(() => finish(false));
         }
     });
-
-    imagePreloadCache.set(url, promise);
-    return promise;
-}
-
-function cssBackgroundUrls(el) {
-    const bg = getComputedStyle(el).backgroundImage || "";
-    return Array.from(bg.matchAll(/url\(["']?([^"')]+)["']?\)/g)).map(m => m[1]);
 }
 
 async function preloadHomeAssets() {
     const urls = new Set();
-
     if (selectedCountry) {
         urls.add(homeImageUrl(selectedCountry));
         urls.add(countryImageUrl(selectedCountry));
     }
-
-    // تمام تصاویر واقعی داشبورد
-    document.querySelectorAll("#game img").forEach(img => {
-        const src = img.getAttribute("src");
-        if (src) urls.add(src);
-    });
-
-    // هر تصویر پس‌زمینه‌ای که در داشبورد استفاده شده
-    document.querySelectorAll("#home *").forEach(el => {
-        cssBackgroundUrls(el).forEach(u => urls.add(u));
-    });
-
-    // همه را همزمان لود کن؛ بدون تأخیر مصنوعی
-    await Promise.all(Array.from(urls).map(url => preloadImage(url)));
+    await Promise.all([...urls].filter(Boolean).map(url => preloadImage(url)));
 }
 
 function showDashboardShell() {
-    showOnly("game");
-    showGamePage("home");
-    document.getElementById("game").classList.add("booting");
-    if (selectedCountry) updateGameHeader();
+    // تا وقتی عکس‌های اصلی آماده نشده‌اند، همان صفحه‌ی لودینگ قبلی نمایش داده شود.
+    showOnly("loading");
 }
 
 async function showGame() {
     showDashboardShell();
-    updateGameHeader();
-    updateHomeStats();
-
-    // تا آماده‌شدن تصاویر لازم، خود داشبورد نمایش داده نمی‌شود.
     await preloadHomeAssets();
+
+    // فقط بعد از آماده شدن عکس‌های اصلی داشبورد را باز کن.
+    showOnly("game");
+    showGamePage("home");
+    if (selectedCountry) updateGameHeader();
     updateHomeStats();
 
-    await new Promise(requestAnimationFrame);
-
-    document.getElementById("game").classList.remove("booting");
     startStatsPolling();
     refreshNotificationBadge();
 }
@@ -2262,22 +2224,13 @@ async function createPreviewGlobe(containerId, svgId, selected) {
 (async function init() {
     showOnly("loading");
 
-    // درخواست‌های اولیه همزمان اجرا می‌شوند تا زمان انتظار کمتر شود.
-    const countriesPromise = loadCountries();
-    const playerPromise = loadPlayer();
-    const armyPromise = loadArmyCatalog();
-
-    // تصاویر کشورها را از همان ابتدا گرم می‌کنیم تا دانلود مجدد لازم نباشد.
-    const countryImagesPromise = Promise.all(
-        Object.keys(COUNTRY_IMAGE_EXT).map(cid => preloadImage(countryImageUrl(cid), 6000))
-    );
-
-    await Promise.all([countriesPromise, playerPromise, armyPromise, countryImagesPromise]);
+    await Promise.all([loadCountries(), loadPlayer(), loadArmyCatalog()]);
 
     if (player?.country) {
         selectedCountry = player.country;
         await showGame();
     } else {
+        await Promise.all(Object.keys(COUNTRY_IMAGE_EXT).map(cid => preloadImage(countryImageUrl(cid))));
         showCountrySelection();
     }
 })();
