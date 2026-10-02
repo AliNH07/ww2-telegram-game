@@ -864,7 +864,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .map-site .site-hit { fill: transparent; }
 .map-site .site-shape { stroke: #ffffff; stroke-width: 1.3; }
 .map-site-oil     .site-shape { fill: #000000; }   /* سکوی نفتی: سیاه، مربع */
-.map-site-steel   .site-shape { fill: #a8e0ff; }   /* معدن فولاد: آبی کمرنگ، مربع */
+.map-site-steel   .site-shape { fill: #a8e0ff; }   /* معدن آهن: آبی کمرنگ، مربع */
 .map-site-uranium .site-shape { fill: #0a3dff; }   /* معدن اورانیوم: آبی، مربع */
 .map-site-food    .site-shape { fill: #7ed957; }
 .map-site-strait  .site-shape { fill: #ffd21f; stroke: #07121f; }   /* تنگه: زرد */
@@ -1331,3 +1331,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .produce-price { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 10.5px; color: #7a8699; }
 .produce-price strong { color: var(--brand); font-size: 15px; direction: ltr; }
 .produce-hint { font-size: 10.5px; color: #7a8699; line-height: 1.6; }
+
+.resource-chip-eta { font-size: 10px; color: var(--red); opacity: 0.85; line-height: 1.5; }
+.produce-res { flex-wrap: wrap; }
+.produce-res strong { line-height: 1.7; text-align: left; }
