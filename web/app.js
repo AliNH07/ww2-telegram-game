@@ -32,8 +32,8 @@ const COUNTRY_IDS = { germany: 276, britain: 826, ussr: 643, usa: 840,
 let ARMY_UNITS = {};
 let ARMY_RES_NAMES = {};
 
-const RESOURCE_NAMES = { food: "غذا", steel: "آهن", uranium: "اورانیوم", oil: "نفت" };
-const RESOURCE_ICONS = { food: "🌾", steel: "⚙️", uranium: "☢️", oil: "🛢️" };
+const RESOURCE_NAMES = { food: "غذا", iron: "آهن", uranium: "اورانیوم", oil: "نفت" };
+const RESOURCE_ICONS = { food: "🌾", iron: "⚙️", uranium: "☢️", oil: "🛢️" };
 const GROUP_ICONS = { land: "🪖", naval: "⚓", air: "✈️", missile: "🚀" };
 const GROUP_TITLES = { land: "زمینی", naval: "دریایی", air: "هوایی", missile: "موشکی" };
 const TREATY_TYPE_NAMES = { alliance: "پیمان اتحاد", non_aggression: "پیمان عدم تجاوز" };
@@ -546,6 +546,7 @@ function renderInfraTab(tab) {
         renderInfraList("infra-land-list", i => i.group === "land");
         renderInfraList("infra-naval-list", i => i.group === "naval");
         renderInfraList("infra-air-list", i => i.group === "air");
+        renderInfraList("infra-missile-list", i => i.group === "missile");
     }
 }
 
@@ -580,7 +581,7 @@ function buildStatsHtml(item, levelData) {
         boxes.push(statBox(icon, "+" + formatNumber(levelData.production), "در روز"));
     }
     if ((g === "land" || g === "naval" || g === "air") && levelData.capacity !== undefined) {
-        boxes.push(statBox("📦", formatNumber(levelData.capacity), "ظرفیت"));
+        boxes.push(statBox("📦", formatNumber(levelData.capacity), "جا"));
     }
     if (levelData.income !== undefined) {
         boxes.push(statBox("💰", "+" + formatMoney(levelData.income), "در روز"));
@@ -725,10 +726,20 @@ function getGroupCapacity(group) {
     return t;
 }
 
-function getGroupUsed(group) {
+// تعداد یگان‌ها
+function getGroupCount(group) {
     let t = 0;
     Object.entries(ARMY_UNITS).forEach(([uid_, u]) => {
         if (u.group === group) t += player?.units?.[uid_] ?? 0;
+    });
+    return t;
+}
+
+// جای اشغال‌شده در پایگاه (جمع جای هر یگان × تعداد)
+function getGroupUsed(group) {
+    let t = 0;
+    Object.entries(ARMY_UNITS).forEach(([uid_, u]) => {
+        if (u.group === group) t += (player?.units?.[uid_] ?? 0) * (u.slots ?? 1);
     });
     return t;
 }
@@ -751,7 +762,7 @@ function renderBaseCards() {
         const cap = getGroupCapacity("land");
         const used = getGroupUsed("land");
         bv.textContent = formatNumber(used);
-        bm.textContent = `از ${formatNumber(cap)}`;
+        bm.textContent = `از ${formatNumber(cap)} جا`;
         if (bf) bf.style.width = cap > 0 ? Math.min(100, (used / cap) * 100) + "%" : "0%";
     } else {
         bv.textContent = "—";
@@ -765,7 +776,7 @@ function renderBaseCards() {
     if (airport && airport.current) {
         const cap = getGroupCapacity("air");
         const used = getGroupUsed("air");
-        as.innerHTML = `<span style="color:#f4f6f9;font-size:18px;font-weight:bold;">${used}</span> از ${cap}`;
+        as.innerHTML = `<span style="color:#f4f6f9;font-size:18px;font-weight:bold;">${formatNumber(used)}</span> از ${formatNumber(cap)} جا`;
         as.classList.remove("base-card-empty");
     } else {
         as.textContent = "ساخته نشده";
@@ -781,7 +792,7 @@ function renderBaseCards() {
         const cap = getGroupCapacity("naval");
         const used = getGroupUsed("naval");
         pv.textContent = formatNumber(used);
-        pm.textContent = `از ${formatNumber(cap)}`;
+        pm.textContent = `از ${formatNumber(cap)} جا`;
         if (pf) pf.style.width = cap > 0 ? Math.min(100, (used / cap) * 100) + "%" : "0%";
     } else {
         pv.textContent = "—";
@@ -789,21 +800,31 @@ function renderBaseCards() {
         if (pf) pf.style.width = "0%";
     }
 
-    // موشکی
-    const ms = document.getElementById("base-missile-status");
-    if (ms) {
-        ms.textContent = "ساخته نشده";
-        ms.classList.add("base-card-empty");
+    // انبار موشک
+    const depot = player.infra["missile_depot"];
+    const mv = document.getElementById("base-missile-value");
+    const mm = document.getElementById("base-missile-max");
+    const mf = document.getElementById("base-missile-fill");
+    if (depot && depot.current) {
+        const cap = getGroupCapacity("missile");
+        const used = getGroupUsed("missile");
+        mv.textContent = formatNumber(used);
+        mm.textContent = `از ${formatNumber(cap)} جا`;
+        if (mf) mf.style.width = cap > 0 ? Math.min(100, (used / cap) * 100) + "%" : "0%";
+    } else {
+        mv.textContent = "—";
+        mm.textContent = "ساخته نشده";
+        if (mf) mf.style.width = "0%";
     }
 }
 
 function renderArmyTabsCounts() {
     if (!player) return;
     const set = (id, n) => { const e = document.getElementById(id); if (e) e.textContent = formatNumber(n); };
-    set("army-count-land", getGroupUsed("land"));
-    set("army-count-air", getGroupUsed("air"));
-    set("army-count-naval", getGroupUsed("naval"));
-    set("army-count-missile", 0);
+    set("army-count-land", getGroupCount("land"));
+    set("army-count-air", getGroupCount("air"));
+    set("army-count-naval", getGroupCount("naval"));
+    set("army-count-missile", getGroupCount("missile"));
 }
 
 function unitLevelDots(count, max = 6) {
@@ -837,7 +858,7 @@ function renderArmyUnitsNew() {
         const count = player.units?.[uid_] ?? 0;
         const req = player.infra?.[u.requires];
         const hasReq = (req?.level ?? 0) > 0;
-        const full = used >= cap;
+        const full = (cap - used) < (u.slots ?? 1);
 
         let statusText = "";
         let disabled = false;
@@ -845,7 +866,7 @@ function renderArmyUnitsNew() {
             statusText = `برای باز شدن، «${req?.name || u.requires}» را بسازید.`;
             disabled = true;
         } else if (full) {
-            statusText = "ظرفیت پر است.";
+            statusText = "جای خالی کافی نیست؛ پایگاه را ارتقا دهید.";
             disabled = true;
         }
 
@@ -878,7 +899,7 @@ function toLatinDigits(str) {
 function calcMaxProducible(u) {
     let m = Math.floor((player.money ?? 0) / u.cost);
     if (u.manpower > 0) m = Math.min(m, Math.floor((player.manpower ?? 0) / u.manpower));
-    m = Math.min(m, getGroupCapacity(u.group) - getGroupUsed(u.group));
+    m = Math.min(m, Math.floor((getGroupCapacity(u.group) - getGroupUsed(u.group)) / (u.slots ?? 1)));
     return Number.isFinite(m) ? Math.max(0, m) : 0;
 }
 
@@ -891,11 +912,8 @@ function openProduceModal(uid_) {
 
     const extra = [];
     if (u.transport_capacity) extra.push(`<div class="produce-info-item"><span>🚚 ظرفیت حمل</span><strong>${formatNumber(u.transport_capacity)}</strong></div>`);
-    if (u.group === "air") {
-        extra.push(u.slots > 0
-            ? `<div class="produce-info-item"><span>📦 جا روی ناو</span><strong>${formatNumber(u.slots)}</strong></div>`
-            : `<div class="produce-info-item"><span>📦 ناو هواپیمابر</span><strong>نیاز ندارد</strong></div>`);
-    }
+    const slotWhere = u.needs_carrier ? "پایگاه و ناو" : (u.group === "air" ? "فرودگاه، بدون نیاز به ناو" : "پایگاه");
+    extra.push(`<div class="produce-info-item produce-res"><span>📦 جا (${slotWhere})</span><strong>${formatNumber(u.slots ?? 1)}</strong></div>`);
 
     const ov = document.createElement("div");
     ov.className = "modal-overlay produce-overlay";
@@ -943,7 +961,7 @@ function openProduceModal(uid_) {
         if ((player.money ?? 0) < u.cost * q) return "پول کافی نیست.";
         if ((player.manpower ?? 0) < u.manpower * q) return "نیروی انسانی کافی نیست.";
         const room = getGroupCapacity(u.group) - getGroupUsed(u.group);
-        if (q > room) return `ظرفیت کافی نیست (جای خالی: ${formatNumber(Math.max(0, room))}).`;
+        if (q * (u.slots ?? 1) > room) return `جای خالی کافی نیست (${formatNumber(Math.max(0, room))} جا خالی است؛ پایگاه را ارتقا دهید).`;
         return "";
     };
 
@@ -1125,7 +1143,7 @@ function openBattleModal(wid) {
     const carriers = myUnits.aircraft_carrier || 0;
     // بالگرد بدون ناو هم می‌تواند حمله کند؛ جنگنده و بمب‌افکن به ناو هواپیمابر نیاز دارند
     const hasCarrier = Object.entries(ARMY_UNITS).some(([k, x]) =>
-        x.group === "air" && (myUnits[k] || 0) > 0 && ((x.slots || 0) === 0 || carriers > 0));
+        x.group === "air" && (myUnits[k] || 0) > 0 && (!x.needs_carrier || carriers > 0));
     const carrierCap = ARMY_UNITS.aircraft_carrier?.transport_capacity ?? 50;
     const airLabel = hasCarrier ? "✈️ هوایی (تعداد)" : "✈️ هوایی — بدون بالگرد یا ناو هواپیمابر غیرفعال";
     const ov = document.createElement("div");
