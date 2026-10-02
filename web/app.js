@@ -30,6 +30,7 @@ const COUNTRY_IDS = { germany: 276, britain: 826, ussr: 643, usa: 840,
     france: 250, italy: 380, china: 156, japan: 392 };
 
 let ARMY_UNITS = {};
+let ARMY_RES_NAMES = {};
 
 const RESOURCE_NAMES = { food: "غذا", steel: "فولاد", uranium: "اورانیوم", oil: "نفت" };
 const RESOURCE_ICONS = { food: "🌾", steel: "⚙️", uranium: "☢️", oil: "🛢️" };
@@ -176,7 +177,11 @@ function askText(title, placeholder) {
 }
 
 async function loadArmyCatalog() {
-    try { ARMY_UNITS = (await apiGet("/api/army-units")).units || {}; }
+    try {
+        const d = await apiGet("/api/army-units");
+        ARMY_UNITS = d.units || {};
+        ARMY_RES_NAMES = d.resources || {};
+    }
     catch (e) { console.error("Army catalog:", e); }
 }
 
@@ -819,9 +824,8 @@ function renderArmyUnitsNew() {
         const req = player.infra?.[u.requires];
         const hasReq = (req?.level ?? 0) > 0;
         const full = used >= cap;
-        const totalPower = count * (u.attack + u.defense);
 
-        let statusText;
+        let statusText = "";
         let disabled = false;
         if (!hasReq) {
             statusText = `برای باز شدن، «${req?.name || u.requires}» را بسازید.`;
@@ -829,86 +833,169 @@ function renderArmyUnitsNew() {
         } else if (full) {
             statusText = "ظرفیت پر است.";
             disabled = true;
-        } else {
-            statusText = "آماده آموزش";
         }
 
         const card = document.createElement("div");
-        card.className = "unit-card-new" + (disabled ? " locked" : "");
-
-        const transportChip = u.transport_capacity
-            ? `<div class="unit-chip"><span>🚚 ظرفیت حمل</span>
-               <span class="unit-chip-value">${formatNumber(u.transport_capacity)}</span></div>`
-            : "";
-
+        card.className = "unit-card-new unit-card-simple" + (disabled ? " locked" : "");
         card.innerHTML = `
-            <div class="unit-card-new-top">
-                <div class="unit-card-new-name">
-                    <div class="unit-card-new-title">${u.name}</div>
-                    ${unitLevelDots(count)}
-                </div>
-                <div class="unit-card-new-power ${totalPower === 0 ? "zero" : ""}">
-                    ${formatNumber(totalPower)}
-                </div>
+            <div class="unit-simple-info">
+                <div class="unit-card-new-title">${u.name}</div>
+                <div class="unit-simple-count">تعداد: ${formatNumber(count)}</div>
+                ${statusText ? `<div class="unit-simple-status">${statusText}</div>` : ""}
             </div>
-
-            <div class="unit-card-new-stats">
-                <div class="unit-chip">
-                    <span>⚔️ حمله</span>
-                    <span class="unit-chip-value">${u.attack}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>🛡️ دفاع</span>
-                    <span class="unit-chip-value">${u.defense}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>تعداد</span>
-                    <span class="unit-chip-value">${formatNumber(count)}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>💰</span>
-                    <span class="unit-chip-value">${formatMoney(u.cost)}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>👥</span>
-                    <span class="unit-chip-value">${formatNumber(u.manpower)}</span>
-                </div>
-                ${transportChip}
-            </div>
-
-            <div class="unit-card-new-action">
-                <button class="unit-produce-btn" data-unit="${uid_}" data-count="1" ${disabled ? "disabled" : ""}>
-                    ⚙️ تولید
-                </button>
-                <button class="unit-produce-btn" data-unit="${uid_}" data-count="10" ${disabled ? "disabled" : ""}>
-                    ⚙️ ×۱۰
-                </button>
-                <span class="unit-status-text">${statusText}</span>
-            </div>
+            <button class="unit-produce-btn unit-simple-btn" ${disabled ? "disabled" : ""}>⚙️ تولید</button>
         `;
 
         if (!disabled) {
-            card.querySelectorAll(".unit-produce-btn").forEach(b => {
-                b.addEventListener("click", () => trainUnit(uid_, Number(b.dataset.count)));
-            });
+            card.querySelector(".unit-produce-btn").addEventListener("click", () => openProduceModal(uid_));
         }
-
         c.appendChild(card);
     });
 }
 
+/* ---------- پنجرهٔ تولید ---------- */
+function toLatinDigits(str) {
+    return String(str)
+        .replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))
+        .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+}
+
+// حداکثر تعدادی که با پول، نیروی انسانی، منابع و ظرفیت فعلی قابل تولید است
+function calcMaxProducible(u) {
+    let m = Math.floor((player.money ?? 0) / u.cost);
+    if (u.manpower > 0) m = Math.min(m, Math.floor((player.manpower ?? 0) / u.manpower));
+    Object.entries(u.resources || {}).forEach(([k, amt]) => {
+        if (amt > 0) m = Math.min(m, Math.floor((player.resources?.[k] ?? 0) / amt));
+    });
+    m = Math.min(m, getGroupCapacity(u.group) - getGroupUsed(u.group));
+    return Number.isFinite(m) ? Math.max(0, m) : 0;
+}
+
+function openProduceModal(uid_) {
+    const u = ARMY_UNITS[uid_];
+    if (!u || !player) return;
+    document.querySelectorAll(".produce-overlay").forEach(e => e.remove());
+
+    let qty = 1;
+
+    const extra = [];
+    if (u.transport_capacity) extra.push(`<div class="produce-info-item"><span>🚚 ظرفیت حمل</span><strong>${formatNumber(u.transport_capacity)}</strong></div>`);
+    if (u.group === "air") {
+        extra.push(u.slots > 0
+            ? `<div class="produce-info-item"><span>📦 جا روی ناو</span><strong>${formatNumber(u.slots)}</strong></div>`
+            : `<div class="produce-info-item"><span>📦 ناو هواپیمابر</span><strong>نیاز ندارد</strong></div>`);
+    }
+
+    const ov = document.createElement("div");
+    ov.className = "modal-overlay produce-overlay";
+    ov.innerHTML = `
+        <div class="modal-box produce-box">
+            <div class="produce-head">
+                <div class="modal-title">${u.name}</div>
+                <button class="produce-close" aria-label="بستن">×</button>
+            </div>
+
+            <div class="produce-qty-row">
+                <button class="pq-btn" data-act="dec">−</button>
+                <input id="pq-input" class="pq-input" type="text" inputmode="numeric" autocomplete="off" value="1">
+                <button class="pq-btn" data-act="inc">+</button>
+                <button class="pq-max" data-act="max">Max</button>
+            </div>
+
+            <div class="produce-quick-row">
+                <button class="pq-quick" data-set="10">10</button>
+                <button class="pq-quick" data-set="100">100</button>
+            </div>
+
+            <div class="produce-info">
+                <div class="produce-info-item"><span>⚔️ حمله</span><strong>${formatNumber(u.attack)}</strong></div>
+                <div class="produce-info-item"><span>🛡️ دفاع</span><strong>${formatNumber(u.defense)}</strong></div>
+                <div class="produce-info-item"><span>👥 نیروی انسانی</span><strong id="pq-mp">0</strong></div>
+                <div class="produce-info-item"><span>⏱️ زمان ساخت</span><strong>${formatDuration(u.build_time || 0)}</strong></div>
+                ${extra.join("")}
+                <div class="produce-info-item produce-res"><span>منابع</span><strong id="pq-res">—</strong></div>
+            </div>
+
+            <div class="produce-warn" id="pq-warn"></div>
+
+            <div class="produce-footer">
+                <button class="produce-go" id="pq-go">⚙️ تولید</button>
+                <div class="produce-price"><span>قیمت</span><strong id="pq-price">$0</strong></div>
+            </div>
+        </div>`;
+
+    const $ = sel => ov.querySelector(sel);
+    const inp = $("#pq-input"), goBtn = $("#pq-go");
+
+    const warnFor = q => {
+        if ((player.money ?? 0) < u.cost * q) return "پول کافی نیست.";
+        if ((player.manpower ?? 0) < u.manpower * q) return "نیروی انسانی کافی نیست.";
+        for (const [k, amt] of Object.entries(u.resources || {})) {
+            if ((player.resources?.[k] ?? 0) < amt * q) return `${ARMY_RES_NAMES[k] || k} کافی نیست.`;
+        }
+        const room = getGroupCapacity(u.group) - getGroupUsed(u.group);
+        if (q > room) return `ظرفیت کافی نیست (جای خالی: ${formatNumber(Math.max(0, room))}).`;
+        return "";
+    };
+
+    const update = () => {
+        $("#pq-price").textContent = formatMoney(u.cost * qty);
+        $("#pq-mp").textContent = formatNumber(u.manpower * qty);
+        const resParts = Object.entries(u.resources || {})
+            .map(([k, amt]) => `${ARMY_RES_NAMES[k] || k} ${formatNumber(amt * qty)}`);
+        $("#pq-res").textContent = resParts.length ? resParts.join(" · ") : "—";
+        const warn = warnFor(Math.max(qty, 1));
+        $("#pq-warn").textContent = warn;
+        goBtn.disabled = qty < 1 || !!warn;
+    };
+
+    const setQty = (n, syncInput = true) => {
+        qty = Math.max(0, Math.min(Math.floor(n) || 0, 1_000_000_000));
+        if (syncInput) inp.value = String(qty);
+        update();
+    };
+
+    inp.addEventListener("input", () => {
+        const digits = toLatinDigits(inp.value).replace(/\D/g, "");
+        inp.value = digits;
+        setQty(digits === "" ? 0 : parseInt(digits, 10), false);
+    });
+    inp.addEventListener("blur", () => { inp.value = String(qty); });
+
+    $("[data-act='dec']").onclick = () => setQty(Math.max(1, qty - 1));
+    $("[data-act='inc']").onclick = () => setQty(qty + 1);
+    $("[data-act='max']").onclick = () => setQty(calcMaxProducible(u));
+    ov.querySelectorAll(".pq-quick").forEach(b => { b.onclick = () => setQty(Number(b.dataset.set)); });
+
+    const close = () => ov.remove();
+    $(".produce-close").onclick = close;
+    ov.addEventListener("click", e => { if (e.target === ov) close(); });
+
+    goBtn.onclick = async () => {
+        if (qty < 1) return;
+        goBtn.disabled = true;
+        const ok = await trainUnit(uid_, qty);
+        if (ok) close(); else update();
+    };
+
+    document.body.appendChild(ov);
+    update();
+}
+
 async function trainUnit(uid_, count) {
-    if (!userId) return;
+    if (!userId) return false;
     try {
         const d = await apiPost("/api/train-unit", { unit_id: uid_, count });
-        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        if (!d.success) { showToast(d.message || "خطا", "error"); return false; }
         player = d.player;
         updateHomeStats();
         renderArmySummary();
         renderBaseCards();
         renderArmyTabsCounts();
         renderArmyUnitsNew();
-    } catch (e) { showToast("خطا."); }
+        showToast(`${formatNumber(count)} × ${ARMY_UNITS[uid_]?.name || ""} تولید شد.`, "success");
+        return true;
+    } catch (e) { showToast("خطا."); return false; }
 }
 
 /* =========================================================
@@ -1027,8 +1114,13 @@ async function loadWarData() {
 }
 
 function openBattleModal(wid) {
-    const hasCarrier = (player?.units?.aircraft_carrier || 0) > 0;
-    const airLabel = hasCarrier ? "✈️ هوایی (تعداد)" : "✈️ هوایی — بدون ناو هواپیمابر غیرفعال";
+    const myUnits = player?.units || {};
+    const carriers = myUnits.aircraft_carrier || 0;
+    // بالگرد بدون ناو هم می‌تواند حمله کند؛ جنگنده و بمب‌افکن به ناو هواپیمابر نیاز دارند
+    const hasCarrier = Object.entries(ARMY_UNITS).some(([k, x]) =>
+        x.group === "air" && (myUnits[k] || 0) > 0 && ((x.slots || 0) === 0 || carriers > 0));
+    const carrierCap = ARMY_UNITS.aircraft_carrier?.transport_capacity ?? 50;
+    const airLabel = hasCarrier ? "✈️ هوایی (تعداد)" : "✈️ هوایی — بدون بالگرد یا ناو هواپیمابر غیرفعال";
     const ov = document.createElement("div");
     ov.className = "modal-overlay";
     ov.innerHTML = `
@@ -1040,6 +1132,7 @@ function openBattleModal(wid) {
             <input id="bt-naval" class="diplomacy-input" type="number" value="0" min="0">
             <label class="diplomacy-label">${airLabel}</label>
             <input id="bt-air" class="diplomacy-input" type="number" value="0" min="0" ${hasCarrier ? "" : "disabled"}>
+            <div class="produce-hint">جنگنده و بمب‌افکن فقط به اندازهٔ ظرفیت ناوها (هر ناو ${carrierCap} جا؛ الان ${formatNumber(carriers * carrierCap)} جا) شرکت می‌کنند. بالگرد به ناو نیاز ندارد.</div>
             <div class="modal-actions">
                 <button class="modal-cancel">انصراف</button>
                 <button class="modal-ok">اجرای نبرد</button>
