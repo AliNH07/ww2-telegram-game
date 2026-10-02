@@ -321,56 +321,58 @@ async function confirmCountrySelection() {
     } finally { enteringCountry = false; }
 }
 
-/* ---------- ورود به داشبورد: ابتدا عکس‌های اصلی خانه، سپس نمایش ---------- */
-function preloadImage(url, timeout = 3000) {
+/* ---------- ورود به داشبورد: لود همه عکس‌های خانه، بعد نمایش ---------- */
+function preloadImage(url, timeout = 8000) {
     return new Promise(resolve => {
-        if (!url) { resolve(false); return; }
+        if (!url) { resolve(); return; }
         const img = new Image();
-        let doneOnce = false;
-        const finish = ok => {
-            if (doneOnce) return;
-            doneOnce = true;
-            clearTimeout(timer);
-            resolve(ok);
-        };
-        const timer = setTimeout(() => finish(false), timeout);
-        img.decoding = "async";
-        img.onload = () => finish(true);
-        img.onerror = () => finish(false);
+        const timer = setTimeout(resolve, timeout);
+        const done = () => { clearTimeout(timer); resolve(); };
+        img.onload = done; img.onerror = done;   // فایلِ نبود، منتظر نمی‌ماند
         img.src = url;
-        if (img.complete) {
-            if (img.naturalWidth > 0) finish(true);
-            else if (img.naturalWidth === 0) img.decode?.().catch(() => finish(false));
-        }
     });
 }
 
+function cssBackgroundUrls(el) {
+    const bg = getComputedStyle(el).backgroundImage || "";
+    return Array.from(bg.matchAll(/url\(["']?([^"')]+)["']?\)/g)).map(m => m[1]);
+}
+
 async function preloadHomeAssets() {
-    const urls = new Set();
-    if (selectedCountry) {
-        urls.add(homeImageUrl(selectedCountry));
-        urls.add(countryImageUrl(selectedCountry));
-    }
-    await Promise.all([...urls].filter(Boolean).map(url => preloadImage(url)));
+    const urls = new Set([homeImageUrl(selectedCountry), countryImageUrl(selectedCountry)]);
+    document.querySelectorAll("#game .game-header img, #home img").forEach(img => {
+        const src = img.getAttribute("src");
+        if (src) urls.add(src);
+    });
+    document.querySelectorAll("#home .action-card").forEach(c =>
+        cssBackgroundUrls(c).forEach(u => urls.add(u)));
+    await Promise.all(Array.from(urls).map(u => preloadImage(u)));
+    // استیکری که فایلش نیست، مخفی شود
+    document.querySelectorAll("#home .action-icon img").forEach(img => {
+        if (img.complete && img.naturalWidth === 0) img.style.display = "none";
+    });
 }
 
 function showDashboardShell() {
-    // تا وقتی عکس‌های اصلی آماده نشده‌اند، همان صفحه‌ی لودینگ قبلی نمایش داده شود.
-    showOnly("loading");
+    showOnly("game");
+    showGamePage("home");
+    document.getElementById("game").classList.add("booting");
+    if (selectedCountry) updateGameHeader();
 }
 
 async function showGame() {
     showDashboardShell();
+    updateGameHeader(); updateHomeStats();
+    const t0 = Date.now();
     await preloadHomeAssets();
-
-    // فقط بعد از آماده شدن عکس‌های اصلی داشبورد را باز کن.
-    showOnly("game");
-    showGamePage("home");
-    if (selectedCountry) updateGameHeader();
-    updateHomeStats();
-
-    startStatsPolling();
-    refreshNotificationBadge();
+    updateHomeStats();   // عکس خانه از کش گذاشته شود
+    const heroPhoto = document.getElementById("home-card-photo");
+    for (let i = 0; i < 10 && heroPhoto && !heroPhoto.classList.contains("loaded") && !heroPhoto.dataset.failed; i++) await sleep(50);
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const el = Date.now() - t0;
+    if (el < 600) await sleep(600 - el);
+    document.getElementById("game").classList.remove("booting");
+    startStatsPolling(); refreshNotificationBadge();
 }
 
 function updateGameHeader() {
@@ -2223,13 +2225,20 @@ async function createPreviewGlobe(containerId, svgId, selected) {
 ========================================================= */
 (async function init() {
     showOnly("loading");
+    const t0 = Date.now();
 
-    await Promise.all([loadCountries(), loadPlayer(), loadArmyCatalog()]);
+    await loadCountries();
+    await loadPlayer();
+    await loadArmyCatalog();
+
+    const el = Date.now() - t0;
+    if (el < 1000) await new Promise(r => setTimeout(r, 1000 - el));
 
     if (player?.country) {
         selectedCountry = player.country;
-        await showGame();
+        showGame();
     } else {
+        // اول همه پرچم‌ها لود شوند، بعد صفحه انتخاب کشور
         await Promise.all(Object.keys(COUNTRY_IMAGE_EXT).map(cid => preloadImage(countryImageUrl(cid))));
         showCountrySelection();
     }
