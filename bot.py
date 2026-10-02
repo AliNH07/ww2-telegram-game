@@ -260,10 +260,10 @@ ECONOMY = {
 ARMY_UNITS = {
     "infantry": {"name": "پیاده‌نظام", "group": "land", "requires": "land_barracks",
         "cost": 50_000, "manpower": 300, "resources": {"food": 100},
-        "attack": 20, "defense": 10},
+        "attack": 20, "defense": 10, "slots": 1},
     "tank": {"name": "تانک", "group": "land", "requires": "land_tank_factory",
         "cost": 150_000, "manpower": 250, "resources": {"steel": 300, "food": 150},
-        "attack": 50, "defense": 25},
+        "attack": 50, "defense": 25, "slots": 4},
     "ship": {"name": "ناو دریایی", "group": "naval", "requires": "naval_port",
         "cost": 250_000, "manpower": 200, "resources": {"oil": 250, "food": 150},
         "attack": 50, "defense": 60},
@@ -272,20 +272,25 @@ ARMY_UNITS = {
         "attack": 45, "defense": 25},
     "transport_ship": {"name": "ناو ترابری", "group": "naval", "requires": "naval_port",
         "cost": 180_000, "manpower": 150, "resources": {"oil": 150, "steel": 200},
-        "attack": 5, "defense": 40, "transport_capacity": 500},
+        "attack": 5, "defense": 40, "transport_capacity": 100},
     "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": "naval_shipyard",
         "cost": 800_000, "manpower": 500, "resources": {"oil": 800, "steel": 1200},
-        "attack": 25, "defense": 90},
+        "attack": 25, "defense": 90, "transport_capacity": 50},
     "fighter": {"name": "جنگنده", "group": "air", "requires": "air_airport",
         "cost": 200_000, "manpower": 150, "resources": {"oil": 200, "steel": 100},
-        "attack": 45, "defense": 40},
+        "attack": 45, "defense": 40, "slots": 5},
     "bomber": {"name": "بمب‌افکن", "group": "air", "requires": "air_arsenal",
         "cost": 250_000, "manpower": 180, "resources": {"oil": 300, "steel": 150},
-        "attack": 60, "defense": 15},
+        "attack": 60, "defense": 15, "slots": 10},
     "helicopter": {"name": "بالگرد", "group": "air", "requires": "air_airport",
         "cost": 120_000, "manpower": 100, "resources": {"oil": 120, "steel": 60},
-        "attack": 30, "defense": 35},
+        "attack": 30, "defense": 35, "slots": 0},   # بالگرد نیازی به ناو هواپیمابر ندارد
 }
+
+# زمان ساخت (ثانیه) — فعلاً همه ۰ هستند
+for _u in ARMY_UNITS.values():
+    _u.setdefault("build_time", 0)
+    _u.setdefault("slots", 0)
 
 MAP_RESOURCES = {
     # مختصات بر اساس میدان‌ها و معدن‌های فعال در سال ۱۹۹۳ — zone: sea = دریا / land = خشکی
@@ -818,7 +823,7 @@ async def train_unit(request):
     data = await read_json(request); unit_id = data.get("unit_id")
     try: count = int(data.get("count", 1))
     except: count = 1
-    count = max(1, min(count, 50))
+    count = max(1, min(count, 100000))
     if unit_id not in ARMY_UNITS:
         return web.json_response({"success": False, "error": "invalid_unit"}, status=400)
     if uid not in players: players[uid] = create_player(uid)
@@ -837,9 +842,11 @@ async def train_unit(request):
     count = min(count, cap - used)
     total_cost = unit["cost"] * count; total_mp = unit["manpower"] * count
     if p.get("money", 0) < total_cost:
-        return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
+        return web.json_response({"success": False, "error": "not_enough_money",
+                                  "message": "پول کافی ندارید."}, status=400)
     if p.get("manpower", 0) < total_mp:
-        return web.json_response({"success": False, "error": "not_enough_manpower"}, status=400)
+        return web.json_response({"success": False, "error": "not_enough_manpower",
+                                  "message": "نیروی انسانی کافی ندارید."}, status=400)
     for k, a in unit["resources"].items():
         if p["resources"].get(k, 0) < a * count:
             return web.json_response({"success": False, "error": "not_enough_resource",
@@ -1037,12 +1044,17 @@ async def perform_battle(request):
               "at": utcnow().isoformat(), "winner": None}
     attacker_wins = 0; defender_wins = 0; air_winner = None
 
-    has_carrier = atk["units"].get("aircraft_carrier", 0) > 0
+    # ظرفیت ناوهای هواپیمابر؛ جنگنده و بمب‌افکن فقط به اندازهٔ این ظرفیت می‌توانند حمله کنند
+    carrier_slots = (atk["units"].get("aircraft_carrier", 0)
+                     * ARMY_UNITS["aircraft_carrier"]["transport_capacity"])
+    # بالگرد بدون ناو هم می‌تواند حمله کند
+    air_possible = any(
+        atk["units"].get(k, 0) > 0 and (u["slots"] == 0 or carrier_slots > 0)
+        for k, u in ARMY_UNITS.items() if u["group"] == "air")
 
     for front in ["air", "naval", "land"]:
         atk_attack = 0
-        # بدون ناو هواپیمابر، هیچ حملهٔ هوایی ممکن نیست
-        if front == "air" and not has_carrier:
+        if front == "air" and not air_possible:
             dfd_def = def_power(dfd, front) * 1.10
             dfd_final = dfd_def * (1 + random.uniform(-0.08, 0.08))
             report["fronts"][front] = {"attacker_power": 0,
@@ -1057,10 +1069,16 @@ async def perform_battle(request):
         total_available = sum(available.values())
         if total_available > 0 and requested > 0:
             ratio = min(1.0, requested / total_available)
-            for uid_, count in available.items():
-                u = ARMY_UNITS[uid_]
-                sent = int(count * ratio)
-                atk_attack += sent * u["attack"]
+            sent_map = {uid_: int(count * ratio) for uid_, count in available.items()}
+            if front == "air":
+                need = sum(n * ARMY_UNITS[k]["slots"] for k, n in sent_map.items())
+                if need > carrier_slots:
+                    f = carrier_slots / need
+                    for k in sent_map:
+                        if ARMY_UNITS[k]["slots"] > 0:
+                            sent_map[k] = int(sent_map[k] * f)
+            for uid_, sent in sent_map.items():
+                atk_attack += sent * ARMY_UNITS[uid_]["attack"]
                 atk["units"][uid_] -= sent
         dfd_def = def_power(dfd, front) * 1.10
         if air_winner == w["attacker"] and front in ["naval", "land"]: atk_attack *= 1.15
