@@ -439,8 +439,9 @@ function updateHomeStats() {
     document.getElementById("home-income").textContent = formatMoney(player.daily_income);
     document.getElementById("home-manpower").textContent = formatNumber(player.manpower);
     document.getElementById("home-manpower-production").textContent = formatNumber(player.manpower_production);
-    document.getElementById("home-power").textContent = formatNumber(player.power_capacity);
-    document.getElementById("home-power-sub").textContent = `مصرف: ${formatNumber(player.power_consumption ?? 0)}`;
+    const pCap = player.power_capacity ?? 0, pUse = player.power_consumption ?? 0;
+    document.getElementById("home-power").textContent = formatNumber(Math.max(0, pCap - pUse));   // برق آزاد = ظرفیت − مصرف
+    document.getElementById("home-power-sub").textContent = `مصرف: ${formatNumber(pUse)} از ${formatNumber(pCap)}`;
     document.getElementById("home-army").textContent = formatNumber(player.army);
     const season = player.season ?? "بهار";
     document.getElementById("home-season").textContent = season;
