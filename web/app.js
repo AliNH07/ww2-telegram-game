@@ -32,7 +32,7 @@ const COUNTRY_IDS = { germany: 276, britain: 826, ussr: 643, usa: 840,
 let ARMY_UNITS = {};
 let ARMY_RES_NAMES = {};
 
-const RESOURCE_NAMES = { food: "غذا", steel: "فولاد", uranium: "اورانیوم", oil: "نفت" };
+const RESOURCE_NAMES = { food: "غذا", steel: "آهن", uranium: "اورانیوم", oil: "نفت" };
 const RESOURCE_ICONS = { food: "🌾", steel: "⚙️", uranium: "☢️", oil: "🛢️" };
 const GROUP_ICONS = { land: "🪖", naval: "⚓", air: "✈️", missile: "🚀" };
 const GROUP_TITLES = { land: "زمینی", naval: "دریایی", air: "هوایی", missile: "موشکی" };
@@ -185,6 +185,20 @@ async function loadArmyCatalog() {
     catch (e) { console.error("Army catalog:", e); }
 }
 
+function formatEta(hours) {
+    if (!Number.isFinite(hours)) return "مدت زیادی";
+    if (hours < 1) return "کمتر از یک ساعت";
+    const d = Math.floor(hours / 24), h = Math.floor(hours % 24);
+    if (d === 0) return `${h} ساعت`;
+    if (h === 0) return `${d} روز`;
+    return `${d} روز و ${h} ساعت`;
+}
+
+function upkeepText(u, q) {
+    const parts = Object.entries(u.upkeep || {}).map(([k, amt]) => `${RESOURCE_NAMES[k] || k} ${formatNumber(amt * q)}`);
+    return parts.length ? parts.join(" · ") : "—";
+}
+
 function renderResourceBars() {
     if (!player?.resources) return;
     document.querySelectorAll(".resource-bar").forEach(bar => {
@@ -193,19 +207,19 @@ function renderResourceBars() {
             const amt = player.resources[key] ?? 0;
             const rate = player.resource_production?.[key] ?? 0;
             const use = player.resource_consumption?.[key] ?? 0;
+            const net = player.resource_net?.[key] ?? (rate - use);
             const chip = document.createElement("div");
             chip.className = "resource-chip";
             let rateLine = "";
-            if (rate > 0 && use > 0) {
-                rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>
-                            <div class="resource-chip-rate down">▼ ${formatNumber(use)} کسر فصلی</div>`;
-            } else if (rate > 0) {
-                rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>`;
-            } else if (use > 0) {
-                rateLine = `<div class="resource-chip-rate down">▼ ${formatNumber(use)} /روز</div>`;
-            } else {
-                rateLine = `<div class="resource-chip-rate zero">بدون تولید</div>`;
+            if (rate > 0) rateLine += `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>`;
+            if (rate > 0 && use > 0) rateLine += `<div class="resource-chip-rate down">▼ ${formatNumber(use)} کسر فصلی</div>`;
+            if (net < 0) {
+                rateLine += `<div class="resource-chip-rate down">▼ روزانه ${formatNumber(-net)} کمتر می‌شود</div>`;
+                rateLine += amt <= 0
+                    ? `<div class="resource-chip-eta">⏳ موجودی تمام شده است</div>`
+                    : `<div class="resource-chip-eta">⏳ تا ${formatEta(amt / -net * 24)} دیگر تمام خواهد شد</div>`;
             }
+            if (!rateLine) rateLine = `<div class="resource-chip-rate zero">بدون تولید</div>`;
             chip.innerHTML = `
                 <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span></div>
                 <div class="resource-chip-value">${formatNumber(amt)}</div>
@@ -860,13 +874,10 @@ function toLatinDigits(str) {
         .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
 }
 
-// حداکثر تعدادی که با پول، نیروی انسانی، منابع و ظرفیت فعلی قابل تولید است
+// حداکثر تعدادی که با پول، نیروی انسانی و ظرفیت فعلی قابل تولید است
 function calcMaxProducible(u) {
     let m = Math.floor((player.money ?? 0) / u.cost);
     if (u.manpower > 0) m = Math.min(m, Math.floor((player.manpower ?? 0) / u.manpower));
-    Object.entries(u.resources || {}).forEach(([k, amt]) => {
-        if (amt > 0) m = Math.min(m, Math.floor((player.resources?.[k] ?? 0) / amt));
-    });
     m = Math.min(m, getGroupCapacity(u.group) - getGroupUsed(u.group));
     return Number.isFinite(m) ? Math.max(0, m) : 0;
 }
@@ -899,7 +910,7 @@ function openProduceModal(uid_) {
                 <button class="pq-btn" data-act="dec">−</button>
                 <input id="pq-input" class="pq-input" type="text" inputmode="numeric" autocomplete="off" value="1">
                 <button class="pq-btn" data-act="inc">+</button>
-                <button class="pq-max" data-act="max">Max</button>
+                <button class="pq-max" data-act="max">حداکثر</button>
             </div>
 
             <div class="produce-quick-row">
@@ -913,7 +924,8 @@ function openProduceModal(uid_) {
                 <div class="produce-info-item"><span>👥 نیروی انسانی</span><strong id="pq-mp">0</strong></div>
                 <div class="produce-info-item"><span>⏱️ زمان ساخت</span><strong>${formatDuration(u.build_time || 0)}</strong></div>
                 ${extra.join("")}
-                <div class="produce-info-item produce-res"><span>منابع</span><strong id="pq-res">—</strong></div>
+                <div class="produce-info-item produce-res"><span>🍽️ مصرف روزانهٔ هر واحد</span><strong>${upkeepText(u, 1)}</strong></div>
+                <div class="produce-info-item produce-res"><span>مصرف روزانهٔ کل (برای تعداد انتخابی)</span><strong id="pq-res">—</strong></div>
             </div>
 
             <div class="produce-warn" id="pq-warn"></div>
@@ -930,9 +942,6 @@ function openProduceModal(uid_) {
     const warnFor = q => {
         if ((player.money ?? 0) < u.cost * q) return "پول کافی نیست.";
         if ((player.manpower ?? 0) < u.manpower * q) return "نیروی انسانی کافی نیست.";
-        for (const [k, amt] of Object.entries(u.resources || {})) {
-            if ((player.resources?.[k] ?? 0) < amt * q) return `${ARMY_RES_NAMES[k] || k} کافی نیست.`;
-        }
         const room = getGroupCapacity(u.group) - getGroupUsed(u.group);
         if (q > room) return `ظرفیت کافی نیست (جای خالی: ${formatNumber(Math.max(0, room))}).`;
         return "";
@@ -941,9 +950,7 @@ function openProduceModal(uid_) {
     const update = () => {
         $("#pq-price").textContent = formatMoney(u.cost * qty);
         $("#pq-mp").textContent = formatNumber(u.manpower * qty);
-        const resParts = Object.entries(u.resources || {})
-            .map(([k, amt]) => `${ARMY_RES_NAMES[k] || k} ${formatNumber(amt * qty)}`);
-        $("#pq-res").textContent = resParts.length ? resParts.join(" · ") : "—";
+        $("#pq-res").textContent = qty > 0 ? upkeepText(u, qty) : "—";
         const warn = warnFor(Math.max(qty, 1));
         $("#pq-warn").textContent = warn;
         goBtn.disabled = qty < 1 || !!warn;
