@@ -308,153 +308,64 @@ img { -webkit-user-drag: none; user-select: none; }
 .page-title span { color: #6b7480; font-size: 11px; }
 .page-title h1 { font-size: 24px; margin-top: 4px; color: #f4f6f9; }
 
-/* ==================== کارت خانه ==================== */
-.home-card {
-    background: #0b0e15;
-    border: 1px solid rgba(var(--brand-rgb), 0.22);
-    border-radius: 20px; overflow: hidden; margin-bottom: 18px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-.home-card-top {
-    position: relative;
-    z-index: 2;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 14px;
-    background: transparent;
-}
-.world-chip {
-    background: rgba(15, 20, 30, 0.7);
-    border: 1px solid rgba(var(--brand-rgb), 0.25);
-    color: #a0a8b3; font-size: 11px; padding: 5px 12px; border-radius: 20px;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-}
-.home-country-chip {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 13px; color: #f4f6f9;
-    background: rgba(15, 20, 30, 0.7);
-    padding: 5px 10px;
-    border-radius: 20px;
-    border: 1px solid rgba(var(--brand-rgb), 0.2);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-}
-/* بدنه: نسبت ۳:۴ مثل خود عکس تا کامل دیده شود */
-.home-card-body {
-    position: relative; overflow: hidden;
-    aspect-ratio: 3 / 4;
-    width: 100%;
-    display: flex; flex-direction: column; justify-content: flex-start;
-}
-.home-card-photo {
-    opacity: 0; transition: opacity 0.4s ease;
-    position: absolute; inset: 0;
-    background-color: #0b0e15;
-    background-size: cover;
-    background-position: center top;
-    z-index: 0;
-}
-/* فقط پایین عکس تیره می‌شود تا نوشته‌ها خوانا باشند و بالا کاملاً دیده شود */
+/* ==================== کارت خانه (Command Center) ==================== */
+.ic { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.home-card { background: #0b0e15; border: 1px solid rgba(var(--brand-rgb), .22); border-radius: 18px; overflow: hidden; margin-bottom: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.home-card-body { position: relative; direction: ltr; display: flex; align-items: stretch; gap: 10px; padding: 10px; min-height: 196px; }
+.home-card-photo { position: absolute; inset: 0; opacity: 0; transition: opacity .4s; background: #0b0e15 center top / cover; }
 .home-card-photo.loaded { opacity: 1; }
-.home-card-photo::after {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg,
-        rgba(11, 14, 21, 0.65) 0%,
-        rgba(11, 14, 21, 0.4) 22%,
-        rgba(11, 14, 21, 0.62) 55%,
-        rgba(11, 14, 21, 0.95) 100%);
-}
+.home-card-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11,14,21,.25), rgba(11,14,21,.7)); }
+.hero-country { position: relative; z-index: 1; flex: 0 0 34%; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; gap: 6px; text-align: center; padding-top: 4px; direction: rtl; }
+.hero-country .flag-wrap { width: 52px; height: 52px; }
+.hero-country strong { font-size: 17px; text-shadow: 0 2px 8px #000; }
+.world-chip { background: rgba(15,20,30,.7); border: 1px solid rgba(var(--brand-rgb), .25); color: #a0a8b3; font-size: 11px; padding: 4px 10px; border-radius: 20px; }
+.home-stats { position: relative; z-index: 1; flex: 1; direction: rtl; display: flex; flex-direction: column; gap: 9px; padding: 10px 12px; text-align: right; border-radius: 14px; background: rgba(10,14,22,.78); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.hs-money, .hs-manpower, .hs-power { display: flex; align-items: center; gap: 8px; }
+.hs-ic { font-size: 26px; color: #8fb4e8; } .hs-ic.gold { color: var(--brand); }
+.hs-value { display: block; font-weight: bold; line-height: 1.15; }
+.hs-label { display: block; font-size: 11px; color: #aeb6c2; margin-top: 2px; }
+.hs-sub { display: block; font-size: 10px; color: #8a93a0; margin-top: 2px; }
+.hs-money .hs-value { font-size: 22px; color: var(--brand); }
+.hs-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.12); }
+.hs-duo .hs-value { font-size: 17px; }
+.hs-duo .hs-ic { font-size: 22px; }
+.hs-foot { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.12); font-size: 10.5px; color: #c3cad3; }
+.hs-income, .hs-income span { color: var(--green); font-weight: bold; }
+.season-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 9px 14px; border-top: 1px solid rgba(255,255,255,.1); font-size: 11.5px; color: #c3cad3; }
+.season-tag { color: #f4f6f9; } .season-hint { color: var(--brand); opacity: .85; font-size: 10.5px; }
 
-/* آمار — بدون باکس، روی عکس */
-.home-stats {
-    position: relative; z-index: 1;
-    display: flex; flex-direction: column; gap: 14px;
-    padding: 14px 18px 0; text-align: right;
-}
-.hs-label { display: block; font-size: 12px; color: rgba(255,255,255,0.8); margin-bottom: 3px; text-shadow: 0 1px 5px rgba(0,0,0,.7); }
-.hs-value { display: block; color: #fff; font-weight: bold; line-height: 1.1; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
-.hs-sub   { display: block; font-size: 11.5px; color: #c3cad3; margin-top: 4px; text-shadow: 0 1px 5px rgba(0,0,0,.7); }
-.hs-sub span { color: var(--green); font-weight: bold; }
-
-.hs-money .hs-value { font-size: 34px; color: var(--brand); }
-.hs-money .hs-sub   { font-size: 13px; }
-.hs-manpower .hs-value { font-size: 24px; }
-
-.hs-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
-    padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.14); }
-.hs-duo .hs-value { font-size: 20px; }
-
-.season-bar {
-    position: relative; z-index: 1;
-    display: flex; align-items: center; justify-content: space-between;
-    margin-top: auto;
-    padding: 14px 18px;
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-    font-size: 12px; color: #c3cad3;
-    background: transparent;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-.season-tag { font-size: 13px; color: #f4f6f9; }
-.season-hint { font-size: 11px; color: var(--brand); opacity: 0.85; }
-
-/* ==================== باکس‌های اقدام ==================== */
-.action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.action-card {
-    position: relative; border-radius: 18px; overflow: hidden; min-height: 132px;
-    border: 1px solid rgba(var(--brand-rgb), 0.12);
-    transition: all 0.25s ease; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
-}
-.action-card:hover {
-    transform: translateY(-3px);
-    border-color: rgba(var(--brand-rgb), 0.35);
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
-}
-.action-card:active { transform: scale(0.97); }
-.action-overlay {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    justify-content: space-between;
-    padding: 14px;
-    background: linear-gradient(180deg,
-        rgba(8, 12, 20, 0.35) 0%, rgba(8, 12, 20, 0) 40%, rgba(8, 12, 20, 0.82) 100%);
-}
-.action-icon {
-    position: absolute; top: 12px; left: 12px; font-size: 17px;
-    width: 38px; height: 38px; border-radius: 50%; overflow: hidden;
-    display: flex; align-items: center; justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-}
-.action-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.action-card h3 { align-self: flex-start; text-align: right; margin: 4px 0 0; max-width: calc(100% - 52px); font-size: 15px; color: #fff; line-height: 1.3; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
-.action-card p { align-self: flex-end; text-align: right; max-width: 78%; font-size: 10.5px; color: rgba(255,255,255,0.8); line-height: 1.75; }
+/* ==================== بخش‌ها و باکس‌ها ==================== */
+.home-section { margin-bottom: 14px; }
+.sec-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin-bottom: 9px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--tc) 55%, transparent); background: linear-gradient(90deg, color-mix(in srgb, var(--tc) 22%, #0b0e15), #0b0e15 80%); }
+.sec-title { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: bold; color: #fff; }
+.sec-title .ic { font-size: 22px; color: var(--tc); }
+.sec-sub { margin-inline-start: auto; font-size: 10.5px; color: #aeb6c2; }
+.sec-chev { font-size: 16px; color: var(--tc); }
+.tile-grid { display: grid; gap: 10px; }
+.tile-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.tile-wide { grid-column: 1 / -1; }
+.tile { position: relative; display: flex; align-items: flex-end; gap: 9px; min-height: 118px; padding: 11px; border-radius: 16px; overflow: hidden; text-align: right; border: 1px solid color-mix(in srgb, var(--tc) 70%, transparent); box-shadow: 0 6px 18px rgba(0,0,0,.4), inset 0 0 18px color-mix(in srgb, var(--tc) 18%, transparent); transition: transform .15s; }
+.sec-military .tile { min-height: 150px; }
+.tile::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,12,20,.1) 0%, rgba(8,12,20,.55) 55%, rgba(8,12,20,.92) 100%); }
+.tile > * { position: relative; }
+.tile:active { transform: scale(.97); }
+.tile:focus-visible { outline: 2px solid var(--tc); outline-offset: 2px; }
+.hex { flex: none; width: 44px; height: 46px; display: grid; place-items: center; color: var(--tc); background: var(--tc); clip-path: polygon(50% 0, 94% 25%, 94% 75%, 50% 100%, 6% 75%, 6% 25%); position: relative; }
+.hex::before { content: ""; position: absolute; inset: 2px; background: linear-gradient(160deg, #101a2e, #0a0f1c); clip-path: inherit; }
+.hex .ic { position: relative; font-size: 22px; }
+.tile-text { flex: 1; min-width: 0; }
+.tile h3 { font-size: 15px; color: #fff; line-height: 1.3; text-shadow: 0 2px 6px rgba(0,0,0,.6); }
+.tile p { font-size: 10px; color: rgba(255,255,255,.78); line-height: 1.6; }
+.tile-chev { font-size: 16px; color: var(--tc); align-self: center; }
 .action-army           { background-color: #1a2338; background-image: linear-gradient(150deg, rgba(74,79,168,.30) 0%, rgba(13,16,36,.55) 75%), url('/images/categories/army.png'); background-size: cover; background-position: center; }
-.action-army .action-icon { background: var(--c-army); color: #fff; }
 .action-war             { background-color: #381210; background-image: linear-gradient(150deg, rgba(122,44,40,.30) 0%, rgba(24,10,9,.55) 75%), url('/images/categories/war.jpg'); background-size: cover; background-position: center; }
-.action-war .action-icon { background: var(--c-war); color: #fff; }
 .action-diplomacy      { background-color: #241835; background-image: linear-gradient(150deg, rgba(90,58,134,.30) 0%, rgba(18,10,30,.55) 75%), url('/images/categories/diplomacy.png'); background-size: cover; background-position: center; }
-.action-diplomacy .action-icon { background: var(--c-diplomacy); color: #fff; }
 .action-economy         { background-color: #0e2c1e; background-image: linear-gradient(150deg, rgba(37,122,84,.30) 0%, rgba(8,26,18,.55) 75%), url('/images/categories/economy.jpg'); background-size: cover; background-position: center; }
-.action-economy .action-icon { background: var(--c-economy); color: #fff; }
 .action-infrastructure { background-color: #0d2b29; background-image: linear-gradient(150deg, rgba(29,122,118,.30) 0%, rgba(7,24,22,.55) 75%), url('/images/categories/infrastructure.png'); background-size: cover; background-position: center; }
-.action-infrastructure .action-icon { background: var(--c-infra); color: #fff; }
 .action-market          { background-color: #3d2c0d; background-image: linear-gradient(150deg, rgba(168,122,46,.30) 0%, rgba(28,20,8,.55) 75%), url('/images/categories/market.png'); background-size: cover; background-position: center; }
-.action-market .action-icon { background: var(--c-market); color: #1a1208; }
-
-/* ===== ردیف ۳ باکس کوچک ===== */
-.action-grid-3 { grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
-.action-grid-3 .action-card { min-height: 108px; border-radius: 16px; }
-.action-grid-3 .action-overlay { padding: 10px; }
-.action-grid-3 .action-icon { width: 28px; height: 28px; top: 9px; left: 9px; }
-.action-grid-3 .action-card h3 { font-size: 12.5px; max-width: calc(100% - 36px); margin-top: 2px; }
-.action-grid-3 .action-card p { font-size: 9px; line-height: 1.6; max-width: 100%; }
 .action-ranking  { background-color: #2a1d0a; background-image: linear-gradient(150deg, rgba(227,176,75,.30) 0%, rgba(20,14,6,.55) 75%), url('/images/categories/ranking.jpg'); background-size: cover; background-position: center; }
-.action-ranking .action-icon  { background: #e3b04b; }
 .action-transfer { background-color: #0e2c1e; background-image: linear-gradient(150deg, rgba(74,222,128,.25) 0%, rgba(8,26,18,.55) 75%), url('/images/categories/transfer.jpg'); background-size: cover; background-position: center; }
-.action-transfer .action-icon { background: #4ade80; }
 .action-stats    { background-color: #101c2e; background-image: linear-gradient(150deg, rgba(96,165,250,.28) 0%, rgba(8,14,26,.55) 75%), url('/images/categories/stats.jpg'); background-size: cover; background-position: center; }
-.action-stats .action-icon    { background: #60a5fa; }
 
 /* ==================== تب‌های زیرساخت ==================== */
 .infra-tabs {
@@ -1216,9 +1127,6 @@ img { -webkit-user-drag: none; user-select: none; }
     .country-facts span { font-size: 9px; }
     .game-title { font-size: 12px; letter-spacing: 2px; }
     .globe-card { height: 32vh; }
-    .action-card { min-height: 115px; }
-    .action-card h3 { align-self: flex-start; text-align: right; margin: 4px 0 0; max-width: calc(100% - 52px); font-size: 13px; }
-    .action-card p { align-self: flex-end; text-align: right; max-width: 78%; font-size: 9.5px; }
     .map-box { height: 42vh; }
     .stat-box { min-width: 80px; padding: 6px 7px; }
     .stat-box-value { font-size: 11.5px; }
