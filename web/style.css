@@ -1272,3 +1272,62 @@ img { -webkit-user-drag: none; user-select: none; }
 .modal-actions button { flex: 1; padding: 10px; border-radius: 10px; font-size: 12.5px; }
 .modal-ok { background: var(--brand); color: #0b0e15; font-weight: bold; }
 .modal-cancel { background: #16233a; color: #c3cad3; border: 1px solid rgba(var(--brand-rgb), 0.15); }
+
+/* ==================== کارت ساده یگان + پنجرهٔ تولید ==================== */
+.unit-card-simple { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+.unit-simple-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.unit-simple-count { font-size: 11px; color: #7a8699; }
+.unit-simple-status { font-size: 10.5px; color: #7a8699; line-height: 1.5; }
+.unit-simple-btn { flex: 0 0 auto; min-width: 110px; }
+
+.produce-box { gap: 12px; }
+.produce-head { display: flex; align-items: center; justify-content: space-between; }
+.produce-head .modal-title { margin: 0; font-size: 15px; font-weight: bold; }
+.produce-close {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06); color: #c3cad3; font-size: 18px; line-height: 1;
+}
+.produce-qty-row { display: flex; direction: ltr; gap: 8px; align-items: stretch; }
+.pq-btn {
+    width: 46px; border-radius: 12px; font-size: 22px; font-weight: bold;
+    background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(var(--brand-rgb), 0.2); color: #f4f6f9;
+}
+.pq-btn:active, .pq-quick:active, .pq-max:active { transform: scale(0.96); }
+.pq-input {
+    flex: 1; min-width: 0; text-align: center; direction: ltr;
+    font-family: inherit; font-size: 18px; font-weight: bold; color: #f4f6f9;
+    background: #0b0e15; border: 1px solid rgba(var(--brand-rgb), 0.3);
+    border-radius: 12px; padding: 10px; outline: none;
+}
+.pq-input:focus { border-color: rgba(var(--brand-rgb), 0.7); }
+.pq-max {
+    padding: 0 14px; border-radius: 12px; font-size: 12.5px; font-weight: bold;
+    background: rgba(var(--brand-rgb), 0.15); border: 1px solid rgba(var(--brand-rgb), 0.4); color: var(--brand);
+}
+.produce-quick-row { display: flex; gap: 8px; }
+.pq-quick {
+    flex: 1; padding: 9px; border-radius: 11px; font-size: 13px; font-weight: bold;
+    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(var(--brand-rgb), 0.15); color: #f4f6f9;
+}
+.produce-info {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 14px;
+    background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(var(--brand-rgb), 0.12);
+    border-radius: 14px; padding: 12px;
+}
+.produce-info-item { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11.5px; color: #a0a8b3; }
+.produce-info-item strong { color: #f4f6f9; font-size: 12px; }
+.produce-res { grid-column: 1 / -1; }
+.produce-warn { min-height: 16px; font-size: 11.5px; color: var(--red); text-align: center; }
+.produce-footer { display: flex; align-items: center; gap: 12px; }
+.produce-go {
+    flex: 1; padding: 13px; border-radius: 12px; font-size: 13.5px; font-weight: bold;
+    background: rgba(74, 222, 128, 0.14); border: 1px solid rgba(74, 222, 128, 0.35); color: var(--green);
+}
+.produce-go:active { transform: scale(0.97); background: rgba(74, 222, 128, 0.22); }
+.produce-go:disabled {
+    opacity: 0.4; background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.06); color: #6b7480; cursor: not-allowed;
+}
+.produce-price { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 10.5px; color: #7a8699; }
+.produce-price strong { color: var(--brand); font-size: 15px; direction: ltr; }
+.produce-hint { font-size: 10.5px; color: #7a8699; line-height: 1.6; }
