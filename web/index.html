@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261002c">
+<link rel="stylesheet" href="/style.css?v=20261002d">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -13,9 +13,10 @@
 
 <!-- ==================== لودینگ ==================== -->
 <section id="loading" class="screen loading-screen">
-    <div class="loading-box">
-        <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+    <div class="loading-row">
+        <span class="loading-spinner"></span>
         <p class="loading-text">در حال اتصال به تلگرام...</p>
+        <div class="loading-bar"><div class="loading-bar-fill"></div></div>
     </div>
 </section>
 
@@ -78,36 +79,6 @@
     </div>
 </section>
 
-<!-- ==================== پیش‌نمایش کشور ==================== -->
-<section id="country-preview" class="screen hidden">
-    <header class="game-header">
-        <div class="header-right">
-            <div class="flag-wrap"><img id="selected-country-flag" class="flag-img" src="" alt=""></div>
-        </div>
-        <div class="header-center"><div class="game-title">FRONT-LINE 1993</div></div>
-        <div class="header-left">
-            <button class="header-button">🔔</button>
-            <button class="header-button">☰</button>
-        </div>
-    </header>
-    <div class="back-bar">
-        <button id="preview-back-button" class="back-button">→ بازگشت به انتخاب کشور</button>
-    </div>
-    <div class="preview-content">
-        <div class="preview-title">
-            <span>کشور انتخاب شده</span>
-            <h1 id="preview-country-name">—</h1>
-            <p>موقعیت کشور شما روی نقشه جهان</p>
-        </div>
-        <div class="globe-card">
-            <div id="preview-globe-container" class="globe-container">
-                <svg id="preview-globe"></svg>
-            </div>
-        </div>
-        <button id="enter-game-button" class="primary-game-button">ورود به بازی</button>
-    </div>
-</section>
-
 <!-- ==================== بازی ==================== -->
 <section id="game" class="screen hidden">
 
@@ -123,6 +94,13 @@
             <button class="header-button" id="game-menu-button">☰</button>
         </div>
     </header>
+
+    <!-- نوار «در حال ورود به داشبورد» زیر هدر -->
+    <div id="dashboard-loading" class="loading-row loading-row-inline">
+        <span class="loading-spinner"></span>
+        <p class="loading-text">در حال ورود به داشبورد...</p>
+        <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+    </div>
 
     <!-- ==================== خانه ==================== -->
     <main id="home" class="game-page">
@@ -240,10 +218,12 @@
                 </div>
             </button>
         </div>
+    </main>
 
-        <div style="margin:22px 0 10px;color:#a0a8b3;font-size:13px;font-weight:bold;">
-            🏆 رتبه‌بندی جهانی
-        </div>
+    <!-- ==================== رتبه جهانی ==================== -->
+    <main id="ranking" class="game-page hidden">
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
+        <div class="page-title"><span>مقایسه کشورها</span><h1>🏆 رتبه‌بندی جهانی</h1></div>
         <div id="rankings-list" class="rankings-list"></div>
     </main>
 
@@ -616,6 +596,6 @@
 
 </section>
 
-<script src="/app.js?v=20261002c"></script>
+<script src="/app.js?v=20261002d"></script>
 </body>
 </html>
