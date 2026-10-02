@@ -845,18 +845,30 @@ img { -webkit-user-drag: none; user-select: none; }
     border: 1px solid rgba(var(--brand-rgb), 0.15);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
-.map-box svg { width: 100%; height: 100%; display: block; cursor: grab; }
+.map-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.map-box svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .map-box svg:active { cursor: grabbing; }
 .globe-water { fill: #0b1520; }
-.map-country { transition: fill 0.3s ease; }
-.map-ocean-label { fill: #4a6a86; font-size: 6.5px; pointer-events: none; user-select: none; }
-.map-country-label { fill: #d9e0e8; font-size: 7px; pointer-events: none; user-select: none; }
-.map-site { stroke: #0b1520; stroke-width: 0.6px; cursor: pointer; }
-.map-site-oil { fill: #2d2a1a; stroke: var(--brand); stroke-width: 1.2; }
-.map-site-steel { fill: #1e2833; stroke: #94a8bc; stroke-width: 1.2; }
-.map-site-uranium { fill: #1a2d1f; stroke: var(--green); stroke-width: 1.2; }
-.map-site-food { fill: #2d2618; stroke: #d4a017; stroke-width: 1.2; }
-.map-site-strait { fill: var(--brand); stroke: #0b1520; stroke-width: 0.6; }
+
+/* اسم‌ها روی نقشه */
+.map-ocean-label, .map-sea-label, .map-country-label {
+    pointer-events: none; user-select: none; -webkit-user-select: none;
+    paint-order: stroke; stroke-linejoin: round;
+}
+.map-ocean-label { fill: rgba(205, 232, 255, 0.85); font-style: italic; letter-spacing: 0.8px; stroke: rgba(5, 25, 50, 0.6); stroke-width: 2.4px; }
+.map-sea-label   { fill: rgba(205, 232, 255, 0.78); font-style: italic; stroke: rgba(5, 25, 50, 0.6); stroke-width: 2.2px; }
+.map-country-label { fill: #ffffff; font-weight: 600; stroke: rgba(8, 18, 30, 0.85); stroke-width: 2.4px; }
+
+/* سکوها: مربعی و رنگی */
+.map-site { cursor: pointer; }
+.map-site .site-hit { fill: transparent; }
+.map-site .site-shape { stroke: #07121f; stroke-width: 1.4; }
+.map-site-oil     .site-shape { fill: #ff6a3d; }
+.map-site-steel   .site-shape { fill: #d7e0ea; }
+.map-site-uranium .site-shape { fill: #3ddc84; }
+.map-site-food    .site-shape { fill: #ffd23f; }
+.map-site-strait  .site-shape { fill: #ffffff; }
+.map-site.mine .site-shape { stroke: #f0b429; stroke-width: 2.4; }
 .map-controls {
     position: absolute; left: 12px; bottom: 12px;
     display: flex; flex-direction: column; gap: 8px; z-index: 5;
@@ -877,15 +889,16 @@ img { -webkit-user-drag: none; user-select: none; }
 .map-legend div { display: flex; align-items: center; gap: 6px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .dot-own            { background: #f0b429; }
-.dot-own-occupied   { background: #2fa360; }
-.dot-other          { background: #b8862a; }
-.dot-other-occupied { background: #8e4ec6; }
-.dot-unowned        { background: #4a5460; }
-.dot-oil            { background: var(--brand); border: 1px solid #0b1520; }
-.dot-steel          { background: #94a8bc; border: 1px solid #0b1520; }
-.dot-uranium        { background: var(--green); border: 1px solid #0b1520; }
-.dot-food           { background: #d4a017; border: 1px solid #0b1520; }
-.dot-strait         { background: var(--brand); border: 2px solid #0b1520; }
+.dot-own-occupied   { background: #34b36b; }
+.dot-other          { background: #c9792a; }
+.dot-other-occupied { background: #9b5de5; }
+.dot-unowned        { background: #a9b39a; }
+.dot-oil, .dot-steel, .dot-uranium, .dot-food { border-radius: 2px; border: 1px solid #07121f; }
+.dot-oil     { background: #ff6a3d; }
+.dot-steel   { background: #d7e0ea; }
+.dot-uranium { background: #3ddc84; }
+.dot-food    { background: #ffd23f; }
+.dot-strait  { background: #ffffff; border: 1px solid #07121f; }
 
 /* ==================== پنل اطلاعات نقشه ==================== */
 .map-info-panel {
