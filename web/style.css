@@ -415,6 +415,20 @@ img { -webkit-user-drag: none; user-select: none; }
 .action-market          { background-color: #3d2c0d; background-image: linear-gradient(150deg, rgba(168,122,46,.30) 0%, rgba(28,20,8,.55) 75%), url('/images/categories/market.png'); background-size: cover; background-position: center; }
 .action-market .action-icon { background: var(--c-market); color: #1a1208; }
 
+/* ===== ردیف ۳ باکس کوچک ===== */
+.action-grid-3 { grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+.action-grid-3 .action-card { min-height: 108px; border-radius: 16px; }
+.action-grid-3 .action-overlay { padding: 10px; }
+.action-grid-3 .action-icon { width: 28px; height: 28px; top: 9px; left: 9px; }
+.action-grid-3 .action-card h3 { font-size: 12.5px; max-width: calc(100% - 36px); margin-top: 2px; }
+.action-grid-3 .action-card p { font-size: 9px; line-height: 1.6; max-width: 100%; }
+.action-ranking  { background-color: #2a1d0a; background-image: linear-gradient(150deg, rgba(227,176,75,.30) 0%, rgba(20,14,6,.55) 75%), url('/images/categories/ranking.jpg'); background-size: cover; background-position: center; }
+.action-ranking .action-icon  { background: #e3b04b; }
+.action-transfer { background-color: #0e2c1e; background-image: linear-gradient(150deg, rgba(74,222,128,.25) 0%, rgba(8,26,18,.55) 75%), url('/images/categories/transfer.jpg'); background-size: cover; background-position: center; }
+.action-transfer .action-icon { background: #4ade80; }
+.action-stats    { background-color: #101c2e; background-image: linear-gradient(150deg, rgba(96,165,250,.28) 0%, rgba(8,14,26,.55) 75%), url('/images/categories/stats.jpg'); background-size: cover; background-position: center; }
+.action-stats .action-icon    { background: #60a5fa; }
+
 /* ==================== تب‌های زیرساخت ==================== */
 .infra-tabs {
     display: flex; gap: 6px; margin-bottom: 14px;
