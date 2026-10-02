@@ -862,12 +862,12 @@ img { -webkit-user-drag: none; user-select: none; }
 /* سکوها: مربعی و رنگی */
 .map-site { cursor: pointer; }
 .map-site .site-hit { fill: transparent; }
-.map-site .site-shape { stroke: #07121f; stroke-width: 1.4; }
-.map-site-oil     .site-shape { fill: #ff6a3d; }
-.map-site-steel   .site-shape { fill: #d7e0ea; }
-.map-site-uranium .site-shape { fill: #3ddc84; }
-.map-site-food    .site-shape { fill: #ffd23f; }
-.map-site-strait  .site-shape { fill: #ffffff; }
+.map-site .site-shape { stroke: #ffffff; stroke-width: 1.3; }
+.map-site-oil     .site-shape { fill: #000000; }   /* سکوی نفتی: سیاه، مربع */
+.map-site-steel   .site-shape { fill: #a8e0ff; }   /* معدن فولاد: آبی کمرنگ، مربع */
+.map-site-uranium .site-shape { fill: #0a3dff; }   /* معدن اورانیوم: آبی، مربع */
+.map-site-food    .site-shape { fill: #7ed957; }
+.map-site-strait  .site-shape { fill: #ffd21f; stroke: #07121f; }   /* تنگه: زرد */
 .map-site.mine .site-shape { stroke: #f0b429; stroke-width: 2.4; }
 .map-controls {
     position: absolute; left: 12px; bottom: 12px;
@@ -888,17 +888,18 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 .map-legend div { display: flex; align-items: center; gap: 6px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.dot-own            { background: #f0b429; }
+.dot-own            { background: #ffd21f; }
 .dot-own-occupied   { background: #34b36b; }
-.dot-other          { background: #c9792a; }
+.dot-other          { background: #2f7fe8; }
 .dot-other-occupied { background: #9b5de5; }
-.dot-unowned        { background: #a9b39a; }
-.dot-oil, .dot-steel, .dot-uranium, .dot-food { border-radius: 2px; border: 1px solid #07121f; }
-.dot-oil     { background: #ff6a3d; }
-.dot-steel   { background: #d7e0ea; }
-.dot-uranium { background: #3ddc84; }
-.dot-food    { background: #ffd23f; }
-.dot-strait  { background: #ffffff; border: 1px solid #07121f; }
+.dot-inactive       { background: #0b0b0e; border: 1px solid #6b7480; }
+.dot-nogame         { background: repeating-linear-gradient(135deg, #2c3544 0 2px, #96a5bc 2px 3px); border: 1px solid #6b7480; }
+.dot-oil, .dot-steel, .dot-uranium, .dot-food { border-radius: 2px; border: 1px solid #e8eef6; }
+.dot-oil     { background: #000000; }
+.dot-steel   { background: #a8e0ff; }
+.dot-uranium { background: #0a3dff; }
+.dot-food    { background: #7ed957; }
+.dot-strait  { background: #ffd21f; border: 1px solid #07121f; }
 
 /* ==================== پنل اطلاعات نقشه ==================== */
 .map-info-panel {
