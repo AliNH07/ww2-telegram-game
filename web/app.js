@@ -321,16 +321,43 @@ async function confirmCountrySelection() {
     } finally { enteringCountry = false; }
 }
 
-/* ---------- ورود به داشبورد: لود همه عکس‌های خانه، بعد نمایش ---------- */
+/* ---------- ورود به داشبورد: همه تصاویر لازم قبل از نمایش ---------- */
+const imagePreloadCache = new Map();
+
 function preloadImage(url, timeout = 8000) {
-    return new Promise(resolve => {
-        if (!url) { resolve(); return; }
+    if (!url) return Promise.resolve(false);
+    if (imagePreloadCache.has(url)) return imagePreloadCache.get(url);
+
+    const promise = new Promise(resolve => {
         const img = new Image();
-        const timer = setTimeout(resolve, timeout);
-        const done = () => { clearTimeout(timer); resolve(); };
-        img.onload = done; img.onerror = done;   // فایلِ نبود، منتظر نمی‌ماند
+        let settled = false;
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            resolve(false);
+        }, timeout);
+
+        const done = ok => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(ok);
+        };
+
+        img.decoding = "async";
+        img.onload = () => done(true);
+        img.onerror = () => done(false);
         img.src = url;
+
+        if (img.complete) {
+            img.decode?.()
+                .then(() => done(img.naturalWidth > 0))
+                .catch(() => done(img.naturalWidth > 0));
+        }
     });
+
+    imagePreloadCache.set(url, promise);
+    return promise;
 }
 
 function cssBackgroundUrls(el) {
@@ -339,18 +366,26 @@ function cssBackgroundUrls(el) {
 }
 
 async function preloadHomeAssets() {
-    const urls = new Set([homeImageUrl(selectedCountry), countryImageUrl(selectedCountry)]);
-    document.querySelectorAll("#game .game-header img, #home img").forEach(img => {
+    const urls = new Set();
+
+    if (selectedCountry) {
+        urls.add(homeImageUrl(selectedCountry));
+        urls.add(countryImageUrl(selectedCountry));
+    }
+
+    // تمام تصاویر واقعی داشبورد
+    document.querySelectorAll("#game img").forEach(img => {
         const src = img.getAttribute("src");
         if (src) urls.add(src);
     });
-    document.querySelectorAll("#home .action-card").forEach(c =>
-        cssBackgroundUrls(c).forEach(u => urls.add(u)));
-    await Promise.all(Array.from(urls).map(u => preloadImage(u)));
-    // استیکری که فایلش نیست، مخفی شود
-    document.querySelectorAll("#home .action-icon img").forEach(img => {
-        if (img.complete && img.naturalWidth === 0) img.style.display = "none";
+
+    // هر تصویر پس‌زمینه‌ای که در داشبورد استفاده شده
+    document.querySelectorAll("#home *").forEach(el => {
+        cssBackgroundUrls(el).forEach(u => urls.add(u));
     });
+
+    // همه را همزمان لود کن؛ بدون تأخیر مصنوعی
+    await Promise.all(Array.from(urls).map(url => preloadImage(url)));
 }
 
 function showDashboardShell() {
@@ -362,17 +397,18 @@ function showDashboardShell() {
 
 async function showGame() {
     showDashboardShell();
-    updateGameHeader(); updateHomeStats();
-    const t0 = Date.now();
+    updateGameHeader();
+    updateHomeStats();
+
+    // تا آماده‌شدن تصاویر لازم، خود داشبورد نمایش داده نمی‌شود.
     await preloadHomeAssets();
-    updateHomeStats();   // عکس خانه از کش گذاشته شود
-    const heroPhoto = document.getElementById("home-card-photo");
-    for (let i = 0; i < 10 && heroPhoto && !heroPhoto.classList.contains("loaded") && !heroPhoto.dataset.failed; i++) await sleep(50);
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const el = Date.now() - t0;
-    if (el < 600) await sleep(600 - el);
+    updateHomeStats();
+
+    await new Promise(requestAnimationFrame);
+
     document.getElementById("game").classList.remove("booting");
-    startStatsPolling(); refreshNotificationBadge();
+    startStatsPolling();
+    refreshNotificationBadge();
 }
 
 function updateGameHeader() {
@@ -2225,21 +2261,23 @@ async function createPreviewGlobe(containerId, svgId, selected) {
 ========================================================= */
 (async function init() {
     showOnly("loading");
-    const t0 = Date.now();
 
-    await loadCountries();
-    await loadPlayer();
-    await loadArmyCatalog();
+    // درخواست‌های اولیه همزمان اجرا می‌شوند تا زمان انتظار کمتر شود.
+    const countriesPromise = loadCountries();
+    const playerPromise = loadPlayer();
+    const armyPromise = loadArmyCatalog();
 
-    const el = Date.now() - t0;
-    if (el < 1000) await new Promise(r => setTimeout(r, 1000 - el));
+    // تصاویر کشورها را از همان ابتدا گرم می‌کنیم تا دانلود مجدد لازم نباشد.
+    const countryImagesPromise = Promise.all(
+        Object.keys(COUNTRY_IMAGE_EXT).map(cid => preloadImage(countryImageUrl(cid), 6000))
+    );
+
+    await Promise.all([countriesPromise, playerPromise, armyPromise, countryImagesPromise]);
 
     if (player?.country) {
         selectedCountry = player.country;
-        showGame();
+        await showGame();
     } else {
-        // اول همه پرچم‌ها لود شوند، بعد صفحه انتخاب کشور
-        await Promise.all(Object.keys(COUNTRY_IMAGE_EXT).map(cid => preloadImage(countryImageUrl(cid))));
         showCountrySelection();
     }
 })();
