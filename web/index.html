@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261002g">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css?v=20261002h">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -84,13 +87,13 @@
 
     <header class="game-header">
         <div class="header-right">
-            <div class="flag-wrap"><img id="game-country-flag" class="flag-img" src="" alt=""></div>
-        </div>
-        <div class="header-center"><div class="game-title">FRONT-LINE 1993</div></div>
-        <div class="header-left">
+            <div class="flag-wrap flag-wrap-lg"><img id="game-country-flag" class="flag-img" src="" alt=""></div>
             <button class="header-button" id="game-notification-button">
                 🔔<span id="notif-badge" class="notif-badge hidden">0</span>
             </button>
+        </div>
+        <div class="header-left">
+            <div class="game-title">FRONT-LINE 1993</div>
             <button class="header-button" id="game-menu-button">☰</button>
         </div>
     </header>
@@ -139,8 +142,8 @@
                             <div><strong class="hs-value" id="home-power">0</strong><span class="hs-label">برق آزاد</span><span class="hs-sub" id="home-power-sub">مصرف: 0</span></div></div>
                     </div>
                     <div class="hs-foot">
-                        <span class="hs-income">درآمد: <span id="home-income">$0</span></span>
-                        <span>تولید: <span id="home-manpower-production">0</span></span>
+                        <span class="hs-income">درآمد روزانه: <span id="home-income">$0</span></span>
+                        <span>نیروی انسانی روزانه: <span id="home-manpower-production">0</span></span>
                         <span>قدرت: <span id="home-army">0</span></span>
                     </div>
                 </div>
@@ -591,6 +594,6 @@
 
 </section>
 
-<script src="/app.js?v=20261002g"></script>
+<script src="/app.js?v=20261002h"></script>
 </body>
 </html>
