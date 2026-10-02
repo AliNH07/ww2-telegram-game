@@ -1569,10 +1569,66 @@ async function loadMyListings() {
 const WORLD_NAMES_FA = {4:"افغانستان",8:"آلبانی",10:"جنوبگان",12:"الجزایر",16:"ساموآی امریکا",20:"آندورا",24:"آنگولا",28:"آنتیگوا و باربودا",31:"جمهوری آذربایجان",32:"آرژانتین",36:"استرالیا",40:"اتریش",44:"باهاما",48:"بحرین",50:"بنگلادش",51:"ارمنستان",52:"باربادوس",56:"بلژیک",60:"برمودا",64:"بوتان",68:"بولیوی",70:"بوسنی",72:"بوتسوانا",76:"برزیل",84:"بلیز",90:"جزایر سلیمان",92:"جزایر ویرجین",96:"برونئی",100:"بلغارستان",104:"میانمار (برمه)",108:"بوروندی",112:"بلاروس",116:"کامبوج",120:"کامرون",124:"کانادا",132:"کیپ‌ورد",140:"آفریقای مرکزی",144:"سری‌لانکا",148:"چاد",152:"شیلی",156:"چین",158:"تایوان",170:"کلمبیا",174:"کومور",178:"کنگو",180:"کنگو (دموکراتیک)",184:"جزایر کوک",188:"کاستاریکا",191:"کرواسی",192:"کوبا",196:"قبرس",203:"چک",204:"بنین",208:"دانمارک",212:"دومینیکا",214:"جمهوری دومینیکن",218:"اکوادور",222:"السالوادور",226:"گینه استوایی",231:"اتیوپی",232:"اریتره",233:"استونی",234:"جزایر فارو",238:"فالکلند",239:"جورجیای جنوبی",242:"فیجی",246:"فنلاند",250:"فرانسه",254:"گویان فرانسه",258:"پلی‌نزی فرانسه",260:"سرزمین‌های فرانسوی جنوبی",262:"جیبوتی",266:"گابن",268:"گرجستان",270:"گامبیا",275:"فلسطین",276:"آلمان",288:"غنا",296:"کیریباتی",300:"یونان",304:"گرینلند",308:"گرنادا",316:"گوام",320:"گواتمالا",324:"گینه",328:"گویان",332:"هائیتی",340:"هندوراس",344:"هنگ‌کنگ",348:"مجارستان",352:"ایسلند",356:"هند",360:"اندونزی",364:"ایران",368:"عراق",372:"ایرلند",376:"اسرائیل",380:"ایتالیا",384:"ساحل عاج",388:"جامائیکا",392:"ژاپن",398:"قزاقستان",400:"اردن",404:"کنیا",408:"کره شمالی",410:"کره جنوبی",414:"کویت",417:"قرقیزستان",418:"لائوس",422:"لبنان",426:"لسوتو",428:"لتونی",430:"لیبریا",434:"لیبی",438:"لیختن‌اشتاین",440:"لیتوانی",442:"لوکزامبورگ",446:"ماکائو، منطقهٔ ویژهٔ اداری چین",450:"ماداگاسکار",454:"مالاوی",458:"مالزی",462:"مالدیو",466:"مالی",470:"مالت",478:"موریتانی",480:"موریس",484:"مکزیک",492:"موناکو",496:"مغولستان",498:"مولداوی",499:"مونته‌نگرو",504:"مراکش",508:"موزامبیک",512:"عمان",516:"نامیبیا",520:"نائورو",524:"نپال",528:"هلند",531:"کوراسائو",533:"آروبا",534:"سنت مارتن",535:"جزایر کارائیب هلند",540:"کالدونیای جدید",548:"وانواتو",554:"نیوزیلند",558:"نیکاراگوئه",562:"نیجر",566:"نیجریه",578:"نروژ",580:"ماریانای شمالی",583:"میکرونزی",584:"جزایر مارشال",585:"پالائو",586:"پاکستان",591:"پاناما",598:"پاپوآ گینه نو",600:"پاراگوئه",604:"پرو",608:"فیلیپین",612:"جزایر پیت‌کرن",616:"لهستان",620:"پرتغال",624:"گینه بیسائو",626:"تیمور شرقی",630:"پورتوریکو",634:"قطر",642:"رومانی",643:"شوروی",646:"رواندا",654:"سنت هلن",659:"سنت کیتس",660:"آنگویلا",662:"سنت لوسیا",670:"سنت وینسنت",674:"سان‌مارینو",678:"سائوتومه",682:"عربستان سعودی",686:"سنگال",688:"صربستان",690:"سیشل",694:"سیرالئون",702:"سنگاپور",703:"اسلواکی",704:"ویتنام",705:"اسلوونی",706:"سومالی",710:"افریقای جنوبی",716:"زیمبابوه",724:"اسپانیا",728:"سودان جنوبی",729:"سودان",732:"صحرای غربی",740:"سورینام",748:"اسواتینی",752:"سوئد",756:"سوئیس",760:"سوریه",762:"تاجیکستان",764:"تایلند",768:"توگو",776:"تونگا",780:"ترینیداد",784:"امارات",788:"تونس",792:"ترکیه",795:"ترکمنستان",796:"جزایر تورکس و کایکوس",798:"تووالو",800:"اوگاندا",804:"اوکراین",807:"مقدونیه شمالی",818:"مصر",826:"بریتانیا",834:"تانزانیا",840:"آمریکا",850:"جزایر ویرجین",854:"بورکینافاسو",858:"اروگوئه",860:"ازبکستان",862:"ونزوئلا",882:"ساموآ",887:"یمن",894:"زامبیا"};
 const MAP_ODD_NAMES = { "Kosovo": "کوزوو", "N. Cyprus": "قبرس شمالی", "Somaliland": "سومالیلند" };
 const MAP_COLORS = {
-    own: "#f0b429", other: "#c9792a", ownOcc: "#34b36b", otherOcc: "#9b5de5",
-    free: "#a9b39a", world: "#77846f"
+    own: "#ffd21f",        // کشوری که خود بازیکن انتخاب کرده → زرد
+    other: "#2f7fe8",      // کشوری که بازیکن دیگری انتخاب کرده (فعال) → آبی
+    inactive: "#0b0b0e",   // در بازی هست ولی کسی انتخابش نکرده (غیرفعال) → سیاه
+    ownOcc: "#34b36b", otherOcc: "#9b5de5",
+    hatchBase: "#2c3544", hatchLine: "rgba(150,165,188,0.75)"   // هنوز به بازی اضافه نشده → هاشور
 };
 const MAP_SPHERE = { type: "Sphere" };
+
+/* ---------- نقشه سیاسی ۱۹۹۳ ----------
+   داده‌ی نقشه مرزهای امروزی دارد؛ این جدول آن را به قلمروهای سال ۱۹۹۳ تبدیل می‌کند.
+   (اعضا: id عددی کشور یا نام برای فیچرهای بدون id) */
+const SOVIET_BLOC = true;   // true: «شوروی» بازی = کل ۱۵ جمهوری | false: فقط روسیه
+const MAP_1993_REALMS = {
+    643: SOVIET_BLOC
+        ? [643, 804, 112, 498, 233, 428, 440, 268, 51, 31, 398, 860, 795, 417, 762]
+        : [643],
+    688: [688, 499, "Kosovo"],     // یوگسلاوی (صربستان + مونته‌نگرو + کوزوو)
+    729: [729, 728],               // سودان (سودان جنوبی هنوز جدا نشده)
+    360: [360, 626],               // اندونزی (تیمور شرقی جزو اندونزی)
+    706: [706, "Somaliland"],      // سومالی
+    196: [196, "N. Cyprus"]        // قبرس
+};
+function realm1993(f) {
+    const id = (f.id === undefined || f.id === null) ? null : Number(f.id);
+    const nm = f.properties && f.properties.name;
+    for (const [rid, members] of Object.entries(MAP_1993_REALMS)) {
+        if ((id !== null && members.includes(id)) || members.includes(nm)) return Number(rid);
+    }
+    return id !== null ? id : "n:" + nm;
+}
+// چند فیچر → یک MultiPolygon (بدون دست‌زدن به جهت حلقه‌ها، مناسب کره)
+function combineFeatures(feats, id) {
+    const polys = [];
+    feats.forEach(ft => {
+        const g = ft.geometry;
+        if (g.type === "Polygon") polys.push(g.coordinates);
+        else if (g.type === "MultiPolygon") g.coordinates.forEach(c => polys.push(c));
+    });
+    return { type: "Feature", id, properties: { name: "" }, geometry: { type: "MultiPolygon", coordinates: polys } };
+}
+// الگوی هاشور (خط‌خطی مورب) برای کشورهای اضافه‌نشده
+let mapHatch = null;
+function getHatchPattern(ctx) {
+    if (mapHatch) return mapHatch;
+    const S = 8, d = mapDpr;
+    const c = document.createElement("canvas");
+    c.width = c.height = Math.round(S * d);
+    const g = c.getContext("2d");
+    g.scale(d, d);
+    g.fillStyle = MAP_COLORS.hatchBase; g.fillRect(0, 0, S, S);
+    g.strokeStyle = MAP_COLORS.hatchLine; g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(-2, S + 2); g.lineTo(S + 2, -2);
+    g.moveTo(-2, 2);     g.lineTo(2, -2);
+    g.moveTo(S - 2, S + 2); g.lineTo(S + 2, S - 2);
+    g.stroke();
+    mapHatch = ctx.createPattern(c, "repeat");
+    try { mapHatch.setTransform(new DOMMatrix().scale(1 / d)); } catch (e) {}
+    return mapHatch;
+}
 
 let mapProjection = null, mapPath = null, mapSvg = null;
 let mapSize = 0, mapMinScale = 0, mapMaxScale = 0;
@@ -1583,6 +1639,7 @@ let mapSites = [];
 let mapSitesSvg = null;
 let mapCanvas = null, mapCtx = null, mapDpr = 1, mapW = 320, mapH = 300;
 let mapFeatures = [], mapGroups = [], mapWaterItems = [], mapGraticule = null, mapRaf = 0;
+let mapBorders = null, mapCoast = null;
 
 async function initWorldMap() {
     const box = document.querySelector(".map-box");
@@ -1624,12 +1681,28 @@ async function initWorldMap() {
     Object.entries(COUNTRY_IDS).forEach(([k, id]) => { keyById[id] = k; });
     const R = Math.PI / 180;
 
-    // اطلاعات ثابت هر کشور یک‌بار محاسبه می‌شود (نه در هر فریم)
-    mapFeatures = land.features.map(f => {
-        const id = Number(f.id);
+    // ---- قلمروهای ۱۹۹۳ ----
+    const geoms = world.objects.countries.geometries;
+    const realmOfGeom = new Map();
+    const realms = new Map();
+    land.features.forEach((f, i) => {
+        const rid = realm1993(f);
+        realmOfGeom.set(geoms[i], rid);
+        let r = realms.get(rid);
+        if (!r) { r = { rid, feats: [] }; realms.set(rid, r); }
+        r.feats.push(f);
+    });
+    // فقط مرزِ بین دو قلمرو مختلف + ساحل کشیده می‌شود (مرز داخلی شوروی/یوگسلاوی دیده نمی‌شود)
+    mapBorders = topojson.mesh(world, world.objects.countries, (x, y) => realmOfGeom.get(x) !== realmOfGeom.get(y));
+    mapCoast = topojson.mesh(world, world.objects.countries, (x, y) => x === y);
+
+    // اطلاعات ثابت هر قلمرو یک‌بار محاسبه می‌شود (نه در هر فریم)
+    mapFeatures = Array.from(realms.values()).map(r => {
+        const f = r.feats.length === 1 ? r.feats[0] : combineFeatures(r.feats, r.rid);
+        const id = typeof r.rid === "number" ? r.rid : NaN;
         const key = keyById[id] || null;
-        const name = key ? COUNTRY_NAMES[key]
-            : (WORLD_NAMES_FA[id] || MAP_ODD_NAMES[f.properties && f.properties.name] || "");
+        // اسم فقط برای کشورهایی که در بازی هستند؛ بقیه بی‌نام
+        const name = key ? COUNTRY_NAMES[key] : "";
         const bb = d3.geoBounds(f);
         let dLon = bb[1][0] - bb[0][0]; if (dLon < 0) dLon += 360;
         const c = d3.geoCentroid(f);
@@ -1709,7 +1782,7 @@ function renderMapSites() {
         const s = d3.select(this);
         if (d.kind === "strait") s.append("circle").attr("class", "site-shape").attr("r", 4.4);
         else s.append("rect").attr("class", "site-shape")
-            .attr("x", -4.5).attr("y", -4.5).attr("width", 9).attr("height", 9).attr("rx", 1.6);
+            .attr("x", -5).attr("y", -5).attr("width", 10).attr("height", 10).attr("rx", 0.5);
     });
 }
 
@@ -1837,15 +1910,23 @@ function drawMapNow() {
     ctx.beginPath(); mapPath(mapGraticule);
     ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.stroke();
 
-    // خشکی‌ها (هم‌رنگ‌ها در یک مسیر)
+    // خشکی‌ها (هم‌رنگ‌ها در یک مسیر؛ کشورهای اضافه‌نشده هاشور)
     ctx.lineJoin = "round";
     for (const g of mapGroups) {
         ctx.beginPath();
         for (const m of g.items) mapPath(m.f);
-        ctx.fillStyle = g.fill; ctx.fill();
-        ctx.lineWidth = g.game ? 0.9 : 0.5;
-        ctx.strokeStyle = "rgba(10,22,36,0.65)";
-        ctx.stroke();
+        ctx.fillStyle = g.hatch ? getHatchPattern(ctx) : g.fill;
+        ctx.fill();
+        if (!g.hatch) { ctx.lineWidth = 0.5; ctx.strokeStyle = g.fill; ctx.stroke(); }   // پوشاندن درز
+    }
+    // مرز کشورها و ساحل
+    if (mapBorders) {
+        ctx.beginPath(); mapPath(mapBorders);
+        ctx.lineWidth = 0.6; ctx.strokeStyle = "rgba(215,228,245,0.5)"; ctx.stroke();
+    }
+    if (mapCoast) {
+        ctx.beginPath(); mapPath(mapCoast);
+        ctx.lineWidth = 0.7; ctx.strokeStyle = "rgba(215,228,245,0.6)"; ctx.stroke();
     }
 
     // سایه‌روشن برای حالت سه‌بعدی
@@ -1906,7 +1987,7 @@ function updateMapLabels() {
 }
 
 function mapFillFor(m) {
-    if (!m.key) return MAP_COLORS.world;
+    if (!m.key) return null;   // هنوز به بازی اضافه نشده → هاشور
     const info = countries[m.key];
     if (info?.occupier) {
         if (info.occupier === selectedCountry) return MAP_COLORS.ownOcc;
@@ -1915,16 +1996,16 @@ function mapFillFor(m) {
     }
     if (m.key === selectedCountry) return MAP_COLORS.own;
     if (info?.taken) return MAP_COLORS.other;
-    return MAP_COLORS.free;
+    return MAP_COLORS.inactive;
 }
 
 function updateMapColors() {
     const groups = new Map();
     mapFeatures.forEach(m => {
         const fill = mapFillFor(m);
-        const gk = fill + (m.key ? "g" : "");
+        const gk = fill || "hatch";
         let g = groups.get(gk);
-        if (!g) { g = { fill, game: !!m.key, items: [] }; groups.set(gk, g); }
+        if (!g) { g = { fill, hatch: !fill, game: !!m.key, items: [] }; groups.set(gk, g); }
         g.items.push(m);
     });
     mapGroups = Array.from(groups.values());
@@ -1943,8 +2024,8 @@ function showCountryInfo(feature) {
     actionBtn.classList.add("hidden");
 
     if (!e) {
-        flagEl.textContent = "🏳️"; nameEl.textContent = WORLD_NAMES_FA[cid] || "منطقه غیربازی";
-        statusEl.textContent = "بی‌صاحب"; descEl.textContent = "کنترل نشده.";
+        flagEl.textContent = "🏳️"; nameEl.textContent = "منطقه ناشناخته";
+        statusEl.textContent = "هنوز به بازی اضافه نشده"; descEl.textContent = "این کشور هنوز در بازی فعال نیست.";
         panel.classList.remove("hidden"); return;
     }
     const [key] = e;
@@ -1959,7 +2040,7 @@ function showCountryInfo(feature) {
     } else if (info?.taken) {
         statusEl.textContent = "بازیکن دیگر"; descEl.textContent = "در اختیار بازیکن دیگر.";
     } else {
-        statusEl.textContent = "بی‌صاحب"; descEl.textContent = "هنوز انتخاب نشده.";
+        statusEl.textContent = "غیرفعال"; descEl.textContent = "هنوز توسط هیچ بازیکنی انتخاب نشده.";
     }
     panel.classList.remove("hidden");
 }
@@ -1977,7 +2058,8 @@ function showSiteInfo(site) {
         descEl.textContent = `درآمد روزانه: ${formatMoney(site.income)}`;
     } else {
         flagEl.textContent = RESOURCE_ICONS[site.type] || "📍";
-        descEl.textContent = `تولید: ${formatNumber(site.production)} در روز`;
+        const zoneTxt = site.zone === "sea" ? "🌊 در دریا" : (site.zone === "land" ? "⛰️ در خشکی" : "");
+        descEl.textContent = `تولید: ${formatNumber(site.production)} در روز` + (zoneTxt ? ` — ${zoneTxt}` : "");
     }
     nameEl.textContent = site.name;
     if (site.owner) {
