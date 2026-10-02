@@ -28,8 +28,8 @@ COUNTRIES = {
 
 STARTING_MONEY = 10_000_000
 STARTING_MANPOWER = 50_000
-BASE_DAILY_INCOME = 100_000
-BASE_MANPOWER_PRODUCTION = 500
+BASE_DAILY_INCOME = 500_000
+BASE_MANPOWER_PRODUCTION = 10_000
 DAYS_PER_SEASON = 3
 GAME_TOTAL_DAYS = 12
 SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
@@ -288,18 +288,31 @@ ARMY_UNITS = {
 }
 
 MAP_RESOURCES = {
-    "oil_gulf": {"type": "oil", "name": "سکوی نفتی خلیج فارس", "lon": 51.5, "lat": 27.0, "production": 5_000_000},
-    "oil_caspian": {"type": "oil", "name": "سکوی نفتی خزر", "lon": 51.0, "lat": 41.5, "production": 3_000_000},
-    "oil_northsea": {"type": "oil", "name": "سکوی نفتی دریای شمال", "lon": 2.0, "lat": 56.5, "production": 4_000_000},
-    "oil_texas": {"type": "oil", "name": "میدان نفتی تگزاس", "lon": -100.0, "lat": 31.0, "production": 4_000_000},
-    "steel_ural": {"type": "steel", "name": "معدن فولاد اورال", "lon": 60.0, "lat": 58.0, "production": 3_000_000},
-    "steel_ruhr": {"type": "steel", "name": "معدن فولاد رور", "lon": 7.0, "lat": 51.4, "production": 4_000_000},
-    "steel_brazil": {"type": "steel", "name": "معدن فولاد برزیل", "lon": -50.0, "lat": -15.0, "production": 3_500_000},
-    "uranium_kazakh": {"type": "uranium", "name": "معدن اورانیوم قزاقستان", "lon": 68.0, "lat": 48.0, "production": 2_500_000},
-    "uranium_canada": {"type": "uranium", "name": "معدن اورانیوم کانادا", "lon": -105.0, "lat": 58.0, "production": 2_000_000},
-    "uranium_aussie": {"type": "uranium", "name": "معدن اورانیوم استرالیا", "lon": 134.0, "lat": -25.0, "production": 2_200_000},
-    "food_ukraine": {"type": "food", "name": "دشت‌های کشاورزی اوکراین", "lon": 32.0, "lat": 49.0, "production": 2_500_000},
-    "food_india": {"type": "food", "name": "دشت‌های هند", "lon": 78.0, "lat": 22.0, "production": 2_500_000},
+    # مختصات بر اساس میدان‌ها و معدن‌های فعال در سال ۱۹۹۳ — zone: sea = دریا / land = خشکی
+    # ---------- نفت ----------
+    "oil_gulf":       {"type": "oil", "zone": "sea",  "name": "سکوی نفتی خلیج فارس",               "lon": 51.5,  "lat": 27.0,  "production": 5_000_000},
+    "oil_caspian":    {"type": "oil", "zone": "sea",  "name": "سکوی نفتی خزر (نفت‌داشلاری، باکو)",  "lon": 50.8,  "lat": 40.2,  "production": 3_000_000},
+    "oil_northsea":   {"type": "oil", "zone": "sea",  "name": "سکوی نفتی دریای شمال (اکوفیسک)",     "lon": 3.2,   "lat": 56.5,  "production": 4_000_000},
+    "oil_gom":        {"type": "oil", "zone": "sea",  "name": "سکوی نفتی خلیج مکزیک",              "lon": -90.5, "lat": 28.2,  "production": 4_000_000},
+    "oil_campos":     {"type": "oil", "zone": "sea",  "name": "سکوی نفتی حوضه کامپوس (برزیل)",      "lon": -40.0, "lat": -22.5, "production": 2_500_000},
+    "oil_texas":      {"type": "oil", "zone": "land", "name": "میدان نفتی پرمین (تگزاس)",           "lon": -102.0,"lat": 31.9,  "production": 4_000_000},
+    "oil_ghawar":     {"type": "oil", "zone": "land", "name": "میدان نفتی غوار (عربستان)",          "lon": 49.4,  "lat": 25.4,  "production": 5_000_000},
+    "oil_siberia":    {"type": "oil", "zone": "land", "name": "میدان نفتی سیبری غربی",              "lon": 76.7,  "lat": 61.1,  "production": 4_000_000},
+    # ---------- فولاد ----------
+    "steel_ural":     {"type": "steel", "zone": "land", "name": "معدن فولاد اورال (ماگنیتوگورسک)",  "lon": 59.1,  "lat": 53.4,  "production": 3_000_000},
+    "steel_ruhr":     {"type": "steel", "zone": "land", "name": "معدن فولاد رور",                    "lon": 7.0,   "lat": 51.4,  "production": 4_000_000},
+    "steel_brazil":   {"type": "steel", "zone": "land", "name": "معدن فولاد برزیل (کاراجاس)",        "lon": -50.2, "lat": -6.1,  "production": 3_500_000},
+    "steel_mesabi":   {"type": "steel", "zone": "land", "name": "معدن فولاد مسابی (آمریکا)",         "lon": -92.6, "lat": 47.5,  "production": 3_000_000},
+    "steel_anshan":   {"type": "steel", "zone": "land", "name": "معدن فولاد آنشان (چین)",            "lon": 123.0, "lat": 41.1,  "production": 3_500_000},
+    # ---------- اورانیوم ----------
+    "uranium_kazakh":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم قزاقستان",          "lon": 72.2,  "lat": 52.4,  "production": 2_500_000},
+    "uranium_canada":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم کانادا (آتاباسکا)", "lon": -105.6,"lat": 57.2,  "production": 2_000_000},
+    "uranium_aussie":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم استرالیا (رنجر)",    "lon": 132.9, "lat": -12.7, "production": 2_200_000},
+    "uranium_niger":   {"type": "uranium", "zone": "land", "name": "معدن اورانیوم نیجر (آرلیت)",       "lon": 7.4,   "lat": 18.7,  "production": 2_000_000},
+    "uranium_namibia": {"type": "uranium", "zone": "land", "name": "معدن اورانیوم نامیبیا (روسینگ)",   "lon": 15.0,  "lat": -22.5, "production": 2_000_000},
+    # ---------- غذا ----------
+    "food_ukraine":   {"type": "food", "zone": "land", "name": "دشت‌های کشاورزی اوکراین",            "lon": 32.0,  "lat": 49.0,  "production": 2_500_000},
+    "food_india":     {"type": "food", "zone": "land", "name": "دشت‌های هند",                        "lon": 78.0,  "lat": 22.0,  "production": 2_500_000},
 }
 
 STRAITS_DATA = {
@@ -311,7 +324,7 @@ STRAITS_DATA = {
     "dover": {"name": "تنگه دوور", "lon": 1.4, "lat": 50.9, "income": 20_000},
     "panama": {"name": "کانال پاناما", "lon": -79.6, "lat": 9.1, "income": 20_000},
     "malacca": {"name": "تنگه مالاکا", "lon": 103.8, "lat": 1.3, "income": 20_000},
-    "taiwan": {"name": "تنگه تایوان", "lon": 121.0, "lat": 24.0, "income": 20_000},
+    "taiwan": {"name": "تنگه تایوان", "lon": 119.6, "lat": 24.4, "income": 20_000},
     "korea": {"name": "تنگه کره", "lon": 129.9, "lat": 34.0, "income": 20_000},
 }
 
@@ -1461,9 +1474,10 @@ async def debug_auth(request):
 # =========================================================
 WEB_DIR = os.path.join("web")
 
-async def index(request): return web.FileResponse(os.path.join(WEB_DIR, "index.html"))
-async def style(request): return web.FileResponse(os.path.join(WEB_DIR, "style.css"))
-async def app_js(request): return web.FileResponse(os.path.join(WEB_DIR, "app.js"))
+NO_CACHE = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+async def index(request): return web.FileResponse(os.path.join(WEB_DIR, "index.html"), headers=NO_CACHE)
+async def style(request): return web.FileResponse(os.path.join(WEB_DIR, "style.css"), headers=NO_CACHE)
+async def app_js(request): return web.FileResponse(os.path.join(WEB_DIR, "app.js"), headers=NO_CACHE)
 
 async def create_web_app():
     app = web.Application(middlewares=[cors_middleware])
