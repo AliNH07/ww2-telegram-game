@@ -1117,3 +1117,127 @@ img { -webkit-user-drag: none; user-select: none; }
 .modal-actions button { flex: 1; padding: 10px; border-radius: 10px; font-size: 12.5px; }
 .modal-ok { background: var(--brand); color: #0b0e15; font-weight: bold; }
 .modal-cancel { background: #16233a; color: #c3cad3; border: 1px solid rgba(var(--brand-rgb), 0.15); }
+
+
+/* ==================== اصلاحات داشبورد / هدر - 2026 ==================== */
+
+.game-header { padding: 0 12px; }
+
+.flag-wrap-lg {
+    width: 54px;
+    height: 54px;
+}
+
+.header-left { gap: 8px; }
+
+.game-title {
+    font-size: 17px;
+    font-weight: 950;
+    letter-spacing: 1.6px;
+}
+
+.header-button {
+    width: 40px;
+    height: 40px;
+}
+
+.notif-badge {
+    top: -4px;
+    left: -4px;
+}
+
+/* کارت خانه دقیقاً ۳:۴ */
+.home-card {
+    box-shadow: 0 5px 14px rgba(0,0,0,.22);
+}
+
+.home-card-body {
+    aspect-ratio: 3 / 4;
+    min-height: 0;
+    position: relative;
+    padding: 10px;
+}
+
+/* تصویر تمام سطح کارت را می‌گیرد و بیش از حد تیره نمی‌شود */
+.home-card-photo {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    background-position: center center !important;
+    background-size: cover !important;
+    background-repeat: no-repeat !important;
+    opacity: 1;
+    filter: none;
+}
+
+.home-card-photo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(
+            to bottom,
+            rgba(5, 8, 14, 0.05) 0%,
+            rgba(5, 8, 14, 0.02) 40%,
+            rgba(5, 8, 14, 0.28) 72%,
+            rgba(5, 8, 14, 0.58) 100%
+        );
+    pointer-events: none;
+}
+
+.home-card-body > *:not(.home-card-photo) {
+    position: relative;
+    z-index: 1;
+}
+
+/* اطلاعات روی عکس، شفاف‌تر تا خود تصویر بهتر دیده شود */
+.hero-country {
+    background: rgba(7, 10, 16, 0.42);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 13px;
+    padding: 7px 9px;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+.home-stats {
+    margin-top: auto;
+    background: rgba(7, 10, 16, 0.38);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 14px;
+    padding: 9px;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+.hs-money, .hs-duo, .hs-foot {
+    background: rgba(7, 10, 16, 0.22);
+    border-radius: 10px;
+}
+
+.hs-value { font-weight: 900; }
+
+.hs-label, .hs-sub {
+    text-shadow: 0 1px 3px rgba(0,0,0,.75);
+}
+
+.hs-foot {
+    gap: 7px;
+    padding: 7px 8px;
+}
+
+.hs-income { font-weight: 800; }
+
+.season-bar { box-shadow: none !important; }
+
+@media (max-width: 600px) {
+    .home-card-body { aspect-ratio: 3 / 4; }
+    .flag-wrap-lg { width: 52px; height: 52px; }
+    .game-title {
+        font-size: 16px;
+        font-weight: 950;
+    }
+}
