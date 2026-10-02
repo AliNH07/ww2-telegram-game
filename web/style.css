@@ -95,7 +95,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .flag-inline-sm { width: 16px; height: 16px; }
 
 /* ==================== لودینگ ==================== */
-.loading-screen { display: flex; align-items: center; justify-content: center; padding: 20px; }
+.loading-screen { display: flex; align-items: flex-start; justify-content: center; padding: 18px 14px; }
 .loading-box {
     width: min(320px, 85%); background: rgba(11, 14, 21, 0.85);
     border: 1px solid rgba(var(--brand-rgb), 0.15); border-radius: 16px;
@@ -114,6 +114,31 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 @keyframes loadingSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
 .loading-text { color: #a0a8b3; font-size: 12.5px; letter-spacing: 0.4px; }
+
+/* ردیف لودینگ (بالای صفحه) */
+.loading-row {
+    position: relative; width: 100%; max-width: 520px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    padding: 15px 18px;
+    background: rgba(11, 14, 21, 0.9);
+    border: 1px solid rgba(var(--brand-rgb), 0.28);
+    border-radius: 16px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 24px rgba(var(--brand-rgb), 0.08);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
+.loading-row .loading-text { color: #f4f6f9; font-size: 13px; font-weight: bold; margin: 0; }
+.loading-row .loading-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2.5px; margin: 0; border-radius: 0; }
+.loading-spinner {
+    flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%;
+    border: 2.5px solid rgba(var(--brand-rgb), 0.25); border-top-color: var(--brand);
+    animation: loadingSpin 0.8s linear infinite;
+}
+@keyframes loadingSpin { to { transform: rotate(360deg); } }
+
+/* ورود به داشبورد: فقط هدر + این ردیف دیده می‌شود */
+#dashboard-loading { display: none; width: auto; margin: 8px 14px 0; }
+#game.booting #dashboard-loading { display: flex; }
+#game.booting .game-page, #game.booting .bottom-nav { display: none !important; }
 
 /* ==================== انتخاب کشور ==================== */
 .country-screen { overflow-y: auto; padding: 35px 18px 30px; }
@@ -295,8 +320,7 @@ img { -webkit-user-drag: none; user-select: none; }
     z-index: 2;
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 14px;
-    background: rgba(11, 14, 21, 0.85);
-    border-bottom: 1px solid rgba(var(--brand-rgb), 0.15);
+    background: transparent;
 }
 .world-chip {
     background: rgba(15, 20, 30, 0.7);
@@ -315,63 +339,59 @@ img { -webkit-user-drag: none; user-select: none; }
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
 }
-.home-card-body { position: relative; padding: 4px 0 0; overflow: hidden; }
+/* بدنه: نسبت ۳:۴ مثل خود عکس تا کامل دیده شود */
+.home-card-body {
+    position: relative; overflow: hidden;
+    aspect-ratio: 3 / 4;
+    width: 100%;
+    display: flex; flex-direction: column; justify-content: flex-start;
+}
 .home-card-photo {
+    opacity: 0; transition: opacity 0.4s ease;
     position: absolute; inset: 0;
     background-color: #0b0e15;
     background-size: cover;
-    background-position: center;
+    background-position: center top;
     z-index: 0;
 }
+/* فقط پایین عکس تیره می‌شود تا نوشته‌ها خوانا باشند و بالا کاملاً دیده شود */
+.home-card-photo.loaded { opacity: 1; }
 .home-card-photo::after {
     content: ""; position: absolute; inset: 0;
     background: linear-gradient(180deg,
-        rgba(11, 14, 21, 0.6) 0%,
-        rgba(11, 14, 21, 0.85) 50%,
+        rgba(11, 14, 21, 0.65) 0%,
+        rgba(11, 14, 21, 0.4) 22%,
+        rgba(11, 14, 21, 0.62) 55%,
         rgba(11, 14, 21, 0.95) 100%);
 }
 
-.home-stats-grid {
+/* آمار — بدون باکس، روی عکس */
+.home-stats {
     position: relative; z-index: 1;
-    display: grid; grid-template-columns: repeat(2, 1fr);
-    gap: 8px; padding: 8px 12px 12px;
+    display: flex; flex-direction: column; gap: 14px;
+    padding: 14px 18px 0; text-align: right;
 }
-.home-stat {
-    position: relative; min-height: 96px;
-    border-radius: 14px; overflow: hidden;
-    background-color: rgba(11, 14, 21, 0.55);
-    background-size: cover; background-position: center;
-    border: 1px solid rgba(var(--brand-rgb), 0.12);
-    display: flex;
-    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
-}
-.home-stat:nth-of-type(1) { background-image: linear-gradient(150deg, #a97a1f 0%, #2d1f08 78%); }
-.home-stat:nth-of-type(2) { background-image: linear-gradient(150deg, #b8862a 0%, #2d1f08 78%); }
-.home-stat:nth-of-type(3) { background-image: linear-gradient(150deg, #2fb8b3 0%, #0f2e2c 78%); }
-.home-stat:nth-of-type(4) { background-image: linear-gradient(150deg, #b03a35 0%, #2d0f0e 78%); }
-.home-stat-overlay {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    justify-content: flex-end; align-items: flex-end;
-    text-align: right; padding: 10px 12px;
-    background: linear-gradient(180deg,
-        rgba(6, 10, 18, 0.05) 0%,
-        rgba(6, 10, 18, 0.82) 100%);
-}
-.home-stat-label { font-size: 10.5px; color: rgba(255, 255, 255, 0.85); margin-bottom: 2px; text-shadow: 0 1px 4px rgba(0,0,0,.5); }
-.home-stat-value { font-size: 19px; color: #fff; font-weight: bold; line-height: 1.1; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
-.home-stat-sub { font-size: 10px; color: #a0a8b3; margin-top: 2px; }
-.home-stat-sub span { color: var(--green); }
+.hs-label { display: block; font-size: 12px; color: rgba(255,255,255,0.8); margin-bottom: 3px; text-shadow: 0 1px 5px rgba(0,0,0,.7); }
+.hs-value { display: block; color: #fff; font-weight: bold; line-height: 1.1; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+.hs-sub   { display: block; font-size: 11.5px; color: #c3cad3; margin-top: 4px; text-shadow: 0 1px 5px rgba(0,0,0,.7); }
+.hs-sub span { color: var(--green); font-weight: bold; }
+
+.hs-money .hs-value { font-size: 34px; color: var(--brand); }
+.hs-money .hs-sub   { font-size: 13px; }
+.hs-manpower .hs-value { font-size: 24px; }
+
+.hs-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.14); }
+.hs-duo .hs-value { font-size: 20px; }
 
 .season-bar {
     position: relative; z-index: 1;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 16px 16px;
-    border-top: 1px solid rgba(var(--brand-rgb), 0.15);
+    margin-top: auto;
+    padding: 14px 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
     font-size: 12px; color: #c3cad3;
-    background: rgba(11, 14, 21, 0.55);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    background: transparent;
     gap: 10px;
     flex-wrap: wrap;
 }
@@ -394,20 +414,21 @@ img { -webkit-user-drag: none; user-select: none; }
 .action-overlay {
     position: absolute; inset: 0;
     display: flex; flex-direction: column;
-    justify-content: flex-end; align-items: flex-end;
-    text-align: right; padding: 14px;
+    justify-content: space-between;
+    padding: 14px;
     background: linear-gradient(180deg,
-        rgba(8, 12, 20, 0) 35%, rgba(8, 12, 20, 0.78) 100%);
+        rgba(8, 12, 20, 0.35) 0%, rgba(8, 12, 20, 0) 40%, rgba(8, 12, 20, 0.82) 100%);
 }
 .action-icon {
     position: absolute; top: 12px; left: 12px; font-size: 17px;
-    width: 36px; height: 36px; border-radius: 50%;
+    width: 38px; height: 38px; border-radius: 50%; overflow: hidden;
     display: flex; align-items: center; justify-content: center;
     border: 1px solid rgba(255, 255, 255, 0.22);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
-.action-card h3 { font-size: 15px; color: #fff; margin-bottom: 4px; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
-.action-card p { font-size: 10.5px; color: rgba(255,255,255,0.8); line-height: 1.6; }
+.action-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.action-card h3 { align-self: flex-start; text-align: right; margin: 4px 0 0; max-width: calc(100% - 52px); font-size: 15px; color: #fff; line-height: 1.3; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.action-card p { align-self: flex-end; text-align: right; max-width: 78%; font-size: 10.5px; color: rgba(255,255,255,0.8); line-height: 1.75; }
 .action-army           { background-color: #1a2338; background-image: linear-gradient(150deg, rgba(74,79,168,.30) 0%, rgba(13,16,36,.55) 75%), url('/images/categories/army.png'); background-size: cover; background-position: center; }
 .action-army .action-icon { background: var(--c-army); color: #fff; }
 .action-war             { background-color: #381210; background-image: linear-gradient(150deg, rgba(122,44,40,.30) 0%, rgba(24,10,9,.55) 75%), url('/images/categories/war.jpg'); background-size: cover; background-position: center; }
@@ -420,6 +441,20 @@ img { -webkit-user-drag: none; user-select: none; }
 .action-infrastructure .action-icon { background: var(--c-infra); color: #fff; }
 .action-market          { background-color: #3d2c0d; background-image: linear-gradient(150deg, rgba(168,122,46,.30) 0%, rgba(28,20,8,.55) 75%), url('/images/categories/market.png'); background-size: cover; background-position: center; }
 .action-market .action-icon { background: var(--c-market); color: #1a1208; }
+
+/* ===== ردیف ۳ باکس کوچک ===== */
+.action-grid-3 { grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+.action-grid-3 .action-card { min-height: 108px; border-radius: 16px; }
+.action-grid-3 .action-overlay { padding: 10px; }
+.action-grid-3 .action-icon { width: 28px; height: 28px; top: 9px; left: 9px; }
+.action-grid-3 .action-card h3 { font-size: 12.5px; max-width: calc(100% - 36px); margin-top: 2px; }
+.action-grid-3 .action-card p { font-size: 9px; line-height: 1.6; max-width: 100%; }
+.action-ranking  { background-color: #2a1d0a; background-image: linear-gradient(150deg, rgba(227,176,75,.30) 0%, rgba(20,14,6,.55) 75%), url('/images/categories/ranking.jpg'); background-size: cover; background-position: center; }
+.action-ranking .action-icon  { background: #e3b04b; }
+.action-transfer { background-color: #0e2c1e; background-image: linear-gradient(150deg, rgba(74,222,128,.25) 0%, rgba(8,26,18,.55) 75%), url('/images/categories/transfer.jpg'); background-size: cover; background-position: center; }
+.action-transfer .action-icon { background: #4ade80; }
+.action-stats    { background-color: #101c2e; background-image: linear-gradient(150deg, rgba(96,165,250,.28) 0%, rgba(8,14,26,.55) 75%), url('/images/categories/stats.jpg'); background-size: cover; background-position: center; }
+.action-stats .action-icon    { background: #60a5fa; }
 
 /* ==================== تب‌های زیرساخت ==================== */
 .infra-tabs {
@@ -810,18 +845,30 @@ img { -webkit-user-drag: none; user-select: none; }
     border: 1px solid rgba(var(--brand-rgb), 0.15);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
-.map-box svg { width: 100%; height: 100%; display: block; cursor: grab; }
+.map-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.map-box svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .map-box svg:active { cursor: grabbing; }
 .globe-water { fill: #0b1520; }
-.map-country { transition: fill 0.3s ease; }
-.map-ocean-label { fill: #4a6a86; font-size: 6.5px; pointer-events: none; user-select: none; }
-.map-country-label { fill: #d9e0e8; font-size: 7px; pointer-events: none; user-select: none; }
-.map-site { stroke: #0b1520; stroke-width: 0.6px; cursor: pointer; }
-.map-site-oil { fill: #2d2a1a; stroke: var(--brand); stroke-width: 1.2; }
-.map-site-steel { fill: #1e2833; stroke: #94a8bc; stroke-width: 1.2; }
-.map-site-uranium { fill: #1a2d1f; stroke: var(--green); stroke-width: 1.2; }
-.map-site-food { fill: #2d2618; stroke: #d4a017; stroke-width: 1.2; }
-.map-site-strait { fill: var(--brand); stroke: #0b1520; stroke-width: 0.6; }
+
+/* اسم‌ها روی نقشه */
+.map-ocean-label, .map-sea-label, .map-country-label {
+    pointer-events: none; user-select: none; -webkit-user-select: none;
+    paint-order: stroke; stroke-linejoin: round;
+}
+.map-ocean-label { fill: rgba(205, 232, 255, 0.85); font-style: italic; letter-spacing: 0.8px; stroke: rgba(5, 25, 50, 0.6); stroke-width: 2.4px; }
+.map-sea-label   { fill: rgba(205, 232, 255, 0.78); font-style: italic; stroke: rgba(5, 25, 50, 0.6); stroke-width: 2.2px; }
+.map-country-label { fill: #ffffff; font-weight: 600; stroke: rgba(8, 18, 30, 0.85); stroke-width: 2.4px; }
+
+/* سکوها: مربعی و رنگی */
+.map-site { cursor: pointer; }
+.map-site .site-hit { fill: transparent; }
+.map-site .site-shape { stroke: #ffffff; stroke-width: 1.3; }
+.map-site-oil     .site-shape { fill: #000000; }   /* سکوی نفتی: سیاه، مربع */
+.map-site-steel   .site-shape { fill: #a8e0ff; }   /* معدن فولاد: آبی کمرنگ، مربع */
+.map-site-uranium .site-shape { fill: #0a3dff; }   /* معدن اورانیوم: آبی، مربع */
+.map-site-food    .site-shape { fill: #7ed957; }
+.map-site-strait  .site-shape { fill: #ffd21f; stroke: #07121f; }   /* تنگه: زرد */
+.map-site.mine .site-shape { stroke: #f0b429; stroke-width: 2.4; }
 .map-controls {
     position: absolute; left: 12px; bottom: 12px;
     display: flex; flex-direction: column; gap: 8px; z-index: 5;
@@ -841,16 +888,18 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 .map-legend div { display: flex; align-items: center; gap: 6px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.dot-own            { background: #f0b429; }
-.dot-own-occupied   { background: #2fa360; }
-.dot-other          { background: #b8862a; }
-.dot-other-occupied { background: #8e4ec6; }
-.dot-unowned        { background: #4a5460; }
-.dot-oil            { background: var(--brand); border: 1px solid #0b1520; }
-.dot-steel          { background: #94a8bc; border: 1px solid #0b1520; }
-.dot-uranium        { background: var(--green); border: 1px solid #0b1520; }
-.dot-food           { background: #d4a017; border: 1px solid #0b1520; }
-.dot-strait         { background: var(--brand); border: 2px solid #0b1520; }
+.dot-own            { background: #ffd21f; }
+.dot-own-occupied   { background: #34b36b; }
+.dot-other          { background: #2f7fe8; }
+.dot-other-occupied { background: #9b5de5; }
+.dot-inactive       { background: #0b0b0e; border: 1px solid #6b7480; }
+.dot-nogame         { background: repeating-linear-gradient(135deg, #2c3544 0 2px, #96a5bc 2px 3px); border: 1px solid #6b7480; }
+.dot-oil, .dot-steel, .dot-uranium, .dot-food { border-radius: 2px; border: 1px solid #e8eef6; }
+.dot-oil     { background: #000000; }
+.dot-steel   { background: #a8e0ff; }
+.dot-uranium { background: #0a3dff; }
+.dot-food    { background: #7ed957; }
+.dot-strait  { background: #ffd21f; border: 1px solid #07121f; }
 
 /* ==================== پنل اطلاعات نقشه ==================== */
 .map-info-panel {
@@ -1072,8 +1121,8 @@ img { -webkit-user-drag: none; user-select: none; }
 :root {
     --nav-h: 70px;          /* ارتفاع نوار */
     --nav-icon: 24px;       /* آیکن دکمه‌های معمولی */
-    --nav-home: 68px;       /* قطر دکمه خانه */
-    --nav-home-lift: 30px;  /* مقدار بیرون‌زدگی دکمه خانه از نوار */
+    --nav-home: 58px;       /* قطر دکمه خانه */
+    --nav-home-lift: 24px;  /* مقدار بیرون‌زدگی دکمه خانه از نوار */
 }
 
 .bottom-nav {
@@ -1141,7 +1190,7 @@ img { -webkit-user-drag: none; user-select: none; }
         inset 0 1px 0 rgba(255, 255, 255, 0.12);
     transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
 }
-.bottom-nav .nav-home .nav-icon svg { width: 34px; height: 34px; }
+.bottom-nav .nav-home .nav-icon svg { width: 29px; height: 29px; }
 .bottom-nav .nav-home small { font-size: 11.5px; font-weight: bold; color: var(--brand); }
 
 .bottom-nav .nav-home.active .nav-icon {
@@ -1168,10 +1217,8 @@ img { -webkit-user-drag: none; user-select: none; }
     .game-title { font-size: 12px; letter-spacing: 2px; }
     .globe-card { height: 32vh; }
     .action-card { min-height: 115px; }
-    .action-card h3 { font-size: 13px; }
-    .action-card p { font-size: 9.5px; }
-    .home-stat { min-height: 88px; }
-    .home-stat-value { font-size: 16px; }
+    .action-card h3 { align-self: flex-start; text-align: right; margin: 4px 0 0; max-width: calc(100% - 52px); font-size: 13px; }
+    .action-card p { align-self: flex-end; text-align: right; max-width: 78%; font-size: 9.5px; }
     .map-box { height: 42vh; }
     .stat-box { min-width: 80px; padding: 6px 7px; }
     .stat-box-value { font-size: 11.5px; }
