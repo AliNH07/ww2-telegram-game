@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261002h">
+<link rel="stylesheet" href="/style.css?v=20261002j">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -267,6 +267,10 @@
                     <h2 class="infra-section-title">✈️ هوایی</h2>
                     <div id="infra-air-list" class="infra-card-list"></div>
                 </div>
+                <div class="infra-section">
+                    <h2 class="infra-section-title">🚀 موشکی</h2>
+                    <div id="infra-missile-list" class="infra-card-list"></div>
+                </div>
             </div>
         </div>
     </main>
@@ -324,10 +328,14 @@
             </div>
             <div class="base-card">
                 <div class="base-card-head">
-                    <div class="base-card-name">پایگاه موشکی</div>
+                    <div class="base-card-name">انبار موشک</div>
                     <div class="base-card-icon">🚀</div>
                 </div>
-                <div class="base-card-empty" id="base-missile-status">ساخته نشده</div>
+                <div class="base-card-value" id="base-missile-value">—</div>
+                <div class="base-card-max" id="base-missile-max"></div>
+                <div class="base-card-progress">
+                    <div class="base-card-progress-fill" id="base-missile-fill" style="width:0%"></div>
+                </div>
             </div>
         </div>
 
@@ -430,7 +438,7 @@
             <div><span class="dot dot-inactive"></span> غیرفعال (انتخاب نشده)</div>
             <div><span class="dot dot-nogame"></span> هنوز به بازی اضافه نشده</div>
             <div><span class="dot dot-oil"></span> سکوی نفت</div>
-            <div><span class="dot dot-steel"></span> معدن آهن</div>
+            <div><span class="dot dot-iron"></span> معدن آهن</div>
             <div><span class="dot dot-uranium"></span> معدن اورانیوم</div>
             <div><span class="dot dot-food"></span> دشت کشاورزی</div>
             <div><span class="dot dot-strait"></span> تنگه</div>
@@ -512,7 +520,7 @@
                 <label class="diplomacy-label">منبع فروش</label>
                 <select id="mk-sell-res" class="diplomacy-select">
                     <option value="food">🌾 غذا</option>
-                    <option value="steel">⚙️ آهن</option>
+                    <option value="iron">⚙️ آهن</option>
                     <option value="uranium">☢️ اورانیوم</option>
                     <option value="oil">🛢️ نفت</option>
                 </select>
@@ -522,7 +530,7 @@
                 <select id="mk-want-res" class="diplomacy-select">
                     <option value="money">💰 پول</option>
                     <option value="food">🌾 غذا</option>
-                    <option value="steel">⚙️ آهن</option>
+                    <option value="iron">⚙️ آهن</option>
                     <option value="uranium">☢️ اورانیوم</option>
                     <option value="oil">🛢️ نفت</option>
                 </select>
@@ -597,6 +605,6 @@
 
 </section>
 
-<script src="/app.js?v=20261002h"></script>
+<script src="/app.js?v=20261002j"></script>
 </body>
 </html>
