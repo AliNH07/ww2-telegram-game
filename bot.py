@@ -632,18 +632,25 @@ def verify_init_data(init_data: str):
     except Exception as e:
         logging.error("verify_init_data: %s", e); return None
 
-def get_auth_user_id(request):
+def get_auth_user(request):
+    """برمی‌گرداند dict کاربر تلگرام یا None"""
     init_data = request.headers.get("X-Telegram-Init-Data") or request.query.get("init_data")
     if init_data:
         user = verify_init_data(init_data)
         if user and user.get("id"):
-            return int(user["id"])
+            return user
     if not AUTH_REQUIRED:
         uid = request.query.get("user_id")
         if uid:
-            try: return int(uid)
-            except: return None
+            try:
+                return {"id": int(uid), "first_name": f"User{uid}", "last_name": "", "username": ""}
+            except:
+                return None
     return None
+
+def get_auth_user_id(request):
+    user = get_auth_user(request)
+    return int(user["id"]) if user else None
 
 async def read_json(request):
     try: return await request.json()
@@ -680,6 +687,20 @@ async def start_command(message: types.Message):
     else:
         text = "⚔️ به FRONT-LINE 1993 خوش آمدید.\nابتدا کشور خود را انتخاب کنید."
     await message.answer(text, reply_markup=kb)
+
+@dp.message(Command("testgroup"))
+async def test_group(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    try:
+        await bot.send_message(
+            chat_id=int(GROUP_CHAT_ID),
+            message_thread_id=GENERAL_TOPIC_ID if GENERAL_TOPIC_ID else None,
+            text="✅ تست پیام گروه موفق بود"
+        )
+        await message.answer("پیام به گروه ارسال شد.")
+    except Exception as e:
+        await message.answer(f"خطا:\n{e}")
 
 async def notify_admin(text, keyboard=None):
     if ADMIN_ID:
@@ -737,8 +758,9 @@ async def get_countries(request):
     return web.json_response(result)
 
 async def select_country(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    user = get_auth_user(request)
+    if not user: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    uid = int(user["id"])
     data = await read_json(request); cid = data.get("country")
     if cid not in COUNTRIES:
         return web.json_response({"success": False, "error": "invalid_country"}, status=400)
@@ -756,13 +778,20 @@ async def select_country(request):
     p["country"] = cid
     if not p.get("started_at"):
         now = utcnow().isoformat(); p["started_at"] = now; p["last_update"] = now
+    # ذخیره اسم بازیکن
+    first = (user.get("first_name") or "").strip()
+    last = (user.get("last_name") or "").strip()
+    uname = (user.get("username") or "").strip()
+    display_name = (first + (" " + last if last else "")).strip() or (f"@{uname}" if uname else f"ID {uid}")
+    p["display_name"] = display_name
+    p["username"] = uname
     save_state()
 
     # اعلام در گروه (تاپیک General)
     if GROUP_CHAT_ID:
         try:
             c = COUNTRIES[cid]
-            text = f"{c['flag']} {c['name']} بازیکن جدید گرفت\n🆔 {uid}"
+            text = f"{c['flag']} {c['name']} بازیکن جدید گرفت\n👤 {display_name}\n🆔 {uid}"
             kwargs = {"chat_id": int(GROUP_CHAT_ID), "text": text}
             if GENERAL_TOPIC_ID:
                 kwargs["message_thread_id"] = GENERAL_TOPIC_ID
