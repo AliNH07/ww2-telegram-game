@@ -1461,9 +1461,10 @@ async def debug_auth(request):
 # =========================================================
 WEB_DIR = os.path.join("web")
 
-async def index(request): return web.FileResponse(os.path.join(WEB_DIR, "index.html"))
-async def style(request): return web.FileResponse(os.path.join(WEB_DIR, "style.css"))
-async def app_js(request): return web.FileResponse(os.path.join(WEB_DIR, "app.js"))
+NO_CACHE = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+async def index(request): return web.FileResponse(os.path.join(WEB_DIR, "index.html"), headers=NO_CACHE)
+async def style(request): return web.FileResponse(os.path.join(WEB_DIR, "style.css"), headers=NO_CACHE)
+async def app_js(request): return web.FileResponse(os.path.join(WEB_DIR, "app.js"), headers=NO_CACHE)
 
 async def create_web_app():
     app = web.Application(middlewares=[cors_middleware])
