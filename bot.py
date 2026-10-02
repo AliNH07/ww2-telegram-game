@@ -17,6 +17,10 @@ AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "0") == "1"
 DATA_DIR = os.getenv("DATA_DIR", "data")
 STATE_FILE = os.path.join(DATA_DIR, "state.json")
 
+# گروه اعلام انتخاب کشور (تاپیک General)
+GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID", "-1004497298608")
+GENERAL_TOPIC_ID = int(os.getenv("GENERAL_TOPIC_ID", "1"))
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 
 COUNTRIES = {
@@ -753,6 +757,19 @@ async def select_country(request):
     if not p.get("started_at"):
         now = utcnow().isoformat(); p["started_at"] = now; p["last_update"] = now
     save_state()
+
+    # اعلام در گروه (تاپیک General)
+    if GROUP_CHAT_ID:
+        try:
+            c = COUNTRIES[cid]
+            text = f"{c['flag']} {c['name']} بازیکن جدید گرفت\n🆔 {uid}"
+            kwargs = {"chat_id": int(GROUP_CHAT_ID), "text": text}
+            if GENERAL_TOPIC_ID:
+                kwargs["message_thread_id"] = GENERAL_TOPIC_ID
+            await bot.send_message(**kwargs)
+        except Exception as e:
+            logging.warning("group country notify failed: %s", e)
+
     return web.json_response({"success": True, "player": serialize_player(p)})
 
 # =========================================================
