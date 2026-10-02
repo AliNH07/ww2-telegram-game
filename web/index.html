@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261002f">
+<link rel="stylesheet" href="/style.css?v=20261002g">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -104,120 +104,114 @@
 
     <!-- ==================== خانه ==================== -->
     <main id="home" class="game-page">
+        <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+            <symbol id="i-war" viewBox="0 0 24 24"><path d="M5 4l9 9M19 4l-9 9M4 20l4-4M20 20l-4-4M3 17l4 4M21 17l-4 4"/></symbol>
+            <symbol id="i-army" viewBox="0 0 24 24"><path d="M4 16a8 8 0 0116 0v2H4zM12 8V5M8 18v2h8v-2"/></symbol>
+            <symbol id="i-economy" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3 3 7 3s7-1.3 7-3v-6"/></symbol>
+            <symbol id="i-diplomacy" viewBox="0 0 24 24"><path d="m11 17 2 2a1 1 0 1 0 3-3M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.9-3.9a3 3 0 0 0-4.2 0l-.9.9a1 1 0 1 1-3-3l2.8-2.8a5.8 5.8 0 0 1 7-.9l.5.3a2 2 0 0 0 1.4.3L21 4M21 3l1 11h-2M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3M3 4h8"/></symbol>
+            <symbol id="i-market" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></symbol>
+            <symbol id="i-ranking" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 01-8 0zM8 6H4v1a4 4 0 004 4M16 6h4v1a4 4 0 01-4 4M12 13v4M8 21h8M10 17h4"/></symbol>
+            <symbol id="i-infra" viewBox="0 0 24 24"><path d="M3 21h18M5 21V10l5 3v-3l5 3V6h4v15"/></symbol>
+            <symbol id="i-stats" viewBox="0 0 24 24"><path d="M5 21V12M12 21V5M19 21v-8"/></symbol>
+            <symbol id="i-transfer" viewBox="0 0 24 24"><path d="M4 9h15l-3-3M20 15H5l3 3"/></symbol>
+            <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></symbol>
+            <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.5 3-6 6-6s6 2.5 6 6M16 5a3 3 0 010 6M18 14c2 .6 3 2.5 3 6"/></symbol>
+            <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+            <symbol id="i-chev" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+        </defs></svg>
         <div class="home-card">
             <div class="home-card-body">
                 <div class="home-card-photo" id="home-card-photo"></div>
-
-                <div class="home-card-top">
+                <div class="hero-country">
+                    <div class="flag-wrap"><img id="home-country-flag" class="flag-img" src="" alt=""></div>
+                    <strong id="home-country-name">—</strong>
                     <span class="world-chip">🌐 World 1</span>
-                    <span class="home-country-chip">
-                        <span id="home-country-name">—</span>
-                        <div class="flag-wrap flag-wrap-sm"><img id="home-country-flag" class="flag-img" src="" alt=""></div>
-                    </span>
                 </div>
-
                 <div class="home-stats">
                     <div class="hs-money">
-                        <span class="hs-label">🪙 خزانه</span>
-                        <strong class="hs-value" id="home-money">$0</strong>
-                        <span class="hs-sub">درآمد روزانه: <span id="home-income">$0</span></span>
+                        <svg class="ic hs-ic gold"><use href="#i-economy"/></svg>
+                        <div><strong class="hs-value" id="home-money">$0</strong><span class="hs-label">دارایی خزانه کشور</span></div>
                     </div>
-
-                    <div class="hs-manpower">
-                        <span class="hs-label">👥 نیروی انسانی</span>
-                        <strong class="hs-value" id="home-manpower">0</strong>
-                        <span class="hs-sub">تولید: <span id="home-manpower-production">0</span> /روز</span>
-                    </div>
-
                     <div class="hs-duo">
-                        <div>
-                            <span class="hs-label">⚡ برق</span>
-                            <strong class="hs-value" id="home-power">0</strong>
-                            <span class="hs-sub" id="home-power-sub">مصرف: 0</span>
-                        </div>
-                        <div>
-                            <span class="hs-label">⚔️ قدرت نظامی</span>
-                            <strong class="hs-value" id="home-army">0</strong>
-                        </div>
+                        <div class="hs-manpower"><svg class="ic hs-ic"><use href="#i-people"/></svg>
+                            <div><strong class="hs-value" id="home-manpower">0</strong><span class="hs-label">نیروی انسانی</span></div></div>
+                        <div class="hs-power"><svg class="ic hs-ic gold"><use href="#i-bolt"/></svg>
+                            <div><strong class="hs-value" id="home-power">0</strong><span class="hs-label">برق آزاد</span><span class="hs-sub" id="home-power-sub">مصرف: 0</span></div></div>
+                    </div>
+                    <div class="hs-foot">
+                        <span class="hs-income">درآمد: <span id="home-income">$0</span></span>
+                        <span>تولید: <span id="home-manpower-production">0</span></span>
+                        <span>قدرت: <span id="home-army">0</span></span>
                     </div>
                 </div>
-
-                <div class="season-bar">
-                    <span id="home-season-end">—</span>
-                    <span class="season-tag">🕐 <span id="home-season">بهار</span></span>
-                    <span class="season-hint" id="home-season-hint"></span>
-                </div>
+            </div>
+            <div class="season-bar">
+                <span id="home-season-end">—</span>
+                <span class="season-tag">🕐 <span id="home-season">بهار</span></span>
+                <span class="season-hint" id="home-season-hint"></span>
             </div>
         </div>
 
-        <div class="action-grid">
-            <button class="action-card action-army" data-section="army">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/army.jpg" alt=""></span>
-                    <h3>ارتش</h3>
-                    <p>آموزش نیروی زمینی، هوایی و دریایی</p>
-                </div>
+        <section class="home-section sec-military" style="--tc:#e5484d">
+            <div class="sec-head"><span class="sec-title"><svg class="ic"><use href="#i-war"/></svg>نظامی</span><span class="sec-sub">قدرت، امنیت، پیروزی</span><svg class="sec-chev ic"><use href="#i-chev"/></svg></div>
+            <div class="tile-grid cols-2">
+            <button class="action-card tile action-army" data-section="army" style="--tc:#4aa3ff">
+                <span class="hex"><svg class="ic"><use href="#i-army"/></svg></span>
+                <span class="tile-text"><h3>ارتش</h3><p>مدیریت نیروهای نظامی</p></span>
+                <svg class="tile-chev ic"><use href="#i-chev"/></svg>
             </button>
-            <button class="action-card action-war" data-section="war">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/war.jpg" alt=""></span>
-                    <h3>جنگ</h3>
-                    <p>اعلام جنگ و نبرد سه‌جبهه‌ای</p>
-                </div>
+            <button class="action-card tile action-war" data-section="war" style="--tc:#e5484d">
+                <span class="hex"><svg class="ic"><use href="#i-war"/></svg></span>
+                <span class="tile-text"><h3>جنگ</h3><p>عملیات نظامی و حمله</p></span>
+                <svg class="tile-chev ic"><use href="#i-chev"/></svg>
             </button>
-            <button class="action-card action-diplomacy" data-section="diplomacy">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/diplomacy.jpg" alt=""></span>
-                    <h3>دیپلماسی</h3>
-                    <p>پیمان اتحاد یا عدم تجاوز</p>
-                </div>
+            </div>
+        </section>
+        <section class="home-section sec-world" style="--tc:#4aa3ff">
+            <div class="sec-head"><span class="sec-title"><svg class="ic"><use href="#i-market"/></svg>کشور و جهان</span><span class="sec-sub">دیپلماسی، اقتصاد، اعتبار</span><svg class="sec-chev ic"><use href="#i-chev"/></svg></div>
+            <div class="tile-grid cols-2">
+            <button class="action-card tile action-economy" data-section="economy" style="--tc:#4ade80">
+                <span class="hex"><svg class="ic"><use href="#i-economy"/></svg></span>
+                <span class="tile-text"><h3>اقتصاد</h3><p>منابع، مالیات، توسعه</p></span>
+                <svg class="tile-chev ic"><use href="#i-chev"/></svg>
             </button>
-            <button class="action-card action-economy" data-section="economy">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/economy.jpg" alt=""></span>
-                    <h3>اقتصاد</h3>
-                    <p>افزایش درآمد روزانه کشور</p>
-                </div>
+            <button class="action-card tile action-diplomacy" data-section="diplomacy" style="--tc:#4aa3ff">
+                <span class="hex"><svg class="ic"><use href="#i-diplomacy"/></svg></span>
+                <span class="tile-text"><h3>دیپلماسی</h3><p>روابط بین‌الملل</p></span>
+                <svg class="tile-chev ic"><use href="#i-chev"/></svg>
             </button>
-            <button class="action-card action-infrastructure" data-section="infrastructure">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/infrastructure.jpg" alt=""></span>
-                    <h3>زیرساخت</h3>
-                    <p>برق، نیرو، منابع، نظامی</p>
-                </div>
+            <button class="action-card tile action-market" data-section="market" style="--tc:#e3b04b">
+                <span class="hex"><svg class="ic"><use href="#i-market"/></svg></span>
+                <span class="tile-text"><h3>بازار جهانی</h3><p>خرید و فروش، تجارت</p></span>
+                <svg class="tile-chev ic"><use href="#i-chev"/></svg>
             </button>
-            <button class="action-card action-market" data-section="market">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/market.jpg" alt=""></span>
-                    <h3>بازار جهانی</h3>
-                    <p>معاملات منابع بین کشورها</p>
-                </div>
+            <button class="action-card tile action-ranking" data-section="ranking" style="--tc:#a479e0">
+                <span class="hex"><svg class="ic"><use href="#i-ranking"/></svg></span>
+                <span class="tile-text"><h3>رتبه جهانی</h3><p>جایگاه در جهان</p></span>
+                <svg class="tile-chev ic"><use href="#i-chev"/></svg>
             </button>
-        </div>
-
-        <div class="action-grid action-grid-3">
-            <button class="action-card action-mini action-ranking" data-section="ranking">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/ranking.jpg" alt=""></span>
-                    <h3>رتبه جهانی</h3>
-                    <p>مقایسه با کشورها</p>
-                </div>
+            </div>
+        </section>
+        <section class="home-section sec-manage" style="--tc:#4ade80">
+            <div class="sec-head"><span class="sec-title"><svg class="ic"><use href="#i-gear"/></svg>مدیریت</span><span class="sec-sub">زیرساخت، اطلاعات، منابع</span><svg class="sec-chev ic"><use href="#i-chev"/></svg></div>
+            <div class="tile-grid cols-2">
+            <button class="action-card tile action-infrastructure" data-section="infrastructure" style="--tc:#33b4b0">
+                <span class="hex"><svg class="ic"><use href="#i-infra"/></svg></span>
+                <span class="tile-text"><h3>زیرساخت</h3><p>ساخت و ساز، توسعه</p></span>
+                <svg class="tile-chev ic"><use href="#i-chev"/></svg>
             </button>
-            <button class="action-card action-mini action-transfer" data-section="transfer">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/transfer.jpg" alt=""></span>
-                    <h3>انتقال پول</h3>
-                    <p>ارسال پول به بازیکن</p>
-                </div>
+            <button class="action-card tile action-stats" data-section="stats" style="--tc:#60a5fa">
+                <span class="hex"><svg class="ic"><use href="#i-stats"/></svg></span>
+                <span class="tile-text"><h3>آمار کشور</h3><p>اطلاعات و گزارش‌ها</p></span>
+                <svg class="tile-chev ic"><use href="#i-chev"/></svg>
             </button>
-            <button class="action-card action-mini action-stats" data-section="stats">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/stats.jpg" alt=""></span>
-                    <h3>آمار کشور</h3>
-                    <p>جزئیات و وضعیت</p>
-                </div>
+            <button class="action-card tile action-transfer tile-wide" data-section="transfer" style="--tc:#4ade80">
+                <span class="hex"><svg class="ic"><use href="#i-transfer"/></svg></span>
+                <span class="tile-text"><h3>انتقال پول</h3><p>معاملات و واریز</p></span>
+                <svg class="tile-chev ic"><use href="#i-chev"/></svg>
             </button>
-        </div>
+            </div>
+        </section>
     </main>
 
     <!-- ==================== رتبه جهانی ==================== -->
@@ -597,6 +591,6 @@
 
 </section>
 
-<script src="/app.js?v=20261002f"></script>
+<script src="/app.js?v=20261002g"></script>
 </body>
 </html>
