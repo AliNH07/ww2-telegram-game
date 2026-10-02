@@ -49,7 +49,7 @@ SEASON_HINTS = {
 }
 
 STARTING_RESOURCES = {"food": 5_000, "steel": 0, "uranium": 0, "oil": 5_000}
-RESOURCE_NAMES = {"food": "غذا", "steel": "فولاد", "uranium": "اورانیوم", "oil": "نفت"}
+RESOURCE_NAMES = {"food": "غذا", "steel": "آهن", "uranium": "اورانیوم", "oil": "نفت"}
 GROUP_NAMES = {"land": "زمینی", "naval": "دریایی", "air": "هوایی",
                "power": "برق", "manpower": "نیروی انسانی", "resource": "منابع"}
 TREATY_TYPE_NAMES = {"alliance": "پیمان اتحاد", "non_aggression": "پیمان عدم تجاوز"}
@@ -164,8 +164,8 @@ INFRASTRUCTURE = {
         "levels": [L(cost=220_000, production=50_000), L(cost=500_000, production=130_000), L(cost=1_100_000, production=300_000), L(cost=2_200_000, production=700_000), L(cost=4_200_000, production=1_500_000)],
     },
     "resource_steel_mill": {
-        "name": "کارخانه فولاد", "group": "resource", "resource_key": "steel", "icon": "⚙️",
-        "desc": "فولاد تولید می‌کند. پایهٔ صنعت و ساخت تانک است.",
+        "name": "کارخانه آهن", "group": "resource", "resource_key": "steel", "icon": "⚙️",
+        "desc": "آهن تولید می‌کند. پایهٔ صنعت و ساخت تانک است.",
         "levels": [L(cost=240_000, production=50_000), L(cost=540_000, production=130_000), L(cost=1_200_000, production=300_000), L(cost=2_400_000, production=700_000), L(cost=4_500_000, production=1_500_000)],
     },
     "resource_uranium_mine": {
@@ -232,8 +232,8 @@ ECONOMY = {
         "levels": [L(cost=280_000, income=70_000), L(cost=700_000, income=180_000), L(cost=1_600_000, income=420_000), L(cost=3_400_000, income=920_000), L(cost=6_800_000, income=1_850_000)],
     },
     "eco_steel": {
-        "name": "کارخانه فولاد", "group": "eco", "icon": "⚙️",
-        "desc": "فولاد را به محصولات صنعتی تبدیل می‌کند.",
+        "name": "کارخانه آهن", "group": "eco", "icon": "⚙️",
+        "desc": "آهن را به محصولات صنعتی تبدیل می‌کند.",
         "power_required": 18,
         "levels": [L(cost=420_000, income=100_000), L(cost=1_050_000, income=260_000), L(cost=2_400_000, income=600_000), L(cost=5_100_000, income=1_300_000), L(cost=10_200_000, income=2_600_000)],
     },
@@ -259,31 +259,31 @@ ECONOMY = {
 
 ARMY_UNITS = {
     "infantry": {"name": "پیاده‌نظام", "group": "land", "requires": "land_barracks",
-        "cost": 50_000, "manpower": 300, "resources": {"food": 100},
+        "cost": 50_000, "manpower": 300, "upkeep": {"food": 100},
         "attack": 20, "defense": 10, "slots": 1},
     "tank": {"name": "تانک", "group": "land", "requires": "land_tank_factory",
-        "cost": 150_000, "manpower": 250, "resources": {"steel": 300, "food": 150},
+        "cost": 150_000, "manpower": 250, "upkeep": {"food": 150, "steel": 300},
         "attack": 50, "defense": 25, "slots": 4},
     "ship": {"name": "ناو دریایی", "group": "naval", "requires": "naval_port",
-        "cost": 250_000, "manpower": 200, "resources": {"oil": 250, "food": 150},
+        "cost": 250_000, "manpower": 200, "upkeep": {"food": 150, "oil": 250},
         "attack": 50, "defense": 60},
     "submarine": {"name": "زیردریایی", "group": "naval", "requires": "naval_shipyard",
-        "cost": 200_000, "manpower": 120, "resources": {"oil": 200, "steel": 150},
-        "attack": 45, "defense": 25},
+        "cost": 400_000, "manpower": 220, "upkeep": {"food": 120, "oil": 300, "steel": 250},
+        "attack": 80, "defense": 70},
     "transport_ship": {"name": "ناو ترابری", "group": "naval", "requires": "naval_port",
-        "cost": 180_000, "manpower": 150, "resources": {"oil": 150, "steel": 200},
+        "cost": 180_000, "manpower": 150, "upkeep": {"food": 100, "oil": 150, "steel": 200},
         "attack": 5, "defense": 40, "transport_capacity": 100},
     "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": "naval_shipyard",
-        "cost": 800_000, "manpower": 500, "resources": {"oil": 800, "steel": 1200},
+        "cost": 800_000, "manpower": 500, "upkeep": {"food": 200, "oil": 800, "steel": 1200},
         "attack": 25, "defense": 90, "transport_capacity": 50},
     "fighter": {"name": "جنگنده", "group": "air", "requires": "air_airport",
-        "cost": 200_000, "manpower": 150, "resources": {"oil": 200, "steel": 100},
+        "cost": 200_000, "manpower": 150, "upkeep": {"food": 100, "oil": 200, "steel": 100},
         "attack": 45, "defense": 40, "slots": 5},
     "bomber": {"name": "بمب‌افکن", "group": "air", "requires": "air_arsenal",
-        "cost": 250_000, "manpower": 180, "resources": {"oil": 300, "steel": 150},
+        "cost": 250_000, "manpower": 180, "upkeep": {"food": 120, "oil": 300, "steel": 150},
         "attack": 60, "defense": 15, "slots": 10},
     "helicopter": {"name": "بالگرد", "group": "air", "requires": "air_airport",
-        "cost": 120_000, "manpower": 100, "resources": {"oil": 120, "steel": 60},
+        "cost": 120_000, "manpower": 100, "upkeep": {"food": 80, "oil": 120, "steel": 60},
         "attack": 30, "defense": 35, "slots": 0},   # بالگرد نیازی به ناو هواپیمابر ندارد
 }
 
@@ -303,12 +303,12 @@ MAP_RESOURCES = {
     "oil_texas":      {"type": "oil", "zone": "land", "name": "میدان نفتی پرمین (تگزاس)",           "lon": -102.0,"lat": 31.9,  "production": 4_000_000},
     "oil_ghawar":     {"type": "oil", "zone": "land", "name": "میدان نفتی غوار (عربستان)",          "lon": 49.4,  "lat": 25.4,  "production": 5_000_000},
     "oil_siberia":    {"type": "oil", "zone": "land", "name": "میدان نفتی سیبری غربی",              "lon": 76.7,  "lat": 61.1,  "production": 4_000_000},
-    # ---------- فولاد ----------
-    "steel_ural":     {"type": "steel", "zone": "land", "name": "معدن فولاد اورال (ماگنیتوگورسک)",  "lon": 59.1,  "lat": 53.4,  "production": 3_000_000},
-    "steel_ruhr":     {"type": "steel", "zone": "land", "name": "معدن فولاد رور",                    "lon": 7.0,   "lat": 51.4,  "production": 4_000_000},
-    "steel_brazil":   {"type": "steel", "zone": "land", "name": "معدن فولاد برزیل (کاراجاس)",        "lon": -50.2, "lat": -6.1,  "production": 3_500_000},
-    "steel_mesabi":   {"type": "steel", "zone": "land", "name": "معدن فولاد مسابی (آمریکا)",         "lon": -92.6, "lat": 47.5,  "production": 3_000_000},
-    "steel_anshan":   {"type": "steel", "zone": "land", "name": "معدن فولاد آنشان (چین)",            "lon": 123.0, "lat": 41.1,  "production": 3_500_000},
+    # ---------- آهن ----------
+    "steel_ural":     {"type": "steel", "zone": "land", "name": "معدن آهن اورال (ماگنیتوگورسک)",  "lon": 59.1,  "lat": 53.4,  "production": 3_000_000},
+    "steel_ruhr":     {"type": "steel", "zone": "land", "name": "معدن آهن رور",                    "lon": 7.0,   "lat": 51.4,  "production": 4_000_000},
+    "steel_brazil":   {"type": "steel", "zone": "land", "name": "معدن آهن برزیل (کاراجاس)",        "lon": -50.2, "lat": -6.1,  "production": 3_500_000},
+    "steel_mesabi":   {"type": "steel", "zone": "land", "name": "معدن آهن مسابی (آمریکا)",         "lon": -92.6, "lat": 47.5,  "production": 3_000_000},
+    "steel_anshan":   {"type": "steel", "zone": "land", "name": "معدن آهن آنشان (چین)",            "lon": 123.0, "lat": 41.1,  "production": 3_500_000},
     # ---------- اورانیوم ----------
     "uranium_kazakh":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم قزاقستان",          "lon": 72.2,  "lat": 52.4,  "production": 2_500_000},
     "uranium_canada":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم کانادا (آتاباسکا)", "lon": -105.6,"lat": 57.2,  "production": 2_000_000},
@@ -474,7 +474,16 @@ def compute_rates(player):
             resource_consumption[key] = raw - reduced
             resource_production[key] = reduced
 
+    # ----- مصرف روزانهٔ یگان‌ها (غذا، نفت، آهن) -----
+    army_consumption = {k: 0 for k in RESOURCE_NAMES}
+    for unit_id, unit in ARMY_UNITS.items():
+        n = player.get("units", {}).get(unit_id, 0)
+        if n <= 0: continue
+        for k, amt in unit.get("upkeep", {}).items():
+            army_consumption[k] += amt * n
+
     return {"gross_income": income, "net_income": income,
+            "army_consumption": army_consumption,
             "power_capacity": power_capacity, "power_consumption": power_consumption,
             "manpower_production": manpower_production,
             "resource_production": resource_production,
@@ -494,6 +503,9 @@ def accrue_player(player):
     for key, amount in rates["resource_production"].items():
         player["resources"][key] = player["resources"].get(key, 0) + amount * f
     for key, amount in rates["resource_consumption"].items():
+        if amount > 0:
+            player["resources"][key] = max(0, player["resources"].get(key, 0) - amount * f)
+    for key, amount in rates["army_consumption"].items():
         if amount > 0:
             player["resources"][key] = max(0, player["resources"].get(key, 0) - amount * f)
     player["last_update"] = now.isoformat()
@@ -523,6 +535,9 @@ def serialize_player(player):
     data = dict(player); data.update(get_game_time(player))
     data["resource_production"] = rates["resource_production"]
     data["resource_consumption"] = rates["resource_consumption"]
+    data["army_consumption"] = rates["army_consumption"]
+    data["resource_net"] = {k: rates["resource_production"][k] - rates["resource_consumption"][k]
+                            - rates["army_consumption"][k] for k in RESOURCE_NAMES}
     data["power_capacity"] = rates["power_capacity"]
     data["power_consumption"] = rates["power_consumption"]
     data["manpower_production"] = rates["manpower_production"]
@@ -847,12 +862,7 @@ async def train_unit(request):
     if p.get("manpower", 0) < total_mp:
         return web.json_response({"success": False, "error": "not_enough_manpower",
                                   "message": "نیروی انسانی کافی ندارید."}, status=400)
-    for k, a in unit["resources"].items():
-        if p["resources"].get(k, 0) < a * count:
-            return web.json_response({"success": False, "error": "not_enough_resource",
-                                      "message": f"{RESOURCE_NAMES[k]} کافی ندارید."}, status=400)
     p["money"] -= total_cost; p["manpower"] -= total_mp
-    for k, a in unit["resources"].items(): p["resources"][k] -= a * count
     p["units"][unit_id] = p["units"].get(unit_id, 0) + count
     recompute_army(p); save_state()
     return web.json_response({"success": True, "player": serialize_player(p)})
