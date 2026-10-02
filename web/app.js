@@ -330,6 +330,7 @@ function preloadImage(url, timeout = 8000) {
         const done = () => { clearTimeout(timer); resolve(); };
         img.onload = done; img.onerror = done;   // فایلِ نبود، منتظر نمی‌ماند
         img.src = url;
+        if (img.decode) img.decode().then(done, done);   // تا کاملاً آماده نمایش شود
     });
 }
 
@@ -365,6 +366,10 @@ async function showGame() {
     updateGameHeader(); updateHomeStats();
     const t0 = Date.now();
     await preloadHomeAssets();
+    updateHomeStats();   // عکس خانه از کش گذاشته شود
+    const heroPhoto = document.getElementById("home-card-photo");
+    for (let i = 0; i < 20 && heroPhoto && !heroPhoto.classList.contains("loaded"); i++) await sleep(50);
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const el = Date.now() - t0;
     if (el < 600) await sleep(600 - el);
     document.getElementById("game").classList.remove("booting");
