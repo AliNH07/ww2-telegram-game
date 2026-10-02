@@ -322,6 +322,7 @@ img { -webkit-user-drag: none; user-select: none; }
     display: flex; flex-direction: column; justify-content: flex-start;
 }
 .home-card-photo {
+    opacity: 0; transition: opacity 0.4s ease;
     position: absolute; inset: 0;
     background-color: #0b0e15;
     background-size: cover;
@@ -329,6 +330,7 @@ img { -webkit-user-drag: none; user-select: none; }
     z-index: 0;
 }
 /* فقط پایین عکس تیره می‌شود تا نوشته‌ها خوانا باشند و بالا کاملاً دیده شود */
+.home-card-photo.loaded { opacity: 1; }
 .home-card-photo::after {
     content: ""; position: absolute; inset: 0;
     background: linear-gradient(180deg,
