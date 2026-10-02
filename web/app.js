@@ -330,7 +330,6 @@ function preloadImage(url, timeout = 8000) {
         const done = () => { clearTimeout(timer); resolve(); };
         img.onload = done; img.onerror = done;   // فایلِ نبود، منتظر نمی‌ماند
         img.src = url;
-        if (img.decode) img.decode().then(done, done);   // تا کاملاً آماده نمایش شود
     });
 }
 
@@ -368,7 +367,7 @@ async function showGame() {
     await preloadHomeAssets();
     updateHomeStats();   // عکس خانه از کش گذاشته شود
     const heroPhoto = document.getElementById("home-card-photo");
-    for (let i = 0; i < 20 && heroPhoto && !heroPhoto.classList.contains("loaded"); i++) await sleep(50);
+    for (let i = 0; i < 10 && heroPhoto && !heroPhoto.classList.contains("loaded") && !heroPhoto.dataset.failed; i++) await sleep(50);
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const el = Date.now() - t0;
     if (el < 600) await sleep(600 - el);
@@ -437,6 +436,7 @@ function updateHomeStats() {
                 photo.style.backgroundImage = `url(${url})`;
                 photo.classList.add("loaded");
             };
+            img.onerror = () => { photo.dataset.failed = "1"; };
             img.src = url;
         }
     }
