@@ -368,8 +368,22 @@ function updateHomeStats() {
     document.getElementById("home-country-flag").src = countryImageUrl(selectedCountry);
     document.getElementById("home-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     const photo = document.getElementById("home-card-photo");
-    if (photo) photo.style.backgroundImage =
-        `url(${homeImageUrl(selectedCountry)}), url(${countryImageUrl(selectedCountry)})`;
+    if (photo) {
+        // فقط عکس خودِ خانه؛ تا کامل لود نشود چیزی نشان داده نمی‌شود و اگر فایل نبود، پس‌زمینه ساده می‌ماند
+        const url = homeImageUrl(selectedCountry);
+        if (photo.dataset.src !== url) {
+            photo.dataset.src = url;
+            photo.classList.remove("loaded");
+            photo.style.backgroundImage = "none";
+            const img = new Image();
+            img.onload = () => {
+                if (photo.dataset.src !== url) return;
+                photo.style.backgroundImage = `url(${url})`;
+                photo.classList.add("loaded");
+            };
+            img.src = url;
+        }
+    }
     document.getElementById("home-money").textContent = formatMoney(player.money);
     document.getElementById("home-income").textContent = formatMoney(player.daily_income);
     document.getElementById("home-manpower").textContent = formatNumber(player.manpower);
