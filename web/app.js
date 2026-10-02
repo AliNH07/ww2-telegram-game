@@ -37,20 +37,9 @@ const GROUP_ICONS = { land: "🪖", naval: "⚓", air: "✈️", missile: "🚀"
 const GROUP_TITLES = { land: "زمینی", naval: "دریایی", air: "هوایی", missile: "موشکی" };
 const TREATY_TYPE_NAMES = { alliance: "پیمان اتحاد", non_aggression: "پیمان عدم تجاوز" };
 
-// [طول, عرض, اسم, حداقل زوم, حداکثر زوم] — اقیانوس‌ها همیشه، دریاها فقط با زوم بیشتر
 const OCEAN_LABELS = [
-    [-35, 25, "اقیانوس اطلس", 0, 3.2], [-18, -22, "اقیانوس اطلس", 0, 3.2],
-    [-145, 5, "اقیانوس آرام", 0, 3.2], [172, 8, "اقیانوس آرام", 0, 3.2],
-    [78, -18, "اقیانوس هند", 0, 3.2],
-    [20, -62, "اقیانوس منجمد جنوبی", 0, 3.2], [60, 82, "اقیانوس منجمد شمالی", 0, 3.2],
-    [18, 34.5, "دریای مدیترانه", 1.4, 9], [34, 43.3, "دریای سیاه", 1.4, 9],
-    [65, 15, "دریای عرب", 1.4, 9], [88, 14, "خلیج بنگال", 1.4, 9],
-    [3, 56, "دریای شمال", 1.4, 9], [19.5, 58.5, "دریای بالتیک", 1.4, 9],
-    [-74, 15, "دریای کارائیب", 1.4, 9], [-90, 25, "خلیج مکزیک", 1.4, 9],
-    [114, 13, "دریای چین جنوبی", 1.4, 9], [134, 40, "دریای ژاپن", 1.4, 9],
-    [38.5, 20.5, "دریای سرخ", 1.4, 9], [40, 73, "دریای بارنتس", 1.4, 9],
-    [52, 27.2, "خلیج فارس", 1.4, 9], [2, 68, "دریای نروژ", 1.4, 9],
-    [160, -38, "دریای تاسمان", 1.4, 9]
+    [-40, 25, "اقیانوس اطلس"], [-150, 0, "اقیانوس آرام"], [75, -20, "اقیانوس هند"],
+    [90, 65, "اقیانوس منجمد شمالی"], [20, -60, "اقیانوس منجمد جنوبی"]
 ];
 
 /* =========================================================
@@ -98,7 +87,7 @@ function countryImageUrl(cid) {
     return `/images/countries/${cid}.${COUNTRY_IMAGE_EXT[cid] || "jpg"}`;
 }
 
-// تصویر پس‌زمینه کارت خانه (جدا از پرچم)
+// تصویر پس‌زمینه کارت خانه (جدا از پرچم) — اگر فایل نبود، پرچم نمایش داده می‌شود
 function homeImageUrl(cid) {
     return `/images/home/${cid}.jpg`;
 }
@@ -280,7 +269,7 @@ document.querySelectorAll("[data-country-card]").forEach(card => {
             showMessage("این کشور قبلاً انتخاب شده است."); return;
         }
         selectedCountry = cid;
-        confirmCountrySelection();
+        showCountryPreview();
     });
 });
 
@@ -291,15 +280,25 @@ function showMessage(msg) {
     setTimeout(() => { if (el.textContent === msg) el.textContent = ""; }, 4000);
 }
 
-let enteringCountry = false;
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function showCountryPreview() {
+    if (!selectedCountry) { showCountrySelection(); return; }
+    showOnly("country-preview");
+    document.getElementById("selected-country-flag").src = countryImageUrl(selectedCountry);
+    document.getElementById("preview-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
+    createPreviewGlobe("preview-globe-container", "preview-globe", selectedCountry);
+}
+
+document.getElementById("preview-back-button").addEventListener("click", () => {
+    selectedCountry = null; showCountrySelection();
+});
+
+document.getElementById("enter-game-button").addEventListener("click", async () => {
+    await confirmCountrySelection();
+});
 
 async function confirmCountrySelection() {
-    if (enteringCountry) return;
     if (!userId) { showToast("از داخل تلگرام وارد شوید."); return; }
     if (player?.country === selectedCountry) { showGame(); return; }
-    enteringCountry = true;
-    showDashboardShell();   // بلافاصله هدر + «در حال ورود به داشبورد»
     try {
         const data = await apiPost("/api/select-country", { country: selectedCountry });
         if (!data.success) {
@@ -307,72 +306,18 @@ async function confirmCountrySelection() {
                 showToast("این کشور قبلاً انتخاب شده است.");
                 selectedCountry = null; await loadCountries(); showCountrySelection(); return;
             }
-            if (data.error === "already_has_country") {
-                await loadPlayer();
-                if (player?.country) selectedCountry = player.country;
-                showGame(); return;
-            }
-            if (data.error === "occupied") { showToast("این کشور اشغال شده است."); showCountrySelection(); return; }
-            showToast(data.message || "خطا در انتخاب کشور."); showCountrySelection(); return;
+            if (data.error === "already_has_country") { await loadPlayer(); showGame(); return; }
+            if (data.error === "occupied") { showToast("این کشور اشغال شده است."); return; }
+            showToast(data.message || "خطا در انتخاب کشور."); return;
         }
         player = data.player; await loadCountries(); showGame();
-    } catch (e) {
-        showToast("خطای شبکه."); showCountrySelection();
-    } finally { enteringCountry = false; }
+    } catch (e) { showToast("خطای شبکه."); }
 }
 
-/* ---------- ورود به داشبورد: لود همه عکس‌های خانه، بعد نمایش ---------- */
-function preloadImage(url, timeout = 8000) {
-    return new Promise(resolve => {
-        if (!url) { resolve(); return; }
-        const img = new Image();
-        const timer = setTimeout(resolve, timeout);
-        const done = () => { clearTimeout(timer); resolve(); };
-        img.onload = done; img.onerror = done;   // فایلِ نبود، منتظر نمی‌ماند
-        img.src = url;
-    });
-}
-
-function cssBackgroundUrls(el) {
-    const bg = getComputedStyle(el).backgroundImage || "";
-    return Array.from(bg.matchAll(/url\(["']?([^"')]+)["']?\)/g)).map(m => m[1]);
-}
-
-async function preloadHomeAssets() {
-    const urls = new Set([homeImageUrl(selectedCountry), countryImageUrl(selectedCountry)]);
-    document.querySelectorAll("#game .game-header img, #home img").forEach(img => {
-        const src = img.getAttribute("src");
-        if (src) urls.add(src);
-    });
-    document.querySelectorAll("#home .action-card").forEach(c =>
-        cssBackgroundUrls(c).forEach(u => urls.add(u)));
-    await Promise.all(Array.from(urls).map(u => preloadImage(u)));
-    // استیکری که فایلش نیست، مخفی شود
-    document.querySelectorAll("#home .action-icon img").forEach(img => {
-        if (img.complete && img.naturalWidth === 0) img.style.display = "none";
-    });
-}
-
-function showDashboardShell() {
-    showOnly("game");
-    showGamePage("home");
-    document.getElementById("game").classList.add("booting");
-    if (selectedCountry) updateGameHeader();
-}
-
-async function showGame() {
-    showDashboardShell();
-    updateGameHeader(); updateHomeStats();
-    const t0 = Date.now();
-    await preloadHomeAssets();
-    updateHomeStats();   // عکس خانه از کش گذاشته شود
-    const heroPhoto = document.getElementById("home-card-photo");
-    for (let i = 0; i < 10 && heroPhoto && !heroPhoto.classList.contains("loaded") && !heroPhoto.dataset.failed; i++) await sleep(50);
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const el = Date.now() - t0;
-    if (el < 600) await sleep(600 - el);
-    document.getElementById("game").classList.remove("booting");
-    startStatsPolling(); refreshNotificationBadge();
+function showGame() {
+    showOnly("game"); showGamePage("home");
+    updateGameHeader(); updateHomeStats(); startStatsPolling();
+    loadRankings(); refreshNotificationBadge();
 }
 
 function updateGameHeader() {
@@ -423,30 +368,14 @@ function updateHomeStats() {
     document.getElementById("home-country-flag").src = countryImageUrl(selectedCountry);
     document.getElementById("home-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
     const photo = document.getElementById("home-card-photo");
-    if (photo) {
-        // فقط عکس خودِ خانه؛ تا کامل لود نشود چیزی نشان داده نمی‌شود و اگر فایل نبود، پس‌زمینه ساده می‌ماند
-        const url = homeImageUrl(selectedCountry);
-        if (photo.dataset.src !== url) {
-            photo.dataset.src = url;
-            photo.classList.remove("loaded");
-            photo.style.backgroundImage = "none";
-            const img = new Image();
-            img.onload = () => {
-                if (photo.dataset.src !== url) return;
-                photo.style.backgroundImage = `url(${url})`;
-                photo.classList.add("loaded");
-            };
-            img.onerror = () => { photo.dataset.failed = "1"; };
-            img.src = url;
-        }
-    }
+    if (photo) photo.style.backgroundImage =
+        `url(${homeImageUrl(selectedCountry)}), url(${countryImageUrl(selectedCountry)})`;
     document.getElementById("home-money").textContent = formatMoney(player.money);
     document.getElementById("home-income").textContent = formatMoney(player.daily_income);
     document.getElementById("home-manpower").textContent = formatNumber(player.manpower);
     document.getElementById("home-manpower-production").textContent = formatNumber(player.manpower_production);
-    const pCap = player.power_capacity ?? 0, pUse = player.power_consumption ?? 0;
-    document.getElementById("home-power").textContent = formatNumber(Math.max(0, pCap - pUse));   // برق آزاد = ظرفیت − مصرف
-    document.getElementById("home-power-sub").textContent = `مصرف: ${formatNumber(pUse)} از ${formatNumber(pCap)}`;
+    document.getElementById("home-power").textContent = formatNumber(player.power_capacity);
+    document.getElementById("home-power-sub").textContent = `مصرف: ${formatNumber(player.power_consumption ?? 0)}`;
     document.getElementById("home-army").textContent = formatNumber(player.army);
     const season = player.season ?? "بهار";
     document.getElementById("home-season").textContent = season;
@@ -494,8 +423,6 @@ document.querySelectorAll(".action-card").forEach(card => {
         else if (s === "diplomacy") openDiplomacyPage();
         else if (s === "economy") openEconomyPage();
         else if (s === "market") { showGamePage("market"); loadMarketListings(); }
-        else if (s === "ranking") { showGamePage("ranking"); loadRankings(); }
-        else if (s === "transfer" || s === "stats") showToast("به‌زودی فعال می‌شود");
     });
 });
 
@@ -1175,7 +1102,7 @@ document.querySelectorAll(".nav-item").forEach(item => {
         showGamePage(page);
         document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
         item.classList.add("active");
-        if (page === "home") { updateHomeStats(); refreshNotificationBadge(); }
+        if (page === "home") { updateHomeStats(); loadRankings(); refreshNotificationBadge(); }
         else if (page === "map") setTimeout(() => initWorldMap(), 30);
         else if (page === "communications") { loadAnnouncements(); loadUnion(); loadNews(); refreshNotificationBadge(); }
         else if (page === "market") { loadMarketListings(); loadMyListings(); }
@@ -1572,80 +1499,13 @@ async function loadMyListings() {
 /* =========================================================
    Map — World globe
 ========================================================= */
-const WORLD_NAMES_FA = {4:"افغانستان",8:"آلبانی",10:"جنوبگان",12:"الجزایر",16:"ساموآی امریکا",20:"آندورا",24:"آنگولا",28:"آنتیگوا و باربودا",31:"جمهوری آذربایجان",32:"آرژانتین",36:"استرالیا",40:"اتریش",44:"باهاما",48:"بحرین",50:"بنگلادش",51:"ارمنستان",52:"باربادوس",56:"بلژیک",60:"برمودا",64:"بوتان",68:"بولیوی",70:"بوسنی",72:"بوتسوانا",76:"برزیل",84:"بلیز",90:"جزایر سلیمان",92:"جزایر ویرجین",96:"برونئی",100:"بلغارستان",104:"میانمار (برمه)",108:"بوروندی",112:"بلاروس",116:"کامبوج",120:"کامرون",124:"کانادا",132:"کیپ‌ورد",140:"آفریقای مرکزی",144:"سری‌لانکا",148:"چاد",152:"شیلی",156:"چین",158:"تایوان",170:"کلمبیا",174:"کومور",178:"کنگو",180:"کنگو (دموکراتیک)",184:"جزایر کوک",188:"کاستاریکا",191:"کرواسی",192:"کوبا",196:"قبرس",203:"چک",204:"بنین",208:"دانمارک",212:"دومینیکا",214:"جمهوری دومینیکن",218:"اکوادور",222:"السالوادور",226:"گینه استوایی",231:"اتیوپی",232:"اریتره",233:"استونی",234:"جزایر فارو",238:"فالکلند",239:"جورجیای جنوبی",242:"فیجی",246:"فنلاند",250:"فرانسه",254:"گویان فرانسه",258:"پلی‌نزی فرانسه",260:"سرزمین‌های فرانسوی جنوبی",262:"جیبوتی",266:"گابن",268:"گرجستان",270:"گامبیا",275:"فلسطین",276:"آلمان",288:"غنا",296:"کیریباتی",300:"یونان",304:"گرینلند",308:"گرنادا",316:"گوام",320:"گواتمالا",324:"گینه",328:"گویان",332:"هائیتی",340:"هندوراس",344:"هنگ‌کنگ",348:"مجارستان",352:"ایسلند",356:"هند",360:"اندونزی",364:"ایران",368:"عراق",372:"ایرلند",376:"اسرائیل",380:"ایتالیا",384:"ساحل عاج",388:"جامائیکا",392:"ژاپن",398:"قزاقستان",400:"اردن",404:"کنیا",408:"کره شمالی",410:"کره جنوبی",414:"کویت",417:"قرقیزستان",418:"لائوس",422:"لبنان",426:"لسوتو",428:"لتونی",430:"لیبریا",434:"لیبی",438:"لیختن‌اشتاین",440:"لیتوانی",442:"لوکزامبورگ",446:"ماکائو، منطقهٔ ویژهٔ اداری چین",450:"ماداگاسکار",454:"مالاوی",458:"مالزی",462:"مالدیو",466:"مالی",470:"مالت",478:"موریتانی",480:"موریس",484:"مکزیک",492:"موناکو",496:"مغولستان",498:"مولداوی",499:"مونته‌نگرو",504:"مراکش",508:"موزامبیک",512:"عمان",516:"نامیبیا",520:"نائورو",524:"نپال",528:"هلند",531:"کوراسائو",533:"آروبا",534:"سنت مارتن",535:"جزایر کارائیب هلند",540:"کالدونیای جدید",548:"وانواتو",554:"نیوزیلند",558:"نیکاراگوئه",562:"نیجر",566:"نیجریه",578:"نروژ",580:"ماریانای شمالی",583:"میکرونزی",584:"جزایر مارشال",585:"پالائو",586:"پاکستان",591:"پاناما",598:"پاپوآ گینه نو",600:"پاراگوئه",604:"پرو",608:"فیلیپین",612:"جزایر پیت‌کرن",616:"لهستان",620:"پرتغال",624:"گینه بیسائو",626:"تیمور شرقی",630:"پورتوریکو",634:"قطر",642:"رومانی",643:"شوروی",646:"رواندا",654:"سنت هلن",659:"سنت کیتس",660:"آنگویلا",662:"سنت لوسیا",670:"سنت وینسنت",674:"سان‌مارینو",678:"سائوتومه",682:"عربستان سعودی",686:"سنگال",688:"صربستان",690:"سیشل",694:"سیرالئون",702:"سنگاپور",703:"اسلواکی",704:"ویتنام",705:"اسلوونی",706:"سومالی",710:"افریقای جنوبی",716:"زیمبابوه",724:"اسپانیا",728:"سودان جنوبی",729:"سودان",732:"صحرای غربی",740:"سورینام",748:"اسواتینی",752:"سوئد",756:"سوئیس",760:"سوریه",762:"تاجیکستان",764:"تایلند",768:"توگو",776:"تونگا",780:"ترینیداد",784:"امارات",788:"تونس",792:"ترکیه",795:"ترکمنستان",796:"جزایر تورکس و کایکوس",798:"تووالو",800:"اوگاندا",804:"اوکراین",807:"مقدونیه شمالی",818:"مصر",826:"بریتانیا",834:"تانزانیا",840:"آمریکا",850:"جزایر ویرجین",854:"بورکینافاسو",858:"اروگوئه",860:"ازبکستان",862:"ونزوئلا",882:"ساموآ",887:"یمن",894:"زامبیا"};
-const MAP_ODD_NAMES = { "Kosovo": "کوزوو", "N. Cyprus": "قبرس شمالی", "Somaliland": "سومالیلند" };
-const MAP_COLORS = {
-    own: "#ffd21f",        // کشوری که خود بازیکن انتخاب کرده → زرد
-    other: "#2f7fe8",      // کشوری که بازیکن دیگری انتخاب کرده (فعال) → آبی
-    inactive: "#0b0b0e",   // در بازی هست ولی کسی انتخابش نکرده (غیرفعال) → سیاه
-    ownOcc: "#34b36b", otherOcc: "#9b5de5",
-    hatchBase: "#2c3544", hatchLine: "rgba(150,165,188,0.75)"   // هنوز به بازی اضافه نشده → هاشور
-};
-const MAP_SPHERE = { type: "Sphere" };
-
-/* ---------- نقشه سیاسی ۱۹۹۳ ----------
-   داده‌ی نقشه مرزهای امروزی دارد؛ این جدول آن را به قلمروهای سال ۱۹۹۳ تبدیل می‌کند.
-   (اعضا: id عددی کشور یا نام برای فیچرهای بدون id) */
-const SOVIET_BLOC = true;   // true: «شوروی» بازی = کل ۱۵ جمهوری | false: فقط روسیه
-const MAP_1993_REALMS = {
-    643: SOVIET_BLOC
-        ? [643, 804, 112, 498, 233, 428, 440, 268, 51, 31, 398, 860, 795, 417, 762]
-        : [643],
-    688: [688, 499, "Kosovo"],     // یوگسلاوی (صربستان + مونته‌نگرو + کوزوو)
-    729: [729, 728],               // سودان (سودان جنوبی هنوز جدا نشده)
-    360: [360, 626],               // اندونزی (تیمور شرقی جزو اندونزی)
-    706: [706, "Somaliland"],      // سومالی
-    196: [196, "N. Cyprus"]        // قبرس
-};
-function realm1993(f) {
-    const id = (f.id === undefined || f.id === null) ? null : Number(f.id);
-    const nm = f.properties && f.properties.name;
-    for (const [rid, members] of Object.entries(MAP_1993_REALMS)) {
-        if ((id !== null && members.includes(id)) || members.includes(nm)) return Number(rid);
-    }
-    return id !== null ? id : "n:" + nm;
-}
-// چند فیچر → یک MultiPolygon (بدون دست‌زدن به جهت حلقه‌ها، مناسب کره)
-function combineFeatures(feats, id) {
-    const polys = [];
-    feats.forEach(ft => {
-        const g = ft.geometry;
-        if (g.type === "Polygon") polys.push(g.coordinates);
-        else if (g.type === "MultiPolygon") g.coordinates.forEach(c => polys.push(c));
-    });
-    return { type: "Feature", id, properties: { name: "" }, geometry: { type: "MultiPolygon", coordinates: polys } };
-}
-// الگوی هاشور (خط‌خطی مورب) برای کشورهای اضافه‌نشده
-let mapHatch = null;
-function getHatchPattern(ctx) {
-    if (mapHatch) return mapHatch;
-    const S = 8, d = mapDpr;
-    const c = document.createElement("canvas");
-    c.width = c.height = Math.round(S * d);
-    const g = c.getContext("2d");
-    g.scale(d, d);
-    g.fillStyle = MAP_COLORS.hatchBase; g.fillRect(0, 0, S, S);
-    g.strokeStyle = MAP_COLORS.hatchLine; g.lineWidth = 1.2;
-    g.beginPath();
-    g.moveTo(-2, S + 2); g.lineTo(S + 2, -2);
-    g.moveTo(-2, 2);     g.lineTo(2, -2);
-    g.moveTo(S - 2, S + 2); g.lineTo(S + 2, S - 2);
-    g.stroke();
-    mapHatch = ctx.createPattern(c, "repeat");
-    try { mapHatch.setTransform(new DOMMatrix().scale(1 / d)); } catch (e) {}
-    return mapHatch;
-}
-
 let mapProjection = null, mapPath = null, mapSvg = null;
 let mapSize = 0, mapMinScale = 0, mapMaxScale = 0;
 let mapRotation = [0, -10];
-let mapInitialized = false, mapInitializing = false;
+let mapInitialized = false;
 let mapAbort = null;
 let mapSites = [];
 let mapSitesSvg = null;
-let mapCanvas = null, mapCtx = null, mapDpr = 1, mapW = 320, mapH = 300;
-let mapFeatures = [], mapGroups = [], mapWaterItems = [], mapGraticule = null, mapRaf = 0;
-let mapBorders = null, mapCoast = null;
 
 async function initWorldMap() {
     const box = document.querySelector(".map-box");
@@ -1653,101 +1513,49 @@ async function initWorldMap() {
     if (!box || !svgEl) return;
 
     if (mapInitialized) { updateMapColors(); redrawMap(); return; }
-    if (mapInitializing) return;
-    mapInitializing = true;
 
     const w = box.clientWidth || 320;
     const h = box.clientHeight || 300;
-    mapW = w; mapH = h;
     mapSize = Math.min(w, h) * 0.46;
     mapMinScale = mapSize * 0.8;
     mapMaxScale = mapSize * 6;
 
     let world;
     try { world = await loadWorldAtlas(); }
-    catch (e) { console.error(e); mapInitializing = false; return; }
+    catch (e) { console.error(e); return; }
 
     const land = topojson.feature(world, world.objects.countries);
-
-    // Canvas برای خود کره (خیلی سریع‌تر از SVG)؛ SVG فقط برای اسم‌ها و سکوها روی آن می‌نشیند
-    mapDpr = Math.min(window.devicePixelRatio || 1, 2);
-    mapCanvas = document.createElement("canvas");
-    mapCanvas.className = "map-canvas";
-    mapCanvas.width = Math.round(w * mapDpr);
-    mapCanvas.height = Math.round(h * mapDpr);
-    box.insertBefore(mapCanvas, box.firstChild);
-    mapCtx = mapCanvas.getContext("2d");
-
-    mapGraticule = d3.geoGraticule10();
     mapProjection = d3.geoOrthographic().scale(mapSize).translate([w / 2, h / 2])
         .rotate(mapRotation).clipAngle(90);
-    mapPath = d3.geoPath(mapProjection, mapCtx);
-
-    const keyById = {};
-    Object.entries(COUNTRY_IDS).forEach(([k, id]) => { keyById[id] = k; });
-    const R = Math.PI / 180;
-
-    // ---- قلمروهای ۱۹۹۳ ----
-    const geoms = world.objects.countries.geometries;
-    const realmOfGeom = new Map();
-    const realms = new Map();
-    land.features.forEach((f, i) => {
-        const rid = realm1993(f);
-        realmOfGeom.set(geoms[i], rid);
-        let r = realms.get(rid);
-        if (!r) { r = { rid, feats: [] }; realms.set(rid, r); }
-        r.feats.push(f);
-    });
-    // فقط مرزِ بین دو قلمرو مختلف + ساحل کشیده می‌شود (مرز داخلی شوروی/یوگسلاوی دیده نمی‌شود)
-    mapBorders = topojson.mesh(world, world.objects.countries, (x, y) => realmOfGeom.get(x) !== realmOfGeom.get(y));
-    mapCoast = topojson.mesh(world, world.objects.countries, (x, y) => x === y);
-
-    // اطلاعات ثابت هر قلمرو یک‌بار محاسبه می‌شود (نه در هر فریم)
-    mapFeatures = Array.from(realms.values()).map(r => {
-        const f = r.feats.length === 1 ? r.feats[0] : combineFeatures(r.feats, r.rid);
-        const id = typeof r.rid === "number" ? r.rid : NaN;
-        const key = keyById[id] || null;
-        // اسم فقط برای کشورهایی که در بازی هستند؛ بقیه بی‌نام
-        const name = key ? COUNTRY_NAMES[key] : "";
-        const bb = d3.geoBounds(f);
-        let dLon = bb[1][0] - bb[0][0]; if (dLon < 0) dLon += 360;
-        const c = d3.geoCentroid(f);
-        const sArea = Math.sqrt(d3.geoArea(f)) * 1.7;
-        return {
-            f, id, key, name, c, label: null, shown: false, tw: 0,
-            sw: Math.min(dLon * R * Math.max(0.2, Math.cos(c[1] * R)), sArea),
-            sh: Math.min((bb[1][1] - bb[0][1]) * R, sArea)
-        };
-    });
-
+    mapPath = d3.geoPath(mapProjection);
     mapSvg = d3.select(svgEl).attr("viewBox", `0 0 ${w} ${h}`);
     mapSvg.selectAll("*").remove();
 
-    // اسم اقیانوس‌ها و دریاها
-    const waterG = mapSvg.append("g").attr("class", "map-water-labels");
-    mapWaterItems = OCEAN_LABELS.map(d => {
-        const node = waterG.append("text")
-            .attr("class", d[3] > 0 ? "map-sea-label" : "map-ocean-label")
-            .attr("text-anchor", "middle").attr("dominant-baseline", "central")
-            .style("display", "none").text(d[2]).node();
-        return { d, node, shown: false };
-    });
+    mapSvg.append("path").datum({ type: "Sphere" }).attr("class", "globe-water").attr("d", mapPath);
 
-    // اسم کشورها (فقط وقتی روی کشور جا شود نمایش داده می‌شود)
-    const labelG = mapSvg.append("g").attr("class", "map-country-labels");
-    mapFeatures.forEach(m => {
-        if (!m.name) return;
-        const node = labelG.append("text").attr("class", "map-country-label")
-            .attr("text-anchor", "middle").attr("dominant-baseline", "central")
-            .attr("font-size", 10).text(m.name).node();
-        let tw = 0;
-        try { tw = node.getComputedTextLength(); } catch (e) {}
-        m.tw = tw > 0 ? tw / 10 : m.name.length * 0.5;   // عرض متن به‌ازای هر ۱px فونت
-        node.style.display = "none";
-        m.label = node;
-    });
+    mapSvg.selectAll(".map-country")
+        .data(land.features).enter().append("path")
+        .attr("class", "map-country").attr("d", mapPath)
+        .attr("data-country-id", d => d.id)
+        .on("click", (e, d) => { e.stopPropagation(); showCountryInfo(d); });
 
+    mapSvg.selectAll(".map-country-label")
+        .data(land.features.filter(d => Object.values(COUNTRY_IDS).includes(Number(d.id))))
+        .enter().append("text")
+        .attr("class", "map-country-label").attr("text-anchor", "middle")
+        .text(d => {
+            const e = Object.entries(COUNTRY_IDS).find(([, id]) => id === Number(d.id));
+            return e ? COUNTRY_NAMES[e[0]] : "";
+        });
+
+    mapSvg.selectAll(".map-ocean-label")
+        .data(OCEAN_LABELS).enter().append("text")
+        .attr("class", "map-ocean-label").attr("text-anchor", "middle")
+        .text(d => d[2]);
+
+    await loadMapSites();
     mapSitesSvg = mapSvg.append("g").attr("class", "map-sites-layer");
+    renderMapSites();
 
     updateMapColors(); redrawMap();
     attachMapInteractions(svgEl);
@@ -1760,50 +1568,31 @@ async function initWorldMap() {
     document.getElementById("map-info-close").onclick = () => {
         document.getElementById("map-info-panel").classList.add("hidden");
     };
-    mapInitialized = true; mapInitializing = false;
-
-    // سکوها بعد از نمایش کره لود می‌شوند تا نقشه زودتر دیده شود
-    await loadMapSites();
-    renderMapSites();
-    redrawMap();
+    mapInitialized = true;
 }
 
 async function loadMapSites() {
     try { mapSites = await apiGet("/api/map-sites"); }
     catch (e) { mapSites = []; }
-    if (!Array.isArray(mapSites)) mapSites = [];
 }
 
 function renderMapSites() {
     if (!mapSitesSvg) return;
     mapSitesSvg.selectAll("*").remove();
-    const g = mapSitesSvg.selectAll(".map-site").data(mapSites).enter().append("g")
-        .attr("class", d => `map-site map-site-${d.kind === "strait" ? "strait" : d.type}` +
-            (d.owner && d.owner === selectedCountry ? " mine" : ""))
-        .style("display", "none")
+    mapSitesSvg.selectAll(".map-site")
+        .data(mapSites).enter().append("circle")
+        .attr("class", d => `map-site map-site-${d.kind === "strait" ? "strait" : d.type}`)
+        .attr("r", 3.2)
         .on("click", (e, d) => { e.stopPropagation(); showSiteInfo(d); });
-    g.append("rect").attr("class", "site-hit")
-        .attr("x", -11).attr("y", -11).attr("width", 22).attr("height", 22);
-    g.each(function (d) {
-        const s = d3.select(this);
-        if (d.kind === "strait") s.append("circle").attr("class", "site-shape").attr("r", 4.4);
-        else s.append("rect").attr("class", "site-shape")
-            .attr("x", -5).attr("y", -5).attr("width", 10).attr("height", 10).attr("rx", 0.5);
-    });
 }
 
 function updateMapSitePositions() {
     if (!mapSitesSvg || !mapProjection) return;
     const rot = mapProjection.rotate();
-    const zoom = mapProjection.scale() / mapSize;
-    const k = (1 + Math.min(0.7, (zoom - 1) * 0.15)).toFixed(2);
-    mapSitesSvg.selectAll(".map-site").each(function (d) {
-        const p = viewCos(d.lon, d.lat, rot) > 0.02 ? mapProjection([d.lon, d.lat]) : null;
-        if (p) {
-            this.setAttribute("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)}) scale(${k})`);
-            this.style.display = "";
-        } else this.style.display = "none";
-    });
+    mapSitesSvg.selectAll(".map-site")
+        .attr("opacity", d => isPointVisible(d.lon, d.lat, rot) ? 1 : 0)
+        .attr("cx", d => { const p = mapProjection([d.lon, d.lat]); return p ? p[0] : -9999; })
+        .attr("cy", d => { const p = mapProjection([d.lon, d.lat]); return p ? p[1] : -9999; });
 }
 
 function zoomMap(f) {
@@ -1816,23 +1605,16 @@ function attachMapInteractions(svgEl) {
     if (mapAbort) mapAbort.abort();
     mapAbort = new AbortController();
     const signal = mapAbort.signal;
-    let dragging = false, pinching = false, lx = 0, ly = 0, pd = 0, ps = mapSize, moved = 0;
+    let dragging = false, pinching = false, lx = 0, ly = 0, pd = 0, ps = mapSize;
 
-    // سرعت چرخش متناسب با زوم: هرچه نزدیک‌تر، حرکت انگشت ریزتر (قبلاً ثابت بود و در زوم زیاد پرش می‌کرد)
-    const rotateBy = (dx, dy) => {
-        const k = 57.2958 / mapProjection.scale();
-        mapRotation[0] += dx * k;
-        mapRotation[1] = Math.max(-90, Math.min(90, mapRotation[1] - dy * k));
-        mapProjection.rotate(mapRotation); redrawMap();
-    };
-
-    svgEl.addEventListener("mousedown", e => { dragging = true; moved = 0; lx = e.clientX; ly = e.clientY; }, { signal });
+    svgEl.addEventListener("mousedown", e => { dragging = true; lx = e.clientX; ly = e.clientY; }, { signal });
     window.addEventListener("mouseup", () => { dragging = false; }, { signal });
     window.addEventListener("mousemove", e => {
         if (!dragging) return;
-        const dx = e.clientX - lx, dy = e.clientY - ly;
-        moved += Math.abs(dx) + Math.abs(dy);
-        rotateBy(dx, dy);
+        mapRotation[0] += (e.clientX - lx) * 0.4;
+        mapRotation[1] -= (e.clientY - ly) * 0.4;
+        mapRotation[1] = Math.max(-90, Math.min(90, mapRotation[1]));
+        mapProjection.rotate(mapRotation); redrawMap();
         lx = e.clientX; ly = e.clientY;
     }, { signal });
 
@@ -1843,11 +1625,11 @@ function attachMapInteractions(svgEl) {
 
     svgEl.addEventListener("touchstart", e => {
         if (e.touches.length === 2) {
-            pinching = true; dragging = false; moved = 99;
+            pinching = true; dragging = false;
             pd = getTouchDistance(e.touches); ps = mapProjection.scale(); return;
         }
         if (!e.touches.length) return;
-        dragging = true; moved = 0; lx = e.touches[0].clientX; ly = e.touches[0].clientY;
+        dragging = true; lx = e.touches[0].clientX; ly = e.touches[0].clientY;
     }, { passive: true, signal });
 
     svgEl.addEventListener("touchend", e => {
@@ -1863,159 +1645,53 @@ function attachMapInteractions(svgEl) {
             redrawMap(); return;
         }
         if (!dragging || !e.touches.length) return;
-        const dx = e.touches[0].clientX - lx, dy = e.touches[0].clientY - ly;
-        moved += Math.abs(dx) + Math.abs(dy);
-        rotateBy(dx, dy);
+        mapRotation[0] += (e.touches[0].clientX - lx) * 0.4;
+        mapRotation[1] -= (e.touches[0].clientY - ly) * 0.4;
+        mapRotation[1] = Math.max(-90, Math.min(90, mapRotation[1]));
+        mapProjection.rotate(mapRotation); redrawMap();
         lx = e.touches[0].clientX; ly = e.touches[0].clientY;
         e.preventDefault();
     }, { passive: false, signal });
-
-    // انتخاب کشور با لمس (چون کشورها روی Canvas کشیده می‌شوند، با مختصات پیدا می‌شود)
-    svgEl.addEventListener("click", e => {
-        if (moved > 6) return;
-        const rect = svgEl.getBoundingClientRect();
-        if (!rect.width || !rect.height) return;
-        const x = (e.clientX - rect.left) * (mapW / rect.width);
-        const y = (e.clientY - rect.top) * (mapH / rect.height);
-        const ll = mapProjection.invert([x, y]);
-        if (!ll || !isFinite(ll[0]) || !isFinite(ll[1])) return;
-        const hit = mapFeatures.find(m => d3.geoContains(m.f, ll));
-        if (hit) showCountryInfo(hit.f);
-    }, { signal });
 }
 
-// رسم حداکثر یک‌بار در هر فریم (قبلاً در هر رویداد لمس کل نقشه دوباره رسم می‌شد)
 function redrawMap() {
-    if (!mapProjection || mapRaf) return;
-    mapRaf = requestAnimationFrame(() => { mapRaf = 0; drawMapNow(); });
-}
+    if (!mapSvg || !mapProjection) return;
+    const rot = mapProjection.rotate();
+    mapSvg.selectAll("path.globe-water, path.map-country").attr("d", mapPath);
 
-function drawMapNow() {
-    if (!mapCtx || !mapProjection) return;
-    const ctx = mapCtx, w = mapW, h = mapH;
-    const r = mapProjection.scale(), cx = w / 2, cy = h / 2;
-    ctx.setTransform(mapDpr, 0, 0, mapDpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
+    mapSvg.selectAll(".map-ocean-label")
+        .attr("opacity", d => isPointVisible(d[0], d[1], rot) ? 1 : 0)
+        .attr("x", d => { const p = mapProjection([d[0], d[1]]); return p ? p[0] : -9999; })
+        .attr("y", d => { const p = mapProjection([d[0], d[1]]); return p ? p[1] : -9999; });
 
-    // هاله اطراف کره
-    const glow = ctx.createRadialGradient(cx, cy, r * 0.97, cx, cy, r * 1.14);
-    glow.addColorStop(0, "rgba(110,185,255,0.45)");
-    glow.addColorStop(1, "rgba(110,185,255,0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(cx, cy, r * 1.14, 0, 2 * Math.PI); ctx.fill();
+    mapSvg.selectAll(".map-country-label")
+        .attr("x", d => { const c = mapPath.centroid(d); return isNaN(c[0]) ? -9999 : c[0]; })
+        .attr("y", d => { const c = mapPath.centroid(d); return isNaN(c[1]) ? -9999 : c[1]; })
+        .attr("opacity", d => { const c = mapPath.centroid(d); return isNaN(c[0]) ? 0 : 1; });
 
-    // اقیانوس (آبی)
-    ctx.beginPath(); mapPath(MAP_SPHERE);
-    const water = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.05, cx, cy, r * 1.05);
-    water.addColorStop(0, "#3a8bc7");
-    water.addColorStop(0.55, "#1d62a0");
-    water.addColorStop(1, "#0b2d52");
-    ctx.fillStyle = water; ctx.fill();
-
-    // مدارها و نصف‌النهارها
-    ctx.beginPath(); mapPath(mapGraticule);
-    ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.stroke();
-
-    // خشکی‌ها (هم‌رنگ‌ها در یک مسیر؛ کشورهای اضافه‌نشده هاشور)
-    ctx.lineJoin = "round";
-    for (const g of mapGroups) {
-        ctx.beginPath();
-        for (const m of g.items) mapPath(m.f);
-        ctx.fillStyle = g.hatch ? getHatchPattern(ctx) : g.fill;
-        ctx.fill();
-        if (!g.hatch) { ctx.lineWidth = 0.5; ctx.strokeStyle = g.fill; ctx.stroke(); }   // پوشاندن درز
-    }
-    // مرز کشورها و ساحل
-    if (mapBorders) {
-        ctx.beginPath(); mapPath(mapBorders);
-        ctx.lineWidth = 0.6; ctx.strokeStyle = "rgba(215,228,245,0.5)"; ctx.stroke();
-    }
-    if (mapCoast) {
-        ctx.beginPath(); mapPath(mapCoast);
-        ctx.lineWidth = 0.7; ctx.strokeStyle = "rgba(215,228,245,0.6)"; ctx.stroke();
-    }
-
-    // سایه‌روشن برای حالت سه‌بعدی
-    ctx.beginPath(); mapPath(MAP_SPHERE);
-    const shade = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.25, cx, cy, r);
-    shade.addColorStop(0, "rgba(255,255,255,0.12)");
-    shade.addColorStop(0.65, "rgba(0,0,0,0)");
-    shade.addColorStop(1, "rgba(0,8,24,0.5)");
-    ctx.fillStyle = shade; ctx.fill();
-
-    // لبه کره
-    ctx.beginPath(); mapPath(MAP_SPHERE);
-    ctx.lineWidth = 1.2; ctx.strokeStyle = "rgba(150,205,255,0.6)"; ctx.stroke();
-
-    updateMapLabels();
     updateMapSitePositions();
 }
 
-function updateMapLabels() {
-    const scale = mapProjection.scale();
-    const zoom = scale / mapSize;
-    const rot = mapProjection.rotate();
-    const fs = Math.max(7, Math.min(13, 6.5 + zoom * 1.5));
-
-    // اسم کشور: فقط اگر روی خودِ کشور جا شود
-    for (const m of mapFeatures) {
-        const node = m.label;
-        if (!node) continue;
-        let p = null;
-        const z = viewCos(m.c[0], m.c[1], rot);
-        if (z > 0.25 && m.sw * scale * z >= m.tw * fs * 1.1 && m.sh * scale * z >= fs * 1.5) {
-            p = mapProjection(m.c);
-            if (p && (p[0] < -20 || p[0] > mapW + 20 || p[1] < -20 || p[1] > mapH + 20)) p = null;
-        }
-        if (p) {
-            node.setAttribute("x", p[0].toFixed(1));
-            node.setAttribute("y", p[1].toFixed(1));
-            node.setAttribute("font-size", fs.toFixed(1));
-            if (!m.shown) { node.style.display = ""; m.shown = true; }
-        } else if (m.shown) { node.style.display = "none"; m.shown = false; }
-    }
-
-    // اسم اقیانوس‌ها و دریاها (هرکدام در بازه زوم خودش)
-    for (const o of mapWaterItems) {
-        const d = o.d;
-        let p = null;
-        if (zoom >= d[3] && zoom <= d[4] && viewCos(d[0], d[1], rot) > 0.35) {
-            p = mapProjection([d[0], d[1]]);
-            if (p && (p[0] < -30 || p[0] > mapW + 30 || p[1] < -10 || p[1] > mapH + 10)) p = null;
-        }
-        if (p) {
-            o.node.setAttribute("x", p[0].toFixed(1));
-            o.node.setAttribute("y", p[1].toFixed(1));
-            o.node.setAttribute("font-size", (d[3] > 0 ? fs * 0.95 : fs * 1.2).toFixed(1));
-            if (!o.shown) { o.node.style.display = ""; o.shown = true; }
-        } else if (o.shown) { o.node.style.display = "none"; o.shown = false; }
-    }
-}
-
-function mapFillFor(m) {
-    if (!m.key) return null;   // هنوز به بازی اضافه نشده → هاشور
-    const info = countries[m.key];
-    if (info?.occupier) {
-        if (info.occupier === selectedCountry) return MAP_COLORS.ownOcc;
-        if (info.taken && m.key === selectedCountry) return MAP_COLORS.ownOcc;
-        return MAP_COLORS.otherOcc;
-    }
-    if (m.key === selectedCountry) return MAP_COLORS.own;
-    if (info?.taken) return MAP_COLORS.other;
-    return MAP_COLORS.inactive;
-}
-
 function updateMapColors() {
-    const groups = new Map();
-    mapFeatures.forEach(m => {
-        const fill = mapFillFor(m);
-        const gk = fill || "hatch";
-        let g = groups.get(gk);
-        if (!g) { g = { fill, hatch: !fill, game: !!m.key, items: [] }; groups.set(gk, g); }
-        g.items.push(m);
-    });
-    mapGroups = Array.from(groups.values());
-    if (mapSitesSvg) renderMapSites();
+    if (!mapSvg) return;
+    mapSvg.selectAll(".map-country")
+        .attr("fill", d => {
+            const cid = Number(d.id);
+            const e = Object.entries(COUNTRY_IDS).find(([, id]) => id === cid);
+            if (!e) return "#151b21";
+            const [key] = e;
+            const info = countries[key];
+            if (info?.occupier) {
+                if (info.occupier === selectedCountry) return "#2fa360";
+                if (info.taken && key === selectedCountry) return "#2fa360";
+                return "#8e4ec6";
+            }
+            if (key === selectedCountry) return "#d98a25";
+            if (info?.taken) return "#b8862a";
+            return "#1c2733";
+        })
+        .attr("stroke", d => Object.values(COUNTRY_IDS).includes(Number(d.id)) ? "#2d3a48" : "#141c25")
+        .attr("stroke-width", .6);
 }
 
 function showCountryInfo(feature) {
@@ -2030,8 +1706,8 @@ function showCountryInfo(feature) {
     actionBtn.classList.add("hidden");
 
     if (!e) {
-        flagEl.textContent = "🏳️"; nameEl.textContent = "منطقه ناشناخته";
-        statusEl.textContent = "هنوز به بازی اضافه نشده"; descEl.textContent = "این کشور هنوز در بازی فعال نیست.";
+        flagEl.textContent = "🏳️"; nameEl.textContent = "منطقه غیربازی";
+        statusEl.textContent = "بی‌صاحب"; descEl.textContent = "کنترل نشده.";
         panel.classList.remove("hidden"); return;
     }
     const [key] = e;
@@ -2046,7 +1722,7 @@ function showCountryInfo(feature) {
     } else if (info?.taken) {
         statusEl.textContent = "بازیکن دیگر"; descEl.textContent = "در اختیار بازیکن دیگر.";
     } else {
-        statusEl.textContent = "غیرفعال"; descEl.textContent = "هنوز توسط هیچ بازیکنی انتخاب نشده.";
+        statusEl.textContent = "بی‌صاحب"; descEl.textContent = "هنوز انتخاب نشده.";
     }
     panel.classList.remove("hidden");
 }
@@ -2064,8 +1740,7 @@ function showSiteInfo(site) {
         descEl.textContent = `درآمد روزانه: ${formatMoney(site.income)}`;
     } else {
         flagEl.textContent = RESOURCE_ICONS[site.type] || "📍";
-        const zoneTxt = site.zone === "sea" ? "🌊 در دریا" : (site.zone === "land" ? "⛰️ در خشکی" : "");
-        descEl.textContent = `تولید: ${formatNumber(site.production)} در روز` + (zoneTxt ? ` — ${zoneTxt}` : "");
+        descEl.textContent = `تولید: ${formatNumber(site.production)} در روز`;
     }
     nameEl.textContent = site.name;
     if (site.owner) {
@@ -2101,13 +1776,6 @@ async function captureSite(siteId) {
 ========================================================= */
 function getTouchDistance(t) {
     return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-}
-
-// کسینوس فاصله زاویه‌ای نقطه تا مرکز دید (بیشتر از ۰ یعنی روی نیمکره روبه‌رو)
-function viewCos(lon, lat, rot) {
-    const r = Math.PI / 180;
-    const l1 = -rot[1] * r, l2 = lat * r, dl = (lon + rot[0]) * r;
-    return Math.sin(l1) * Math.sin(l2) + Math.cos(l1) * Math.cos(l2) * Math.cos(dl);
 }
 
 function isPointVisible(lon, lat, rot) {
@@ -2238,8 +1906,6 @@ async function createPreviewGlobe(containerId, svgId, selected) {
         selectedCountry = player.country;
         showGame();
     } else {
-        // اول همه پرچم‌ها لود شوند، بعد صفحه انتخاب کشور
-        await Promise.all(Object.keys(COUNTRY_IMAGE_EXT).map(cid => preloadImage(countryImageUrl(cid))));
         showCountrySelection();
     }
 })();
