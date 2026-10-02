@@ -423,6 +423,11 @@ document.querySelectorAll(".action-card").forEach(card => {
         else if (s === "diplomacy") openDiplomacyPage();
         else if (s === "economy") openEconomyPage();
         else if (s === "market") { showGamePage("market"); loadMarketListings(); }
+        else if (s === "ranking") {
+            const box = document.getElementById("rankings-list");
+            if (box) box.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        else if (s === "transfer" || s === "stats") showToast("به‌زودی فعال می‌شود");
     });
 });
 
