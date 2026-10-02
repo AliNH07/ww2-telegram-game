@@ -308,8 +308,209 @@ img { -webkit-user-drag: none; user-select: none; }
 
 /* ==================== کارت خانه (Command Center) ==================== */
 .ic { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.home-card { background: #0b0e15; border: 1px solid rgba(var(--brand-rgb), .22); border-radius: 18px; overflow: hidden; margin-bottom: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
-.home-card-body { position: relative; display: flex; flex-direction: column; aspect-ratio: 3 / 4; width: 100%; padding: 10px; overflow: hidden; }
+
+/* ==================== صفحه خانه — Command Center ==================== */
+.home-card { position: relative; }
+
+/* تصویر خانه دقیقاً با نسبت 3:4 نمایش داده می‌شود؛ مناسب تصویر عمودی ساخته‌شده */
+.home-card-body {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #0b0e15;
+}
+.home-card-photo {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-color: #101722;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    opacity: 0;
+    transition: opacity .25s ease;
+}
+.home-card-photo.loaded { opacity: 1; }
+
+/* لایه‌ی تیره ملایم تا متن خوانا بماند ولی خود عکس واضح دیده شود */
+.home-card-body::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+        linear-gradient(90deg, rgba(5,8,13,.08) 0%, rgba(5,8,13,.18) 42%, rgba(5,8,13,.60) 100%),
+        linear-gradient(180deg, rgba(5,8,13,.06) 0%, rgba(5,8,13,.04) 55%, rgba(5,8,13,.38) 100%);
+}
+
+.hero-country {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 3;
+    width: 48%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    text-shadow: 0 2px 5px rgba(0,0,0,.9);
+}
+.hero-country .flag-wrap { width: 58px; height: 58px; border-width: 2px; box-shadow: 0 5px 16px rgba(0,0,0,.45); }
+.hero-country strong { font-size: clamp(18px, 4.8vw, 27px); color: #fff; line-height: 1.15; }
+.world-chip {
+    flex-basis: 100%;
+    margin-right: 66px;
+    margin-top: -4px;
+    color: #d7dde6;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.home-stats {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    bottom: 10px;
+    z-index: 3;
+    width: 48%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 14px 12px;
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(7,12,19,.82), rgba(7,12,19,.70));
+    box-shadow: 0 8px 24px rgba(0,0,0,.28);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+.hs-money, .hs-manpower, .hs-power {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.hs-money { padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,.13); }
+.hs-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 0; }
+.hs-manpower, .hs-power { padding: 8px 5px; }
+.hs-power { border-right: 1px solid rgba(255,255,255,.12); padding-right: 9px; }
+.hs-ic { width: 31px; height: 31px; color: #a8bfe8; filter: drop-shadow(0 2px 5px rgba(0,0,0,.55)); }
+.hs-ic.gold { color: #e8b64e; }
+.hs-value {
+    display: block;
+    color: #f4f6f9;
+    font-size: clamp(15px, 3.7vw, 22px);
+    line-height: 1.15;
+    direction: ltr;
+    text-align: right;
+    white-space: nowrap;
+}
+.hs-label { display: block; margin-top: 3px; color: #c5ccd6; font-size: 10px; line-height: 1.4; }
+.hs-sub { display: block; margin-top: 2px; color: #7f8b9b; font-size: 8.5px; }
+.hs-foot {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,.13);
+    color: #c4ccd7;
+    font-size: 9px;
+    line-height: 1.45;
+}
+.hs-foot span { white-space: nowrap; }
+.hs-foot .hs-income { color: #4ade80; }
+.hs-foot #home-income { color: #4ade80; font-weight: bold; }
+
+.season-bar {
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 12px;
+    color: #aeb8c7;
+    background: rgba(8,12,18,.92);
+    border-top: 1px solid rgba(var(--brand-rgb),.14);
+    font-size: 9.5px;
+}
+.season-tag { color: var(--brand); font-weight: bold; white-space: nowrap; }
+.season-hint { color: #7f8b9b; text-align: left; }
+
+/* بخش‌های پایین صفحه خانه */
+.home-section { margin-bottom: 14px; }
+.sec-head {
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border: 1px solid color-mix(in srgb, var(--tc) 42%, transparent);
+    border-radius: 14px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--tc) 11%, rgba(11,14,21,.88)), rgba(11,14,21,.82));
+}
+.sec-title { display: flex; align-items: center; gap: 7px; color: var(--tc); font-size: 17px; font-weight: bold; }
+.sec-title .ic { width: 23px; height: 23px; }
+.sec-sub { margin-right: auto; color: #9aa5b5; font-size: 9px; }
+.sec-chev { color: var(--tc); width: 18px; height: 18px; }
+.tile-grid { display: grid; gap: 8px; }
+.tile-grid.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.action-card.tile {
+    position: relative;
+    min-height: 104px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 9px;
+    text-align: right;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--tc) 55%, transparent);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(15,20,30,.92), rgba(8,12,18,.84));
+    box-shadow: inset 0 0 22px color-mix(in srgb, var(--tc) 5%, transparent), 0 5px 15px rgba(0,0,0,.24);
+}
+.action-card.tile:active { transform: scale(.985); }
+.hex {
+    width: 48px; height: 55px; flex: 0 0 48px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--tc);
+    border: 1px solid color-mix(in srgb, var(--tc) 80%, transparent);
+    background: color-mix(in srgb, var(--tc) 10%, rgba(8,12,18,.92));
+    clip-path: polygon(25% 3%,75% 3%,100% 25%,100% 75%,75% 97%,25% 97%,0 75%,0 25%);
+}
+.hex .ic { width: 26px; height: 26px; }
+.tile-text { min-width: 0; flex: 1; }
+.tile-text h3 { color: #f4f6f9; font-size: 14px; margin-bottom: 4px; }
+.tile-text p { color: #8e99a9; font-size: 9px; line-height: 1.5; }
+.tile-chev { width: 17px; height: 17px; color: var(--tc); flex: 0 0 auto; }
+.tile-wide { grid-column: 1 / -1; }
+
+@media (max-width: 430px) {
+    .home-card-body { aspect-ratio: 3 / 4; }
+    .hero-country { top: 12px; left: 12px; width: 47%; }
+    .hero-country .flag-wrap { width: 46px; height: 46px; }
+    .world-chip { margin-right: 54px; font-size: 9px; }
+    .home-stats { top: 8px; right: 8px; bottom: 8px; width: 51%; padding: 10px 9px; }
+    .hs-ic { width: 24px; height: 24px; }
+    .hs-value { font-size: 14px; }
+    .hs-label { font-size: 8.5px; }
+    .hs-sub { font-size: 7.5px; }
+    .hs-duo { gap: 3px; padding: 8px 0; }
+    .hs-foot { font-size: 7.8px; gap: 4px; }
+    .sec-title { font-size: 15px; }
+    .sec-sub { font-size: 8px; }
+    .action-card.tile { min-height: 92px; }
+    .hex { width: 42px; height: 48px; flex-basis: 42px; }
+    .hex .ic { width: 23px; height: 23px; }
+    .tile-text h3 { font-size: 12.5px; }
+    .tile-text p { font-size: 8px; }
+}
+
 .infra-tabs::-webkit-scrollbar { display: none; }
 .infra-tab {
     flex: 0 0 auto; padding: 9px 14px; border-radius: 12px;
