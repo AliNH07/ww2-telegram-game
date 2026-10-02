@@ -48,9 +48,9 @@ SEASON_HINTS = {
     "زمستان": "❄️ مصرف سوخت و غذا خیلی زیاد می‌شود",
 }
 
-STARTING_RESOURCES = {"food": 5_000, "steel": 0, "uranium": 0, "oil": 5_000}
-RESOURCE_NAMES = {"food": "غذا", "steel": "آهن", "uranium": "اورانیوم", "oil": "نفت"}
-GROUP_NAMES = {"land": "زمینی", "naval": "دریایی", "air": "هوایی",
+STARTING_RESOURCES = {"food": 5_000, "iron": 0, "uranium": 0, "oil": 5_000}
+RESOURCE_NAMES = {"food": "غذا", "iron": "آهن", "uranium": "اورانیوم", "oil": "نفت"}
+GROUP_NAMES = {"land": "زمینی", "naval": "دریایی", "air": "هوایی", "missile": "موشکی",
                "power": "برق", "manpower": "نیروی انسانی", "resource": "منابع"}
 TREATY_TYPE_NAMES = {"alliance": "پیمان اتحاد", "non_aggression": "پیمان عدم تجاوز"}
 ANN_COSTS = {1: 0, 2: 0, 3: 10_000, 4: 400_000}
@@ -163,8 +163,8 @@ INFRASTRUCTURE = {
         "desc": "نفت خام استخراج می‌کند. برای پالایشگاه و ارتش ضروری است.",
         "levels": [L(cost=220_000, production=50_000), L(cost=500_000, production=130_000), L(cost=1_100_000, production=300_000), L(cost=2_200_000, production=700_000), L(cost=4_200_000, production=1_500_000)],
     },
-    "resource_steel_mill": {
-        "name": "کارخانه آهن", "group": "resource", "resource_key": "steel", "icon": "⚙️",
+    "resource_iron_mill": {
+        "name": "کارخانه آهن", "group": "resource", "resource_key": "iron", "icon": "⚙️",
         "desc": "آهن تولید می‌کند. پایهٔ صنعت و ساخت تانک است.",
         "levels": [L(cost=240_000, production=50_000), L(cost=540_000, production=130_000), L(cost=1_200_000, production=300_000), L(cost=2_400_000, production=700_000), L(cost=4_500_000, production=1_500_000)],
     },
@@ -177,38 +177,48 @@ INFRASTRUCTURE = {
     # ==================== نظامی ====================
     "land_barracks": {
         "name": "پادگان", "group": "land", "icon": "🪖",
-        "desc": "محل استقرار پیاده‌نظام. هر سطح ظرفیت را ۱۰۰۰ نفر بیشتر می‌کند.",
-        "levels": [L(cost=200_000, capacity=1000), L(cost=450_000, capacity=2000), L(cost=950_000, capacity=3000), L(cost=1_800_000, capacity=4000), L(cost=3_200_000, capacity=5000)],
+        "desc": "محل استقرار پیاده‌نظام و تانک. ظرفیت بر حسب «جا» است و هر یگان تعدادی جا اشغال می‌کند؛ با ارتقا بزرگ‌تر می‌شود.",
+        "levels": [L(cost=200_000, capacity=400), L(cost=450_000, capacity=800), L(cost=950_000, capacity=1400), L(cost=1_800_000, capacity=2200), L(cost=3_200_000, capacity=3200)],
     },
     "land_hq": {
         "name": "ستاد فرماندهی", "group": "land", "icon": "🪖",
         "desc": "پیاده‌نظام اینجا تولید می‌شود. هر سطح ۱۰٪ به دفاع کشور در برابر حملات مستقیم اضافه می‌کند.",
-        "levels": [L(cost=500_000, capacity=3), L(cost=1_100_000, capacity=8), L(cost=2_300_000, capacity=18), L(cost=4_300_000, capacity=35), L(cost=7_500_000, capacity=60)],
+        "levels": [L(cost=500_000), L(cost=1_100_000), L(cost=2_300_000), L(cost=4_300_000), L(cost=7_500_000)],
     },
     "land_tank_factory": {
         "name": "کارخانه تانک", "group": "land", "icon": "🪖",
         "desc": "تانک و لانچر تولید می‌کند. هر سطح تولید را سریع‌تر و دفاع تانک‌ها را قوی‌تر می‌کند.",
-        "levels": [L(cost=600_000, capacity=3), L(cost=1_300_000, capacity=8), L(cost=2_800_000, capacity=16), L(cost=5_200_000, capacity=30), L(cost=9_000_000, capacity=55)],
+        "levels": [L(cost=600_000), L(cost=1_300_000), L(cost=2_800_000), L(cost=5_200_000), L(cost=9_000_000)],
     },
     "naval_port": {
         "name": "بندر", "group": "naval", "icon": "⚓",
-        "desc": "محل پهلو گرفتن ناوگان. هر سطح ظرفیت بندر را بیشتر می‌کند.",
-        "levels": [L(cost=550_000, capacity=3), L(cost=1_200_000, capacity=8), L(cost=2_600_000, capacity=18), L(cost=4_800_000, capacity=30), L(cost=8_500_000, capacity=55)],
+        "desc": "محل پهلو گرفتن ناوگان. ظرفیت بر حسب «جا» است و هر ناو تعدادی جا اشغال می‌کند؛ با ارتقا بزرگ‌تر می‌شود.",
+        "levels": [L(cost=550_000, capacity=500), L(cost=1_200_000, capacity=1000), L(cost=2_600_000, capacity=1700), L(cost=4_800_000, capacity=2700), L(cost=8_500_000, capacity=4000)],
     },
     "naval_shipyard": {
         "name": "کارخانه کشتی‌سازی", "group": "naval", "icon": "⚓",
         "desc": "زیردریایی، ناوشکن، ناو ترابری و ناو هواپیمابر تولید می‌کند.",
-        "levels": [L(cost=900_000, capacity=2), L(cost=1_900_000, capacity=6), L(cost=4_000_000, capacity=14), L(cost=7_300_000, capacity=25), L(cost=12_500_000, capacity=45)],
+        "levels": [L(cost=900_000), L(cost=1_900_000), L(cost=4_000_000), L(cost=7_300_000), L(cost=12_500_000)],
     },
     "air_airport": {
         "name": "فرودگاه نظامی", "group": "air", "icon": "✈️",
-        "desc": "محل استقرار جنگنده، بمب‌افکن، بالگرد و هواپیمای سوخت‌رسان.",
-        "levels": [L(cost=650_000, capacity=3), L(cost=1_400_000, capacity=8), L(cost=2_900_000, capacity=18), L(cost=5_400_000, capacity=30), L(cost=9_300_000, capacity=55)],
+        "desc": "محل استقرار جنگنده، بمب‌افکن و بالگرد. ظرفیت بر حسب «جا» است؛ با ارتقا بزرگ‌تر می‌شود.",
+        "levels": [L(cost=650_000, capacity=600), L(cost=1_400_000, capacity=1200), L(cost=2_900_000, capacity=2000), L(cost=5_400_000, capacity=3200), L(cost=9_300_000, capacity=5000)],
     },
     "air_arsenal": {
         "name": "کارخانه ادوات هوایی", "group": "air", "icon": "✈️",
         "desc": "جنگنده، بمب‌افکن و بالگرد تولید می‌کند. هر سطح تولید را سریع‌تر می‌کند.",
-        "levels": [L(cost=950_000, capacity=2), L(cost=2_000_000, capacity=6), L(cost=4_200_000, capacity=14), L(cost=7_600_000, capacity=25), L(cost=13_000_000, capacity=45)],
+        "levels": [L(cost=950_000), L(cost=2_000_000), L(cost=4_200_000), L(cost=7_600_000), L(cost=13_000_000)],
+    },
+    "missile_center": {
+        "name": "مرکز توسعه موشکی", "group": "missile", "icon": "🚀",
+        "desc": "موشک تاکتیکی، کروز و بالستیک اینجا تولید می‌شود.",
+        "levels": [L(cost=900_000), L(cost=1_900_000), L(cost=4_000_000), L(cost=7_300_000), L(cost=12_500_000)],
+    },
+    "missile_depot": {
+        "name": "انبار موشک", "group": "missile", "icon": "🚀",
+        "desc": "محل نگهداری موشک‌ها. ظرفیت بر حسب «جا» است و هر موشک تعدادی جا اشغال می‌کند؛ با ارتقا بزرگ‌تر می‌شود.",
+        "levels": [L(cost=600_000, capacity=700), L(cost=1_300_000, capacity=1400), L(cost=2_800_000, capacity=2300), L(cost=5_200_000, capacity=3600), L(cost=9_000_000, capacity=5500)],
     },
 }
 
@@ -231,7 +241,7 @@ ECONOMY = {
         "power_required": 12,
         "levels": [L(cost=280_000, income=70_000), L(cost=700_000, income=180_000), L(cost=1_600_000, income=420_000), L(cost=3_400_000, income=920_000), L(cost=6_800_000, income=1_850_000)],
     },
-    "eco_steel": {
+    "eco_iron": {
         "name": "کارخانه آهن", "group": "eco", "icon": "⚙️",
         "desc": "آهن را به محصولات صنعتی تبدیل می‌کند.",
         "power_required": 18,
@@ -258,39 +268,50 @@ ECONOMY = {
 }
 
 ARMY_UNITS = {
+    # slots = جایی که هر یگان در پایگاه (پادگان/بندر/فرودگاه) اشغال می‌کند؛ جنگنده و بمب‌افکن همین جا را روی ناو هواپیمابر هم می‌گیرند
+    # upkeep = مصرف روزانهٔ هر واحد
     "infantry": {"name": "پیاده‌نظام", "group": "land", "requires": "land_barracks",
         "cost": 50_000, "manpower": 300, "upkeep": {"food": 100},
         "attack": 20, "defense": 10, "slots": 1},
     "tank": {"name": "تانک", "group": "land", "requires": "land_tank_factory",
-        "cost": 150_000, "manpower": 250, "upkeep": {"food": 150, "steel": 300},
+        "cost": 150_000, "manpower": 250, "upkeep": {"food": 150, "iron": 300},
         "attack": 50, "defense": 25, "slots": 4},
     "ship": {"name": "ناو دریایی", "group": "naval", "requires": "naval_port",
         "cost": 250_000, "manpower": 200, "upkeep": {"food": 150, "oil": 250},
-        "attack": 50, "defense": 60},
+        "attack": 50, "defense": 60, "slots": 25},
     "submarine": {"name": "زیردریایی", "group": "naval", "requires": "naval_shipyard",
-        "cost": 400_000, "manpower": 220, "upkeep": {"food": 120, "oil": 300, "steel": 250},
-        "attack": 80, "defense": 70},
+        "cost": 400_000, "manpower": 220, "upkeep": {"food": 120, "oil": 300, "iron": 250},
+        "attack": 80, "defense": 70, "slots": 20},
     "transport_ship": {"name": "ناو ترابری", "group": "naval", "requires": "naval_port",
-        "cost": 180_000, "manpower": 150, "upkeep": {"food": 100, "oil": 150, "steel": 200},
-        "attack": 5, "defense": 40, "transport_capacity": 100},
+        "cost": 180_000, "manpower": 150, "upkeep": {"food": 100, "oil": 150, "iron": 200},
+        "attack": 5, "defense": 40, "slots": 30, "transport_capacity": 100},
     "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": "naval_shipyard",
-        "cost": 800_000, "manpower": 500, "upkeep": {"food": 200, "oil": 800, "steel": 1200},
-        "attack": 25, "defense": 90, "transport_capacity": 50},
+        "cost": 800_000, "manpower": 500, "upkeep": {"food": 200, "oil": 800, "iron": 1200},
+        "attack": 25, "defense": 90, "slots": 100, "transport_capacity": 50},
     "fighter": {"name": "جنگنده", "group": "air", "requires": "air_airport",
-        "cost": 200_000, "manpower": 150, "upkeep": {"food": 100, "oil": 200, "steel": 100},
-        "attack": 45, "defense": 40, "slots": 5},
+        "cost": 200_000, "manpower": 150, "upkeep": {"food": 100, "oil": 200, "iron": 100},
+        "attack": 45, "defense": 40, "slots": 5, "needs_carrier": True},
     "bomber": {"name": "بمب‌افکن", "group": "air", "requires": "air_arsenal",
-        "cost": 250_000, "manpower": 180, "upkeep": {"food": 120, "oil": 300, "steel": 150},
-        "attack": 60, "defense": 15, "slots": 10},
+        "cost": 250_000, "manpower": 180, "upkeep": {"food": 120, "oil": 300, "iron": 150},
+        "attack": 60, "defense": 15, "slots": 10, "needs_carrier": True},
     "helicopter": {"name": "بالگرد", "group": "air", "requires": "air_airport",
-        "cost": 120_000, "manpower": 100, "upkeep": {"food": 80, "oil": 120, "steel": 60},
-        "attack": 30, "defense": 35, "slots": 0},   # بالگرد نیازی به ناو هواپیمابر ندارد
+        "cost": 120_000, "manpower": 100, "upkeep": {"food": 80, "oil": 120, "iron": 60},
+        "attack": 30, "defense": 35, "slots": 3},   # بالگرد نیازی به ناو هواپیمابر ندارد
+    "missile_tactical": {"name": "موشک تاکتیکی", "group": "missile", "requires": "missile_center",
+        "cost": 300_000, "manpower": 120, "upkeep": {"food": 60, "oil": 100, "iron": 80},
+        "attack": 70, "defense": 5, "slots": 10},
+    "missile_cruise": {"name": "موشک کروز", "group": "missile", "requires": "missile_center",
+        "cost": 600_000, "manpower": 160, "upkeep": {"food": 70, "oil": 180, "iron": 150},
+        "attack": 110, "defense": 10, "slots": 20},
+    "missile_ballistic": {"name": "موشک بالستیک", "group": "missile", "requires": "missile_center",
+        "cost": 1_200_000, "manpower": 220, "upkeep": {"food": 80, "oil": 300, "iron": 250},
+        "attack": 180, "defense": 15, "slots": 40},
 }
 
 # زمان ساخت (ثانیه) — فعلاً همه ۰ هستند
 for _u in ARMY_UNITS.values():
     _u.setdefault("build_time", 0)
-    _u.setdefault("slots", 0)
+    _u.setdefault("needs_carrier", False)
 
 MAP_RESOURCES = {
     # مختصات بر اساس میدان‌ها و معدن‌های فعال در سال ۱۹۹۳ — zone: sea = دریا / land = خشکی
@@ -304,11 +325,11 @@ MAP_RESOURCES = {
     "oil_ghawar":     {"type": "oil", "zone": "land", "name": "میدان نفتی غوار (عربستان)",          "lon": 49.4,  "lat": 25.4,  "production": 5_000_000},
     "oil_siberia":    {"type": "oil", "zone": "land", "name": "میدان نفتی سیبری غربی",              "lon": 76.7,  "lat": 61.1,  "production": 4_000_000},
     # ---------- آهن ----------
-    "steel_ural":     {"type": "steel", "zone": "land", "name": "معدن آهن اورال (ماگنیتوگورسک)",  "lon": 59.1,  "lat": 53.4,  "production": 3_000_000},
-    "steel_ruhr":     {"type": "steel", "zone": "land", "name": "معدن آهن رور",                    "lon": 7.0,   "lat": 51.4,  "production": 4_000_000},
-    "steel_brazil":   {"type": "steel", "zone": "land", "name": "معدن آهن برزیل (کاراجاس)",        "lon": -50.2, "lat": -6.1,  "production": 3_500_000},
-    "steel_mesabi":   {"type": "steel", "zone": "land", "name": "معدن آهن مسابی (آمریکا)",         "lon": -92.6, "lat": 47.5,  "production": 3_000_000},
-    "steel_anshan":   {"type": "steel", "zone": "land", "name": "معدن آهن آنشان (چین)",            "lon": 123.0, "lat": 41.1,  "production": 3_500_000},
+    "iron_ural":     {"type": "iron", "zone": "land", "name": "معدن آهن اورال (ماگنیتوگورسک)",  "lon": 59.1,  "lat": 53.4,  "production": 3_000_000},
+    "iron_ruhr":     {"type": "iron", "zone": "land", "name": "معدن آهن رور",                    "lon": 7.0,   "lat": 51.4,  "production": 4_000_000},
+    "iron_brazil":   {"type": "iron", "zone": "land", "name": "معدن آهن برزیل (کاراجاس)",        "lon": -50.2, "lat": -6.1,  "production": 3_500_000},
+    "iron_mesabi":   {"type": "iron", "zone": "land", "name": "معدن آهن مسابی (آمریکا)",         "lon": -92.6, "lat": 47.5,  "production": 3_000_000},
+    "iron_anshan":   {"type": "iron", "zone": "land", "name": "معدن آهن آنشان (چین)",            "lon": 123.0, "lat": 41.1,  "production": 3_500_000},
     # ---------- اورانیوم ----------
     "uranium_kazakh":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم قزاقستان",          "lon": 72.2,  "lat": 52.4,  "production": 2_500_000},
     "uranium_canada":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم کانادا (آتاباسکا)", "lon": -105.6,"lat": 57.2,  "production": 2_000_000},
@@ -391,7 +412,7 @@ def get_group_capacity(player, group):
     for item_id, item in INFRASTRUCTURE.items():
         if item.get("group") != group: continue
         lv = get_infra_level(player, item_id)
-        if lv > 0: total += item["levels"][lv - 1]["capacity"]
+        if lv > 0: total += item["levels"][lv - 1].get("capacity", 0)
     return total
 
 def get_group_units(player, group):
@@ -399,6 +420,13 @@ def get_group_units(player, group):
     for unit_id, unit in ARMY_UNITS.items():
         if unit["group"] == group:
             total += player.get("units", {}).get(unit_id, 0)
+    return total
+
+def get_group_slots(player, group):
+    total = 0
+    for unit_id, unit in ARMY_UNITS.items():
+        if unit["group"] == group:
+            total += player.get("units", {}).get(unit_id, 0) * unit["slots"]
     return total
 
 def recompute_army(player):
@@ -452,7 +480,7 @@ def compute_rates(player):
             income += res["production"] // 10
             resource_production["oil"] += res["production"] // 5
         elif res["type"] == "food":    resource_production["food"]    += res["production"] // 5
-        elif res["type"] == "steel":   resource_production["steel"]   += res["production"] // 5
+        elif res["type"] == "iron":   resource_production["iron"]   += res["production"] // 5
         elif res["type"] == "uranium": resource_production["uranium"] += res["production"] // 5
 
     for key, owner in strait_holdings.items():
@@ -850,11 +878,12 @@ async def train_unit(request):
     if get_infra_level(p, req) <= 0:
         return web.json_response({"success": False, "error": "no_infra",
                                   "message": f"ابتدا «{INFRASTRUCTURE[req]['name']}» را بسازید."}, status=400)
-    cap = get_group_capacity(p, group); used = get_group_units(p, group)
-    if used >= cap:
+    cap = get_group_capacity(p, group); used = get_group_slots(p, group)
+    room = cap - used
+    if room < unit["slots"]:
         return web.json_response({"success": False, "error": "capacity_full",
-                                  "message": f"ظرفیت {GROUP_NAMES[group]} پر است."}, status=400)
-    count = min(count, cap - used)
+                                  "message": f"جای خالی {GROUP_NAMES[group]} کافی نیست؛ پایگاه را ارتقا دهید."}, status=400)
+    count = min(count, room // unit["slots"])
     total_cost = unit["cost"] * count; total_mp = unit["manpower"] * count
     if p.get("money", 0) < total_cost:
         return web.json_response({"success": False, "error": "not_enough_money",
@@ -1059,7 +1088,7 @@ async def perform_battle(request):
                      * ARMY_UNITS["aircraft_carrier"]["transport_capacity"])
     # بالگرد بدون ناو هم می‌تواند حمله کند
     air_possible = any(
-        atk["units"].get(k, 0) > 0 and (u["slots"] == 0 or carrier_slots > 0)
+        atk["units"].get(k, 0) > 0 and (not u["needs_carrier"] or carrier_slots > 0)
         for k, u in ARMY_UNITS.items() if u["group"] == "air")
 
     for front in ["air", "naval", "land"]:
@@ -1081,11 +1110,12 @@ async def perform_battle(request):
             ratio = min(1.0, requested / total_available)
             sent_map = {uid_: int(count * ratio) for uid_, count in available.items()}
             if front == "air":
-                need = sum(n * ARMY_UNITS[k]["slots"] for k, n in sent_map.items())
+                need = sum(n * ARMY_UNITS[k]["slots"] for k, n in sent_map.items()
+                           if ARMY_UNITS[k]["needs_carrier"])
                 if need > carrier_slots:
                     f = carrier_slots / need
                     for k in sent_map:
-                        if ARMY_UNITS[k]["slots"] > 0:
+                        if ARMY_UNITS[k]["needs_carrier"]:
                             sent_map[k] = int(sent_map[k] * f)
             for uid_, sent in sent_map.items():
                 atk_attack += sent * ARMY_UNITS[uid_]["attack"]
