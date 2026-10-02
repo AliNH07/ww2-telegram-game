@@ -87,7 +87,7 @@ function countryImageUrl(cid) {
     return `/images/countries/${cid}.${COUNTRY_IMAGE_EXT[cid] || "jpg"}`;
 }
 
-// تصویر پس‌زمینه کارت خانه (جدا از پرچم) — اگر فایل نبود، پرچم نمایش داده می‌شود
+// تصویر پس‌زمینه کارت خانه (جدا از پرچم)
 function homeImageUrl(cid) {
     return `/images/home/${cid}.jpg`;
 }
@@ -269,7 +269,7 @@ document.querySelectorAll("[data-country-card]").forEach(card => {
             showMessage("این کشور قبلاً انتخاب شده است."); return;
         }
         selectedCountry = cid;
-        showCountryPreview();
+        confirmCountrySelection();
     });
 });
 
@@ -280,25 +280,15 @@ function showMessage(msg) {
     setTimeout(() => { if (el.textContent === msg) el.textContent = ""; }, 4000);
 }
 
-function showCountryPreview() {
-    if (!selectedCountry) { showCountrySelection(); return; }
-    showOnly("country-preview");
-    document.getElementById("selected-country-flag").src = countryImageUrl(selectedCountry);
-    document.getElementById("preview-country-name").textContent = COUNTRY_NAMES[selectedCountry] || selectedCountry;
-    createPreviewGlobe("preview-globe-container", "preview-globe", selectedCountry);
-}
-
-document.getElementById("preview-back-button").addEventListener("click", () => {
-    selectedCountry = null; showCountrySelection();
-});
-
-document.getElementById("enter-game-button").addEventListener("click", async () => {
-    await confirmCountrySelection();
-});
+let enteringCountry = false;
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function confirmCountrySelection() {
+    if (enteringCountry) return;
     if (!userId) { showToast("از داخل تلگرام وارد شوید."); return; }
     if (player?.country === selectedCountry) { showGame(); return; }
+    enteringCountry = true;
+    showDashboardShell();   // بلافاصله هدر + «در حال ورود به داشبورد»
     try {
         const data = await apiPost("/api/select-country", { country: selectedCountry });
         if (!data.success) {
@@ -306,18 +296,68 @@ async function confirmCountrySelection() {
                 showToast("این کشور قبلاً انتخاب شده است.");
                 selectedCountry = null; await loadCountries(); showCountrySelection(); return;
             }
-            if (data.error === "already_has_country") { await loadPlayer(); showGame(); return; }
-            if (data.error === "occupied") { showToast("این کشور اشغال شده است."); return; }
-            showToast(data.message || "خطا در انتخاب کشور."); return;
+            if (data.error === "already_has_country") {
+                await loadPlayer();
+                if (player?.country) selectedCountry = player.country;
+                showGame(); return;
+            }
+            if (data.error === "occupied") { showToast("این کشور اشغال شده است."); showCountrySelection(); return; }
+            showToast(data.message || "خطا در انتخاب کشور."); showCountrySelection(); return;
         }
         player = data.player; await loadCountries(); showGame();
-    } catch (e) { showToast("خطای شبکه."); }
+    } catch (e) {
+        showToast("خطای شبکه."); showCountrySelection();
+    } finally { enteringCountry = false; }
 }
 
-function showGame() {
-    showOnly("game"); showGamePage("home");
-    updateGameHeader(); updateHomeStats(); startStatsPolling();
-    loadRankings(); refreshNotificationBadge();
+/* ---------- ورود به داشبورد: لود همه عکس‌های خانه، بعد نمایش ---------- */
+function preloadImage(url, timeout = 8000) {
+    return new Promise(resolve => {
+        if (!url) { resolve(); return; }
+        const img = new Image();
+        const timer = setTimeout(resolve, timeout);
+        const done = () => { clearTimeout(timer); resolve(); };
+        img.onload = done; img.onerror = done;   // فایلِ نبود، منتظر نمی‌ماند
+        img.src = url;
+    });
+}
+
+function cssBackgroundUrls(el) {
+    const bg = getComputedStyle(el).backgroundImage || "";
+    return Array.from(bg.matchAll(/url\(["']?([^"')]+)["']?\)/g)).map(m => m[1]);
+}
+
+async function preloadHomeAssets() {
+    const urls = new Set([homeImageUrl(selectedCountry), countryImageUrl(selectedCountry)]);
+    document.querySelectorAll("#game .game-header img, #home img").forEach(img => {
+        const src = img.getAttribute("src");
+        if (src) urls.add(src);
+    });
+    document.querySelectorAll("#home .action-card").forEach(c =>
+        cssBackgroundUrls(c).forEach(u => urls.add(u)));
+    await Promise.all(Array.from(urls).map(u => preloadImage(u)));
+    // استیکری که فایلش نیست، مخفی شود
+    document.querySelectorAll("#home .action-icon img").forEach(img => {
+        if (img.complete && img.naturalWidth === 0) img.style.display = "none";
+    });
+}
+
+function showDashboardShell() {
+    showOnly("game");
+    showGamePage("home");
+    document.getElementById("game").classList.add("booting");
+    if (selectedCountry) updateGameHeader();
+}
+
+async function showGame() {
+    showDashboardShell();
+    updateGameHeader(); updateHomeStats();
+    const t0 = Date.now();
+    await preloadHomeAssets();
+    const el = Date.now() - t0;
+    if (el < 600) await sleep(600 - el);
+    document.getElementById("game").classList.remove("booting");
+    startStatsPolling(); refreshNotificationBadge();
 }
 
 function updateGameHeader() {
@@ -437,10 +477,7 @@ document.querySelectorAll(".action-card").forEach(card => {
         else if (s === "diplomacy") openDiplomacyPage();
         else if (s === "economy") openEconomyPage();
         else if (s === "market") { showGamePage("market"); loadMarketListings(); }
-        else if (s === "ranking") {
-            const box = document.getElementById("rankings-list");
-            if (box) box.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+        else if (s === "ranking") { showGamePage("ranking"); loadRankings(); }
         else if (s === "transfer" || s === "stats") showToast("به‌زودی فعال می‌شود");
     });
 });
@@ -1121,7 +1158,7 @@ document.querySelectorAll(".nav-item").forEach(item => {
         showGamePage(page);
         document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
         item.classList.add("active");
-        if (page === "home") { updateHomeStats(); loadRankings(); refreshNotificationBadge(); }
+        if (page === "home") { updateHomeStats(); refreshNotificationBadge(); }
         else if (page === "map") setTimeout(() => initWorldMap(), 30);
         else if (page === "communications") { loadAnnouncements(); loadUnion(); loadNews(); refreshNotificationBadge(); }
         else if (page === "market") { loadMarketListings(); loadMyListings(); }
@@ -1925,6 +1962,8 @@ async function createPreviewGlobe(containerId, svgId, selected) {
         selectedCountry = player.country;
         showGame();
     } else {
+        // اول همه پرچم‌ها لود شوند، بعد صفحه انتخاب کشور
+        await Promise.all(Object.keys(COUNTRY_IMAGE_EXT).map(cid => preloadImage(countryImageUrl(cid))));
         showCountrySelection();
     }
 })();
