@@ -95,7 +95,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .flag-inline-sm { width: 16px; height: 16px; }
 
 /* ==================== لودینگ ==================== */
-.loading-screen { display: flex; align-items: flex-start; justify-content: center; padding: 18px 14px; }
+.loading-screen { display: flex; align-items: center; justify-content: center; padding: 20px; }
 .loading-box {
     width: min(320px, 85%); background: rgba(11, 14, 21, 0.85);
     border: 1px solid rgba(var(--brand-rgb), 0.15); border-radius: 16px;
@@ -114,31 +114,6 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 @keyframes loadingSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
 .loading-text { color: #a0a8b3; font-size: 12.5px; letter-spacing: 0.4px; }
-
-/* ردیف لودینگ (بالای صفحه) */
-.loading-row {
-    position: relative; width: 100%; max-width: 520px; overflow: hidden;
-    display: flex; align-items: center; justify-content: center; gap: 12px;
-    padding: 15px 18px;
-    background: rgba(11, 14, 21, 0.9);
-    border: 1px solid rgba(var(--brand-rgb), 0.28);
-    border-radius: 16px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 24px rgba(var(--brand-rgb), 0.08);
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-}
-.loading-row .loading-text { color: #f4f6f9; font-size: 13px; font-weight: bold; margin: 0; }
-.loading-row .loading-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2.5px; margin: 0; border-radius: 0; }
-.loading-spinner {
-    flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%;
-    border: 2.5px solid rgba(var(--brand-rgb), 0.25); border-top-color: var(--brand);
-    animation: loadingSpin 0.8s linear infinite;
-}
-@keyframes loadingSpin { to { transform: rotate(360deg); } }
-
-/* ورود به داشبورد: فقط هدر + این ردیف دیده می‌شود */
-#dashboard-loading { display: none; width: auto; margin: 8px 14px 0; }
-#game.booting #dashboard-loading { display: flex; }
-#game.booting .game-page, #game.booting .bottom-nav { display: none !important; }
 
 /* ==================== انتخاب کشور ==================== */
 .country-screen { overflow-y: auto; padding: 35px 18px 30px; }
@@ -179,18 +154,20 @@ img { -webkit-user-drag: none; user-select: none; }
 /* ==================== هدر ==================== */
 .game-header {
     height: 64px; width: 100%;
-    display: flex; align-items: center; justify-content: space-between; padding: 0 14px;
-    background: transparent; border-bottom: none;
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    align-items: center; padding: 0 14px;
+    background: transparent;
+    border-bottom: none;
     position: relative; z-index: 20;
 }
-.header-right, .header-left { display: flex; align-items: center; gap: 10px; }
-.flag-wrap-lg { width: 48px; height: 48px; border-width: 2px; }
+.header-right { display: flex; justify-content: flex-start; align-items: center; }
+.header-left { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.header-center { text-align: center; }
 .game-title {
-    font-family: "Russo One", Impact, "Arial Black", sans-serif;
-    font-size: 16px; font-weight: 900; letter-spacing: 1.5px; direction: ltr; white-space: nowrap;
-    background: linear-gradient(180deg, #fff3cf 0%, #e3b04b 55%, #a97a1f 100%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,.8));
+    font-size: 14px; font-weight: bold; letter-spacing: 3px;
+    color: var(--brand);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 20px rgba(var(--brand-rgb), 0.3);
+    font-family: Tahoma, Arial, sans-serif;
 }
 .header-button {
     width: 38px; height: 38px; border-radius: 50%;
@@ -306,211 +283,150 @@ img { -webkit-user-drag: none; user-select: none; }
 .page-title span { color: #6b7480; font-size: 11px; }
 .page-title h1 { font-size: 24px; margin-top: 4px; color: #f4f6f9; }
 
-/* ==================== کارت خانه (Command Center) ==================== */
-.ic { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-
-/* ==================== صفحه خانه — Command Center ==================== */
-.home-card { position: relative; }
-
-/* تصویر خانه دقیقاً با نسبت 3:4 نمایش داده می‌شود؛ مناسب تصویر عمودی ساخته‌شده */
-.home-card-body {
-    position: relative;
-    display: block;
-    width: 100%;
-    aspect-ratio: 3 / 4;
-    min-height: 0;
-    padding: 0;
-    overflow: hidden;
+/* ==================== کارت خانه ==================== */
+.home-card {
     background: #0b0e15;
+    border: 1px solid rgba(var(--brand-rgb), 0.22);
+    border-radius: 20px; overflow: hidden; margin-bottom: 18px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
-.home-card-photo {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    background-color: #101722;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: cover;
-    opacity: 0;
-    transition: opacity .25s ease;
+.home-card-top {
+    position: relative;
+    z-index: 2;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px;
+    background: rgba(11, 14, 21, 0.85);
+    border-bottom: 1px solid rgba(var(--brand-rgb), 0.15);
 }
-.home-card-photo.loaded { opacity: 1; }
-
-/* لایه‌ی تیره ملایم تا متن خوانا بماند ولی خود عکس واضح دیده شود */
-.home-card-body::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background:
-        linear-gradient(90deg, rgba(5,8,13,.08) 0%, rgba(5,8,13,.18) 42%, rgba(5,8,13,.60) 100%),
-        linear-gradient(180deg, rgba(5,8,13,.06) 0%, rgba(5,8,13,.04) 55%, rgba(5,8,13,.38) 100%);
-}
-
-.hero-country {
-    position: absolute;
-    top: 16px;
-    left: 16px;
-    z-index: 3;
-    width: 48%;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    text-shadow: 0 2px 5px rgba(0,0,0,.9);
-}
-.hero-country .flag-wrap { width: 58px; height: 58px; border-width: 2px; box-shadow: 0 5px 16px rgba(0,0,0,.45); }
-.hero-country strong { font-size: clamp(18px, 4.8vw, 27px); color: #fff; line-height: 1.15; }
 .world-chip {
-    flex-basis: 100%;
-    margin-right: 66px;
-    margin-top: -4px;
-    color: #d7dde6;
-    font-size: 11px;
-    font-weight: 500;
+    background: rgba(15, 20, 30, 0.7);
+    border: 1px solid rgba(var(--brand-rgb), 0.25);
+    color: #a0a8b3; font-size: 11px; padding: 5px 12px; border-radius: 20px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.home-country-chip {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: #f4f6f9;
+    background: rgba(15, 20, 30, 0.7);
+    padding: 5px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(var(--brand-rgb), 0.2);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.home-card-body { position: relative; padding: 4px 0 0; overflow: hidden; }
+.home-card-photo {
+    position: absolute; inset: 0;
+    background-color: #0b0e15;
+    background-size: cover;
+    background-position: center;
+    z-index: 0;
+}
+.home-card-photo::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+        rgba(11, 14, 21, 0.6) 0%,
+        rgba(11, 14, 21, 0.85) 50%,
+        rgba(11, 14, 21, 0.95) 100%);
 }
 
-.home-stats {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    bottom: 10px;
-    z-index: 3;
-    width: 48%;
+.home-stats-grid {
+    position: relative; z-index: 1;
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 8px; padding: 8px 12px 12px;
+}
+.home-stat {
+    position: relative; min-height: 96px;
+    border-radius: 14px; overflow: hidden;
+    background-color: rgba(11, 14, 21, 0.55);
+    background-size: cover; background-position: center;
+    border: 1px solid rgba(var(--brand-rgb), 0.12);
     display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 14px 12px;
-    border: 1px solid rgba(255,255,255,.16);
-    border-radius: 16px;
-    background: linear-gradient(180deg, rgba(7,12,19,.82), rgba(7,12,19,.70));
-    box-shadow: 0 8px 24px rgba(0,0,0,.28);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 }
-.hs-money, .hs-manpower, .hs-power {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
+.home-stat:nth-of-type(1) { background-image: linear-gradient(150deg, #a97a1f 0%, #2d1f08 78%); }
+.home-stat:nth-of-type(2) { background-image: linear-gradient(150deg, #b8862a 0%, #2d1f08 78%); }
+.home-stat:nth-of-type(3) { background-image: linear-gradient(150deg, #2fb8b3 0%, #0f2e2c 78%); }
+.home-stat:nth-of-type(4) { background-image: linear-gradient(150deg, #b03a35 0%, #2d0f0e 78%); }
+.home-stat-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: flex-end; align-items: flex-end;
+    text-align: right; padding: 10px 12px;
+    background: linear-gradient(180deg,
+        rgba(6, 10, 18, 0.05) 0%,
+        rgba(6, 10, 18, 0.82) 100%);
 }
-.hs-money { padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,.13); }
-.hs-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 0; }
-.hs-manpower, .hs-power { padding: 8px 5px; }
-.hs-power { border-right: 1px solid rgba(255,255,255,.12); padding-right: 9px; }
-.hs-ic { width: 31px; height: 31px; color: #a8bfe8; filter: drop-shadow(0 2px 5px rgba(0,0,0,.55)); }
-.hs-ic.gold { color: #e8b64e; }
-.hs-value {
-    display: block;
-    color: #f4f6f9;
-    font-size: clamp(15px, 3.7vw, 22px);
-    line-height: 1.15;
-    direction: ltr;
-    text-align: right;
-    white-space: nowrap;
-}
-.hs-label { display: block; margin-top: 3px; color: #c5ccd6; font-size: 10px; line-height: 1.4; }
-.hs-sub { display: block; margin-top: 2px; color: #7f8b9b; font-size: 8.5px; }
-.hs-foot {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 6px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255,255,255,.13);
-    color: #c4ccd7;
-    font-size: 9px;
-    line-height: 1.45;
-}
-.hs-foot span { white-space: nowrap; }
-.hs-foot .hs-income { color: #4ade80; }
-.hs-foot #home-income { color: #4ade80; font-weight: bold; }
+.home-stat-label { font-size: 10.5px; color: rgba(255, 255, 255, 0.85); margin-bottom: 2px; text-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.home-stat-value { font-size: 19px; color: #fff; font-weight: bold; line-height: 1.1; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.home-stat-sub { font-size: 10px; color: #a0a8b3; margin-top: 2px; }
+.home-stat-sub span { color: var(--green); }
 
 .season-bar {
-    min-height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 7px 12px;
-    color: #aeb8c7;
-    background: rgba(8,12,18,.92);
-    border-top: 1px solid rgba(var(--brand-rgb),.14);
-    font-size: 9.5px;
+    position: relative; z-index: 1;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px 16px;
+    border-top: 1px solid rgba(var(--brand-rgb), 0.15);
+    font-size: 12px; color: #c3cad3;
+    background: rgba(11, 14, 21, 0.55);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    gap: 10px;
+    flex-wrap: wrap;
 }
-.season-tag { color: var(--brand); font-weight: bold; white-space: nowrap; }
-.season-hint { color: #7f8b9b; text-align: left; }
+.season-tag { font-size: 13px; color: #f4f6f9; }
+.season-hint { font-size: 11px; color: var(--brand); opacity: 0.85; }
 
-/* بخش‌های پایین صفحه خانه */
-.home-section { margin-bottom: 14px; }
-.sec-head {
-    min-height: 46px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    margin-bottom: 8px;
-    border: 1px solid color-mix(in srgb, var(--tc) 42%, transparent);
-    border-radius: 14px;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--tc) 11%, rgba(11,14,21,.88)), rgba(11,14,21,.82));
+/* ==================== باکس‌های اقدام ==================== */
+.action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.action-card {
+    position: relative; border-radius: 18px; overflow: hidden; min-height: 132px;
+    border: 1px solid rgba(var(--brand-rgb), 0.12);
+    transition: all 0.25s ease; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
 }
-.sec-title { display: flex; align-items: center; gap: 7px; color: var(--tc); font-size: 17px; font-weight: bold; }
-.sec-title .ic { width: 23px; height: 23px; }
-.sec-sub { margin-right: auto; color: #9aa5b5; font-size: 9px; }
-.sec-chev { color: var(--tc); width: 18px; height: 18px; }
-.tile-grid { display: grid; gap: 8px; }
-.tile-grid.cols-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
-.action-card.tile {
-    position: relative;
-    min-height: 104px;
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 10px 9px;
-    text-align: right;
-    overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--tc) 55%, transparent);
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(15,20,30,.92), rgba(8,12,18,.84));
-    box-shadow: inset 0 0 22px color-mix(in srgb, var(--tc) 5%, transparent), 0 5px 15px rgba(0,0,0,.24);
+.action-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(var(--brand-rgb), 0.35);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
 }
-.action-card.tile:active { transform: scale(.985); }
-.hex {
-    width: 48px; height: 55px; flex: 0 0 48px;
+.action-card:active { transform: scale(0.97); }
+.action-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: flex-end; align-items: flex-end;
+    text-align: right; padding: 14px;
+    background: linear-gradient(180deg,
+        rgba(8, 12, 20, 0) 35%, rgba(8, 12, 20, 0.78) 100%);
+}
+.action-icon {
+    position: absolute; top: 12px; left: 12px; font-size: 17px;
+    width: 36px; height: 36px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    color: var(--tc);
-    border: 1px solid color-mix(in srgb, var(--tc) 80%, transparent);
-    background: color-mix(in srgb, var(--tc) 10%, rgba(8,12,18,.92));
-    clip-path: polygon(25% 3%,75% 3%,100% 25%,100% 75%,75% 97%,25% 97%,0 75%,0 25%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
-.hex .ic { width: 26px; height: 26px; }
-.tile-text { min-width: 0; flex: 1; }
-.tile-text h3 { color: #f4f6f9; font-size: 14px; margin-bottom: 4px; }
-.tile-text p { color: #8e99a9; font-size: 9px; line-height: 1.5; }
-.tile-chev { width: 17px; height: 17px; color: var(--tc); flex: 0 0 auto; }
-.tile-wide { grid-column: 1 / -1; }
+.action-card h3 { font-size: 15px; color: #fff; margin-bottom: 4px; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.action-card p { font-size: 10.5px; color: rgba(255,255,255,0.8); line-height: 1.6; }
+.action-army           { background-color: #1a2338; background-image: linear-gradient(150deg, rgba(74,79,168,.30) 0%, rgba(13,16,36,.55) 75%), url('/images/categories/army.png'); background-size: cover; background-position: center; }
+.action-army .action-icon { background: var(--c-army); color: #fff; }
+.action-war             { background-color: #381210; background-image: linear-gradient(150deg, rgba(122,44,40,.30) 0%, rgba(24,10,9,.55) 75%), url('/images/categories/war.jpg'); background-size: cover; background-position: center; }
+.action-war .action-icon { background: var(--c-war); color: #fff; }
+.action-diplomacy      { background-color: #241835; background-image: linear-gradient(150deg, rgba(90,58,134,.30) 0%, rgba(18,10,30,.55) 75%), url('/images/categories/diplomacy.png'); background-size: cover; background-position: center; }
+.action-diplomacy .action-icon { background: var(--c-diplomacy); color: #fff; }
+.action-economy         { background-color: #0e2c1e; background-image: linear-gradient(150deg, rgba(37,122,84,.30) 0%, rgba(8,26,18,.55) 75%), url('/images/categories/economy.jpg'); background-size: cover; background-position: center; }
+.action-economy .action-icon { background: var(--c-economy); color: #fff; }
+.action-infrastructure { background-color: #0d2b29; background-image: linear-gradient(150deg, rgba(29,122,118,.30) 0%, rgba(7,24,22,.55) 75%), url('/images/categories/infrastructure.png'); background-size: cover; background-position: center; }
+.action-infrastructure .action-icon { background: var(--c-infra); color: #fff; }
+.action-market          { background-color: #3d2c0d; background-image: linear-gradient(150deg, rgba(168,122,46,.30) 0%, rgba(28,20,8,.55) 75%), url('/images/categories/market.png'); background-size: cover; background-position: center; }
+.action-market .action-icon { background: var(--c-market); color: #1a1208; }
 
-@media (max-width: 430px) {
-    .home-card-body { aspect-ratio: 3 / 4; }
-    .hero-country { top: 12px; left: 12px; width: 47%; }
-    .hero-country .flag-wrap { width: 46px; height: 46px; }
-    .world-chip { margin-right: 54px; font-size: 9px; }
-    .home-stats { top: 8px; right: 8px; bottom: 8px; width: 51%; padding: 10px 9px; }
-    .hs-ic { width: 24px; height: 24px; }
-    .hs-value { font-size: 14px; }
-    .hs-label { font-size: 8.5px; }
-    .hs-sub { font-size: 7.5px; }
-    .hs-duo { gap: 3px; padding: 8px 0; }
-    .hs-foot { font-size: 7.8px; gap: 4px; }
-    .sec-title { font-size: 15px; }
-    .sec-sub { font-size: 8px; }
-    .action-card.tile { min-height: 92px; }
-    .hex { width: 42px; height: 48px; flex-basis: 42px; }
-    .hex .ic { width: 23px; height: 23px; }
-    .tile-text h3 { font-size: 12.5px; }
-    .tile-text p { font-size: 8px; }
+/* ==================== تب‌های زیرساخت ==================== */
+.infra-tabs {
+    display: flex; gap: 6px; margin-bottom: 14px;
+    overflow-x: auto; padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
 }
-
 .infra-tabs::-webkit-scrollbar { display: none; }
 .infra-tab {
     flex: 0 0 auto; padding: 9px 14px; border-radius: 12px;
@@ -894,30 +810,18 @@ img { -webkit-user-drag: none; user-select: none; }
     border: 1px solid rgba(var(--brand-rgb), 0.15);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
-.map-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
-.map-box svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.map-box svg { width: 100%; height: 100%; display: block; cursor: grab; }
 .map-box svg:active { cursor: grabbing; }
 .globe-water { fill: #0b1520; }
-
-/* اسم‌ها روی نقشه */
-.map-ocean-label, .map-sea-label, .map-country-label {
-    pointer-events: none; user-select: none; -webkit-user-select: none;
-    paint-order: stroke; stroke-linejoin: round;
-}
-.map-ocean-label { fill: rgba(205, 232, 255, 0.85); font-style: italic; letter-spacing: 0.8px; stroke: rgba(5, 25, 50, 0.6); stroke-width: 2.4px; }
-.map-sea-label   { fill: rgba(205, 232, 255, 0.78); font-style: italic; stroke: rgba(5, 25, 50, 0.6); stroke-width: 2.2px; }
-.map-country-label { fill: #ffffff; font-weight: 600; stroke: rgba(8, 18, 30, 0.85); stroke-width: 2.4px; }
-
-/* سکوها: مربعی و رنگی */
-.map-site { cursor: pointer; }
-.map-site .site-hit { fill: transparent; }
-.map-site .site-shape { stroke: #ffffff; stroke-width: 1.3; }
-.map-site-oil     .site-shape { fill: #000000; }   /* سکوی نفتی: سیاه، مربع */
-.map-site-steel   .site-shape { fill: #a8e0ff; }   /* معدن فولاد: آبی کمرنگ، مربع */
-.map-site-uranium .site-shape { fill: #0a3dff; }   /* معدن اورانیوم: آبی، مربع */
-.map-site-food    .site-shape { fill: #7ed957; }
-.map-site-strait  .site-shape { fill: #ffd21f; stroke: #07121f; }   /* تنگه: زرد */
-.map-site.mine .site-shape { stroke: #f0b429; stroke-width: 2.4; }
+.map-country { transition: fill 0.3s ease; }
+.map-ocean-label { fill: #4a6a86; font-size: 6.5px; pointer-events: none; user-select: none; }
+.map-country-label { fill: #d9e0e8; font-size: 7px; pointer-events: none; user-select: none; }
+.map-site { stroke: #0b1520; stroke-width: 0.6px; cursor: pointer; }
+.map-site-oil { fill: #2d2a1a; stroke: var(--brand); stroke-width: 1.2; }
+.map-site-steel { fill: #1e2833; stroke: #94a8bc; stroke-width: 1.2; }
+.map-site-uranium { fill: #1a2d1f; stroke: var(--green); stroke-width: 1.2; }
+.map-site-food { fill: #2d2618; stroke: #d4a017; stroke-width: 1.2; }
+.map-site-strait { fill: var(--brand); stroke: #0b1520; stroke-width: 0.6; }
 .map-controls {
     position: absolute; left: 12px; bottom: 12px;
     display: flex; flex-direction: column; gap: 8px; z-index: 5;
@@ -937,18 +841,16 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 .map-legend div { display: flex; align-items: center; gap: 6px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.dot-own            { background: #ffd21f; }
-.dot-own-occupied   { background: #34b36b; }
-.dot-other          { background: #2f7fe8; }
-.dot-other-occupied { background: #9b5de5; }
-.dot-inactive       { background: #0b0b0e; border: 1px solid #6b7480; }
-.dot-nogame         { background: repeating-linear-gradient(135deg, #2c3544 0 2px, #96a5bc 2px 3px); border: 1px solid #6b7480; }
-.dot-oil, .dot-steel, .dot-uranium, .dot-food { border-radius: 2px; border: 1px solid #e8eef6; }
-.dot-oil     { background: #000000; }
-.dot-steel   { background: #a8e0ff; }
-.dot-uranium { background: #0a3dff; }
-.dot-food    { background: #7ed957; }
-.dot-strait  { background: #ffd21f; border: 1px solid #07121f; }
+.dot-own            { background: #f0b429; }
+.dot-own-occupied   { background: #2fa360; }
+.dot-other          { background: #b8862a; }
+.dot-other-occupied { background: #8e4ec6; }
+.dot-unowned        { background: #4a5460; }
+.dot-oil            { background: var(--brand); border: 1px solid #0b1520; }
+.dot-steel          { background: #94a8bc; border: 1px solid #0b1520; }
+.dot-uranium        { background: var(--green); border: 1px solid #0b1520; }
+.dot-food           { background: #d4a017; border: 1px solid #0b1520; }
+.dot-strait         { background: var(--brand); border: 2px solid #0b1520; }
 
 /* ==================== پنل اطلاعات نقشه ==================== */
 .map-info-panel {
@@ -1170,8 +1072,8 @@ img { -webkit-user-drag: none; user-select: none; }
 :root {
     --nav-h: 70px;          /* ارتفاع نوار */
     --nav-icon: 24px;       /* آیکن دکمه‌های معمولی */
-    --nav-home: 58px;       /* قطر دکمه خانه */
-    --nav-home-lift: 24px;  /* مقدار بیرون‌زدگی دکمه خانه از نوار */
+    --nav-home: 68px;       /* قطر دکمه خانه */
+    --nav-home-lift: 30px;  /* مقدار بیرون‌زدگی دکمه خانه از نوار */
 }
 
 .bottom-nav {
@@ -1239,7 +1141,7 @@ img { -webkit-user-drag: none; user-select: none; }
         inset 0 1px 0 rgba(255, 255, 255, 0.12);
     transition: transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
 }
-.bottom-nav .nav-home .nav-icon svg { width: 29px; height: 29px; }
+.bottom-nav .nav-home .nav-icon svg { width: 34px; height: 34px; }
 .bottom-nav .nav-home small { font-size: 11.5px; font-weight: bold; color: var(--brand); }
 
 .bottom-nav .nav-home.active .nav-icon {
@@ -1263,8 +1165,13 @@ img { -webkit-user-drag: none; user-select: none; }
     .country-info h2 { font-size: 14px; }
     .country-info > span { font-size: 9px; }
     .country-facts span { font-size: 9px; }
-    .game-title { font-size: 14px; letter-spacing: 1px; }
+    .game-title { font-size: 12px; letter-spacing: 2px; }
     .globe-card { height: 32vh; }
+    .action-card { min-height: 115px; }
+    .action-card h3 { font-size: 13px; }
+    .action-card p { font-size: 9.5px; }
+    .home-stat { min-height: 88px; }
+    .home-stat-value { font-size: 16px; }
     .map-box { height: 42vh; }
     .stat-box { min-width: 80px; padding: 6px 7px; }
     .stat-box-value { font-size: 11.5px; }
