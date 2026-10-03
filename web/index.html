@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261003a">
+<link rel="stylesheet" href="/style.css?v=20261003b">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -84,11 +84,10 @@
 
     <header class="game-header">
         <div class="header-right">
-            <div class="flag-wrap flag-wrap-lg"><img id="game-country-flag" class="flag-img" src="" alt=""></div>
-            <button class="header-rank" id="header-rank-button" aria-label="رتبهٔ جهانی">
-                <span class="header-rank-bar"><span class="header-rank-fill" id="header-rank-fill"></span></span>
-                <span class="header-rank-text">رتبهٔ کلی <b id="header-rank-value">—</b></span>
-            </button>
+            <div class="header-flag-box">
+                <div class="flag-wrap flag-wrap-lg"><img id="game-country-flag" class="flag-img" src="" alt=""></div>
+                <button class="header-rank-badge" id="header-rank-button" aria-label="رتبهٔ جهانی"><span id="header-rank-value">—</span></button>
+            </div>
             <button class="header-button" id="game-notification-button" aria-label="اعلان‌ها">
                 🔔<span id="notif-badge" class="notif-badge hidden">0</span>
             </button>
@@ -227,7 +226,9 @@
     <!-- ==================== رتبه جهانی ==================== -->
     <main id="ranking" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
-        <div class="page-title"><span>مقایسه کشورها</span><h1>🏆 رتبه‌بندی جهانی</h1></div>
+        <div class="rk-live-card"><h2>رتبه‌بندی زنده</h2><p id="rk-live-text"></p></div>
+        <div class="rk-tabs" id="rk-tabs"></div>
+        <div class="rk-info" id="rk-info"></div>
         <div id="rankings-list" class="rankings-list"></div>
     </main>
 
@@ -238,7 +239,6 @@
             <div class="page-title"><span>ساخت و توسعه</span><h1>زیرساخت</h1></div>
             <div class="infra-summary">
                 <span id="infra-built-count" class="infra-built-count"></span>
-                <span id="infra-upkeep-total" class="infra-upkeep-total"></span>
             </div>
         </div>
         <div class="resource-bar"></div>
@@ -309,40 +309,28 @@
 
         <div class="base-cards-grid">
             <div class="base-card">
-                <div class="base-card-head">
-                    <div class="base-card-name">پادگان</div>
-                    <div class="base-card-icon">🪖</div>
-                </div>
+                <div class="base-card-head"><div class="base-card-name">پادگان</div><div class="base-card-icon">🪖</div></div>
                 <div class="base-card-value" id="base-barracks-value">—</div>
                 <div class="base-card-max" id="base-barracks-max"></div>
-                <div class="base-card-progress">
-                    <div class="base-card-progress-fill" id="base-barracks-fill" style="width:0%"></div>
-                </div>
+                <div class="base-card-progress"><div class="base-card-progress-fill" id="base-barracks-fill" style="width:0%"></div></div>
             </div>
             <div class="base-card">
-                <div class="base-card-head">
-                    <div class="base-card-name">فرودگاه</div>
-                    <div class="base-card-icon">✈️</div>
-                </div>
-                <div class="base-card-empty" id="base-airport-status">ساخته نشده</div>
+                <div class="base-card-head"><div class="base-card-name">فرودگاه</div><div class="base-card-icon">✈️</div></div>
+                <div class="base-card-value" id="base-airport-value">—</div>
+                <div class="base-card-max" id="base-airport-max"></div>
+                <div class="base-card-progress"><div class="base-card-progress-fill" id="base-airport-fill" style="width:0%"></div></div>
             </div>
             <div class="base-card">
-                <div class="base-card-head">
-                    <div class="base-card-name">بندر</div>
-                    <div class="base-card-icon">⚓</div>
-                </div>
+                <div class="base-card-head"><div class="base-card-name">بندر</div><div class="base-card-icon">⚓</div></div>
                 <div class="base-card-value" id="base-port-value">—</div>
                 <div class="base-card-max" id="base-port-max"></div>
-                <div class="base-card-progress">
-                    <div class="base-card-progress-fill" id="base-port-fill" style="width:0%"></div>
-                </div>
+                <div class="base-card-progress"><div class="base-card-progress-fill" id="base-port-fill" style="width:0%"></div></div>
             </div>
             <div class="base-card">
-                <div class="base-card-head">
-                    <div class="base-card-name">پایگاه موشکی</div>
-                    <div class="base-card-icon">🚀</div>
-                </div>
-                <div class="base-card-empty" id="base-missile-status">ساخته نشده</div>
+                <div class="base-card-head"><div class="base-card-name">انبار موشک</div><div class="base-card-icon">🚀</div></div>
+                <div class="base-card-value" id="base-missile-value">—</div>
+                <div class="base-card-max" id="base-missile-max"></div>
+                <div class="base-card-progress"><div class="base-card-progress-fill" id="base-missile-fill" style="width:0%"></div></div>
             </div>
         </div>
 
@@ -612,6 +600,6 @@
 
 </section>
 
-<script src="/app.js?v=20261002f"></script>
+<script src="/app.js?v=20261003b"></script>
 </body>
 </html>
