@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261002j">
+<link rel="stylesheet" href="/style.css?v=20261003a">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -84,14 +84,18 @@
 
     <header class="game-header">
         <div class="header-right">
-            <div class="flag-wrap"><img id="game-country-flag" class="flag-img" src="" alt=""></div>
-        </div>
-        <div class="header-center"><div class="game-title">FRONT-LINE 1993</div></div>
-        <div class="header-left">
-            <button class="header-button" id="game-notification-button">
+            <div class="flag-wrap flag-wrap-lg"><img id="game-country-flag" class="flag-img" src="" alt=""></div>
+            <button class="header-rank" id="header-rank-button" aria-label="رتبهٔ جهانی">
+                <span class="header-rank-bar"><span class="header-rank-fill" id="header-rank-fill"></span></span>
+                <span class="header-rank-text">رتبهٔ کلی <b id="header-rank-value">—</b></span>
+            </button>
+            <button class="header-button" id="game-notification-button" aria-label="اعلان‌ها">
                 🔔<span id="notif-badge" class="notif-badge hidden">0</span>
             </button>
-            <button class="header-button" id="game-menu-button">☰</button>
+        </div>
+        <div class="header-left">
+            <div class="game-title">FRONT-LINE 1993</div>
+            <button class="header-button" id="game-menu-button" aria-label="منو">☰</button>
         </div>
     </header>
 
@@ -230,19 +234,26 @@
     <!-- ==================== زیرساخت ==================== -->
     <main id="infrastructure" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
-        <div class="page-title"><span>ساخت و توسعه</span><h1>زیرساخت</h1></div>
+        <div class="infra-title-row">
+            <div class="page-title"><span>ساخت و توسعه</span><h1>زیرساخت</h1></div>
+            <div class="infra-summary">
+                <span id="infra-built-count" class="infra-built-count"></span>
+                <span id="infra-upkeep-total" class="infra-upkeep-total"></span>
+            </div>
+        </div>
         <div class="resource-bar"></div>
 
         <div class="infra-tabs">
-            <button class="infra-tab active" data-infra-tab="power">⚡ برق</button>
-            <button class="infra-tab" data-infra-tab="manpower">👥 نیرو</button>
-            <button class="infra-tab" data-infra-tab="food">🌾 غذا</button>
-            <button class="infra-tab" data-infra-tab="resource">🛢️ منابع</button>
-            <button class="infra-tab" data-infra-tab="military">🪖 نظامی</button>
+            <button class="infra-tab active" data-infra-tab="power"><span class="infra-tab-label">⚡ برق</span><span class="infra-tab-count" id="infra-count-power">0/4</span></button>
+            <button class="infra-tab" data-infra-tab="manpower"><span class="infra-tab-label">👥 نیرو</span><span class="infra-tab-count" id="infra-count-manpower">0/6</span></button>
+            <button class="infra-tab" data-infra-tab="food"><span class="infra-tab-label">🌾 غذا</span><span class="infra-tab-count" id="infra-count-food">0/3</span></button>
+            <button class="infra-tab" data-infra-tab="resource"><span class="infra-tab-label">🛢️ منابع</span><span class="infra-tab-count" id="infra-count-resource">0/3</span></button>
+            <button class="infra-tab" data-infra-tab="military"><span class="infra-tab-label">🪖 نظامی</span><span class="infra-tab-count" id="infra-count-military">0/9</span></button>
         </div>
 
         <div class="infra-panels">
             <div id="infra-panel-power" class="infra-panel">
+                <div id="infra-power-grid"></div>
                 <div id="infra-power-list" class="infra-card-list"></div>
             </div>
             <div id="infra-panel-manpower" class="infra-panel hidden">
@@ -328,14 +339,10 @@
             </div>
             <div class="base-card">
                 <div class="base-card-head">
-                    <div class="base-card-name">انبار موشک</div>
+                    <div class="base-card-name">پایگاه موشکی</div>
                     <div class="base-card-icon">🚀</div>
                 </div>
-                <div class="base-card-value" id="base-missile-value">—</div>
-                <div class="base-card-max" id="base-missile-max"></div>
-                <div class="base-card-progress">
-                    <div class="base-card-progress-fill" id="base-missile-fill" style="width:0%"></div>
-                </div>
+                <div class="base-card-empty" id="base-missile-status">ساخته نشده</div>
             </div>
         </div>
 
@@ -438,7 +445,7 @@
             <div><span class="dot dot-inactive"></span> غیرفعال (انتخاب نشده)</div>
             <div><span class="dot dot-nogame"></span> هنوز به بازی اضافه نشده</div>
             <div><span class="dot dot-oil"></span> سکوی نفت</div>
-            <div><span class="dot dot-iron"></span> معدن آهن</div>
+            <div><span class="dot dot-steel"></span> معدن فولاد</div>
             <div><span class="dot dot-uranium"></span> معدن اورانیوم</div>
             <div><span class="dot dot-food"></span> دشت کشاورزی</div>
             <div><span class="dot dot-strait"></span> تنگه</div>
@@ -520,7 +527,7 @@
                 <label class="diplomacy-label">منبع فروش</label>
                 <select id="mk-sell-res" class="diplomacy-select">
                     <option value="food">🌾 غذا</option>
-                    <option value="iron">⚙️ آهن</option>
+                    <option value="steel">⚙️ فولاد</option>
                     <option value="uranium">☢️ اورانیوم</option>
                     <option value="oil">🛢️ نفت</option>
                 </select>
@@ -530,7 +537,7 @@
                 <select id="mk-want-res" class="diplomacy-select">
                     <option value="money">💰 پول</option>
                     <option value="food">🌾 غذا</option>
-                    <option value="iron">⚙️ آهن</option>
+                    <option value="steel">⚙️ فولاد</option>
                     <option value="uranium">☢️ اورانیوم</option>
                     <option value="oil">🛢️ نفت</option>
                 </select>
@@ -605,6 +612,6 @@
 
 </section>
 
-<script src="/app.js?v=20261002j"></script>
+<script src="/app.js?v=20261002f"></script>
 </body>
 </html>
