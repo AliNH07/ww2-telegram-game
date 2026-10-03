@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261003c">
+<link rel="stylesheet" href="/style.css?v=20261003d">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -225,7 +225,7 @@
 
     <!-- ==================== رتبه جهانی ==================== -->
     <main id="ranking" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🏆</span>رتبه‌بندی</span><span class="sb-money">$0</span></div>
         <div class="rk-live-card"><h2>رتبه‌بندی زنده</h2><p id="rk-live-text"></p></div>
         <div class="rk-tabs" id="rk-tabs"></div>
         <div class="rk-info" id="rk-info"></div>
@@ -234,9 +234,9 @@
 
     <!-- ==================== زیرساخت ==================== -->
     <main id="infrastructure" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🏗️</span>زیرساخت</span><span class="sb-money">$0</span></div>
         <div class="infra-title-row">
-            <div class="page-title"><span>ساخت و توسعه</span><h1>زیرساخت</h1></div>
+            <div class="page-title"><h1>زیرساخت</h1></div>
         </div>
         <div class="resource-bar"></div>
 
@@ -285,23 +285,19 @@
 
     <!-- ==================== اقتصاد ==================== -->
     <main id="economy" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">💰</span>اقتصاد</span><span class="sb-money">$0</span></div>
         <div class="page-title"><span>سرمایه‌گذاری</span><h1>اقتصاد</h1></div>
         <div id="economy-list" class="infra-card-list"></div>
     </main>
 
     <!-- ==================== ارتش ==================== -->
     <main id="army" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
-        <div class="page-title"><span>فرماندهی و پیاده‌نظام</span><h1>ارتش</h1></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🛡️</span>ارتش</span><span class="sb-money">$0</span></div>
+        <div class="page-title"><h1>ارتش</h1></div>
 
         <div class="army-summary-card">
-            <div class="army-summary-header">
-                <div class="army-summary-label">🛡️ ارتش</div>
-                <button class="army-info-btn" title="راهنما">؟</button>
-            </div>
+            <div class="army-summary-label">🛡️ قدرت کل ارتش</div>
             <div class="army-summary-power" id="army-total-power">0</div>
-            <div class="army-summary-sub">قدرت کل ارتش</div>
         </div>
 
         <div class="base-cards-grid">
@@ -355,7 +351,7 @@
 
     <!-- ==================== جنگ ==================== -->
     <main id="war" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">⚔️</span>جنگ</span><span class="sb-money">$0</span></div>
         <div class="page-title"><span>عملیات نظامی</span><h1>جنگ</h1></div>
 
         <div class="war-tabs">
@@ -377,7 +373,7 @@
 
     <!-- ==================== دیپلماسی ==================== -->
     <main id="diplomacy" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">📜</span>دیپلماسی</span><span class="sb-money">$0</span></div>
         <div class="page-title"><span>روابط خارجی</span><h1>دیپلماسی</h1></div>
 
         <div class="diplomacy-form">
@@ -495,7 +491,7 @@
 
     <!-- ==================== بازار جهانی ==================== -->
     <main id="market" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🌐</span>بازار جهانی</span><span class="sb-money">$0</span></div>
         <div class="page-title"><span>معاملات بین‌المللی</span><h1>بازار جهانی</h1></div>
 
         <div class="market-tabs">
@@ -597,6 +593,6 @@
 
 </section>
 
-<script src="/app.js?v=20261003c"></script>
+<script src="/app.js?v=20261003d"></script>
 </body>
 </html>
