@@ -532,6 +532,7 @@ function updateHomeStats() {
     if (hint) hint.textContent = SEASON_HINTS[season] || player.season_hint || "";
     const mm = document.getElementById("map-money");
     if (mm) mm.textContent = formatMoney(player.money);
+    document.querySelectorAll(".sb-money").forEach(e => { e.textContent = formatMoney(player.money); });
     renderResourceBars();
 }
 
@@ -752,7 +753,7 @@ function infraNeeds(item) {
 // عدد اصلی کارت: برق / نیرو / تولید منبع / ظرفیت
 function bonusParts(item, n) {
     const b = item.bonus || {}, g = GROUP_TITLES[item.group] || "", p = [];
-    if (b.discount) p.push({ v: `−${Math.round(b.discount * n * 100)}٪`, l: `هزینه تولید ${g}` });
+    if (b.defense && n > 1) p.push({ v: `+${Math.round(b.defense * (n - 1) * 100)}٪`, l: `دفاع ${g}` });
     return p;
 }
 
@@ -1062,7 +1063,7 @@ function renderArmyUnitsNew() {
         const count = player.units?.[uid_] ?? 0;
         const missing = missingReqs(u);
         const full = used >= cap;
-        const totalPower = count * (u.attack + u.defense);
+        const totalPower = Math.round(count * (u.attack + u.defense * (player.def_mult?.[group] ?? 1)));
 
         let statusText = "آماده آموزش";
         if (missing.length) statusText = "🔒 قفل است — برای دیدن نیازها «تولید» را بزنید";
@@ -1093,6 +1094,8 @@ function renderArmyUnitsNew() {
 }
 
 const REQ_WHY = {
+    missile_depot: "محل نگهداری موشک‌ها",
+    missile_factory: "ساخت موشک",
     land_barracks: "محل نگهداری نیروهای زمینی",
     land_hq: "فرماندهی و آموزش نیروهای زمینی",
     land_tank_factory: "ساخت تانک",
@@ -1103,16 +1106,22 @@ const REQ_WHY = {
 };
 
 // ساختمان‌های لازمی که هنوز ساخته نشده‌اند
+function reqList(u) {
+    const ml = u.min_level || {};
+    return (Array.isArray(u.requires) ? u.requires : [u.requires]).map(r => ({ id: r, lvl: ml[r] || 1 }));
+}
 function missingReqs(u) {
-    const list = Array.isArray(u.requires) ? u.requires : [u.requires];
-    return list.filter(r => (player?.infra?.[r]?.level ?? 0) <= 0);
+    return reqList(u).filter(r => (player?.infra?.[r.id]?.level ?? 0) < r.lvl);
 }
 
 function openLockSheet(uid_) {
     const u = ARMY_UNITS[uid_]; if (!u || !player) return;
     closeInfraSheet();
-    const rows = missingReqs(u).map(r =>
-        `<div class="is-row is-bad"><span>🔒 ${player.infra?.[r]?.name || r}</span><b>${REQ_WHY[r] || ""}</b></div>`).join("");
+    const rows = missingReqs(u).map(r => {
+        const it = player.infra?.[r.id], cur = it?.level ?? 0;
+        const name = (it?.name || r.id) + (r.lvl > 1 ? ` سطح ${r.lvl}` : "");
+        return `<div class="is-row is-bad"><span>🔒 ${name}</span><b>${REQ_WHY[r.id] || ""}${cur > 0 ? ` <small>(الان سطح ${cur})</small>` : ""}</b></div>`;
+    }).join("");
     const ov = document.createElement("div");
     ov.id = "infra-sheet"; ov.className = "modal-overlay";
     ov.innerHTML = `
@@ -1145,7 +1154,7 @@ async function trainUnit(uid_, count) {
     } catch (e) { showToast("خطا."); return false; }
 }
 
-function unitCost(u) { return Math.round(u.cost * (player?.cost_mult?.[u.group] ?? 1)); }
+function unitCost(u) { return u.cost; }
 function trainLimits(u) {
     const c = unitCost(u);
     const caps = [getGroupCapacity(u.group) - getGroupUsed(u.group),
@@ -1167,7 +1176,7 @@ function openTrainSheet(uid_) {
                 <div class="ic-hex"><span>${GROUP_ICONS[u.group] || "🪖"}</span></div>
                 <div class="is-titles">
                     <div class="is-name">${u.name}</div>
-                    <div class="is-sub">حمله ${u.attack} · دفاع ${u.defense} · ظرفیت آزاد ${formatNumber(capLeft)}</div>
+                    <div class="is-sub">حمله ${u.attack} · دفاع ${Math.round(u.defense * (player.def_mult?.[u.group] ?? 1))} · ظرفیت آزاد ${formatNumber(capLeft)}</div>
                 </div>
                 <button class="is-close" aria-label="بستن">✕</button>
             </div>
@@ -1191,6 +1200,8 @@ function openTrainSheet(uid_) {
     const update = () => {
         const n = getN(), rows = [];
         rows.push(`<div class="is-row"><span>تعداد فعلی</span><b>${formatNumber(player.units?.[uid_] ?? 0)}</b></div>`);
+        Object.entries(u.daily || {}).forEach(([k, d]) =>
+            rows.push(`<div class="is-row"><span>🔁 مصرف روزانه · ${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}</span><b>${formatNumber(d * n)} <small>(هر عدد ${formatNumber(d)})</small></b></div>`));
         if (u.transport_capacity) rows.push(`<div class="is-row"><span>🚚 ظرفیت حمل</span><b>${formatNumber(u.transport_capacity)}</b></div>`);
         const row = (label, need, have, money) => {
             const bad = need > have;
@@ -1205,9 +1216,8 @@ function openTrainSheet(uid_) {
         });
         if (n > capLeft) { bad = true; rows.push(`<div class="is-row is-bad"><span>📦 ظرفیت آزاد</span><b>${formatNumber(capLeft)}</b></div>`); }
         ov.querySelector("#tr-rows").innerHTML = rows.join("");
-        const base = u.cost * n;
         ov.querySelector("#tr-price").className = "is-price" + (bad ? " is-bad" : "");
-        ov.querySelector("#tr-price").innerHTML = `<span>قیمت ${formatNumber(n)} عدد${cost < u.cost ? ` <small>(بدون تخفیف ${formatMoney(base)})</small>` : ""}</span><b>${formatMoney(cost * n)}</b>`;
+        ov.querySelector("#tr-price").innerHTML = `<span>قیمت ${formatNumber(n)} عدد</span><b>${formatMoney(cost * n)}</b>`;
         okBtn.disabled = bad || n < 1;
         okBtn.textContent = n < 1 ? "تعداد را وارد کنید" : bad ? "امکان تولید نیست" : `تولید ${formatNumber(n)} عدد`;
     };
