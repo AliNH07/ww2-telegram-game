@@ -118,7 +118,7 @@ function showOnly(id) {
 function showGamePage(id) {
     document.querySelectorAll(".game-page").forEach(p => p.classList.add("hidden"));
     const t = document.getElementById(id);
-    if (t) t.classList.remove("hidden");
+    if (t) { t.classList.remove("hidden"); t.scrollTop = 0; }
 }
 
 function formatMoney(v) { return "$" + Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
@@ -638,8 +638,6 @@ function updateInfraCounters() {
         if (el) el.textContent = `${b}/${list.length}`;
         built += b;
     });
-    const bc = document.getElementById("infra-built-count");
-    if (bc) bc.textContent = `${built} از ${items.length} ساخته شده`;
 }
 
 function renderPowerGrid() {
@@ -754,8 +752,6 @@ function infraNeeds(item) {
 // عدد اصلی کارت: برق / نیرو / تولید منبع / ظرفیت
 function bonusParts(item, n) {
     const b = item.bonus || {}, g = GROUP_TITLES[item.group] || "", p = [];
-    if (b.defense_all) p.push({ v: `+${Math.round(b.defense_all * n * 100)}٪`, l: "دفاع کل کشور" });
-    if (b.defense) p.push({ v: `+${Math.round(b.defense * n * 100)}٪`, l: `دفاع ${g}` });
     if (b.discount) p.push({ v: `−${Math.round(b.discount * n * 100)}٪`, l: `هزینه تولید ${g}` });
     return p;
 }
@@ -958,6 +954,8 @@ async function upgradeEconomy(iid) {
 ========================================================= */
 async function openArmyPage() {
     showGamePage("army");
+    currentArmyTab = "land";
+    document.querySelectorAll(".army-tab").forEach(t => t.classList.toggle("active", t.dataset.armyTab === "land"));
     await refreshPlayer();
     renderArmySummary();
     renderBaseCards();
@@ -1062,34 +1060,16 @@ function renderArmyUnitsNew() {
 
     unitsInGroup.forEach(([uid_, u]) => {
         const count = player.units?.[uid_] ?? 0;
-        const req = player.infra?.[u.requires];
-        const hasReq = (req?.level ?? 0) > 0;
+        const missing = missingReqs(u);
         const full = used >= cap;
         const totalPower = count * (u.attack + u.defense);
 
-        let statusText;
-        let disabled = false;
-        if (!hasReq) {
-            statusText = `برای باز شدن، «${req?.name || u.requires}» را بسازید.`;
-            disabled = true;
-        } else if (cap <= 0) {
-            statusText = `ابتدا «${player.infra?.[STORAGE_INFRA[group]]?.name || "ساختمان ظرفیت‌دار"}» را بسازید.`;
-            disabled = true;
-        } else if (full) {
-            statusText = "ظرفیت پر است.";
-            disabled = true;
-        } else {
-            statusText = "آماده آموزش";
-        }
+        let statusText = "آماده آموزش";
+        if (missing.length) statusText = "🔒 قفل است — برای دیدن نیازها «تولید» را بزنید";
+        else if (full) statusText = "ظرفیت پر است.";
 
         const card = document.createElement("div");
-        card.className = "unit-card-new" + (disabled ? " locked" : "");
-
-        const transportChip = u.transport_capacity
-            ? `<div class="unit-chip"><span>🚚 ظرفیت حمل</span>
-               <span class="unit-chip-value">${formatNumber(u.transport_capacity)}</span></div>`
-            : "";
-
+        card.className = "unit-card-new" + (missing.length ? " locked" : "");
         card.innerHTML = `
             <div class="unit-card-new-top">
                 <div class="unit-card-new-name">
@@ -1100,45 +1080,58 @@ function renderArmyUnitsNew() {
                     ${formatNumber(totalPower)}
                 </div>
             </div>
-
-            <div class="unit-card-new-stats">
-                <div class="unit-chip">
-                    <span>⚔️ حمله</span>
-                    <span class="unit-chip-value">${u.attack}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>🛡️ دفاع</span>
-                    <span class="unit-chip-value">${u.defense}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>تعداد</span>
-                    <span class="unit-chip-value">${formatNumber(count)}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>💰</span>
-                    <span class="unit-chip-value">${formatMoney(unitCost(u))}</span>
-                </div>
-                <div class="unit-chip">
-                    <span>👥</span>
-                    <span class="unit-chip-value">${formatNumber(u.manpower)}</span>
-                </div>
-                ${transportChip}
-            </div>
-
             <div class="unit-card-new-action">
-                <button class="unit-produce-btn" data-unit="${uid_}" ${disabled ? "disabled" : ""}>
-                    ⚙️ تولید
-                </button>
+                <button class="unit-produce-btn" ${!missing.length && full ? "disabled" : ""}>⚙️ تولید</button>
                 <span class="unit-status-text">${statusText}</span>
-            </div>
-        `;
-
-        if (!disabled) {
-            card.querySelector(".unit-produce-btn").addEventListener("click", () => openTrainSheet(uid_));
-        }
+            </div>`;
+        card.querySelector(".unit-produce-btn").addEventListener("click", () => {
+            if (missing.length) openLockSheet(uid_); else openTrainSheet(uid_);
+        });
 
         c.appendChild(card);
     });
+}
+
+const REQ_WHY = {
+    land_barracks: "محل نگهداری نیروهای زمینی",
+    land_hq: "فرماندهی و آموزش نیروهای زمینی",
+    land_tank_factory: "ساخت تانک",
+    naval_port: "محل پهلو گرفتن ناوگان",
+    naval_shipyard: "ساخت ناوها و زیردریایی",
+    air_airport: "محل استقرار هواپیماها",
+    air_arsenal: "ساخت جنگنده، بمب‌افکن و بالگرد",
+};
+
+// ساختمان‌های لازمی که هنوز ساخته نشده‌اند
+function missingReqs(u) {
+    const list = Array.isArray(u.requires) ? u.requires : [u.requires];
+    return list.filter(r => (player?.infra?.[r]?.level ?? 0) <= 0);
+}
+
+function openLockSheet(uid_) {
+    const u = ARMY_UNITS[uid_]; if (!u || !player) return;
+    closeInfraSheet();
+    const rows = missingReqs(u).map(r =>
+        `<div class="is-row is-bad"><span>🔒 ${player.infra?.[r]?.name || r}</span><b>${REQ_WHY[r] || ""}</b></div>`).join("");
+    const ov = document.createElement("div");
+    ov.id = "infra-sheet"; ov.className = "modal-overlay";
+    ov.innerHTML = `
+        <div class="ic-sheet">
+            <div class="is-head">
+                <div class="ic-hex"><span>🔒</span></div>
+                <div class="is-titles">
+                    <div class="is-name">${u.name}</div>
+                    <div class="is-sub">برای تولید این یگان باید بسازید:</div>
+                </div>
+                <button class="is-close" aria-label="بستن">✕</button>
+            </div>
+            <div class="is-rows">${rows}</div>
+            <div class="modal-actions"><button class="modal-cancel">بستن</button></div>
+        </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener("click", e => { if (e.target === ov) closeInfraSheet(); });
+    ov.querySelector(".is-close").onclick = closeInfraSheet;
+    ov.querySelector(".modal-cancel").onclick = closeInfraSheet;
 }
 
 async function trainUnit(uid_, count) {
@@ -1197,6 +1190,8 @@ function openTrainSheet(uid_) {
     const getN = () => Math.max(0, Math.floor(Number(inp.value) || 0));
     const update = () => {
         const n = getN(), rows = [];
+        rows.push(`<div class="is-row"><span>تعداد فعلی</span><b>${formatNumber(player.units?.[uid_] ?? 0)}</b></div>`);
+        if (u.transport_capacity) rows.push(`<div class="is-row"><span>🚚 ظرفیت حمل</span><b>${formatNumber(u.transport_capacity)}</b></div>`);
         const row = (label, need, have, money) => {
             const bad = need > have;
             rows.push(`<div class="is-row ${bad ? "is-bad" : ""}"><span>${label}</span><b>${money ? formatMoney(need) : formatNumber(need)} <small>(موجود: ${money ? formatMoney(have) : formatNumber(have)})</small></b></div>`);
