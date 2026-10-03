@@ -179,50 +179,55 @@ INFRASTRUCTURE = {
     "land_hq": {
         "power_required": 3,
         "name": "ستاد فرماندهی", "group": "land", "icon": "🎖️",
-        "desc": "پیاده‌نظام اینجا تولید می‌شود. هر سطح ۱۰٪ به دفاع کشور در برابر حملات مستقیم اضافه می‌کند.",
-        "levels": [L(cost=500_000, capacity=3), L(cost=1_100_000, capacity=8), L(cost=2_300_000, capacity=18), L(cost=4_300_000, capacity=35), L(cost=7_500_000, capacity=60)],
+        "desc": "فرماندهی کل نیروی زمینی. هر سطح ۱۰٪ به دفاع همهٔ جبهه‌ها در برابر حملهٔ مستقیم اضافه می‌کند.",
+        "bonus": {"defense_all": 0.10},
+        "levels": [L(cost=500_000), L(cost=1_100_000), L(cost=2_300_000), L(cost=4_300_000), L(cost=7_500_000)],
     },
     "land_tank_factory": {
         "power_required": 5,
         "name": "کارخانه تانک‌سازی", "group": "land", "icon": "🛡️",
-        "desc": "تانک و لانچر تولید می‌کند. هر سطح تولید را سریع‌تر و دفاع تانک‌ها را قوی‌تر می‌کند.",
-        "levels": [L(cost=600_000, capacity=3), L(cost=1_300_000, capacity=8), L(cost=2_800_000, capacity=16), L(cost=5_200_000, capacity=30), L(cost=9_000_000, capacity=55)],
+        "desc": "تانک تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های زمینی را ۵٪ کم و دفاع جبههٔ زمینی را ۵٪ بیشتر می‌کند.",
+        "bonus": {"discount": 0.05, "defense": 0.05},
+        "levels": [L(cost=600_000), L(cost=1_300_000), L(cost=2_800_000), L(cost=5_200_000), L(cost=9_000_000)],
     },
     "naval_port": {
         "power_required": 4,
         "name": "بندر", "group": "naval", "icon": "⚓",
         "desc": "محل پهلو گرفتن ناوگان. هر سطح ظرفیت بندر را بیشتر می‌کند.",
-        "levels": [L(cost=500_000, capacity=3), L(cost=1_090_000, capacity=8), L(cost=2_360_000, capacity=18), L(cost=4_360_000, capacity=30), L(cost=7_730_000, capacity=55)],
+        "levels": [L(cost=500_000, capacity=2000), L(cost=1_090_000, capacity=4000), L(cost=2_360_000, capacity=6000), L(cost=4_360_000, capacity=8000), L(cost=7_730_000, capacity=10000)],
     },
     "naval_shipyard": {
         "power_required": 8,
         "name": "کشتی‌سازی", "group": "naval", "icon": "🚢",
-        "desc": "زیردریایی، ناوشکن، ناو ترابری و ناو هواپیمابر تولید می‌کند.",
-        "levels": [L(cost=750_000, capacity=2), L(cost=1_580_000, capacity=6), L(cost=3_330_000, capacity=14), L(cost=6_080_000, capacity=25), L(cost=10_420_000, capacity=45)],
+        "desc": "زیردریایی، ناوشکن، ناو ترابری و ناو هواپیمابر تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های دریایی را ۵٪ کم و دفاع جبههٔ دریایی را ۵٪ بیشتر می‌کند.",
+        "bonus": {"discount": 0.05, "defense": 0.05},
+        "levels": [L(cost=750_000), L(cost=1_580_000), L(cost=3_330_000), L(cost=6_080_000), L(cost=10_420_000)],
     },
     "air_airport": {
         "power_required": 5,
-        "name": "فرودگاه نظامی", "group": "air", "icon": "🛫",
-        "desc": "محل استقرار جنگنده، بمب‌افکن، بالگرد و هواپیمای سوخت‌رسان.",
-        "levels": [L(cost=550_000, capacity=3), L(cost=1_180_000, capacity=8), L(cost=2_450_000, capacity=18), L(cost=4_570_000, capacity=30), L(cost=7_870_000, capacity=55)],
+        "name": "فرودگاه", "group": "air", "icon": "🛫",
+        "desc": "محل استقرار جنگنده، بمب‌افکن و بالگرد. هر سطح ظرفیت فرودگاه را بیشتر می‌کند.",
+        "levels": [L(cost=550_000, capacity=2500), L(cost=1_180_000, capacity=5000), L(cost=2_450_000, capacity=7500), L(cost=4_570_000, capacity=10000), L(cost=7_870_000, capacity=12500)],
     },
     "air_arsenal": {
         "power_required": 7,
         "name": "ادوات هوایی", "group": "air", "icon": "✈️",
-        "desc": "جنگنده، بمب‌افکن و بالگرد تولید می‌کند. هر سطح تولید را سریع‌تر می‌کند.",
-        "levels": [L(cost=800_000, capacity=2), L(cost=1_680_000, capacity=6), L(cost=3_540_000, capacity=14), L(cost=6_400_000, capacity=25), L(cost=10_950_000, capacity=45)],
+        "desc": "جنگنده، بمب‌افکن و بالگرد تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های هوایی را ۵٪ کم و دفاع جبههٔ هوایی را ۵٪ بیشتر می‌کند.",
+        "bonus": {"discount": 0.05, "defense": 0.05},
+        "levels": [L(cost=800_000), L(cost=1_680_000), L(cost=3_540_000), L(cost=6_400_000), L(cost=10_950_000)],
     },
     "missile_depot": {
         "power_required": 8,
         "name": "انبار موشک", "group": "missile", "icon": "🚀",
         "desc": "محل نگهداری موشک‌ها. هر سطح ظرفیت انبار را بیشتر می‌کند.",
-        "levels": [L(cost=2_000_000, capacity=2), L(cost=4_200_000, capacity=5), L(cost=8_800_000, capacity=10), L(cost=16_000_000, capacity=18), L(cost=27_000_000, capacity=30)],
+        "levels": [L(cost=2_000_000, capacity=4000), L(cost=4_200_000, capacity=8000), L(cost=8_800_000, capacity=12000), L(cost=16_000_000, capacity=16000), L(cost=27_000_000, capacity=20000)],
     },
     "missile_factory": {
         "power_required": 10,
         "name": "موشک‌سازی", "group": "missile", "icon": "🎯",
-        "desc": "موشک تولید می‌کند. هر سطح تولید را سریع‌تر می‌کند.",
-        "levels": [L(cost=2_400_000, capacity=1), L(cost=5_040_000, capacity=3), L(cost=10_560_000, capacity=7), L(cost=19_200_000, capacity=12), L(cost=32_400_000, capacity=20)],
+        "desc": "موشک تولید می‌کند. هر سطح هزینهٔ تولید موشک‌ها را ۵٪ کم می‌کند.",
+        "bonus": {"discount": 0.05},
+        "levels": [L(cost=2_400_000), L(cost=5_040_000), L(cost=10_560_000), L(cost=19_200_000), L(cost=32_400_000)],
     },
 }
 
@@ -375,7 +380,7 @@ def get_game_time(player):
     season_end = min(season_end, game_end)
     remaining = season_end - now
     if remaining.total_seconds() < 0: remaining = timedelta(0)
-    return {"day": day, "season": SEASONS[si], "season_days_left": remaining.days,
+    return {"season_end": season_end.isoformat(), "day": day, "season": SEASONS[si], "season_days_left": remaining.days,
             "season_hours_left": remaining.seconds // 3600,
             "next_season": SEASONS[(si + 1) % len(SEASONS)],
             "season_hint": SEASON_HINTS.get(SEASONS[si], "")}
@@ -411,8 +416,22 @@ def get_group_capacity(player, group):
     for item_id, item in INFRASTRUCTURE.items():
         if item.get("group") != group: continue
         lv = get_infra_level(player, item_id)
-        if lv > 0: total += item["levels"][min(lv, len(item["levels"])) - 1]["capacity"]
+        if lv > 0: total += item["levels"][min(lv, len(item["levels"])) - 1].get("capacity", 0)
     return total
+
+def infra_bonus(player, key, group=None):
+    t = 0.0
+    for iid, item in INFRASTRUCTURE.items():
+        v = item.get("bonus", {}).get(key)
+        if not v or (group and item.get("group") != group): continue
+        t += v * min(get_infra_level(player, iid), len(item["levels"]))
+    return t
+
+def unit_cost_mult(player, group):
+    return max(0.5, 1 - infra_bonus(player, "discount", group))
+
+def front_defense_mult(player, front):
+    return 1 + infra_bonus(player, "defense_all") + infra_bonus(player, "defense", front)
 
 def get_group_units(player, group):
     total = 0
@@ -535,7 +554,7 @@ def build_catalog_status(player, catalog):
             "name": item["name"], "group": item.get("group"),
             "icon": item.get("icon", ""),
             "desc": item.get("desc", ""),
-            "resource_key": item.get("resource_key"),
+            "resource_key": item.get("resource_key"), "bonus": item.get("bonus"),
             "power_required": item.get("power_required"),
             "level": lv, "max_level": len(levels),
             "current": current, "next": next_info,
@@ -557,6 +576,7 @@ def serialize_player(player):
     data["daily_upkeep"] = rates["daily_upkeep"]
     data["infra"] = build_catalog_status(player, INFRASTRUCTURE)
     data["economy"] = build_catalog_status(player, ECONOMY)
+    data["cost_mult"] = {g: unit_cost_mult(player, g) for g in ("land", "naval", "air", "missile")}
     return data
 
 # =========================================================
@@ -855,7 +875,7 @@ async def train_unit(request):
     data = await read_json(request); unit_id = data.get("unit_id")
     try: count = int(data.get("count", 1))
     except: count = 1
-    count = max(1, min(count, 50))
+    count = max(1, min(count, 100000))
     if unit_id not in ARMY_UNITS:
         return web.json_response({"success": False, "error": "invalid_unit"}, status=400)
     if uid not in players: players[uid] = create_player(uid)
@@ -868,11 +888,15 @@ async def train_unit(request):
         return web.json_response({"success": False, "error": "no_infra",
                                   "message": f"ابتدا «{INFRASTRUCTURE[req]['name']}» را بسازید."}, status=400)
     cap = get_group_capacity(p, group); used = get_group_units(p, group)
+    store = {"land": "پادگان", "naval": "بندر", "air": "فرودگاه", "missile": "انبار موشک"}.get(group, "")
+    if cap <= 0:
+        return web.json_response({"success": False, "error": "no_storage",
+                                  "message": f"برای نگهداری یگان‌ها ابتدا «{store}» را بسازید."}, status=400)
     if used >= cap:
         return web.json_response({"success": False, "error": "capacity_full",
                                   "message": f"ظرفیت {GROUP_NAMES[group]} پر است."}, status=400)
     count = min(count, cap - used)
-    total_cost = unit["cost"] * count; total_mp = unit["manpower"] * count
+    total_cost = int(round(unit["cost"] * unit_cost_mult(p, group))) * count; total_mp = unit["manpower"] * count
     if p.get("money", 0) < total_cost:
         return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
     if p.get("manpower", 0) < total_mp:
@@ -1080,7 +1104,7 @@ async def perform_battle(request):
         atk_attack = 0
         # بدون ناو هواپیمابر، هیچ حملهٔ هوایی ممکن نیست
         if front == "air" and not has_carrier:
-            dfd_def = def_power(dfd, front) * 1.10
+            dfd_def = def_power(dfd, front) * 1.10 * front_defense_mult(dfd, front)
             dfd_final = dfd_def * (1 + random.uniform(-0.08, 0.08))
             report["fronts"][front] = {"attacker_power": 0,
                                        "defender_power": int(dfd_final),
@@ -1099,7 +1123,7 @@ async def perform_battle(request):
                 sent = int(count * ratio)
                 atk_attack += sent * u["attack"]
                 atk["units"][uid_] -= sent
-        dfd_def = def_power(dfd, front) * 1.10
+        dfd_def = def_power(dfd, front) * 1.10 * front_defense_mult(dfd, front)
         if air_winner == w["attacker"] and front in ["naval", "land"]: atk_attack *= 1.15
         elif air_winner == w["defender"] and front in ["naval", "land"]: dfd_def *= 1.15
         atk_final = atk_attack * (1 + random.uniform(-0.08, 0.08))
@@ -1475,17 +1499,23 @@ def compute_rankings():
         cid = p.get("country")
         if not cid: continue
         ensure_player_fields(p); recompute_army(p); rates = compute_rates(p)
-        eco = rates["net_income"] // 1000; mil = p.get("army", 0)
+        eco = max(0, int(rates["net_income"] // 1000)); mil = p.get("army", 0)
         dip = 0
         for t in active_treaties:
             if t["country_a"] == cid or t["country_b"] == cid: dip += 100
         for u in unions.values():
             if cid in u.get("members", []): dip += 150
         dev = sum(p.get("infra_levels", {}).values()) * 50
-        total = eco + mil + dip + dev
+        terr = (sum(1 for o in map_holdings.values() if o == cid)
+                + sum(1 for o in strait_holdings.values() if o == cid)
+                + 5 * sum(1 for o in occupied_countries.values() if o == cid))
         rows.append({"country": cid, "name": COUNTRIES[cid]["name"], "flag": COUNTRIES[cid]["flag"],
-                     "overall": total, "economy": eco, "military": mil, "diplomacy": dip,
+                     "economy": eco, "military": mil, "territory": terr, "diplomacy": dip,
                      "development": dev, "is_eliminated": p.get("is_eliminated", False)})
+    W = {"economy": 30, "military": 25, "territory": 20, "development": 15, "diplomacy": 10}
+    mx = {k: max([r[k] for r in rows] + [0]) for k in W}
+    for r in rows:
+        r["overall"] = round(sum(W[k] * r[k] / mx[k] for k in W if mx[k] > 0), 1)
     rows.sort(key=lambda x: x["overall"], reverse=True)
     for i, r in enumerate(rows): r["rank"] = i + 1
     return rows
