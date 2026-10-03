@@ -387,13 +387,7 @@ async function refreshHeaderRank() {
         const rows = await apiGet("/api/rankings");
         if (!Array.isArray(rows)) return;
         const me = rows.find(r => r.country === selectedCountry);
-        const v = document.getElementById("header-rank-value");
-        const fill = document.getElementById("header-rank-fill");
-        if (!me) { v.textContent = "—"; fill.style.width = "0%"; return; }
-        v.textContent = me.rank;
-        const pct = rows.length > 1 ? Math.round((rows.length - me.rank) / (rows.length - 1) * 100) : 100;
-        fill.style.width = Math.max(8, pct) + "%";
-        btn.title = `رتبه ${me.rank} از ${rows.length}`;
+        document.getElementById("header-rank-value").textContent = me ? me.rank : "—";
     } catch (e) {}
 }
 
@@ -541,26 +535,57 @@ function updateHomeStats() {
     renderResourceBars();
 }
 
+const RK_TABS = [
+    { id: "overall", key: "overall", label: "کلی", info: "<b>کلی</b> بر چه اساسیه: ترکیبِ پنج دسته‌ی دیگر، با وزنِ نابرابر: اقتصاد ۳۰، نظامی ۲۵، قلمرو ۲۰، توسعه ۱۵، دیپلماسی ۱۰. امتیازِ هر دسته نسبت به بهترین کشورِ همان دسته محاسبه می‌شود، پس یک عددِ غول‌آسا بقیه را خفه نمی‌کند." },
+    { id: "economy", key: "economy", label: "اقتصادی", info: "<b>اقتصادی</b> بر چه اساسیه: درآمدِ خالصِ روزانه‌ی کشور، بعد از کسرِ هزینه‌ی نگهداری — هر $1,000 یک امتیاز." },
+    { id: "military", key: "military", label: "قدرت نظامی", info: "<b>قدرت نظامی</b> بر چه اساسیه: مجموعِ قدرتِ همه‌ی یگان‌ها — هر یگان به اندازه‌ی حمله + دفاعش امتیاز دارد. یگان‌هایی که برای جنگ فرستاده شده‌اند حساب نمی‌شوند." },
+    { id: "territory", key: "territory", label: "قلمرو", info: "<b>قلمرو</b> بر چه اساسیه: منابعِ نقشه و تنگه‌هایی که زیرِ کنترلِ کشورند، هر کدام ۱ امتیاز، به‌اضافه‌ی هر کشورِ اشغال‌شده ۵ امتیاز." },
+    { id: "development", key: "development", label: "توسعه", info: "<b>توسعه</b> بر چه اساسیه: مجموعِ سطحِ همه‌ی ساختمان‌ها در زیرساخت و اقتصاد — هر سطح ۵۰ امتیاز." },
+    { id: "diplomacy", key: "diplomacy", label: "دیپلماسی", info: "<b>دیپلماسی</b> بر چه اساسیه: پیمان‌های فعال (هر کدام ۱۰۰ امتیاز) و عضویت در اتحادیه (۱۵۰ امتیاز)." },
+];
+let rkTab = "overall", rkRows = [];
+
+function jalaliStamp(iso) {
+    try {
+        const parts = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", day: "numeric",
+            hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(iso));
+        const g = t => parts.find(p => p.type === t)?.value;
+        return `${g("year")}/${g("month")}/${g("day")}, ${g("hour")}:${g("minute")}`;
+    } catch (e) { return ""; }
+}
+
+function renderRankings() {
+    const tabs = document.getElementById("rk-tabs"), box = document.getElementById("rankings-list");
+    if (!tabs || !box) return;
+    tabs.innerHTML = "";
+    RK_TABS.forEach(t => {
+        const b = document.createElement("button");
+        b.className = "rk-tab" + (t.id === rkTab ? " active" : "");
+        b.textContent = t.label;
+        b.onclick = () => { rkTab = t.id; renderRankings(); };
+        tabs.appendChild(b);
+    });
+    const cur = RK_TABS.find(t => t.id === rkTab);
+    document.getElementById("rk-info").innerHTML = cur.info;
+    const end = player?.season_end ? jalaliStamp(player.season_end) : "";
+    document.getElementById("rk-live-text").textContent =
+        `هنوز نهایی نشده — تا پایانِ فصل این جدول تغییر می‌کند.${end ? " پایان: " + end : ""}`;
+    box.innerHTML = "";
+    if (!rkRows.length) { box.innerHTML = `<div class="diplomacy-item-empty">هنوز رتبه‌ای نیست.</div>`; return; }
+    [...rkRows].sort((x, y) => (y[cur.key] ?? 0) - (x[cur.key] ?? 0)).forEach((r, i) => {
+        const pos = i + 1;
+        const div = document.createElement("div");
+        div.className = `rk-row ${r.is_eliminated ? "rk-elim" : ""}`;
+        div.innerHTML = `<span class="rk-medal rk-m${pos <= 3 ? pos : 0}">${pos}</span>${flagInline(r.country)}<span class="rk-name">${r.name}</span>`;
+        box.appendChild(div);
+    });
+}
+
 async function loadRankings() {
     try {
         const rows = await apiGet("/api/rankings");
-        const box = document.getElementById("rankings-list");
-        if (!box) return;
-        box.innerHTML = "";
-        if (!rows.length) { box.innerHTML = `<div class="diplomacy-item-empty">هنوز رتبه‌ای نیست.</div>`; return; }
-        rows.forEach(r => {
-            const div = document.createElement("div");
-            const cls = r.rank === 1 ? "rank-1" : r.rank === 2 ? "rank-2" : r.rank === 3 ? "rank-3" : "";
-            div.className = `rank-row ${cls} ${r.is_eliminated ? "rank-elim" : ""}`;
-            div.innerHTML = `
-                <div class="rank-num">${r.rank}</div>
-                <div>
-                    <div class="rank-name">${flagInline(r.country, true)} ${r.name}</div>
-                    <div class="rank-sub">💰${r.economy} ⚔️${r.military} 🤝${r.diplomacy} 🏗️${r.development}</div>
-                </div>
-                <div class="rank-score">${formatNumber(r.overall)}</div>`;
-            box.appendChild(div);
-        });
+        rkRows = Array.isArray(rows) ? rows : [];
+        renderRankings();
     } catch (e) { console.error(e); }
 }
 
@@ -615,8 +640,6 @@ function updateInfraCounters() {
     });
     const bc = document.getElementById("infra-built-count");
     if (bc) bc.textContent = `${built} از ${items.length} ساخته شده`;
-    const up = document.getElementById("infra-upkeep-total");
-    if (up) up.textContent = player.daily_upkeep > 0 ? `🔧 نگهداری روزانه: ${formatMoney(player.daily_upkeep)}` : "";
 }
 
 function renderPowerGrid() {
@@ -729,12 +752,21 @@ function infraNeeds(item) {
 }
 
 // عدد اصلی کارت: برق / نیرو / تولید منبع / ظرفیت
-function infraMainFigure(item, lvl) {
+function bonusParts(item, n) {
+    const b = item.bonus || {}, g = GROUP_TITLES[item.group] || "", p = [];
+    if (b.defense_all) p.push({ v: `+${Math.round(b.defense_all * n * 100)}٪`, l: "دفاع کل کشور" });
+    if (b.defense) p.push({ v: `+${Math.round(b.defense * n * 100)}٪`, l: `دفاع ${g}` });
+    if (b.discount) p.push({ v: `−${Math.round(b.discount * n * 100)}٪`, l: `هزینه تولید ${g}` });
+    return p;
+}
+
+function infraMainFigure(item, lvl, n) {
     if (!lvl) return null;
     const g = item.group;
     if (g === "power")    return { value: "+" + formatNumber(lvl.capacity), label: "برق" };
     if (g === "manpower") return { value: "+" + formatNumber(lvl.production), label: "نفر در روز" };
     if (g === "resource") return { value: "+" + formatNumber(lvl.production), label: `${RESOURCE_NAMES[item.resource_key] || ""} در روز` };
+    if (lvl.capacity === undefined) { const p = bonusParts(item, n)[0]; return p ? { value: p.v, label: p.l } : null; }
     return { value: formatNumber(lvl.capacity), label: "ظرفیت" };
 }
 
@@ -746,13 +778,14 @@ function renderInfraList(cid, filterFn) {
         if (!filterFn(item)) return;
         const built = item.level > 0;
         const need = infraNeeds(item);
-        const fig = infraMainFigure(item, built ? item.current : item.next);
+        const fig = infraMainFigure(item, built ? item.current : item.next, built ? item.level : 1);
         const pips = Array.from({ length: item.max_level }, (_, i) => `<i class="${i < item.level ? "on" : ""}"></i>`).join("");
         const upkeepVal = item.next ? item.next_upkeep : item.upkeep;
         const lvlAfter = item.next ? item.level + 1 : item.level;
         const powerChip = (item.group !== "power" && item.power_required)
             ? `<span class="ic-chip">⚡ مصرف ${formatNumber(item.power_required * lvlAfter)} برق</span>` : "";
 
+        const effChips = bonusParts(item, lvlAfter).map(p => `<span class="ic-chip">${p.l} ${p.v}</span>`).join("");
         let btnLabel;
         if (!item.next) btnLabel = "حداکثر سطح";
         else btnLabel = built ? `ارتقا به سطح ${item.level + 1} — ${formatMoney(need.cost)}`
@@ -771,7 +804,7 @@ function renderInfraList(cid, filterFn) {
                 ${fig ? `<div class="ic-main"><b>${fig.value}</b><small>${fig.label}</small></div>` : ""}
             </div>
             <p class="ic-desc">${item.desc || ""}</p>
-            ${powerChip ? `<div class="ic-chips">${powerChip}</div>` : ""}
+            ${(powerChip || effChips) ? `<div class="ic-chips">${powerChip}${effChips}</div>` : ""}
             <div class="ic-foot">
                 <button class="ic-btn ${short ? "ic-btn--short" : ""}" ${item.next ? "" : "disabled"}>${btnLabel}</button>
                 <span class="ic-chip ic-chip--upkeep">🔧 ${formatMoney(upkeepVal)} / روز</span>
@@ -791,11 +824,14 @@ function openInfraSheet(iid) {
     const built = item.level > 0;
     const need = infraNeeds(item);
     const lvlAfter = item.level + 1;
-    const figNow = built ? infraMainFigure(item, item.current) : null;
-    const figNext = infraMainFigure(item, item.next);
+    const figNow = built ? infraMainFigure(item, item.current, item.level) : null;
+    const figNext = infraMainFigure(item, item.next, lvlAfter);
 
     const rows = [];
-    if (figNext) {
+    if (item.next.capacity === undefined) {
+        const now = built ? bonusParts(item, item.level) : [];
+        bonusParts(item, lvlAfter).forEach((p, i) => rows.push(`<div class="is-row"><span>${p.l}</span><b>${now[i] ? `از ${now[i].v} به ${p.v}` : p.v}</b></div>`));
+    } else if (figNext) {
         rows.push(`<div class="is-row"><span>${figNext.label}</span><b>${figNow ? `از ${figNow.value} به ${figNext.value}` : figNext.value}</b></div>`);
     }
     rows.push(`<div class="is-row"><span>🔧 هزینهٔ نگهداری روزانه</span><b>${formatMoney(item.next_upkeep)}${built ? ` <small>(الان ${formatMoney(item.upkeep)})</small>` : ""}</b></div>`);
@@ -961,62 +997,31 @@ function renderArmySummary() {
     el.textContent = formatNumber(player.army);
 }
 
+const BASES = [
+    { key: "barracks", infra: "land_barracks", group: "land" },
+    { key: "airport", infra: "air_airport", group: "air" },
+    { key: "port", infra: "naval_port", group: "naval" },
+    { key: "missile", infra: "missile_depot", group: "missile" },
+];
+const STORAGE_INFRA = { land: "land_barracks", naval: "naval_port", air: "air_airport", missile: "missile_depot" };
+
 function renderBaseCards() {
     if (!player?.infra) return;
-
-    // پادگان
-    const barracks = player.infra["land_barracks"];
-    const bv = document.getElementById("base-barracks-value");
-    const bm = document.getElementById("base-barracks-max");
-    const bf = document.getElementById("base-barracks-fill");
-    if (barracks && barracks.current) {
-        const cap = getGroupCapacity("land");
-        const used = getGroupUsed("land");
-        bv.textContent = formatNumber(used);
-        bm.textContent = `از ${formatNumber(cap)}`;
-        if (bf) bf.style.width = cap > 0 ? Math.min(100, (used / cap) * 100) + "%" : "0%";
-    } else {
-        bv.textContent = "—";
-        bm.textContent = "ساخته نشده";
-        if (bf) bf.style.width = "0%";
-    }
-
-    // فرودگاه
-    const airport = player.infra["air_airport"];
-    const as = document.getElementById("base-airport-status");
-    if (airport && airport.current) {
-        const cap = getGroupCapacity("air");
-        const used = getGroupUsed("air");
-        as.innerHTML = `<span style="color:#f4f6f9;font-size:18px;font-weight:bold;">${used}</span> از ${cap}`;
-        as.classList.remove("base-card-empty");
-    } else {
-        as.textContent = "ساخته نشده";
-        as.classList.add("base-card-empty");
-    }
-
-    // بندر
-    const port = player.infra["naval_port"];
-    const pv = document.getElementById("base-port-value");
-    const pm = document.getElementById("base-port-max");
-    const pf = document.getElementById("base-port-fill");
-    if (port && port.current) {
-        const cap = getGroupCapacity("naval");
-        const used = getGroupUsed("naval");
-        pv.textContent = formatNumber(used);
-        pm.textContent = `از ${formatNumber(cap)}`;
-        if (pf) pf.style.width = cap > 0 ? Math.min(100, (used / cap) * 100) + "%" : "0%";
-    } else {
-        pv.textContent = "—";
-        pm.textContent = "ساخته نشده";
-        if (pf) pf.style.width = "0%";
-    }
-
-    // موشکی
-    const ms = document.getElementById("base-missile-status");
-    if (ms) {
-        ms.textContent = "ساخته نشده";
-        ms.classList.add("base-card-empty");
-    }
+    BASES.forEach(b => {
+        const it = player.infra[b.infra];
+        const v = document.getElementById(`base-${b.key}-value`);
+        const m = document.getElementById(`base-${b.key}-max`);
+        const f = document.getElementById(`base-${b.key}-fill`);
+        if (!v) return;
+        if (it && it.current) {
+            const cap = getGroupCapacity(b.group), used = getGroupUsed(b.group);
+            v.textContent = formatNumber(used);
+            m.textContent = `از ${formatNumber(cap)}`;
+            f.style.width = cap > 0 ? Math.min(100, used / cap * 100) + "%" : "0%";
+        } else {
+            v.textContent = "—"; m.textContent = "ساخته نشده"; f.style.width = "0%";
+        }
+    });
 }
 
 function renderArmyTabsCounts() {
@@ -1067,6 +1072,9 @@ function renderArmyUnitsNew() {
         if (!hasReq) {
             statusText = `برای باز شدن، «${req?.name || u.requires}» را بسازید.`;
             disabled = true;
+        } else if (cap <= 0) {
+            statusText = `ابتدا «${player.infra?.[STORAGE_INFRA[group]]?.name || "ساختمان ظرفیت‌دار"}» را بسازید.`;
+            disabled = true;
         } else if (full) {
             statusText = "ظرفیت پر است.";
             disabled = true;
@@ -1108,7 +1116,7 @@ function renderArmyUnitsNew() {
                 </div>
                 <div class="unit-chip">
                     <span>💰</span>
-                    <span class="unit-chip-value">${formatMoney(u.cost)}</span>
+                    <span class="unit-chip-value">${formatMoney(unitCost(u))}</span>
                 </div>
                 <div class="unit-chip">
                     <span>👥</span>
@@ -1118,20 +1126,15 @@ function renderArmyUnitsNew() {
             </div>
 
             <div class="unit-card-new-action">
-                <button class="unit-produce-btn" data-unit="${uid_}" data-count="1" ${disabled ? "disabled" : ""}>
+                <button class="unit-produce-btn" data-unit="${uid_}" ${disabled ? "disabled" : ""}>
                     ⚙️ تولید
-                </button>
-                <button class="unit-produce-btn" data-unit="${uid_}" data-count="10" ${disabled ? "disabled" : ""}>
-                    ⚙️ ×۱۰
                 </button>
                 <span class="unit-status-text">${statusText}</span>
             </div>
         `;
 
         if (!disabled) {
-            card.querySelectorAll(".unit-produce-btn").forEach(b => {
-                b.addEventListener("click", () => trainUnit(uid_, Number(b.dataset.count)));
-            });
+            card.querySelector(".unit-produce-btn").addEventListener("click", () => openTrainSheet(uid_));
         }
 
         c.appendChild(card);
@@ -1139,17 +1142,93 @@ function renderArmyUnitsNew() {
 }
 
 async function trainUnit(uid_, count) {
-    if (!userId) return;
+    if (!userId) return false;
     try {
         const d = await apiPost("/api/train-unit", { unit_id: uid_, count });
-        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        if (!d.success) { showToast(d.message || "خطا", "error"); return false; }
         player = d.player;
-        updateHomeStats();
-        renderArmySummary();
-        renderBaseCards();
-        renderArmyTabsCounts();
-        renderArmyUnitsNew();
-    } catch (e) { showToast("خطا."); }
+        updateHomeStats(); renderArmySummary(); renderBaseCards(); renderArmyTabsCounts(); renderArmyUnitsNew();
+        return true;
+    } catch (e) { showToast("خطا."); return false; }
+}
+
+function unitCost(u) { return Math.round(u.cost * (player?.cost_mult?.[u.group] ?? 1)); }
+function trainLimits(u) {
+    const c = unitCost(u);
+    const caps = [getGroupCapacity(u.group) - getGroupUsed(u.group),
+        Math.floor((player.money ?? 0) / c), Math.floor((player.manpower ?? 0) / u.manpower)];
+    Object.entries(u.resources || {}).forEach(([k, a]) => caps.push(Math.floor((player.resources?.[k] ?? 0) / a)));
+    return Math.max(0, Math.min(...caps));
+}
+
+// پنجرهٔ تولید: عدد با − / + / حداکثر، دکمه‌های ۱ و ۱۰، اطلاعات و قیمت کل بر اساس تعداد
+function openTrainSheet(uid_) {
+    const u = ARMY_UNITS[uid_]; if (!u || !player) return;
+    closeInfraSheet();
+    const cost = unitCost(u), capLeft = Math.max(0, getGroupCapacity(u.group) - getGroupUsed(u.group));
+    const ov = document.createElement("div");
+    ov.id = "infra-sheet"; ov.className = "modal-overlay";
+    ov.innerHTML = `
+        <div class="ic-sheet">
+            <div class="is-head">
+                <div class="ic-hex"><span>${GROUP_ICONS[u.group] || "🪖"}</span></div>
+                <div class="is-titles">
+                    <div class="is-name">${u.name}</div>
+                    <div class="is-sub">حمله ${u.attack} · دفاع ${u.defense} · ظرفیت آزاد ${formatNumber(capLeft)}</div>
+                </div>
+                <button class="is-close" aria-label="بستن">✕</button>
+            </div>
+            <div class="tr-qty">
+                <button class="tr-step" data-d="-1">−</button>
+                <input class="tr-input" type="number" inputmode="numeric" min="1" value="1">
+                <button class="tr-step" data-d="1">+</button>
+                <button class="tr-max">حداکثر</button>
+            </div>
+            <div class="tr-quick"><button data-n="1">۱</button><button data-n="10">۱۰</button></div>
+            <div class="is-rows" id="tr-rows"></div>
+            <div class="is-price" id="tr-price"></div>
+            <div class="modal-actions">
+                <button class="modal-cancel">انصراف</button>
+                <button class="modal-ok" id="tr-ok">تولید</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    const inp = ov.querySelector(".tr-input"), okBtn = ov.querySelector("#tr-ok");
+    const getN = () => Math.max(0, Math.floor(Number(inp.value) || 0));
+    const update = () => {
+        const n = getN(), rows = [];
+        const row = (label, need, have, money) => {
+            const bad = need > have;
+            rows.push(`<div class="is-row ${bad ? "is-bad" : ""}"><span>${label}</span><b>${money ? formatMoney(need) : formatNumber(need)} <small>(موجود: ${money ? formatMoney(have) : formatNumber(have)})</small></b></div>`);
+            return bad;
+        };
+        let bad = false;
+        bad = row("💰 هزینه", cost * n, player.money ?? 0, true) || bad;
+        bad = row("👥 نیروی انسانی", u.manpower * n, Math.floor(player.manpower ?? 0), false) || bad;
+        Object.entries(u.resources || {}).forEach(([k, a]) => {
+            bad = row(`${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}`, a * n, Math.floor(player.resources?.[k] ?? 0), false) || bad;
+        });
+        if (n > capLeft) { bad = true; rows.push(`<div class="is-row is-bad"><span>📦 ظرفیت آزاد</span><b>${formatNumber(capLeft)}</b></div>`); }
+        ov.querySelector("#tr-rows").innerHTML = rows.join("");
+        const base = u.cost * n;
+        ov.querySelector("#tr-price").className = "is-price" + (bad ? " is-bad" : "");
+        ov.querySelector("#tr-price").innerHTML = `<span>قیمت ${formatNumber(n)} عدد${cost < u.cost ? ` <small>(بدون تخفیف ${formatMoney(base)})</small>` : ""}</span><b>${formatMoney(cost * n)}</b>`;
+        okBtn.disabled = bad || n < 1;
+        okBtn.textContent = n < 1 ? "تعداد را وارد کنید" : bad ? "امکان تولید نیست" : `تولید ${formatNumber(n)} عدد`;
+    };
+    ov.querySelectorAll(".tr-step").forEach(b => b.onclick = () => { inp.value = Math.max(1, getN() + Number(b.dataset.d)); update(); });
+    ov.querySelectorAll(".tr-quick button").forEach(b => b.onclick = () => { inp.value = b.dataset.n; update(); });
+    ov.querySelector(".tr-max").onclick = () => { inp.value = Math.max(1, trainLimits(u)); update(); };
+    inp.addEventListener("input", update);
+    ov.addEventListener("click", e => { if (e.target === ov) closeInfraSheet(); });
+    ov.querySelector(".is-close").onclick = closeInfraSheet;
+    ov.querySelector(".modal-cancel").onclick = closeInfraSheet;
+    okBtn.onclick = async () => {
+        if (okBtn.disabled) return;
+        okBtn.disabled = true;
+        if (await trainUnit(uid_, getN())) closeInfraSheet(); else update();
+    };
+    update();
 }
 
 /* =========================================================
