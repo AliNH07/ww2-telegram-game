@@ -179,14 +179,15 @@ INFRASTRUCTURE = {
     "land_hq": {
         "power_required": 3,
         "name": "ستاد فرماندهی", "group": "land", "icon": "🎖️",
-        "desc": "فرماندهی کل نیروی زمینی. بدون ساخت آن هیچ یگان زمینی تولید نمی‌شود.",
+        "desc": "فرماندهی کل نیروی زمینی. ساخت آن شرط تولید یگان‌های زمینی است. از سطح ۲ به بعد هر ارتقا ۱۰٪ به دفاع یگان‌های زمینی اضافه می‌کند.",
+        "bonus": {"defense": 0.10},
         "levels": [L(cost=500_000), L(cost=1_100_000), L(cost=2_300_000), L(cost=4_300_000), L(cost=7_500_000)],
     },
     "land_tank_factory": {
         "power_required": 5,
         "name": "کارخانه تانک‌سازی", "group": "land", "icon": "🛡️",
-        "desc": "تانک تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های زمینی را ۵٪ کم.",
-        "bonus": {"discount": 0.05},
+        "desc": "تانک تولید می‌کند. از سطح ۲ به بعد هر ارتقا ۵٪ به دفاع یگان‌های زمینی اضافه می‌کند.",
+        "bonus": {"defense": 0.05},
         "levels": [L(cost=600_000), L(cost=1_300_000), L(cost=2_800_000), L(cost=5_200_000), L(cost=9_000_000)],
     },
     "naval_port": {
@@ -198,8 +199,8 @@ INFRASTRUCTURE = {
     "naval_shipyard": {
         "power_required": 8,
         "name": "کشتی‌سازی", "group": "naval", "icon": "🚢",
-        "desc": "زیردریایی، ناوشکن، ناو ترابری و ناو هواپیمابر تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های دریایی را ۵٪ کم.",
-        "bonus": {"discount": 0.05},
+        "desc": "زیردریایی، ناو، ناو ترابری و ناو هواپیمابر تولید می‌کند. از سطح ۲ به بعد هر ارتقا ۵٪ به دفاع یگان‌های دریایی اضافه می‌کند.",
+        "bonus": {"defense": 0.05},
         "levels": [L(cost=750_000), L(cost=1_580_000), L(cost=3_330_000), L(cost=6_080_000), L(cost=10_420_000)],
     },
     "air_airport": {
@@ -211,8 +212,8 @@ INFRASTRUCTURE = {
     "air_arsenal": {
         "power_required": 7,
         "name": "ادوات هوایی", "group": "air", "icon": "✈️",
-        "desc": "جنگنده، بمب‌افکن و بالگرد تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های هوایی را ۵٪ کم.",
-        "bonus": {"discount": 0.05},
+        "desc": "جنگنده، بمب‌افکن و بالگرد تولید می‌کند. از سطح ۲ به بعد هر ارتقا ۵٪ به دفاع یگان‌های هوایی اضافه می‌کند.",
+        "bonus": {"defense": 0.05},
         "levels": [L(cost=800_000), L(cost=1_680_000), L(cost=3_540_000), L(cost=6_400_000), L(cost=10_950_000)],
     },
     "missile_depot": {
@@ -224,8 +225,8 @@ INFRASTRUCTURE = {
     "missile_factory": {
         "power_required": 10,
         "name": "موشک‌سازی", "group": "missile", "icon": "🎯",
-        "desc": "موشک تولید می‌کند. هر سطح هزینهٔ تولید موشک‌ها را ۵٪ کم می‌کند.",
-        "bonus": {"discount": 0.05},
+        "desc": "موشک تولید می‌کند. سطح بالاتر موشک‌های قوی‌تر را باز می‌کند و از سطح ۲ به بعد هر ارتقا ۵٪ به دفاع موشک‌ها اضافه می‌کند.",
+        "bonus": {"defense": 0.05},
         "levels": [L(cost=2_400_000), L(cost=5_040_000), L(cost=10_560_000), L(cost=19_200_000), L(cost=32_400_000)],
     },
 }
@@ -311,6 +312,22 @@ ARMY_UNITS = {
     "helicopter": {"name": "بالگرد", "group": "air", "requires": ["air_airport", "air_arsenal"],
         "cost": 120_000, "manpower": 100, "resources": {"oil": 120, "steel": 60},
         "attack": 30, "defense": 35},
+    # موشک‌ها: علاوه بر هزینهٔ یک‌باره، هر موشکِ موجود هر روز غذا، نفت و فولاد مصرف می‌کند
+    "cruise_missile": {"name": "موشک کروز", "group": "missile", "requires": ["missile_depot", "missile_factory"],
+        "min_level": {"missile_factory": 1},
+        "cost": 400_000, "manpower": 100, "resources": {"steel": 300, "oil": 200, "food": 50},
+        "daily": {"food": 2, "oil": 5, "steel": 3},
+        "attack": 70, "defense": 5},
+    "ballistic_missile": {"name": "موشک بالستیک", "group": "missile", "requires": ["missile_depot", "missile_factory"],
+        "min_level": {"missile_factory": 3},
+        "cost": 900_000, "manpower": 150, "resources": {"steel": 600, "oil": 400, "food": 100},
+        "daily": {"food": 3, "oil": 10, "steel": 6},
+        "attack": 120, "defense": 10},
+    "icbm": {"name": "موشک قاره‌پیما", "group": "missile", "requires": ["missile_depot", "missile_factory"],
+        "min_level": {"missile_factory": 5},
+        "cost": 2_500_000, "manpower": 300, "resources": {"steel": 1200, "oil": 900, "food": 200},
+        "daily": {"food": 5, "oil": 20, "steel": 12},
+        "attack": 250, "defense": 20},
 }
 
 MAP_RESOURCES = {
@@ -418,16 +435,14 @@ def get_group_capacity(player, group):
         if lv > 0: total += item["levels"][min(lv, len(item["levels"])) - 1].get("capacity", 0)
     return total
 
-def infra_bonus(player, key, group=None):
+def group_defense_mult(player, group):
+    # سطح ۱ اثری ندارد؛ از سطح ۲ به بعد هر ارتقا درصدِ دفاع اضافه می‌کند
     t = 0.0
     for iid, item in INFRASTRUCTURE.items():
-        v = item.get("bonus", {}).get(key)
-        if not v or (group and item.get("group") != group): continue
-        t += v * min(get_infra_level(player, iid), len(item["levels"]))
-    return t
-
-def unit_cost_mult(player, group):
-    return max(0.5, 1 - infra_bonus(player, "discount", group))
+        v = item.get("bonus", {}).get("defense")
+        if not v or item.get("group") != group: continue
+        t += v * max(0, min(get_infra_level(player, iid), len(item["levels"])) - 1)
+    return 1 + t
 
 def get_group_units(player, group):
     total = 0
@@ -439,8 +454,9 @@ def get_group_units(player, group):
 def recompute_army(player):
     total = 0
     for unit_id, unit in ARMY_UNITS.items():
-        total += player.get("units", {}).get(unit_id, 0) * (unit["attack"] + unit["defense"])
-    player["army"] = total
+        dm = group_defense_mult(player, unit["group"])
+        total += player.get("units", {}).get(unit_id, 0) * (unit["attack"] + unit["defense"] * dm)
+    player["army"] = int(round(total))
 
 def ensure_player_fields(player):
     player.setdefault("resources", dict(STARTING_RESOURCES))
@@ -514,6 +530,12 @@ def compute_rates(player):
             resource_consumption[key] = raw - reduced
             resource_production[key] = reduced
 
+    # مصرف روزانهٔ موشک‌ها
+    for uid_, u in ARMY_UNITS.items():
+        n = player.get("units", {}).get(uid_, 0)
+        if n > 0:
+            for k, a in u.get("daily", {}).items(): resource_consumption[k] += a * n
+
     return {"gross_income": income, "net_income": income - upkeep, "daily_upkeep": upkeep,
             "power_capacity": power_capacity, "power_consumption": power_consumption,
             "manpower_production": manpower_production,
@@ -572,7 +594,7 @@ def serialize_player(player):
     data["daily_upkeep"] = rates["daily_upkeep"]
     data["infra"] = build_catalog_status(player, INFRASTRUCTURE)
     data["economy"] = build_catalog_status(player, ECONOMY)
-    data["cost_mult"] = {g: unit_cost_mult(player, g) for g in ("land", "naval", "air", "missile")}
+    data["def_mult"] = {g: group_defense_mult(player, g) for g in ("land", "naval", "air", "missile")}
     return data
 
 # =========================================================
@@ -880,7 +902,11 @@ async def train_unit(request):
         return web.json_response({"success": False, "error": "invalid_state"}, status=400)
     ensure_player_fields(p); accrue_player(p)
     unit = ARMY_UNITS[unit_id]; group = unit["group"]
-    missing = [INFRASTRUCTURE[r]["name"] for r in unit["requires"] if get_infra_level(p, r) <= 0]
+    ml = unit.get("min_level", {}); missing = []
+    for r in unit["requires"]:
+        need = ml.get(r, 1)
+        if get_infra_level(p, r) < need:
+            missing.append(INFRASTRUCTURE[r]["name"] + (f" سطح {need}" if need > 1 else ""))
     if missing:
         return web.json_response({"success": False, "error": "no_infra",
                                   "message": "ابتدا بسازید: " + "، ".join(f"«{m}»" for m in missing)}, status=400)
@@ -893,7 +919,7 @@ async def train_unit(request):
         return web.json_response({"success": False, "error": "capacity_full",
                                   "message": f"ظرفیت {GROUP_NAMES[group]} پر است."}, status=400)
     count = min(count, cap - used)
-    total_cost = int(round(unit["cost"] * unit_cost_mult(p, group))) * count; total_mp = unit["manpower"] * count
+    total_cost = unit["cost"] * count; total_mp = unit["manpower"] * count
     if p.get("money", 0) < total_cost:
         return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
     if p.get("manpower", 0) < total_mp:
@@ -1083,7 +1109,7 @@ async def perform_battle(request):
         p = 0
         for uid_, u in ARMY_UNITS.items():
             if u["group"] != side_kind: continue
-            p += player.get("units", {}).get(uid_, 0) * u["defense"]
+            p += player.get("units", {}).get(uid_, 0) * u["defense"] * group_defense_mult(player, side_kind)
         return p
 
     def total_units(player, side_kind):
