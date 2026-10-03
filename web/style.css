@@ -1535,3 +1535,22 @@ img { -webkit-user-drag: none; user-select: none; }
     flex: 1; padding: 9px; border-radius: 10px; font: bold 14px Tahoma, Arial, sans-serif; color: #c3cad3;
     background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12);
 }
+
+/* ---------- نوار بازگشت ---------- */
+.sub-back-bar {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin-bottom: 14px;
+    background: rgba(14, 18, 28, 0.82); border: 1px solid rgba(var(--brand-rgb), 0.28); border-radius: 20px;
+}
+.sub-back-bar .sub-back-button {
+    width: 40px; height: 40px; flex: none; padding: 0; border-radius: 50%;
+    justify-content: center; background: transparent; color: #f4f6f9; border: 1px solid rgba(255, 255, 255, 0.24);
+}
+.sub-back-bar .sub-back-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.sb-title { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: bold; color: #f4f6f9; white-space: nowrap; }
+.sb-icon { font-size: 18px; }
+.sb-money { margin-right: auto; direction: ltr; font-size: 15px; font-weight: bold; color: #e8c36a; }
+
+/* ---------- باکس قدرت کل ارتش (ردیفی) ---------- */
+.army-summary-card { display: flex; align-items: center; justify-content: space-between; padding: 9px 16px; margin-bottom: 12px; border-radius: 14px; }
+.army-summary-card::before { display: none; }
+.army-summary-power { font-size: 22px; padding: 0; text-align: left; }
