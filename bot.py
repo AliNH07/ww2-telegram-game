@@ -179,15 +179,14 @@ INFRASTRUCTURE = {
     "land_hq": {
         "power_required": 3,
         "name": "ستاد فرماندهی", "group": "land", "icon": "🎖️",
-        "desc": "فرماندهی کل نیروی زمینی. هر سطح ۱۰٪ به دفاع همهٔ جبهه‌ها در برابر حملهٔ مستقیم اضافه می‌کند.",
-        "bonus": {"defense_all": 0.10},
+        "desc": "فرماندهی کل نیروی زمینی. بدون ساخت آن هیچ یگان زمینی تولید نمی‌شود.",
         "levels": [L(cost=500_000), L(cost=1_100_000), L(cost=2_300_000), L(cost=4_300_000), L(cost=7_500_000)],
     },
     "land_tank_factory": {
         "power_required": 5,
         "name": "کارخانه تانک‌سازی", "group": "land", "icon": "🛡️",
-        "desc": "تانک تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های زمینی را ۵٪ کم و دفاع جبههٔ زمینی را ۵٪ بیشتر می‌کند.",
-        "bonus": {"discount": 0.05, "defense": 0.05},
+        "desc": "تانک تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های زمینی را ۵٪ کم.",
+        "bonus": {"discount": 0.05},
         "levels": [L(cost=600_000), L(cost=1_300_000), L(cost=2_800_000), L(cost=5_200_000), L(cost=9_000_000)],
     },
     "naval_port": {
@@ -199,8 +198,8 @@ INFRASTRUCTURE = {
     "naval_shipyard": {
         "power_required": 8,
         "name": "کشتی‌سازی", "group": "naval", "icon": "🚢",
-        "desc": "زیردریایی، ناوشکن، ناو ترابری و ناو هواپیمابر تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های دریایی را ۵٪ کم و دفاع جبههٔ دریایی را ۵٪ بیشتر می‌کند.",
-        "bonus": {"discount": 0.05, "defense": 0.05},
+        "desc": "زیردریایی، ناوشکن، ناو ترابری و ناو هواپیمابر تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های دریایی را ۵٪ کم.",
+        "bonus": {"discount": 0.05},
         "levels": [L(cost=750_000), L(cost=1_580_000), L(cost=3_330_000), L(cost=6_080_000), L(cost=10_420_000)],
     },
     "air_airport": {
@@ -212,8 +211,8 @@ INFRASTRUCTURE = {
     "air_arsenal": {
         "power_required": 7,
         "name": "ادوات هوایی", "group": "air", "icon": "✈️",
-        "desc": "جنگنده، بمب‌افکن و بالگرد تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های هوایی را ۵٪ کم و دفاع جبههٔ هوایی را ۵٪ بیشتر می‌کند.",
-        "bonus": {"discount": 0.05, "defense": 0.05},
+        "desc": "جنگنده، بمب‌افکن و بالگرد تولید می‌کند. هر سطح هزینهٔ تولید یگان‌های هوایی را ۵٪ کم.",
+        "bonus": {"discount": 0.05},
         "levels": [L(cost=800_000), L(cost=1_680_000), L(cost=3_540_000), L(cost=6_400_000), L(cost=10_950_000)],
     },
     "missile_depot": {
@@ -285,31 +284,31 @@ ECONOMY = {
 }
 
 ARMY_UNITS = {
-    "infantry": {"name": "پیاده‌نظام", "group": "land", "requires": "land_barracks",
+    "infantry": {"name": "پیاده‌نظام", "group": "land", "requires": ["land_barracks", "land_hq"],
         "cost": 50_000, "manpower": 300, "resources": {"food": 100},
         "attack": 20, "defense": 10},
-    "tank": {"name": "تانک", "group": "land", "requires": "land_tank_factory",
+    "tank": {"name": "تانک", "group": "land", "requires": ["land_barracks", "land_hq", "land_tank_factory"],
         "cost": 150_000, "manpower": 250, "resources": {"steel": 300, "food": 150},
         "attack": 50, "defense": 25},
-    "ship": {"name": "ناو دریایی", "group": "naval", "requires": "naval_port",
+    "ship": {"name": "ناو دریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
         "cost": 250_000, "manpower": 200, "resources": {"oil": 250, "food": 150},
         "attack": 50, "defense": 60},
-    "submarine": {"name": "زیردریایی", "group": "naval", "requires": "naval_shipyard",
+    "submarine": {"name": "زیردریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
         "cost": 200_000, "manpower": 120, "resources": {"oil": 200, "steel": 150},
         "attack": 45, "defense": 25},
-    "transport_ship": {"name": "ناو ترابری", "group": "naval", "requires": "naval_port",
+    "transport_ship": {"name": "ناو ترابری", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
         "cost": 180_000, "manpower": 150, "resources": {"oil": 150, "steel": 200},
         "attack": 5, "defense": 40, "transport_capacity": 500},
-    "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": "naval_shipyard",
+    "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
         "cost": 800_000, "manpower": 500, "resources": {"oil": 800, "steel": 1200},
         "attack": 25, "defense": 90},
-    "fighter": {"name": "جنگنده", "group": "air", "requires": "air_airport",
+    "fighter": {"name": "جنگنده", "group": "air", "requires": ["air_airport", "air_arsenal"],
         "cost": 200_000, "manpower": 150, "resources": {"oil": 200, "steel": 100},
         "attack": 45, "defense": 40},
-    "bomber": {"name": "بمب‌افکن", "group": "air", "requires": "air_arsenal",
+    "bomber": {"name": "بمب‌افکن", "group": "air", "requires": ["air_airport", "air_arsenal"],
         "cost": 250_000, "manpower": 180, "resources": {"oil": 300, "steel": 150},
         "attack": 60, "defense": 15},
-    "helicopter": {"name": "بالگرد", "group": "air", "requires": "air_airport",
+    "helicopter": {"name": "بالگرد", "group": "air", "requires": ["air_airport", "air_arsenal"],
         "cost": 120_000, "manpower": 100, "resources": {"oil": 120, "steel": 60},
         "attack": 30, "defense": 35},
 }
@@ -429,9 +428,6 @@ def infra_bonus(player, key, group=None):
 
 def unit_cost_mult(player, group):
     return max(0.5, 1 - infra_bonus(player, "discount", group))
-
-def front_defense_mult(player, front):
-    return 1 + infra_bonus(player, "defense_all") + infra_bonus(player, "defense", front)
 
 def get_group_units(player, group):
     total = 0
@@ -883,10 +879,11 @@ async def train_unit(request):
     if not p.get("country") or p.get("is_eliminated"):
         return web.json_response({"success": False, "error": "invalid_state"}, status=400)
     ensure_player_fields(p); accrue_player(p)
-    unit = ARMY_UNITS[unit_id]; group = unit["group"]; req = unit["requires"]
-    if get_infra_level(p, req) <= 0:
+    unit = ARMY_UNITS[unit_id]; group = unit["group"]
+    missing = [INFRASTRUCTURE[r]["name"] for r in unit["requires"] if get_infra_level(p, r) <= 0]
+    if missing:
         return web.json_response({"success": False, "error": "no_infra",
-                                  "message": f"ابتدا «{INFRASTRUCTURE[req]['name']}» را بسازید."}, status=400)
+                                  "message": "ابتدا بسازید: " + "، ".join(f"«{m}»" for m in missing)}, status=400)
     cap = get_group_capacity(p, group); used = get_group_units(p, group)
     store = {"land": "پادگان", "naval": "بندر", "air": "فرودگاه", "missile": "انبار موشک"}.get(group, "")
     if cap <= 0:
@@ -1104,7 +1101,7 @@ async def perform_battle(request):
         atk_attack = 0
         # بدون ناو هواپیمابر، هیچ حملهٔ هوایی ممکن نیست
         if front == "air" and not has_carrier:
-            dfd_def = def_power(dfd, front) * 1.10 * front_defense_mult(dfd, front)
+            dfd_def = def_power(dfd, front) * 1.10
             dfd_final = dfd_def * (1 + random.uniform(-0.08, 0.08))
             report["fronts"][front] = {"attacker_power": 0,
                                        "defender_power": int(dfd_final),
@@ -1123,7 +1120,7 @@ async def perform_battle(request):
                 sent = int(count * ratio)
                 atk_attack += sent * u["attack"]
                 atk["units"][uid_] -= sent
-        dfd_def = def_power(dfd, front) * 1.10 * front_defense_mult(dfd, front)
+        dfd_def = def_power(dfd, front) * 1.10
         if air_winner == w["attacker"] and front in ["naval", "land"]: atk_attack *= 1.15
         elif air_winner == w["defender"] and front in ["naval", "land"]: dfd_def *= 1.15
         atk_final = atk_attack * (1 + random.uniform(-0.08, 0.08))
