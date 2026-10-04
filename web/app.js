@@ -33,8 +33,8 @@ let ARMY_UNITS = {};
 
 const RESOURCE_NAMES = { food: "غذا", steel: "فولاد", uranium: "اورانیوم", oil: "نفت" };
 const RESOURCE_ICONS = { food: "🌾", steel: "⚙️", uranium: "☢️", oil: "🛢️" };
-const GROUP_ICONS = { land: "🪖", naval: "⚓", air: "✈️", missile: "🚀" };
-const GROUP_TITLES = { land: "زمینی", naval: "دریایی", air: "هوایی", missile: "موشکی" };
+const GROUP_ICONS = { land: "🪖", naval: "⚓", air: "✈️", missile: "🚀", strategy: "🛰️" };
+const GROUP_TITLES = { land: "زمینی", naval: "دریایی", air: "هوایی", missile: "موشکی", strategy: "استراتژیک" };
 const TREATY_TYPE_NAMES = { alliance: "پیمان اتحاد", non_aggression: "پیمان عدم تجاوز" };
 
 // [طول, عرض, اسم, حداقل زوم, حداکثر زوم] — اقیانوس‌ها همیشه، دریاها فقط با زوم بیشتر
@@ -539,7 +539,7 @@ function updateHomeStats() {
 const RK_TABS = [
     { id: "overall", key: "overall", label: "کلی", info: "<b>کلی</b> بر چه اساسیه: ترکیبِ پنج دسته‌ی دیگر، با وزنِ نابرابر: اقتصاد ۳۰، نظامی ۲۵، قلمرو ۲۰، توسعه ۱۵، دیپلماسی ۱۰. امتیازِ هر دسته نسبت به بهترین کشورِ همان دسته محاسبه می‌شود، پس یک عددِ غول‌آسا بقیه را خفه نمی‌کند." },
     { id: "economy", key: "economy", label: "اقتصادی", info: "<b>اقتصادی</b> بر چه اساسیه: درآمدِ خالصِ روزانه‌ی کشور، بعد از کسرِ هزینه‌ی نگهداری — هر $1,000 یک امتیاز." },
-    { id: "military", key: "military", label: "قدرت نظامی", info: "<b>قدرت نظامی</b> بر چه اساسیه: مجموعِ قدرتِ همه‌ی یگان‌ها — هر یگان به اندازه‌ی حمله + دفاعش امتیاز دارد. یگان‌هایی که برای جنگ فرستاده شده‌اند حساب نمی‌شوند." },
+    { id: "military", key: "military", label: "قدرت نظامی", info: "<b>قدرت نظامی</b> بر چه اساسیه: مجموعِ قدرتِ همه‌ی یگان‌ها — هر یگان به اندازه‌ی حمله + دفاعش امتیاز دارد. یگان‌های مستقر در سکوها و تنگه‌ها هم حساب می‌شوند." },
     { id: "territory", key: "territory", label: "قلمرو", info: "<b>قلمرو</b> بر چه اساسیه: منابعِ نقشه و تنگه‌هایی که زیرِ کنترلِ کشورند، هر کدام ۱ امتیاز، به‌اضافه‌ی هر کشورِ اشغال‌شده ۵ امتیاز." },
     { id: "development", key: "development", label: "توسعه", info: "<b>توسعه</b> بر چه اساسیه: مجموعِ سطحِ همه‌ی ساختمان‌ها در زیرساخت و اقتصاد — هر سطح ۵۰ امتیاز." },
     { id: "diplomacy", key: "diplomacy", label: "دیپلماسی", info: "<b>دیپلماسی</b> بر چه اساسیه: پیمان‌های فعال (هر کدام ۱۰۰ امتیاز) و عضویت در اتحادیه (۱۵۰ امتیاز)." },
@@ -620,6 +620,7 @@ const INFRA_TAB_FILTERS = {
     food:     i => i.group === "resource" && i.resource_key === "food",
     resource: i => i.group === "resource" && i.resource_key !== "food",
     military: i => ["land", "naval", "air", "missile"].includes(i.group),
+    strategy: i => i.group === "strategy",
 };
 
 async function openInfrastructureMenu() {
@@ -679,6 +680,8 @@ function renderInfraTab(tab) {
         renderInfraList("infra-food-list", INFRA_TAB_FILTERS.food);
     else if (tab === "resource")
         renderInfraList("infra-resource-list", INFRA_TAB_FILTERS.resource);
+    else if (tab === "strategy")
+        renderInfraList("infra-strategy-list", INFRA_TAB_FILTERS.strategy);
     else if (tab === "military") {
         renderInfraList("infra-land-list", i => i.group === "land");
         renderInfraList("infra-naval-list", i => i.group === "naval");
@@ -1239,35 +1242,299 @@ function openTrainSheet(uid_) {
 /* =========================================================
    War
 ========================================================= */
-document.querySelectorAll(".war-tab").forEach(tab => {
-    tab.addEventListener("click", () => {
-        document.querySelectorAll(".war-tab").forEach(t => t.classList.remove("active"));
-        tab.classList.add("active");
-        document.querySelectorAll(".war-panel").forEach(p => p.classList.add("hidden"));
-        const panel = document.getElementById(tab.dataset.warTab);
-        if (panel) panel.classList.remove("hidden");
-    });
-});
+let warSites = [];
+let warForces = { home: {}, sites: [] };
+let dispatchOpen = false;
+let dispatchSel = { from: null, to: null, units: {} };
+let forcesFilter = "all";
+let expandedLoc = null;
+let warSearchQ = "";
+let newsQ = "", newsCountry = "";
+let histKind = "all", histCountry = "";
+let warLog = { events: [], history: [], stats: { fights: 0, wins: 0, losses: 0 } };
+let scanState = { scans: 0, sites: {}, countries: {} };
+let satTimer = null;
+let currentWarTab = "war-forces-panel";
 
-function openWarPage() {
-    showGamePage("war");
-    renderWarTargets();
-    loadWarData();
+const sumVals = o => Object.values(o || {}).reduce((a, b) => a + b, 0);
+const unitName = id => ARMY_UNITS[id]?.name || id;
+function siteIcon(s) { return s.kind === "strait" ? "⚓" : (RESOURCE_ICONS[s.type] || "📍"); }
+function unitChips(units) {
+    return Object.entries(units || {}).filter(([, n]) => n > 0)
+        .map(([k, n]) => `<span class="wf-chip">${unitName(k)} <b>${formatNumber(n)}</b></span>`).join("");
+}
+function timeAgo(iso) {
+    const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return "لحظاتی پیش";
+    const m = Math.floor(s / 60); if (m < 60) return `${formatNumber(m)} دقیقه پیش`;
+    const h = Math.floor(m / 60); if (h < 24) return `${formatNumber(h)} ساعت پیش`;
+    return `${formatNumber(Math.floor(h / 24))} روز پیش`;
+}
+function timeLeft(iso) {
+    const ms = new Date(iso).getTime() - Date.now();
+    if (ms <= 0) return "منقضی شد";
+    const m = Math.floor(ms / 60000), h = Math.floor(m / 60);
+    return h > 0 ? `${formatNumber(h)} ساعت و ${formatNumber(m % 60)} دقیقه مانده` : `${formatNumber(m)} دقیقه مانده`;
+}
+function siteLabel(id) {
+    return (typeof mapSites !== "undefined" ? mapSites.find(s => s.id === id) : null)?.name
+        || warSites.find(s => s.id === id)?.name || warForces.sites.find(s => s.id === id)?.name || id;
 }
 
+function fillCountrySelects() {
+    ["news-country", "hist-country"].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el || el.options.length > 1) return;
+        el.innerHTML = `<option value="">همه‌ی کشورها</option>` +
+            Object.entries(COUNTRY_NAMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+    });
+}
+
+function showWarTab(id) {
+    currentWarTab = id;
+    document.querySelectorAll(".war-tab").forEach(t => t.classList.toggle("active", t.dataset.warTab === id));
+    document.querySelectorAll(".war-panel").forEach(p => p.classList.toggle("hidden", p.id !== id));
+    clearInterval(satTimer); satTimer = null;
+    if (id === "war-forces-panel") loadForces();
+    else if (id === "war-targets-panel") { renderWarTargets(); loadWarData(); }
+    else if (id === "war-news-panel" || id === "war-history-panel") loadWarLog();
+    else if (id === "war-sat-panel") {
+        renderSatTab();
+        satTimer = setInterval(() => {
+            if (currentWarTab === "war-sat-panel" && !document.getElementById("war").classList.contains("hidden")) renderSatTab();
+        }, 20000);
+    }
+}
+document.querySelectorAll(".war-tab").forEach(t => t.addEventListener("click", () => showWarTab(t.dataset.warTab)));
+document.getElementById("war-search")?.addEventListener("input", e => { warSearchQ = e.target.value.trim(); renderWarTargets(); });
+document.getElementById("news-search")?.addEventListener("input", e => { newsQ = e.target.value.trim(); renderWarNews(); });
+document.getElementById("news-country")?.addEventListener("change", e => { newsCountry = e.target.value; renderWarNews(); });
+document.getElementById("hist-country")?.addEventListener("change", e => { histCountry = e.target.value; renderWarHistory(); });
+document.querySelectorAll("[data-hist-kind]").forEach(b => b.addEventListener("click", () => {
+    histKind = b.dataset.histKind;
+    document.querySelectorAll("[data-hist-kind]").forEach(x => x.classList.toggle("active", x === b));
+    renderWarHistory();
+}));
+
+async function openWarPage(opts = {}) {
+    showGamePage("war");
+    fillCountrySelects();
+    if (!Object.keys(ARMY_UNITS).length) await loadArmyCatalog();
+    dispatchOpen = !!opts.dispatchTo;
+    dispatchSel = { from: null, to: opts.dispatchTo || null, units: {} };
+    expandedLoc = null; forcesFilter = "all";
+    showWarTab("war-forces-panel");
+}
+function openDispatchTo(siteId) { openWarPage({ dispatchTo: siteId }); }
+
+/* ---------- نیروها ---------- */
+async function loadForces() {
+    try {
+        const [f, s] = await Promise.all([apiGet("/api/war/forces"), apiGet("/api/map-sites")]);
+        if (f && f.home) warForces = f;
+        warSites = Array.isArray(s) ? s : [];
+        if (player?.satellite_built) await loadScanState();
+    } catch (e) { console.error(e); }
+    renderForcesTab();
+}
+function poolOf(loc) { return loc === "home" ? warForces.home : (warForces.sites.find(s => s.id === loc)?.units || {}); }
+function locName(loc) { return loc === "home" ? "خانه" : siteLabel(loc); }
+const wfStat = (n, label) => `<div class="wf-stat"><b>${formatNumber(n)}</b><span>${label}</span></div>`;
+
+function locCardHtml(l) {
+    const total = sumVals(l.units), open = expandedLoc === l.id;
+    const isHome = l.kind === "home";
+    const ico = isHome ? flagInline(selectedCountry) : siteIcon(l);
+    const title = isHome ? `خانه · ${COUNTRY_NAMES[selectedCountry] || ""}` : l.name;
+    const sub = isHome ? "خانه" : (l.kind === "strait" ? "تنگه" : "سکو / معدن");
+    return `<div class="wf-loc ${open ? "open" : ""}">
+        <div class="wf-loc-top" data-toggle="${l.id}">
+            <span class="wf-ico">${ico}</span>
+            <div class="wf-loc-name"><b>${title}</b><small>${sub}</small></div>
+            <div class="wf-loc-count"><b>${formatNumber(total)}</b> یگان <i>${open ? "⌃" : "⌄"}</i></div>
+        </div>
+        <div class="wf-loc-chips">${unitChips(l.units) || `<span class="wf-empty">بدون نیرو</span>`}</div>
+        ${open && total > 0 ? `<div class="wf-loc-actions">
+            <button data-from="${l.id}">🧭 اعزام از این‌جا</button>
+            ${isHome ? "" : `<button data-home="${l.id}">🏠 بازگشت به خانه</button>`}</div>` : ""}
+    </div>`;
+}
+
+function dispatchPanelHtml() {
+    const { from, to } = dispatchSel;
+    let h = `<div class="dp-panel"><div class="dp-squares">
+        <button class="dp-sq ${from ? "set" : ""}" id="dp-from"><small>از کجا</small><b>${from ? locName(from) : "انتخاب"}</b></button>
+        <div class="dp-arrow">←</div>
+        <button class="dp-sq ${to ? "set" : ""}" id="dp-to"><small>به کجا</small><b>${to ? locName(to) : "انتخاب"}</b></button>
+    </div>`;
+    if (from && to) {
+        h += `<div class="dp-units">` + Object.entries(poolOf(from)).filter(([, n]) => n > 0).map(([k, n]) => `
+            <div class="dp-unit" data-u="${k}">
+                <span class="dp-un">${unitName(k)}<small>موجود ${formatNumber(n)}</small></span>
+                <div class="dp-qty"><button data-d="-1">−</button>
+                    <input type="number" inputmode="numeric" min="0" max="${n}" value="${dispatchSel.units[k] || 0}">
+                    <button data-d="1">+</button><button class="dp-all">همه</button></div>
+            </div>`).join("") + `</div>
+            <div class="dp-summary" id="dp-summary"></div>
+            <button class="wf-send-btn dp-go" id="dp-go" disabled>ارسال نیرو</button>`;
+    } else {
+        h += `<div class="dp-hint">اول مبدأ و مقصد را انتخاب کن.</div>`;
+    }
+    return h + `</div>`;
+}
+
+function updateDpSummary() {
+    const sum = document.getElementById("dp-summary"), go = document.getElementById("dp-go");
+    if (!sum || !go) return;
+    const { to } = dispatchSel, total = sumVals(dispatchSel.units);
+    const dst = warSites.find(s => s.id === to);
+    let kind;
+    if (to === "home") kind = "🏠 بازگشت به خانه";
+    else if (!dst?.owner) kind = "🚩 موضع بی‌صاحب است؛ اشغال می‌شود";
+    else if (dst.owner === selectedCountry) kind = "🛡️ موضع خودی؛ نیروها تقویت می‌شوند";
+    else {
+        kind = `⚔️ حمله به ${COUNTRY_NAMES[dst.owner] || dst.owner} (بدون نیاز به اعلان جنگ)`;
+        const sc = scanState.sites?.[to];
+        if (sc?.owner) kind += ` · قدرت دفاعی اسکن‌شده: ${formatNumber(sc.power)}`;
+    }
+    const atk = Object.entries(dispatchSel.units).reduce((a, [k, n]) => a + n * (ARMY_UNITS[k]?.attack || 0), 0);
+    const hostile = dst?.owner && dst.owner !== selectedCountry;
+    sum.innerHTML = `<div>${kind}</div><div>${formatNumber(total)} یگان انتخاب شده${hostile ? ` · قدرت حمله ${formatNumber(atk)}` : ""}</div>`;
+    go.disabled = total < 1;
+}
+
+function renderForcesTab() {
+    const root = document.getElementById("war-forces-root");
+    if (!root) return;
+    const homeN = sumVals(warForces.home);
+    const siteN = warForces.sites.reduce((a, s) => a + sumVals(s.units), 0);
+    const locs = [{ id: "home", kind: "home", name: "خانه", units: warForces.home }, ...warForces.sites];
+    const shown = locs.filter(l => forcesFilter === "all" || l.kind === forcesFilter);
+    const chips = [["all", "همه"], ["home", "خانه"], ["resource", "سکوها و معادن"], ["strait", "تنگه‌ها"]];
+    root.innerHTML = `
+        <div class="wf-stats">${wfStat(homeN, "در خانه")}${wfStat(siteN, `در ${formatNumber(warForces.sites.length)} موضع`)}${wfStat(homeN + siteN, "کل نیروها")}</div>
+        <button class="wf-send-btn" id="wf-send-toggle">🧭 اعزام نیرو</button>
+        ${dispatchOpen ? dispatchPanelHtml() : ""}
+        <div class="wf-section"><span>🗺️ مواضع</span><small>${formatNumber(locs.length)} مکان</small></div>
+        <div class="wf-chips">${chips.map(([k, l]) => `<button class="wf-fchip ${forcesFilter === k ? "active" : ""}" data-f="${k}">${l}</button>`).join("")}</div>
+        <div>${shown.map(locCardHtml).join("")}</div>`;
+
+    root.querySelector("#wf-send-toggle").onclick = () => {
+        dispatchOpen = !dispatchOpen;
+        if (!dispatchOpen) dispatchSel = { from: null, to: null, units: {} };
+        renderForcesTab();
+    };
+    root.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { forcesFilter = b.dataset.f; renderForcesTab(); });
+    root.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
+        expandedLoc = expandedLoc === b.dataset.toggle ? null : b.dataset.toggle; renderForcesTab();
+    });
+    root.querySelectorAll("[data-from]").forEach(b => b.onclick = () => {
+        dispatchOpen = true; dispatchSel = { from: b.dataset.from, to: null, units: {} };
+        renderForcesTab(); showGamePage("war");
+    });
+    root.querySelectorAll("[data-home]").forEach(b => b.onclick = () => {
+        dispatchOpen = true; dispatchSel = { from: b.dataset.home, to: "home", units: {} };
+        renderForcesTab(); showGamePage("war");
+    });
+    if (dispatchOpen) {
+        root.querySelector("#dp-from").onclick = () => openPlaceSheet("from");
+        root.querySelector("#dp-to").onclick = () => openPlaceSheet("to");
+        root.querySelectorAll(".dp-unit").forEach(row => {
+            const k = row.dataset.u, max = poolOf(dispatchSel.from)[k] || 0, inp = row.querySelector("input");
+            const clamp = v => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
+            const set = v => { v = clamp(v); dispatchSel.units[k] = v; inp.value = v; updateDpSummary(); };
+            row.querySelectorAll("[data-d]").forEach(b => b.onclick = () => set((Number(inp.value) || 0) + Number(b.dataset.d)));
+            row.querySelector(".dp-all").onclick = () => set(max);
+            inp.oninput = () => { dispatchSel.units[k] = clamp(inp.value); updateDpSummary(); };
+        });
+        const go = root.querySelector("#dp-go");
+        if (go) { go.onclick = sendDispatch; updateDpSummary(); }
+    }
+}
+
+function placeRow(id, icon, name, sub) {
+    return `<button class="ps-row" data-id="${id}" data-q="${name}"><span class="ps-ic">${icon}</span><span class="ps-t"><b>${name}</b><small>${sub}</small></span></button>`;
+}
+
+function openPlaceSheet(mode) {
+    closeInfraSheet();
+    let rows = "";
+    if (mode === "from") {
+        const locs = [{ id: "home", name: "خانه" }, ...warForces.sites];
+        rows = locs.filter(l => sumVals(poolOf(l.id)) > 0)
+            .map(l => placeRow(l.id, l.id === "home" ? "🏠" : siteIcon(l), l.name, `${formatNumber(sumVals(poolOf(l.id)))} یگان`)).join("")
+            || `<div class="diplomacy-item-empty">هیچ نیرویی نداری.</div>`;
+    } else {
+        const list = [];
+        if (dispatchSel.from !== "home") list.push(placeRow("home", "🏠", "خانه", "بازگشت نیروها"));
+        const order = s => !s.owner ? 0 : (s.owner !== selectedCountry ? 1 : 2);
+        warSites.filter(s => s.id !== dispatchSel.from).sort((a, b) => order(a) - order(b)).forEach(s => {
+            let st = "بی‌صاحب";
+            if (s.owner === selectedCountry) st = "مال شما";
+            else if (s.owner) {
+                st = `در دست ${COUNTRY_NAMES[s.owner] || s.owner}`;
+                const sc = scanState.sites?.[s.id];
+                if (sc?.owner) st += ` · قدرت ${formatNumber(sc.power)}`;
+            }
+            list.push(placeRow(s.id, siteIcon(s), s.name, st));
+        });
+        rows = list.join("");
+    }
+    const ov = document.createElement("div");
+    ov.id = "infra-sheet"; ov.className = "modal-overlay";
+    ov.innerHTML = `<div class="ic-sheet">
+        <div class="is-head"><div class="is-titles"><div class="is-name">${mode === "from" ? "از کجا؟" : "به کجا؟"}</div>
+            <div class="is-sub">${mode === "from" ? "جایی که نیرو داری" : "سکوها، معادن و تنگه‌ها"}</div></div>
+            <button class="is-close" aria-label="بستن">✕</button></div>
+        <input class="ps-search" type="search" placeholder="جستجو...">
+        <div class="ps-list">${rows}</div></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener("click", e => { if (e.target === ov) closeInfraSheet(); });
+    ov.querySelector(".is-close").onclick = closeInfraSheet;
+    ov.querySelector(".ps-search").oninput = e => {
+        const q = e.target.value.trim();
+        ov.querySelectorAll(".ps-row").forEach(r => r.classList.toggle("hidden", !!q && !r.dataset.q.includes(q)));
+    };
+    ov.querySelectorAll(".ps-row").forEach(r => r.onclick = () => {
+        const id = r.dataset.id;
+        if (mode === "from") dispatchSel = { from: id, to: dispatchSel.to === id ? null : dispatchSel.to, units: {} };
+        else dispatchSel.to = id;
+        closeInfraSheet(); renderForcesTab();
+    });
+}
+
+async function sendDispatch() {
+    const { from, to } = dispatchSel;
+    const picked = Object.fromEntries(Object.entries(dispatchSel.units).filter(([, v]) => v > 0));
+    if (!Object.keys(picked).length) return;
+    const dst = warSites.find(s => s.id === to);
+    if (dst?.owner && dst.owner !== selectedCountry &&
+        !confirm(`در «${dst.name}» به ${COUNTRY_NAMES[dst.owner] || dst.owner} حمله می‌شود. ادامه؟`)) return;
+    const btn = document.getElementById("dp-go"); if (btn) btn.disabled = true;
+    try {
+        const d = await apiPost("/api/war/dispatch", { from, to, units: picked });
+        if (!d.success) { showToast(d.message || "خطا"); if (btn) btn.disabled = false; return; }
+        showToast(d.message);
+        if (d.player) { player = d.player; updateHomeStats(); }
+        dispatchOpen = false; dispatchSel = { from: null, to: null, units: {} };
+        await loadForces();
+    } catch (e) { showToast("خطا."); }
+}
+
+/* ---------- اعلان جنگ ---------- */
 function renderWarTargets() {
     const c = document.getElementById("war-target-list");
     if (!c) return;
     c.innerHTML = "";
     const hasUnits = player && Object.values(player.units || {}).some(v => v > 0);
     if (!hasUnits) {
-        c.innerHTML = `<div class="diplomacy-item-empty">برای اعلام جنگ ابتدا باید یگان بسازید.</div>`;
+        c.innerHTML = `<div class="diplomacy-item-empty">برای اعلان جنگ ابتدا باید یگان بسازید.</div>`;
         return;
     }
     Object.keys(COUNTRY_NAMES).forEach(cid => {
         if (cid === selectedCountry) return;
-        const info = countries[cid];
-        const occupied = info?.occupier;
+        if (warSearchQ && !COUNTRY_NAMES[cid].includes(warSearchQ)) return;
+        const occupied = countries[cid]?.occupier;
         const card = document.createElement("div");
         card.className = "war-target-card";
         const occText = occupied ? ` (اشغال توسط ${COUNTRY_NAMES[occupied] || occupied})` : "";
@@ -1276,7 +1543,7 @@ function renderWarTargets() {
                 <div class="flag-wrap"><img class="flag-img" src="${countryImageUrl(cid)}" alt=""></div>
                 <span class="war-target-name">${COUNTRY_NAMES[cid]}${occText}</span>
             </div>
-            <button class="war-attack-button" data-declare="${cid}">⚔️ اعلام جنگ</button>`;
+            <button class="war-attack-button" data-declare="${cid}">⚔️ اعلان جنگ</button>`;
         card.querySelector("[data-declare]").addEventListener("click", () => declareWar(cid));
         c.appendChild(card);
     });
@@ -1349,6 +1616,116 @@ async function loadWarData() {
             });
         }
     } catch (e) { console.error(e); }
+}
+
+/* ---------- اخبار و تاریخچه ---------- */
+async function loadWarLog() {
+    try {
+        const d = await apiGet("/api/war/log");
+        if (d && d.events) warLog = d;
+    } catch (e) { console.error(e); }
+    renderWarNews(); renderWarHistory();
+}
+
+const WAR_EVENT_ICONS = { declare: "⚔️", occupy: "🚩", capture: "🚩", repel: "🛡️", release: "🏳️" };
+
+function renderWarNews() {
+    const box = document.getElementById("war-news-list");
+    if (!box) return;
+    const list = warLog.events.filter(e =>
+        (!newsCountry || (e.countries || []).includes(newsCountry)) && (!newsQ || e.text.includes(newsQ)));
+    if (!list.length) { box.innerHTML = `<div class="diplomacy-item-empty">خبری نیست.</div>`; return; }
+    box.innerHTML = list.map(e => `
+        <div class="wn-item"><div class="wn-ic">${WAR_EVENT_ICONS[e.kind] || "⚔️"}</div>
+            <div class="wn-body"><div class="wn-text">${(e.countries || []).map(c => flagInline(c, true)).join("")} ${e.text}</div>
+            <small>${timeAgo(e.at)}</small></div></div>`).join("");
+}
+
+function renderWarHistory() {
+    const box = document.getElementById("war-history-list"), st = document.getElementById("war-history-stats");
+    if (!box || !st) return;
+    const s = warLog.stats || {};
+    st.innerHTML = `<div class="wf-stat"><b>${formatNumber(s.fights)}</b><span>درگیری</span></div>
+        <div class="wf-stat win"><b>${formatNumber(s.wins)}</b><span>برد</span></div>
+        <div class="wf-stat lose"><b>${formatNumber(s.losses)}</b><span>باخت</span></div>`;
+    const me = selectedCountry;
+    const list = warLog.history.filter(h =>
+        (histKind === "all" || h.kind === histKind) &&
+        (!histCountry || h.attacker === histCountry || h.defender === histCountry));
+    if (!list.length) { box.innerHTML = `<div class="diplomacy-item-empty">درگیری‌ای ثبت نشده.</div>`; return; }
+    const kindLabel = { country: "کشور", strait: "تنگه", resource: "سکو و معدن" };
+    const kindIcon = { country: "⚔️", strait: "⚓", resource: "⛏️" };
+    box.innerHTML = list.map(h => {
+        const win = (h.winner === "attacker" && h.attacker === me) || (h.winner === "defender" && h.defender === me);
+        return `<div class="wh-item ${win ? "win" : "lose"}">
+            <div class="wh-top"><div class="wh-ic">${kindIcon[h.kind] || "⚔️"}</div>
+                <div class="wh-t"><b>${h.title}</b><small>${kindLabel[h.kind] || ""} · ${jalaliStamp(h.at)}</small></div>
+                <span class="wh-badge">${win ? "برد" : "باخت"}</span></div>
+            <div class="wh-res">${win ? "پیروزی" : "شکست"}${h.detail ? ` · ${h.detail}` : ""}</div></div>`;
+    }).join("");
+}
+
+/* ---------- ماهواره ---------- */
+async function loadScanState() {
+    try {
+        const d = await apiGet("/api/satellite/scans");
+        if (d && !d.error) scanState = d;
+    } catch (e) {}
+    return scanState;
+}
+
+function satCountryData(a) {
+    return `<div class="sat-data">
+        <div class="sat-row"><span>💰 درآمد روزانه</span><b>${formatMoney(a.income)}</b></div>
+        <div class="sat-row"><span>🛡️ قدرت کل نظامی</span><b>${formatNumber(a.power)}</b></div>
+        ${(a.locations || []).map(l => `<div class="sat-loc"><div class="sat-row"><span>📍 ${l.name}</span><b>${formatNumber(l.count)} یگان</b></div>
+            <div class="wf-loc-chips">${unitChips(l.units)}</div></div>`).join("")}
+    </div>`;
+}
+
+async function renderSatTab() {
+    const root = document.getElementById("war-sat-root");
+    if (!root) return;
+    if (!player?.satellite_built) {
+        const cost = player?.infra?.satellite?.next?.cost ?? 6000000;
+        root.innerHTML = `<div class="sat-locked"><div class="sat-lock-ic">🔒</div><b>ماهواره ساخته نشده</b>
+            <p>برای باز شدن این بخش، در زیرساخت › استراتژی «ماهواره» را به قیمت ${formatMoney(cost)} بسازید.</p>
+            <button class="wf-send-btn" id="sat-go-infra">رفتن به زیرساخت</button></div>`;
+        root.querySelector("#sat-go-infra").onclick = async () => { await openInfrastructureMenu(); renderInfraTab("strategy"); };
+        return;
+    }
+    await loadScanState();
+    const sc = scanState;
+    const eligible = Object.entries(COUNTRY_NAMES).filter(([cid]) => cid !== selectedCountry && countries[cid]?.taken);
+    const sites = Object.entries(sc.sites || {});
+    root.innerHTML = `
+        <div class="sat-top"><div class="sat-count"><small>اسکن موجود</small><b>${formatNumber(sc.scans)}</b></div>
+            <button class="wf-send-btn sat-launch" id="sat-launch">🚀 پرتاب ماهواره · ${formatMoney(1000000)}<small>+۵ اسکن</small></button></div>
+        <div class="wf-section"><span>🌐 اسکن کشور</span><small>${formatMoney(1100000)} + ۱ اسکن</small></div>
+        <div class="sat-note">با اسکن هر کشور، تا ۲۴ ساعت درآمد روزانه، قدرت کل نظامی و محل نیروهایش زنده نمایش داده می‌شود.</div>
+        ${eligible.length ? eligible.map(([cid, nm]) => {
+            const a = sc.countries?.[cid];
+            return `<div class="sat-country"><div class="sat-c-top">${flagInline(cid)}<b>${nm}</b>
+                ${a ? `<span class="sat-live">🟢 زنده · ${timeLeft(a.expires_at)}</span>` : `<button class="war-attack-button sat-scan" data-c="${cid}">🛰️ اسکن</button>`}</div>
+                ${a ? satCountryData(a) : ""}</div>`;
+        }).join("") : `<div class="diplomacy-item-empty">کشوری با بازیکن فعال نیست.</div>`}
+        <div class="wf-section"><span>📍 اسکن مکان‌ها</span></div>
+        <div class="sat-note">برای اسکن یک سکو، معدن یا تنگه، روی نقشه روی آن بزن و «اسکن» را انتخاب کن. هر اسکن ۱ اسکن مصرف می‌کند و ۲۴ ساعت زنده می‌ماند.</div>
+        ${sites.length ? sites.map(([id, v]) => `<div class="sat-site"><span>${siteLabel(id)}</span>
+            <b>${v.owner ? `${COUNTRY_NAMES[v.owner] || v.owner} · قدرت ${formatNumber(v.power)}` : "بی‌صاحب"}</b>
+            <small>${timeLeft(v.expires_at)}</small></div>`).join("") : `<div class="diplomacy-item-empty">اسکن فعالی نیست.</div>`}`;
+
+    const act = async (path, body) => {
+        try {
+            const d = await apiPost(path, body);
+            if (!d.success) { showToast(d.message || "خطا"); return; }
+            showToast(d.message);
+            if (d.player) { player = d.player; updateHomeStats(); }
+            renderSatTab();
+        } catch (e) { showToast("خطا."); }
+    };
+    root.querySelector("#sat-launch").onclick = () => act("/api/satellite/launch", {});
+    root.querySelectorAll(".sat-scan").forEach(b => b.onclick = () => act("/api/satellite/scan-country", { country: b.dataset.c }));
 }
 
 function openBattleModal(wid) {
@@ -2348,6 +2725,8 @@ function showCountryInfo(feature) {
     const descEl = document.getElementById("map-info-desc");
     const actionBtn = document.getElementById("map-info-action");
     actionBtn.classList.add("hidden");
+    document.getElementById("map-info-scan")?.classList.add("hidden");
+    document.getElementById("map-info-scan-btn")?.classList.add("hidden");
 
     if (!e) {
         flagEl.textContent = "🏳️"; nameEl.textContent = "منطقه ناشناخته";
@@ -2394,13 +2773,36 @@ function showSiteInfo(site) {
         statusEl.textContent = "بی‌صاحب";
     }
 
-    if (site.owner !== selectedCountry) {
-        actionBtn.classList.remove("hidden");
-        actionBtn.onclick = () => captureSite(site.id);
-    } else {
-        actionBtn.classList.add("hidden");
-    }
+    actionBtn.classList.remove("hidden");
+    actionBtn.textContent = "🪖 فرستادن نیرو";
+    actionBtn.onclick = () => openDispatchTo(site.id);
+    renderSiteScan(site);
     panel.classList.remove("hidden");
+}
+
+async function renderSiteScan(site) {
+    const box = document.getElementById("map-info-scan"), btn = document.getElementById("map-info-scan-btn");
+    if (!box || !btn) return;
+    box.classList.add("hidden"); btn.classList.add("hidden");
+    if (!player?.satellite_built || !site.owner || site.owner === selectedCountry) return;
+    await loadScanState();
+    const v = scanState.sites?.[site.id];
+    if (v) {
+        box.classList.remove("hidden");
+        box.innerHTML = `🛰️ قدرت کل داخل: <b>${formatNumber(v.power)}</b> <small>(زنده · ${timeLeft(v.expires_at)})</small>`;
+    } else {
+        btn.classList.remove("hidden");
+        btn.textContent = "🛰️ اسکن (۱ اسکن)";
+        btn.onclick = async () => {
+            try {
+                const d = await apiPost("/api/satellite/scan-site", { site_id: site.id });
+                if (!d.success) { showToast(d.message || "خطا"); return; }
+                showToast(d.message);
+                if (d.player) { player = d.player; updateHomeStats(); }
+                renderSiteScan(site);
+            } catch (e) { showToast("خطا."); }
+        };
+    }
 }
 
 async function captureSite(siteId) {
