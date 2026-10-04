@@ -1692,3 +1692,4 @@ img { -webkit-user-drag: none; user-select: none; }
     background: rgba(var(--brand-rgb), 0.1); border: 1px solid rgba(var(--brand-rgb), 0.3); }
 .map-info-scan small { color: #8d97a7; }
 .map-info-scan-btn { margin-top: 8px; }
+.dp-error { color: #ff8a80; font-size: 12px; line-height: 1.8; margin-top: 4px; }
