@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261003d">
+<link rel="stylesheet" href="/style.css?v=20261002k">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -84,17 +84,14 @@
 
     <header class="game-header">
         <div class="header-right">
-            <div class="header-flag-box">
-                <div class="flag-wrap flag-wrap-lg"><img id="game-country-flag" class="flag-img" src="" alt=""></div>
-                <button class="header-rank-badge" id="header-rank-button" aria-label="رتبهٔ جهانی"><span id="header-rank-value">—</span></button>
-            </div>
-            <button class="header-button" id="game-notification-button" aria-label="اعلان‌ها">
+            <div class="flag-wrap"><img id="game-country-flag" class="flag-img" src="" alt=""></div>
+        </div>
+        <div class="header-center"><div class="game-title">FRONT-LINE 1993</div></div>
+        <div class="header-left">
+            <button class="header-button" id="game-notification-button">
                 🔔<span id="notif-badge" class="notif-badge hidden">0</span>
             </button>
-        </div>
-        <div class="header-left">
-            <div class="game-title">FRONT-LINE 1993</div>
-            <button class="header-button" id="game-menu-button" aria-label="منو">☰</button>
+            <button class="header-button" id="game-menu-button">☰</button>
         </div>
     </header>
 
@@ -225,32 +222,28 @@
 
     <!-- ==================== رتبه جهانی ==================== -->
     <main id="ranking" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🏆</span>رتبه‌بندی</span><span class="sb-money">$0</span></div>
-        <div class="rk-live-card"><h2>رتبه‌بندی زنده</h2><p id="rk-live-text"></p></div>
-        <div class="rk-tabs" id="rk-tabs"></div>
-        <div class="rk-info" id="rk-info"></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
+        <div class="page-title"><span>مقایسه کشورها</span><h1>🏆 رتبه‌بندی جهانی</h1></div>
         <div id="rankings-list" class="rankings-list"></div>
     </main>
 
     <!-- ==================== زیرساخت ==================== -->
     <main id="infrastructure" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🏗️</span>زیرساخت</span><span class="sb-money">$0</span></div>
-        <div class="infra-title-row">
-            <div class="page-title"><h1>زیرساخت</h1></div>
-        </div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
+        <div class="page-title"><span>ساخت و توسعه</span><h1>زیرساخت</h1></div>
         <div class="resource-bar"></div>
 
         <div class="infra-tabs">
-            <button class="infra-tab active" data-infra-tab="power"><span class="infra-tab-label">⚡ برق</span><span class="infra-tab-count" id="infra-count-power">0/4</span></button>
-            <button class="infra-tab" data-infra-tab="manpower"><span class="infra-tab-label">👥 نیرو</span><span class="infra-tab-count" id="infra-count-manpower">0/6</span></button>
-            <button class="infra-tab" data-infra-tab="food"><span class="infra-tab-label">🌾 غذا</span><span class="infra-tab-count" id="infra-count-food">0/3</span></button>
-            <button class="infra-tab" data-infra-tab="resource"><span class="infra-tab-label">🛢️ منابع</span><span class="infra-tab-count" id="infra-count-resource">0/3</span></button>
-            <button class="infra-tab" data-infra-tab="military"><span class="infra-tab-label">🪖 نظامی</span><span class="infra-tab-count" id="infra-count-military">0/9</span></button>
+            <button class="infra-tab active" data-infra-tab="power">⚡ برق</button>
+            <button class="infra-tab" data-infra-tab="manpower">👥 نیرو</button>
+            <button class="infra-tab" data-infra-tab="food">🌾 غذا</button>
+            <button class="infra-tab" data-infra-tab="resource">🛢️ منابع</button>
+            <button class="infra-tab" data-infra-tab="military">🪖 نظامی</button>
+            <button class="infra-tab" data-infra-tab="strategic">🛰️ استراتژی</button>
         </div>
 
         <div class="infra-panels">
             <div id="infra-panel-power" class="infra-panel">
-                <div id="infra-power-grid"></div>
                 <div id="infra-power-list" class="infra-card-list"></div>
             </div>
             <div id="infra-panel-manpower" class="infra-panel hidden">
@@ -280,50 +273,73 @@
                     <div id="infra-missile-list" class="infra-card-list"></div>
                 </div>
             </div>
+            <div id="infra-panel-strategic" class="infra-panel hidden">
+                <div id="infra-strategic-list" class="infra-card-list"></div>
+            </div>
         </div>
     </main>
 
     <!-- ==================== اقتصاد ==================== -->
     <main id="economy" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">💰</span>اقتصاد</span><span class="sb-money">$0</span></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
         <div class="page-title"><span>سرمایه‌گذاری</span><h1>اقتصاد</h1></div>
         <div id="economy-list" class="infra-card-list"></div>
     </main>
 
     <!-- ==================== ارتش ==================== -->
     <main id="army" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🛡️</span>ارتش</span><span class="sb-money">$0</span></div>
-        <div class="page-title"><h1>ارتش</h1></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
+        <div class="page-title"><span>فرماندهی و پیاده‌نظام</span><h1>ارتش</h1></div>
 
         <div class="army-summary-card">
-            <div class="army-summary-label">🛡️ قدرت کل ارتش</div>
+            <div class="army-summary-header">
+                <div class="army-summary-label">🛡️ ارتش</div>
+                <button class="army-info-btn" title="راهنما">؟</button>
+            </div>
             <div class="army-summary-power" id="army-total-power">0</div>
+            <div class="army-summary-sub">قدرت کل ارتش</div>
         </div>
 
         <div class="base-cards-grid">
             <div class="base-card">
-                <div class="base-card-head"><div class="base-card-name">پادگان</div><div class="base-card-icon">🪖</div></div>
+                <div class="base-card-head">
+                    <div class="base-card-name">پادگان</div>
+                    <div class="base-card-icon">🪖</div>
+                </div>
                 <div class="base-card-value" id="base-barracks-value">—</div>
                 <div class="base-card-max" id="base-barracks-max"></div>
-                <div class="base-card-progress"><div class="base-card-progress-fill" id="base-barracks-fill" style="width:0%"></div></div>
+                <div class="base-card-progress">
+                    <div class="base-card-progress-fill" id="base-barracks-fill" style="width:0%"></div>
+                </div>
             </div>
             <div class="base-card">
-                <div class="base-card-head"><div class="base-card-name">فرودگاه</div><div class="base-card-icon">✈️</div></div>
-                <div class="base-card-value" id="base-airport-value">—</div>
-                <div class="base-card-max" id="base-airport-max"></div>
-                <div class="base-card-progress"><div class="base-card-progress-fill" id="base-airport-fill" style="width:0%"></div></div>
+                <div class="base-card-head">
+                    <div class="base-card-name">فرودگاه</div>
+                    <div class="base-card-icon">✈️</div>
+                </div>
+                <div class="base-card-empty" id="base-airport-status">ساخته نشده</div>
             </div>
             <div class="base-card">
-                <div class="base-card-head"><div class="base-card-name">بندر</div><div class="base-card-icon">⚓</div></div>
+                <div class="base-card-head">
+                    <div class="base-card-name">بندر</div>
+                    <div class="base-card-icon">⚓</div>
+                </div>
                 <div class="base-card-value" id="base-port-value">—</div>
                 <div class="base-card-max" id="base-port-max"></div>
-                <div class="base-card-progress"><div class="base-card-progress-fill" id="base-port-fill" style="width:0%"></div></div>
+                <div class="base-card-progress">
+                    <div class="base-card-progress-fill" id="base-port-fill" style="width:0%"></div>
+                </div>
             </div>
             <div class="base-card">
-                <div class="base-card-head"><div class="base-card-name">انبار موشک</div><div class="base-card-icon">🚀</div></div>
+                <div class="base-card-head">
+                    <div class="base-card-name">انبار موشک</div>
+                    <div class="base-card-icon">🚀</div>
+                </div>
                 <div class="base-card-value" id="base-missile-value">—</div>
                 <div class="base-card-max" id="base-missile-max"></div>
-                <div class="base-card-progress"><div class="base-card-progress-fill" id="base-missile-fill" style="width:0%"></div></div>
+                <div class="base-card-progress">
+                    <div class="base-card-progress-fill" id="base-missile-fill" style="width:0%"></div>
+                </div>
             </div>
         </div>
 
@@ -351,13 +367,14 @@
 
     <!-- ==================== جنگ ==================== -->
     <main id="war" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">⚔️</span>جنگ</span><span class="sb-money">$0</span></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
         <div class="page-title"><span>عملیات نظامی</span><h1>جنگ</h1></div>
 
         <div class="war-tabs">
             <button class="war-tab active" data-war-tab="war-targets-panel">اعلام جنگ</button>
             <button class="war-tab" data-war-tab="war-active-panel">جنگ‌های جاری</button>
             <button class="war-tab" data-war-tab="war-reports-panel">گزارش نبرد</button>
+            <button class="war-tab" data-war-tab="war-satellite-panel">🛰️ ماهواره</button>
         </div>
 
         <div id="war-targets-panel" class="war-panel">
@@ -369,11 +386,14 @@
         <div id="war-reports-panel" class="war-panel hidden">
             <div id="war-reports-list"></div>
         </div>
+        <div id="war-satellite-panel" class="war-panel hidden">
+            <div id="war-satellite-content"></div>
+        </div>
     </main>
 
     <!-- ==================== دیپلماسی ==================== -->
     <main id="diplomacy" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">📜</span>دیپلماسی</span><span class="sb-money">$0</span></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
         <div class="page-title"><span>روابط خارجی</span><h1>دیپلماسی</h1></div>
 
         <div class="diplomacy-form">
@@ -426,7 +446,7 @@
             <div><span class="dot dot-inactive"></span> غیرفعال (انتخاب نشده)</div>
             <div><span class="dot dot-nogame"></span> هنوز به بازی اضافه نشده</div>
             <div><span class="dot dot-oil"></span> سکوی نفت</div>
-            <div><span class="dot dot-steel"></span> معدن فولاد</div>
+            <div><span class="dot dot-iron"></span> معدن آهن</div>
             <div><span class="dot dot-uranium"></span> معدن اورانیوم</div>
             <div><span class="dot dot-food"></span> دشت کشاورزی</div>
             <div><span class="dot dot-strait"></span> تنگه</div>
@@ -441,6 +461,8 @@
             <div id="map-info-status" class="map-info-status"></div>
             <div id="map-info-desc" class="map-info-desc"></div>
             <button id="map-info-action" class="map-info-action hidden">فرستادن ناو برای تصرف</button>
+            <button id="map-info-scan" class="map-info-action map-info-scan hidden">🛰️ اسکن</button>
+            <div id="map-info-scan-result" class="map-info-scan-result hidden"></div>
         </div>
     </main>
 
@@ -491,7 +513,7 @@
 
     <!-- ==================== بازار جهانی ==================== -->
     <main id="market" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🌐</span>بازار جهانی</span><span class="sb-money">$0</span></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home">→ بازگشت</button></div>
         <div class="page-title"><span>معاملات بین‌المللی</span><h1>بازار جهانی</h1></div>
 
         <div class="market-tabs">
@@ -508,7 +530,7 @@
                 <label class="diplomacy-label">منبع فروش</label>
                 <select id="mk-sell-res" class="diplomacy-select">
                     <option value="food">🌾 غذا</option>
-                    <option value="steel">⚙️ فولاد</option>
+                    <option value="iron">⚙️ آهن</option>
                     <option value="uranium">☢️ اورانیوم</option>
                     <option value="oil">🛢️ نفت</option>
                 </select>
@@ -518,7 +540,7 @@
                 <select id="mk-want-res" class="diplomacy-select">
                     <option value="money">💰 پول</option>
                     <option value="food">🌾 غذا</option>
-                    <option value="steel">⚙️ فولاد</option>
+                    <option value="iron">⚙️ آهن</option>
                     <option value="uranium">☢️ اورانیوم</option>
                     <option value="oil">🛢️ نفت</option>
                 </select>
@@ -593,6 +615,6 @@
 
 </section>
 
-<script src="/app.js?v=20261003d"></script>
+<script src="/app.js?v=20261002k"></script>
 </body>
 </html>
