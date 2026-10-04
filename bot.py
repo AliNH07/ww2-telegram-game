@@ -229,6 +229,12 @@ INFRASTRUCTURE = {
         "bonus": {"defense": 0.05},
         "levels": [L(cost=2_400_000), L(cost=5_040_000), L(cost=10_560_000), L(cost=19_200_000), L(cost=32_400_000)],
     },
+    "satellite": {
+        "power_required": 6,
+        "name": "ماهواره", "group": "strategy", "icon": "🛰️",
+        "desc": "پایگاه ماهواره‌ای. تب «ماهواره» در بخش جنگ را باز می‌کند: پرتاب ماهواره، اسکن سکوها و تنگه‌ها و اسکن کشورها.",
+        "levels": [L(cost=6_000_000)],
+    },
 }
 
 UPKEEP_RATE = 0.005   # هزینهٔ نگهداری روزانه = ۰٫۵٪ مجموع پولِ خرج‌شده روی ساخت و ارتقا
@@ -446,16 +452,18 @@ def group_defense_mult(player, group):
 
 def get_group_units(player, group):
     total = 0
+    dep = deployed_units(player.get("country"))
     for unit_id, unit in ARMY_UNITS.items():
         if unit["group"] == group:
-            total += player.get("units", {}).get(unit_id, 0)
+            total += player.get("units", {}).get(unit_id, 0) + dep.get(unit_id, 0)
     return total
 
 def recompute_army(player):
     total = 0
+    dep = deployed_units(player.get("country"))
     for unit_id, unit in ARMY_UNITS.items():
         dm = group_defense_mult(player, unit["group"])
-        total += player.get("units", {}).get(unit_id, 0) * (unit["attack"] + unit["defense"] * dm)
+        total += (player.get("units", {}).get(unit_id, 0) + dep.get(unit_id, 0)) * (unit["attack"] + unit["defense"] * dm)
     player["army"] = int(round(total))
 
 def ensure_player_fields(player):
@@ -472,6 +480,8 @@ def ensure_player_fields(player):
     player.setdefault("strait_holdings", {})
     player.setdefault("announcements", {})
     player.setdefault("is_eliminated", False)
+    player.setdefault("scans", 0)
+    player.setdefault("scan_active", {})
 
 def compute_rates(player):
     power_capacity = get_power_total(player)
@@ -594,6 +604,7 @@ def serialize_player(player):
     data["daily_upkeep"] = rates["daily_upkeep"]
     data["infra"] = build_catalog_status(player, INFRASTRUCTURE)
     data["economy"] = build_catalog_status(player, ECONOMY)
+    data["satellite_built"] = get_infra_level(player, "satellite") > 0
     data["def_mult"] = {g: group_defense_mult(player, g) for g in ("land", "naval", "air", "missile")}
     return data
 
@@ -614,6 +625,9 @@ unions = {}
 private_messages = {}
 market_listings = {}
 news_feed = []
+site_forces = {}   # site_id -> {"owner": country, "units": {unit_id: n}}
+war_events = []    # خبرهای جنگ
+war_history = []   # تاریخچهٔ درگیری‌ها
 
 def create_player(user_id):
     return {"user_id": user_id, "country": None, "money": STARTING_MONEY, "army": 0,
@@ -642,7 +656,8 @@ def save_state():
                  "active_wars": active_wars, "war_reports": war_reports[-50:],
                  "announcements": announcements[-100:], "unions": unions,
                  "private_messages": private_messages, "market_listings": market_listings,
-                 "news_feed": news_feed[-200:]}
+                 "news_feed": news_feed[-200:],
+                 "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:]}
         tmp = STATE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False)
@@ -654,6 +669,7 @@ def load_state():
     global diplomacy_proposals, active_treaties, map_holdings, strait_holdings
     global occupied_countries, war_declarations, active_wars, war_reports
     global announcements, unions, private_messages, market_listings, news_feed
+    global site_forces, war_events, war_history
     if not os.path.exists(STATE_FILE):
         logging.info("No state, fresh start."); return
     try:
@@ -672,6 +688,9 @@ def load_state():
         private_messages = state.get("private_messages", {})
         market_listings = state.get("market_listings", {})
         news_feed = state.get("news_feed", [])
+        site_forces = state.get("site_forces", {})
+        war_events = state.get("war_events", [])
+        war_history = state.get("war_history", [])
         logging.info("State loaded: %d players", len(players))
     except Exception as e:
         logging.error("load_state failed: %s", e)
@@ -782,6 +801,7 @@ async def war_cb(cb: types.CallbackQuery):
         w["negotiation_ends"] = (utcnow() + timedelta(hours=NEGOTIATION_HOURS)).isoformat()
         await cb.message.edit_text("✅ تأیید شد. ۲۴ ساعت مذاکره آغاز شد.")
         push_news("اعلام جنگ", f"{COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} اعلام جنگ کرد.")
+        push_war("declare", f"{COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} اعلان جنگ کرد.", [w["attacker"], w["defender"]])
     else:
         w["status"] = "rejected"; await cb.message.edit_text("❌ رد شد.")
     save_state(); await cb.answer()
@@ -1178,6 +1198,8 @@ async def perform_battle(request):
             if owner == w["defender"]: map_holdings[k] = w["attacker"]
         for k, owner in list(strait_holdings.items()):
             if owner == w["defender"]: strait_holdings[k] = w["attacker"]
+        for k in list(site_forces):
+            if site_owner(k) != site_forces[k].get("owner"): del site_forces[k]
         dfd["is_eliminated"] = True
         push_news("اشغال کشور",
             f"{COUNTRIES[w['attacker']]['name']} کشور {COUNTRIES[w['defender']]['name']} را اشغال کرد.")
@@ -1186,6 +1208,12 @@ async def perform_battle(request):
         push_news("دفاع موفق",
             f"{COUNTRIES[w['defender']]['name']} در برابر {COUNTRIES[w['attacker']]['name']} مقاومت کرد.")
 
+    _an, _dn = COUNTRIES[w["attacker"]]["name"], COUNTRIES[w["defender"]]["name"]
+    push_history("country", f"حملهٔ {_an} به {_dn}", w["attacker"], w["defender"], report["winner"], "")
+    if report["winner"] == "attacker":
+        push_war("occupy", f"{_an} کشور {_dn} را اشغال کرد.", [w["attacker"], w["defender"]])
+    else:
+        push_war("repel", f"{_dn} حملهٔ {_an} را دفع کرد.", [w["attacker"], w["defender"]])
     report["id"] = str(uuid.uuid4())
     war_reports.append(report)
     if len(war_reports) > 100: del war_reports[:50]
@@ -1232,6 +1260,250 @@ async def capture_site(request):
         push_news("تصرف تنگه", f"{COUNTRIES[country]['name']} {STRAITS_DATA[site_id]['name']} را تصرف کرد.")
     save_state()
     return web.json_response({"success": True, "message": "تصرف موفق."})
+
+# =========================================================
+# نیروها روی نقشه / اخبار و تاریخچهٔ جنگ / ماهواره
+# =========================================================
+SCAN_HOURS = 24
+SAT_LAUNCH_COST = 1_000_000
+SAT_SCANS = 5
+COUNTRY_SCAN_COST = 1_100_000
+
+def cname(cid): return COUNTRIES[cid]["name"] if cid in COUNTRIES else "—"
+
+def site_meta(site_id):
+    if site_id in MAP_RESOURCES:
+        i = MAP_RESOURCES[site_id]
+        return {"id": site_id, "name": i["name"], "kind": "resource", "type": i.get("type")}
+    if site_id in STRAITS_DATA:
+        return {"id": site_id, "name": STRAITS_DATA[site_id]["name"], "kind": "strait", "type": "strait"}
+    return None
+
+def site_owner(site_id):
+    return map_holdings.get(site_id) or strait_holdings.get(site_id)
+
+def set_site_owner(site_id, cid):
+    d = map_holdings if site_id in MAP_RESOURCES else strait_holdings
+    if cid: d[site_id] = cid
+    else: d.pop(site_id, None)
+
+def garrison(site_id):
+    g = site_forces.get(site_id)
+    if g and g.get("owner") and g["owner"] == site_owner(site_id): return g["units"]
+    return {}
+
+def deployed_units(cid):
+    t = {}
+    if not cid: return t
+    for sid, g in site_forces.items():
+        if g.get("owner") == cid and site_owner(sid) == cid:
+            for k, n in g["units"].items(): t[k] = t.get(k, 0) + n
+    return t
+
+def units_count(units): return sum(n for n in units.values() if n > 0)
+
+def units_power(units, owner_player, key=None):
+    t = 0.0
+    for uid_, n in units.items():
+        u = ARMY_UNITS.get(uid_)
+        if not u or n <= 0: continue
+        dm = group_defense_mult(owner_player, u["group"]) if owner_player else 1
+        if key == "attack": t += n * u["attack"]
+        elif key == "defense": t += n * u["defense"] * dm
+        else: t += n * (u["attack"] + u["defense"] * dm)
+    return t
+
+def push_war(kind, text, countries=()):
+    war_events.append({"id": str(uuid.uuid4()), "kind": kind, "text": text,
+                       "countries": list(countries), "at": utcnow().isoformat()})
+    if len(war_events) > 300: del war_events[:100]
+
+def push_history(kind, title, attacker, defender, winner, detail=""):
+    war_history.append({"id": str(uuid.uuid4()), "kind": kind, "title": title, "attacker": attacker,
+                        "defender": defender, "winner": winner, "detail": detail, "at": utcnow().isoformat()})
+    if len(war_history) > 300: del war_history[:100]
+
+def _me(uid):
+    if uid not in players: players[uid] = create_player(uid)
+    p = players[uid]; ensure_player_fields(p); return p
+
+def _bad(msg, code=400):
+    return web.json_response({"success": False, "message": msg}, status=code)
+
+async def get_forces(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    p = _me(uid); cid = p.get("country"); sites = []
+    for sid in list(site_forces):
+        if cid and site_owner(sid) == cid:
+            g = garrison(sid)
+            if units_count(g) > 0:
+                sites.append({**site_meta(sid), "units": {k: n for k, n in g.items() if n > 0}})
+    return web.json_response({"home": {k: n for k, n in p["units"].items() if n > 0}, "sites": sites})
+
+async def dispatch_forces(request):
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    data = await read_json(request)
+    src = data.get("from"); dst = data.get("to")
+    p = _me(uid); cid = p.get("country")
+    if not cid or p.get("is_eliminated"): return _bad("کشوری ندارید.")
+    if src == dst: return _bad("مبدأ و مقصد یکی است.")
+    if dst != "home" and not site_meta(dst): return _bad("مقصد نامعتبر است.")
+    if src != "home" and (not site_meta(src) or site_owner(src) != cid): return _bad("این مکان در اختیار شما نیست.")
+    pool = p["units"] if src == "home" else garrison(src)
+    units = {}
+    for k, v in (data.get("units") or {}).items():
+        try: n = int(v)
+        except (TypeError, ValueError): continue
+        if k in ARMY_UNITS and n > 0: units[k] = n
+    if not units: return _bad("هیچ یگانی انتخاب نشده.")
+    for k, n in units.items():
+        if pool.get(k, 0) < n: return _bad("تعداد انتخابی بیشتر از موجودی آن مکان است.")
+    owner = site_owner(dst) if dst != "home" else None
+    if owner and owner != cid and have_treaty(cid, owner, "non_aggression"):
+        return _bad("با این کشور پیمان عدم تجاوز دارید.")
+
+    for k, n in units.items(): pool[k] -= n
+    def add_to(dest, sent):
+        for k, n in sent.items(): dest[k] = dest.get(k, 0) + n
+
+    outcome = "moved"
+    if dst == "home":
+        add_to(p["units"], units); msg = "نیروها به خانه بازگشتند."
+    else:
+        meta = site_meta(dst); kind = meta["kind"]
+        if owner == cid:
+            g = site_forces.get(dst)
+            if not g or g.get("owner") != cid: g = site_forces[dst] = {"owner": cid, "units": {}}
+            add_to(g["units"], units); msg = f"نیروها در {meta['name']} مستقر شدند."
+        elif not owner:
+            site_forces[dst] = {"owner": cid, "units": dict(units)}; set_site_owner(dst, cid)
+            push_war("occupy", f"{cname(cid)} به {meta['name']} نیرو فرستاد و آن را گرفت.", [cid])
+            push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, None, "attacker", "بی‌صاحب بود")
+            push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را تصرف کرد.")
+            outcome = "occupied"; msg = f"{meta['name']} را گرفتید."
+        else:
+            _, dfd = get_player_by_country(owner)
+            gar = garrison(dst)
+            atk_p = units_power(units, p, "attack") * (1 + random.uniform(-0.08, 0.08))
+            def_p = units_power(gar, dfd, "defense") * 1.10 * (1 + random.uniform(-0.08, 0.08))
+            empty = units_count(gar) == 0
+            if empty or atk_p > def_p:
+                surv = dict(units) if empty else {k: max(1, int(n * 0.8)) for k, n in units.items()}
+                site_forces[dst] = {"owner": cid, "units": surv}; set_site_owner(dst, cid)
+                push_war("capture", f"{cname(cid)} {meta['name']} را از {cname(owner)} گرفت.", [cid, owner])
+                push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "attacker",
+                             f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}")
+                push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را از {cname(owner)} گرفت.")
+                outcome = "captured"; msg = f"پیروز شدید و {meta['name']} را گرفتید."
+            else:
+                add_to(p["units"], {k: int(n * 0.3) for k, n in units.items()})
+                for k in list(gar): gar[k] = int(gar[k] * 0.8)
+                push_war("repel", f"{cname(owner)} حملهٔ {cname(cid)} به {meta['name']} را دفع کرد.", [cid, owner])
+                push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "defender",
+                             f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}")
+                outcome = "repelled"; msg = "حمله دفع شد. بخش کوچکی از نیروها به خانه برگشتند."
+    if src != "home" and units_count(garrison(src)) == 0:
+        sm = site_meta(src)
+        site_forces.pop(src, None); set_site_owner(src, None)
+        push_war("release", f"{cname(cid)} {sm['name']} را رها کرد و بی‌صاحب ماند.", [cid])
+    save_state()
+    return web.json_response({"success": True, "outcome": outcome, "message": msg, "player": serialize_player(p)})
+
+async def get_war_log(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    p = _me(uid); cid = p.get("country")
+    mine = [h for h in war_history if h.get("attacker") == cid or h.get("defender") == cid]
+    wins = sum(1 for h in mine if (h["winner"] == "attacker" and h["attacker"] == cid)
+               or (h["winner"] == "defender" and h["defender"] == cid))
+    return web.json_response({"events": list(reversed(war_events[-80:])), "history": list(reversed(mine[-80:])),
+                              "stats": {"fights": len(mine), "wins": wins, "losses": len(mine) - wins}})
+
+def active_scans(p):
+    now = utcnow(); sa = p.setdefault("scan_active", {})
+    for k, exp in list(sa.items()):
+        e = parse_dt(exp)
+        if not e or e <= now: del sa[k]
+    return sa
+
+def site_scan_view(site_id):
+    owner = site_owner(site_id)
+    if not owner: return {"owner": None, "power": 0}
+    op = get_player_by_country(owner)[1]
+    return {"owner": owner, "power": int(round(units_power(garrison(site_id), op)))}
+
+def country_scan_view(cid):
+    _, tp = get_player_by_country(cid)
+    if not tp: return None
+    ensure_player_fields(tp); recompute_army(tp); rates = compute_rates(tp)
+    home = {k: n for k, n in tp["units"].items() if n > 0}
+    locs = [{"id": "home", "name": "خانه", "units": home, "count": sum(home.values())}]
+    for sid in site_forces:
+        if site_owner(sid) == cid:
+            g = {k: n for k, n in garrison(sid).items() if n > 0}
+            if g: locs.append({"id": sid, "name": site_meta(sid)["name"], "units": g, "count": sum(g.values())})
+    return {"country": cid, "income": int(rates["net_income"]), "power": tp.get("army", 0), "locations": locs}
+
+async def sat_get_scans(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    p = _me(uid); sa = active_scans(p); sites = {}; countries = {}
+    for key, exp in sa.items():
+        t, _, ident = key.partition(":")
+        if t == "s":
+            v = site_scan_view(ident); v["expires_at"] = exp; sites[ident] = v
+        elif t == "c":
+            v = country_scan_view(ident)
+            if v: v["expires_at"] = exp; countries[ident] = v
+    return web.json_response({"scans": p.get("scans", 0), "satellite_built": get_infra_level(p, "satellite") > 0,
+                              "sites": sites, "countries": countries})
+
+async def sat_launch(request):
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    p = _me(uid)
+    if get_infra_level(p, "satellite") <= 0: return _bad("ابتدا «ماهواره» را در زیرساخت › استراتژی بسازید.")
+    if p.get("money", 0) < SAT_LAUNCH_COST: return _bad("پول کافی نیست.")
+    p["money"] -= SAT_LAUNCH_COST; p["scans"] = p.get("scans", 0) + SAT_SCANS
+    save_state()
+    return web.json_response({"success": True, "message": f"ماهواره پرتاب شد. {SAT_SCANS} اسکن اضافه شد.", "player": serialize_player(p)})
+
+async def sat_scan_site(request):
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    data = await read_json(request); site_id = data.get("site_id")
+    p = _me(uid); cid = p.get("country")
+    if get_infra_level(p, "satellite") <= 0: return _bad("ابتدا ماهواره را بسازید.")
+    if not site_meta(site_id): return _bad("مکان نامعتبر است.")
+    owner = site_owner(site_id)
+    if not owner or owner == cid: return _bad("این مکان بی‌صاحب یا مال خودتان است و اسکن نمی‌خواهد.")
+    sa = active_scans(p); key = "s:" + site_id
+    if key in sa:
+        return web.json_response({"success": True, "message": "اسکن این مکان هنوز فعال است.", "player": serialize_player(p)})
+    if p.get("scans", 0) < 1: return _bad("اسکن باقی نمانده. ماهواره را دوباره پرتاب کنید.")
+    p["scans"] -= 1; sa[key] = (utcnow() + timedelta(hours=SCAN_HOURS)).isoformat()
+    save_state()
+    return web.json_response({"success": True, "message": "اسکن انجام شد و ۲۴ ساعت زنده است.", "player": serialize_player(p)})
+
+async def sat_scan_country(request):
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    data = await read_json(request); target = data.get("country")
+    p = _me(uid); cid = p.get("country")
+    if get_infra_level(p, "satellite") <= 0: return _bad("ابتدا ماهواره را بسازید.")
+    if target not in COUNTRIES or target == cid: return _bad("کشور نامعتبر است.")
+    if get_player_by_country(target)[1] is None: return _bad("این کشور بازیکن ندارد.")
+    sa = active_scans(p); key = "c:" + target
+    if key in sa:
+        return web.json_response({"success": True, "message": "اسکن این کشور هنوز فعال است.", "player": serialize_player(p)})
+    if p.get("scans", 0) < 1: return _bad("اسکن باقی نمانده. ماهواره را دوباره پرتاب کنید.")
+    if p.get("money", 0) < COUNTRY_SCAN_COST: return _bad("پول کافی نیست.")
+    p["scans"] -= 1; p["money"] -= COUNTRY_SCAN_COST
+    sa[key] = (utcnow() + timedelta(hours=SCAN_HOURS)).isoformat()
+    save_state()
+    return web.json_response({"success": True, "message": "اسکن کشور انجام شد و ۲۴ ساعت زنده است.", "player": serialize_player(p)})
 
 # =========================================================
 # API Announcements
@@ -1583,6 +1855,7 @@ async def create_web_app():
         ("/api/announcements", get_announcements), ("/api/announcement", get_announcement_detail),
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
         ("/api/news", get_news), ("/api/rankings", get_rankings),
+        ("/api/war/forces", get_forces), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
         ("/api/debug-auth", debug_auth), ("/health", health)]:
         app.router.add_get(path, h)
 
@@ -1591,7 +1864,9 @@ async def create_web_app():
         ("/api/upgrade-economy", upgrade_economy), ("/api/train-unit", train_unit),
         ("/api/propose-treaty", propose_treaty), ("/api/respond-treaty", respond_treaty),
         ("/api/war/declare", declare_war), ("/api/war/battle", perform_battle),
-        ("/api/map/capture", capture_site),
+        ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces),
+        ("/api/satellite/launch", sat_launch), ("/api/satellite/scan-site", sat_scan_site),
+        ("/api/satellite/scan-country", sat_scan_country),
         ("/api/announcements/create", create_announcement),
         ("/api/announcements/react", react_announcement),
         ("/api/announcements/comment", comment_announcement),
