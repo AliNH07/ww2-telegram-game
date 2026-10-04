@@ -308,7 +308,7 @@ ARMY_UNITS = {
         "attack": 5, "defense": 40, "transport_capacity": 500},
     "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
         "cost": 800_000, "manpower": 500, "resources": {"oil": 800, "steel": 1200},
-        "attack": 25, "defense": 90},
+        "attack": 25, "defense": 90, "aircraft_capacity": 40},
     "fighter": {"name": "جنگنده", "group": "air", "requires": ["air_airport", "air_arsenal"],
         "cost": 200_000, "manpower": 150, "resources": {"oil": 200, "steel": 100},
         "attack": 45, "defense": 40},
@@ -318,6 +318,9 @@ ARMY_UNITS = {
     "helicopter": {"name": "بالگرد", "group": "air", "requires": ["air_airport", "air_arsenal"],
         "cost": 120_000, "manpower": 100, "resources": {"oil": 120, "steel": 60},
         "attack": 30, "defense": 35},
+    "air_tanker": {"name": "هواپیمای سوخت‌رسان", "group": "air", "requires": ["air_airport", "air_arsenal"],
+        "cost": 220_000, "manpower": 120, "resources": {"oil": 250, "steel": 120},
+        "attack": 2, "defense": 20, "refuel_capacity": 20},
     # موشک‌ها: علاوه بر هزینهٔ یک‌باره، هر موشکِ موجود هر روز غذا، نفت و فولاد مصرف می‌کند
     "cruise_missile": {"name": "موشک کروز", "group": "missile", "requires": ["missile_depot", "missile_factory"],
         "min_level": {"missile_factory": 1},
@@ -1231,7 +1234,7 @@ async def get_map_sites(request):
     for k, info in STRAITS_DATA.items():
         sites.append({"id": k, "kind": "strait", "type": "strait", "name": info["name"],
                       "lon": info["lon"], "lat": info["lat"], "income": info["income"],
-                      "owner": strait_holdings.get(k)})
+                      "zone": "sea", "owner": strait_holdings.get(k)})
     return web.json_response(sites)
 
 async def capture_site(request):
@@ -1274,10 +1277,44 @@ def cname(cid): return COUNTRIES[cid]["name"] if cid in COUNTRIES else "—"
 def site_meta(site_id):
     if site_id in MAP_RESOURCES:
         i = MAP_RESOURCES[site_id]
-        return {"id": site_id, "name": i["name"], "kind": "resource", "type": i.get("type")}
+        return {"id": site_id, "name": i["name"], "kind": "resource", "type": i.get("type"), "zone": i.get("zone", "land")}
     if site_id in STRAITS_DATA:
-        return {"id": site_id, "name": STRAITS_DATA[site_id]["name"], "kind": "strait", "type": "strait"}
+        return {"id": site_id, "name": STRAITS_DATA[site_id]["name"], "kind": "strait", "type": "strait", "zone": "sea"}
     return None
+
+def site_zone(site_id):
+    m = site_meta(site_id)
+    return m["zone"] if m else None
+
+def dispatch_rule_errors(units, zone):
+    """قوانین اعزام: بررسی می‌کند ترکیب نیرو در موضعی با این zone (sea/land) مجاز و پشتیبانی‌شده باشد."""
+    errs = []
+    cnt = lambda *ids: sum(max(0, units.get(i, 0)) for i in ids)
+    nm = lambda i: ARMY_UNITS[i]["name"]
+    # یگان‌هایی که اصلاً نمی‌توانند به این نوع موضع بروند
+    banned = [k for k, n in units.items() if n > 0 and k in ARMY_UNITS and (
+        ARMY_UNITS[k]["group"] == "missile" or (zone == "land" and ARMY_UNITS[k]["group"] == "naval"))]
+    if banned:
+        errs.append("این یگان‌ها نمی‌توانند به " + ("خشکی" if zone == "land" else "این موضع") + " بروند: "
+                    + "، ".join(nm(k) for k in banned))
+    if zone == "sea":
+        ground = cnt("infantry", "tank")
+        cap = units.get("transport_ship", 0) * ARMY_UNITS["transport_ship"]["transport_capacity"]
+        if ground > cap:
+            errs.append(f"در دریا، تانک و پیاده‌نظام به {nm('transport_ship')} نیاز دارند "
+                        f"(ظرفیت حمل {cap} از {ground} یگان).")
+        planes = cnt("fighter", "bomber", "air_tanker")
+        cap = units.get("aircraft_carrier", 0) * ARMY_UNITS["aircraft_carrier"]["aircraft_capacity"]
+        if planes > cap:
+            errs.append(f"در دریا، جنگنده و بمب‌افکن به {nm('aircraft_carrier')} نیاز دارند "
+                        f"(ظرفیت {cap} از {planes} هواپیما). بالگرد نیازی ندارد.")
+    elif zone == "land":
+        jets = cnt("fighter", "bomber")
+        cap = units.get("air_tanker", 0) * ARMY_UNITS["air_tanker"]["refuel_capacity"]
+        if jets > cap:
+            errs.append(f"در خشکی، جنگنده و بمب‌افکن به {nm('air_tanker')} نیاز دارند "
+                        f"(ظرفیت سوخت‌رسانی {cap} از {jets} هواپیما). بالگرد نیازی ندارد.")
+    return errs
 
 def site_owner(site_id):
     return map_holdings.get(site_id) or strait_holdings.get(site_id)
@@ -1363,6 +1400,18 @@ async def dispatch_forces(request):
     owner = site_owner(dst) if dst != "home" else None
     if owner and owner != cid and have_treaty(cid, owner, "non_aggression"):
         return _bad("با این کشور پیمان عدم تجاوز دارید.")
+
+    if dst != "home":
+        combined = dict(units)
+        if owner == cid:  # تقویت موضع خودی: پشتیبانی‌های ازقبل مستقرشده هم حساب می‌شوند
+            for k, n in garrison(dst).items(): combined[k] = combined.get(k, 0) + n
+        errs = dispatch_rule_errors(combined, site_zone(dst))
+        if errs: return _bad(errs[0])
+    if src != "home":  # با رفتن این یگان‌ها، نیروهای باقی‌مانده نباید بی‌پشتیبان بمانند
+        zs = site_zone(src)
+        after = {k: pool.get(k, 0) - units.get(k, 0) for k in pool}
+        if not dispatch_rule_errors(pool, zs) and dispatch_rule_errors(after, zs):
+            return _bad("با خروج این یگان‌ها، نیروهای باقی‌مانده در این موضع بدون پشتیبان (ناو ترابری / ناو هواپیمابر / سوخت‌رسان) می‌مانند.")
 
     for k, n in units.items(): pool[k] -= n
     def add_to(dest, sent):
