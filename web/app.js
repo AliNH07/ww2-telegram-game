@@ -30,9 +30,10 @@ const COUNTRY_IDS = { germany: 276, britain: 826, ussr: 643, usa: 840,
     france: 250, italy: 380, china: 156, japan: 392 };
 
 let ARMY_UNITS = {};
+let ARMY_RES_NAMES = {};
 
-const RESOURCE_NAMES = { food: "غذا", steel: "فولاد", uranium: "اورانیوم", oil: "نفت" };
-const RESOURCE_ICONS = { food: "🌾", steel: "⚙️", uranium: "☢️", oil: "🛢️" };
+const RESOURCE_NAMES = { food: "غذا", iron: "آهن", uranium: "اورانیوم", oil: "نفت" };
+const RESOURCE_ICONS = { food: "🌾", iron: "⚙️", uranium: "☢️", oil: "🛢️" };
 const GROUP_ICONS = { land: "🪖", naval: "⚓", air: "✈️", missile: "🚀" };
 const GROUP_TITLES = { land: "زمینی", naval: "دریایی", air: "هوایی", missile: "موشکی" };
 const TREATY_TYPE_NAMES = { alliance: "پیمان اتحاد", non_aggression: "پیمان عدم تجاوز" };
@@ -118,7 +119,7 @@ function showOnly(id) {
 function showGamePage(id) {
     document.querySelectorAll(".game-page").forEach(p => p.classList.add("hidden"));
     const t = document.getElementById(id);
-    if (t) { t.classList.remove("hidden"); t.scrollTop = 0; }
+    if (t) t.classList.remove("hidden");
 }
 
 function formatMoney(v) { return "$" + Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
@@ -176,8 +177,26 @@ function askText(title, placeholder) {
 }
 
 async function loadArmyCatalog() {
-    try { ARMY_UNITS = (await apiGet("/api/army-units")).units || {}; }
+    try {
+        const d = await apiGet("/api/army-units");
+        ARMY_UNITS = d.units || {};
+        ARMY_RES_NAMES = d.resources || {};
+    }
     catch (e) { console.error("Army catalog:", e); }
+}
+
+function formatEta(hours) {
+    if (!Number.isFinite(hours)) return "مدت زیادی";
+    if (hours < 1) return "کمتر از یک ساعت";
+    const d = Math.floor(hours / 24), h = Math.floor(hours % 24);
+    if (d === 0) return `${h} ساعت`;
+    if (h === 0) return `${d} روز`;
+    return `${d} روز و ${h} ساعت`;
+}
+
+function upkeepText(u, q) {
+    const parts = Object.entries(u.upkeep || {}).map(([k, amt]) => `${RESOURCE_NAMES[k] || k} ${formatNumber(amt * q)}`);
+    return parts.length ? parts.join(" · ") : "—";
 }
 
 function renderResourceBars() {
@@ -188,19 +207,19 @@ function renderResourceBars() {
             const amt = player.resources[key] ?? 0;
             const rate = player.resource_production?.[key] ?? 0;
             const use = player.resource_consumption?.[key] ?? 0;
+            const net = player.resource_net?.[key] ?? (rate - use);
             const chip = document.createElement("div");
             chip.className = "resource-chip";
             let rateLine = "";
-            if (rate > 0 && use > 0) {
-                rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>
-                            <div class="resource-chip-rate down">▼ ${formatNumber(use)} کسر فصلی</div>`;
-            } else if (rate > 0) {
-                rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>`;
-            } else if (use > 0) {
-                rateLine = `<div class="resource-chip-rate down">▼ ${formatNumber(use)} /روز</div>`;
-            } else {
-                rateLine = `<div class="resource-chip-rate zero">بدون تولید</div>`;
+            if (rate > 0) rateLine += `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>`;
+            if (rate > 0 && use > 0) rateLine += `<div class="resource-chip-rate down">▼ ${formatNumber(use)} کسر فصلی</div>`;
+            if (net < 0) {
+                rateLine += `<div class="resource-chip-rate down">▼ روزانه ${formatNumber(-net)} کمتر می‌شود</div>`;
+                rateLine += amt <= 0
+                    ? `<div class="resource-chip-eta">⏳ موجودی تمام شده است</div>`
+                    : `<div class="resource-chip-eta">⏳ تا ${formatEta(amt / -net * 24)} دیگر تمام خواهد شد</div>`;
             }
+            if (!rateLine) rateLine = `<div class="resource-chip-rate zero">بدون تولید</div>`;
             chip.innerHTML = `
                 <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span></div>
                 <div class="resource-chip-value">${formatNumber(amt)}</div>
@@ -244,7 +263,6 @@ function startStatsPolling() {
     statsInterval = setInterval(() => {
         refreshPlayer();
         refreshNotificationBadge();
-        refreshHeaderRank();
     }, 30000);
 }
 function stopStatsPolling() {
@@ -374,116 +392,36 @@ async function showGame() {
 
 function updateGameHeader() {
     document.getElementById("game-country-flag").src = countryImageUrl(selectedCountry);
-    refreshHeaderRank();
 }
 
 /* =========================================================
-   Header: rank + notifications
+   Notifications
 ========================================================= */
-async function refreshHeaderRank() {
-    const btn = document.getElementById("header-rank-button");
-    if (!btn || !selectedCountry) return;
-    try {
-        const rows = await apiGet("/api/rankings");
-        if (!Array.isArray(rows)) return;
-        const me = rows.find(r => r.country === selectedCountry);
-        document.getElementById("header-rank-value").textContent = me ? me.rank : "—";
-    } catch (e) {}
-}
-
-document.getElementById("header-rank-button")?.addEventListener("click", () => {
-    showGamePage("ranking");
-    loadRankings();
-});
-
-const seenNewsKey = () => `fl93_seen_news_${userId || "guest"}`;
-function getSeenNews() {
-    try { return new Set(JSON.parse(localStorage.getItem(seenNewsKey()) || "[]")); }
-    catch (e) { return new Set(); }
-}
-function saveSeenNews(set) {
-    try { localStorage.setItem(seenNewsKey(), JSON.stringify([...set].slice(-300))); } catch (e) {}
-}
-function setNotifBadge(count) {
-    const badge = document.getElementById("notif-badge");
-    if (!badge) return;
-    if (count > 0) {
-        badge.textContent = count > 99 ? "99+" : String(count);
-        badge.classList.remove("hidden");
-    } else {
-        badge.classList.add("hidden");
-    }
-}
-
 async function refreshNotificationBadge() {
     try {
         const news = await apiGet("/api/news");
-        const list = Array.isArray(news) ? news : [];
-        const seen = getSeenNews();
-        setNotifBadge(list.filter(n => n.id && !seen.has(n.id)).length);
+        const count = Array.isArray(news) ? news.length : 0;
+        const badge = document.getElementById("notif-badge");
+        if (!badge) return;
+        if (count > 0) {
+            badge.textContent = count > 99 ? "99+" : String(count);
+            badge.classList.remove("hidden");
+        } else {
+            badge.classList.add("hidden");
+        }
     } catch (e) {}
 }
 
-function formatNewsTime(iso) {
-    if (!iso) return "";
-    try {
-        const s = /Z$|[+-]\d\d:\d\d$/.test(iso) ? iso : iso + "Z";
-        return new Date(s).toLocaleString("fa-IR", { dateStyle: "short", timeStyle: "short" });
-    } catch (e) { return ""; }
-}
-
-async function openNotificationsSheet() {
-    document.getElementById("notif-sheet")?.remove();
-    const ov = document.createElement("div");
-    ov.id = "notif-sheet";
-    ov.className = "modal-overlay";
-    ov.innerHTML = `
-        <div class="ic-sheet notif-sheet">
-            <div class="is-head">
-                <div class="is-titles">
-                    <div class="is-name">🔔 اعلان‌ها</div>
-                    <div class="is-sub" id="notif-sub">در حال دریافت...</div>
-                </div>
-                <button class="is-close" aria-label="بستن">✕</button>
-            </div>
-            <div class="notif-list" id="notif-list"></div>
-        </div>`;
-    document.body.appendChild(ov);
-    const close = () => ov.remove();
-    ov.addEventListener("click", e => { if (e.target === ov) close(); });
-    ov.querySelector(".is-close").onclick = close;
-
-    try {
-        const news = await apiGet("/api/news");
-        const list = Array.isArray(news) ? news : [];
-        const seen = getSeenNews();
-        const box = ov.querySelector("#notif-list");
-        box.innerHTML = "";
-        let fresh = 0;
-        list.forEach(item => {
-            const isNew = !!item.id && !seen.has(item.id);
-            if (isNew) fresh++;
-            const div = document.createElement("div");
-            div.className = "notif-item" + (isNew ? " is-new" : "");
-            const t = formatNewsTime(item.at);
-            div.innerHTML = `
-                <div class="notif-title">${isNew ? '<span class="notif-dot"></span>' : ""}${escapeHtml(item.title || "")}</div>
-                <p>${escapeHtml(item.text || "")}</p>
-                ${t ? `<div class="notif-time">${t}</div>` : ""}`;
-            box.appendChild(div);
-        });
-        if (!list.length) box.innerHTML = `<div class="notif-empty">اعلانی وجود ندارد.</div>`;
-        ov.querySelector("#notif-sub").textContent = fresh ? `${fresh} اعلان جدید` : "همه را دیده‌اید";
-        // بعد از دیده شدن، عدد روی زنگ پاک می‌شود
-        list.forEach(n => { if (n.id) seen.add(n.id); });
-        saveSeenNews(seen);
-        setNotifBadge(0);
-    } catch (e) {
-        ov.querySelector("#notif-sub").textContent = "دریافت اعلان‌ها ممکن نشد.";
-    }
-}
-
-document.getElementById("game-notification-button")?.addEventListener("click", openNotificationsSheet);
+document.getElementById("game-notification-button")?.addEventListener("click", () => {
+    showGamePage("communications");
+    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    document.querySelector('[data-page="communications"]')?.classList.add("active");
+    document.querySelectorAll(".comm-tab").forEach(t => t.classList.remove("active"));
+    document.querySelector('[data-tab="comm-news"]')?.classList.add("active");
+    document.querySelectorAll(".comm-panel").forEach(p => p.classList.add("hidden"));
+    document.getElementById("comm-news")?.classList.remove("hidden");
+    loadNews();
+});
 
 /* =========================================================
    Home
@@ -532,61 +470,29 @@ function updateHomeStats() {
     if (hint) hint.textContent = SEASON_HINTS[season] || player.season_hint || "";
     const mm = document.getElementById("map-money");
     if (mm) mm.textContent = formatMoney(player.money);
-    document.querySelectorAll(".sb-money").forEach(e => { e.textContent = formatMoney(player.money); });
     renderResourceBars();
-}
-
-const RK_TABS = [
-    { id: "overall", key: "overall", label: "کلی", info: "<b>کلی</b> بر چه اساسیه: ترکیبِ پنج دسته‌ی دیگر، با وزنِ نابرابر: اقتصاد ۳۰، نظامی ۲۵، قلمرو ۲۰، توسعه ۱۵، دیپلماسی ۱۰. امتیازِ هر دسته نسبت به بهترین کشورِ همان دسته محاسبه می‌شود، پس یک عددِ غول‌آسا بقیه را خفه نمی‌کند." },
-    { id: "economy", key: "economy", label: "اقتصادی", info: "<b>اقتصادی</b> بر چه اساسیه: درآمدِ خالصِ روزانه‌ی کشور، بعد از کسرِ هزینه‌ی نگهداری — هر $1,000 یک امتیاز." },
-    { id: "military", key: "military", label: "قدرت نظامی", info: "<b>قدرت نظامی</b> بر چه اساسیه: مجموعِ قدرتِ همه‌ی یگان‌ها — هر یگان به اندازه‌ی حمله + دفاعش امتیاز دارد. یگان‌هایی که برای جنگ فرستاده شده‌اند حساب نمی‌شوند." },
-    { id: "territory", key: "territory", label: "قلمرو", info: "<b>قلمرو</b> بر چه اساسیه: منابعِ نقشه و تنگه‌هایی که زیرِ کنترلِ کشورند، هر کدام ۱ امتیاز، به‌اضافه‌ی هر کشورِ اشغال‌شده ۵ امتیاز." },
-    { id: "development", key: "development", label: "توسعه", info: "<b>توسعه</b> بر چه اساسیه: مجموعِ سطحِ همه‌ی ساختمان‌ها در زیرساخت و اقتصاد — هر سطح ۵۰ امتیاز." },
-    { id: "diplomacy", key: "diplomacy", label: "دیپلماسی", info: "<b>دیپلماسی</b> بر چه اساسیه: پیمان‌های فعال (هر کدام ۱۰۰ امتیاز) و عضویت در اتحادیه (۱۵۰ امتیاز)." },
-];
-let rkTab = "overall", rkRows = [];
-
-function jalaliStamp(iso) {
-    try {
-        const parts = new Intl.DateTimeFormat("en-US-u-ca-persian-nu-latn", { year: "numeric", month: "numeric", day: "numeric",
-            hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(iso));
-        const g = t => parts.find(p => p.type === t)?.value;
-        return `${g("year")}/${g("month")}/${g("day")}, ${g("hour")}:${g("minute")}`;
-    } catch (e) { return ""; }
-}
-
-function renderRankings() {
-    const tabs = document.getElementById("rk-tabs"), box = document.getElementById("rankings-list");
-    if (!tabs || !box) return;
-    tabs.innerHTML = "";
-    RK_TABS.forEach(t => {
-        const b = document.createElement("button");
-        b.className = "rk-tab" + (t.id === rkTab ? " active" : "");
-        b.textContent = t.label;
-        b.onclick = () => { rkTab = t.id; renderRankings(); };
-        tabs.appendChild(b);
-    });
-    const cur = RK_TABS.find(t => t.id === rkTab);
-    document.getElementById("rk-info").innerHTML = cur.info;
-    const end = player?.season_end ? jalaliStamp(player.season_end) : "";
-    document.getElementById("rk-live-text").textContent =
-        `هنوز نهایی نشده — تا پایانِ فصل این جدول تغییر می‌کند.${end ? " پایان: " + end : ""}`;
-    box.innerHTML = "";
-    if (!rkRows.length) { box.innerHTML = `<div class="diplomacy-item-empty">هنوز رتبه‌ای نیست.</div>`; return; }
-    [...rkRows].sort((x, y) => (y[cur.key] ?? 0) - (x[cur.key] ?? 0)).forEach((r, i) => {
-        const pos = i + 1;
-        const div = document.createElement("div");
-        div.className = `rk-row ${r.is_eliminated ? "rk-elim" : ""}`;
-        div.innerHTML = `<span class="rk-medal rk-m${pos <= 3 ? pos : 0}">${pos}</span>${flagInline(r.country)}<span class="rk-name">${r.name}</span>`;
-        box.appendChild(div);
-    });
 }
 
 async function loadRankings() {
     try {
         const rows = await apiGet("/api/rankings");
-        rkRows = Array.isArray(rows) ? rows : [];
-        renderRankings();
+        const box = document.getElementById("rankings-list");
+        if (!box) return;
+        box.innerHTML = "";
+        if (!rows.length) { box.innerHTML = `<div class="diplomacy-item-empty">هنوز رتبه‌ای نیست.</div>`; return; }
+        rows.forEach(r => {
+            const div = document.createElement("div");
+            const cls = r.rank === 1 ? "rank-1" : r.rank === 2 ? "rank-2" : r.rank === 3 ? "rank-3" : "";
+            div.className = `rank-row ${cls} ${r.is_eliminated ? "rank-elim" : ""}`;
+            div.innerHTML = `
+                <div class="rank-num">${r.rank}</div>
+                <div>
+                    <div class="rank-name">${flagInline(r.country, true)} ${r.name}</div>
+                    <div class="rank-sub">💰${r.economy} ⚔️${r.military} 🤝${r.diplomacy} 🏗️${r.development}</div>
+                </div>
+                <div class="rank-score">${formatNumber(r.overall)}</div>`;
+            box.appendChild(div);
+        });
     } catch (e) { console.error(e); }
 }
 
@@ -614,51 +520,10 @@ document.querySelectorAll(".sub-back-button").forEach(b => {
 /* =========================================================
    Infra
 ========================================================= */
-const INFRA_TAB_FILTERS = {
-    power:    i => i.group === "power",
-    manpower: i => i.group === "manpower",
-    food:     i => i.group === "resource" && i.resource_key === "food",
-    resource: i => i.group === "resource" && i.resource_key !== "food",
-    military: i => ["land", "naval", "air", "missile"].includes(i.group),
-};
-
 async function openInfrastructureMenu() {
     showGamePage("infrastructure");
     await refreshPlayer();
     renderInfraTab("power");
-}
-
-function updateInfraCounters() {
-    if (!player?.infra) return;
-    const items = Object.values(player.infra);
-    let built = 0;
-    Object.entries(INFRA_TAB_FILTERS).forEach(([tab, fn]) => {
-        const list = items.filter(fn);
-        const b = list.filter(i => i.level > 0).length;
-        const el = document.getElementById(`infra-count-${tab}`);
-        if (el) el.textContent = `${b}/${list.length}`;
-        built += b;
-    });
-}
-
-function renderPowerGrid() {
-    const box = document.getElementById("infra-power-grid");
-    if (!box || !player) return;
-    const cap = player.power_capacity ?? 0, use = player.power_consumption ?? 0, net = cap - use;
-    const pct = cap > 0 ? Math.min(100, Math.round(use / cap * 100)) : (use > 0 ? 100 : 0);
-    const state = net < 0 ? "bad" : pct >= 85 ? "warn" : "ok";
-    box.innerHTML = `
-        <div class="pg-card pg-${state}">
-            <div class="pg-head">
-                <span class="pg-title">⚡ شبکهٔ برق</span>
-                <span class="pg-net">${net >= 0 ? "+" : "−"}${formatNumber(Math.abs(net))}</span>
-            </div>
-            <div class="pg-bar"><span class="pg-fill" style="width:${pct}%"></span></div>
-            <div class="pg-foot">
-                <span>تولید ${formatNumber(cap)}</span>
-                <span>مصرف ${formatNumber(use)} · ${pct}٪</span>
-            </div>
-        </div>`;
 }
 
 function renderInfraTab(tab) {
@@ -669,22 +534,22 @@ function renderInfraTab(tab) {
     const panel = document.getElementById(`infra-panel-${tab}`);
     if (panel) panel.classList.remove("hidden");
 
-    updateInfraCounters();
-    if (tab === "power") {
-        renderPowerGrid();
-        renderInfraList("infra-power-list", INFRA_TAB_FILTERS.power);
-    } else if (tab === "manpower")
-        renderInfraList("infra-manpower-list", INFRA_TAB_FILTERS.manpower);
+    if (tab === "power")
+        renderInfraList("infra-power-list", i => i.group === "power");
+    else if (tab === "manpower")
+        renderInfraList("infra-manpower-list", i => i.group === "manpower");
     else if (tab === "food")
-        renderInfraList("infra-food-list", INFRA_TAB_FILTERS.food);
+        renderInfraList("infra-food-list", i => i.group === "resource" && i.resource_key === "food");
     else if (tab === "resource")
-        renderInfraList("infra-resource-list", INFRA_TAB_FILTERS.resource);
+        renderInfraList("infra-resource-list", i => i.group === "resource" && i.resource_key !== "food");
     else if (tab === "military") {
         renderInfraList("infra-land-list", i => i.group === "land");
         renderInfraList("infra-naval-list", i => i.group === "naval");
         renderInfraList("infra-air-list", i => i.group === "air");
         renderInfraList("infra-missile-list", i => i.group === "missile");
     }
+    else if (tab === "strategic")
+        renderInfraList("infra-strategic-list", i => i.group === "strategic");
 }
 
 document.querySelectorAll(".infra-tab").forEach(tab => {
@@ -718,7 +583,7 @@ function buildStatsHtml(item, levelData) {
         boxes.push(statBox(icon, "+" + formatNumber(levelData.production), "در روز"));
     }
     if ((g === "land" || g === "naval" || g === "air") && levelData.capacity !== undefined) {
-        boxes.push(statBox("📦", formatNumber(levelData.capacity), "ظرفیت"));
+        boxes.push(statBox("📦", formatNumber(levelData.capacity), "جا"));
     }
     if (levelData.income !== undefined) {
         boxes.push(statBox("💰", "+" + formatMoney(levelData.income), "در روز"));
@@ -731,170 +596,53 @@ function buildStatsHtml(item, levelData) {
     return `<div class="stat-boxes-row">${boxes.join("")}</div>`;
 }
 
-function freePower() {
-    return Math.max(0, (player?.power_capacity ?? 0) - (player?.power_consumption ?? 0));
-}
-
-// آیا بازیکن می‌تواند سطح بعدی را بسازد؟ (پول، برق، منابع)
-function infraNeeds(item) {
-    const nx = item.next;
-    if (!nx) return null;
-    const moneyOk = (player.money ?? 0) >= nx.cost;
-    const powerReq = item.group === "power" ? 0 : (item.power_required || 0);
-    const powerOk = freePower() >= powerReq;
-    const res = Object.entries(nx.resources || {}).map(([k, need]) => {
-        const have = player.resources?.[k] ?? 0;
-        return { key: k, need, have, ok: have >= need };
-    });
-    const resOk = res.every(r => r.ok);
-    return { cost: nx.cost, moneyOk, powerReq, powerOk, res, resOk, canBuild: moneyOk && powerOk && resOk };
-}
-
-// عدد اصلی کارت: برق / نیرو / تولید منبع / ظرفیت
-function bonusParts(item, n) {
-    const b = item.bonus || {}, g = GROUP_TITLES[item.group] || "", p = [];
-    if (b.defense && n > 1) p.push({ v: `+${Math.round(b.defense * (n - 1) * 100)}٪`, l: `دفاع ${g}` });
-    return p;
-}
-
-function infraMainFigure(item, lvl, n) {
-    if (!lvl) return null;
-    const g = item.group;
-    if (g === "power")    return { value: "+" + formatNumber(lvl.capacity), label: "برق" };
-    if (g === "manpower") return { value: "+" + formatNumber(lvl.production), label: "نفر در روز" };
-    if (g === "resource") return { value: "+" + formatNumber(lvl.production), label: `${RESOURCE_NAMES[item.resource_key] || ""} در روز` };
-    if (lvl.capacity === undefined) { const p = bonusParts(item, n)[0]; return p ? { value: p.v, label: p.l } : null; }
-    return { value: formatNumber(lvl.capacity), label: "ظرفیت" };
-}
-
 function renderInfraList(cid, filterFn) {
     const c = document.getElementById(cid);
     if (!c || !player?.infra) return;
     c.innerHTML = "";
     Object.entries(player.infra).forEach(([iid, item]) => {
         if (!filterFn(item)) return;
-        const built = item.level > 0;
-        const need = infraNeeds(item);
-        const fig = infraMainFigure(item, built ? item.current : item.next, built ? item.level : 1);
-        const pips = Array.from({ length: item.max_level }, (_, i) => `<i class="${i < item.level ? "on" : ""}"></i>`).join("");
-        const upkeepVal = item.next ? item.next_upkeep : item.upkeep;
-        const lvlAfter = item.next ? item.level + 1 : item.level;
-        const powerChip = (item.group !== "power" && item.power_required)
-            ? `<span class="ic-chip">⚡ مصرف ${formatNumber(item.power_required * lvlAfter)} برق</span>` : "";
-
-        const effChips = bonusParts(item, lvlAfter).map(p => `<span class="ic-chip">${p.l} ${p.v}</span>`).join("");
-        let btnLabel;
-        if (!item.next) btnLabel = "حداکثر سطح";
-        else btnLabel = built ? `ارتقا به سطح ${item.level + 1} — ${formatMoney(need.cost)}`
-                              : `ساخت — ${formatMoney(need.cost)}`;
-        const short = need && !need.moneyOk;
-
         const card = document.createElement("div");
-        card.className = `ic-card ${built ? "ic-card--built" : ""} ${short ? "ic-card--short" : ""}`;
+        card.className = "infra-card-new";
+
+        const isBuilt = item.level > 0;
+        const statusText = isBuilt ? `سطح ${item.level}` : "ساخته نشده";
+        const shownLevel = item.next || item.current;
+        const statsHtml = buildStatsHtml(item, shownLevel);
+
+        const btnText = !item.next
+            ? "حداکثر سطح"
+            : (isBuilt ? `⬆️ ارتقا به سطح ${item.level + 1} — ${formatMoney(item.next.cost)}`
+                       : `⬆️ ساخت — ${formatMoney(item.next.cost)}`);
+        const btnDisabled = !item.next ? "disabled" : "";
+
         card.innerHTML = `
-            <div class="ic-top">
-                <div class="ic-hex"><span>${item.icon || "🏗️"}</span></div>
-                <div class="ic-titles">
-                    <div class="ic-name">${item.name}</div>
-                    <div class="ic-pips">${pips}</div>
+            <div class="infra-card-head">
+                <div class="infra-card-icon">${item.icon || "🏗️"}</div>
+                <div class="infra-card-titles">
+                    <div class="infra-card-name">${item.name}</div>
+                    <div class="infra-card-status">${statusText}</div>
                 </div>
-                ${fig ? `<div class="ic-main"><b>${fig.value}</b><small>${fig.label}</small></div>` : ""}
             </div>
-            <p class="ic-desc">${item.desc || ""}</p>
-            ${(powerChip || effChips) ? `<div class="ic-chips">${powerChip}${effChips}</div>` : ""}
-            <div class="ic-foot">
-                <button class="ic-btn ${short ? "ic-btn--short" : ""}" ${item.next ? "" : "disabled"}>${btnLabel}</button>
-                <span class="ic-chip ic-chip--upkeep">🔧 ${formatMoney(upkeepVal)} / روز</span>
-            </div>`;
-        if (item.next) card.addEventListener("click", () => openInfraSheet(iid));
+            <div class="infra-card-desc">${item.desc || ""}</div>
+            ${statsHtml}
+            <button class="infra-card-button" ${btnDisabled}>${btnText}</button>`;
+
+        const btn = card.querySelector(".infra-card-button");
+        if (item.next) btn.addEventListener("click", () => upgradeInfra(iid));
         c.appendChild(card);
     });
 }
 
-function closeInfraSheet() { document.getElementById("infra-sheet")?.remove(); }
-
-// پنجرهٔ ساخت/ارتقا: اطلاعات ← قیمت ← دکمهٔ ساخت
-function openInfraSheet(iid) {
-    const item = player?.infra?.[iid];
-    if (!item || !item.next) return;
-    closeInfraSheet();
-    const built = item.level > 0;
-    const need = infraNeeds(item);
-    const lvlAfter = item.level + 1;
-    const figNow = built ? infraMainFigure(item, item.current, item.level) : null;
-    const figNext = infraMainFigure(item, item.next, lvlAfter);
-
-    const rows = [];
-    if (item.next.capacity === undefined) {
-        const now = built ? bonusParts(item, item.level) : [];
-        bonusParts(item, lvlAfter).forEach((p, i) => rows.push(`<div class="is-row"><span>${p.l}</span><b>${now[i] ? `از ${now[i].v} به ${p.v}` : p.v}</b></div>`));
-    } else if (figNext) {
-        rows.push(`<div class="is-row"><span>${figNext.label}</span><b>${figNow ? `از ${figNow.value} به ${figNext.value}` : figNext.value}</b></div>`);
-    }
-    rows.push(`<div class="is-row"><span>🔧 هزینهٔ نگهداری روزانه</span><b>${formatMoney(item.next_upkeep)}${built ? ` <small>(الان ${formatMoney(item.upkeep)})</small>` : ""}</b></div>`);
-    if (item.group === "power") {
-        rows.push(`<div class="is-row"><span>⚡ برق تولیدی</span><b>${formatNumber(item.next.capacity)} واحد</b></div>`);
-    } else if (item.power_required) {
-        rows.push(`<div class="is-row ${need.powerOk ? "" : "is-bad"}"><span>⚡ مصرف برق</span><b>${formatNumber(item.power_required * lvlAfter)} واحد <small>(برق آزاد: ${formatNumber(freePower())})</small></b></div>`);
-    }
-    need.res.forEach(r => {
-        rows.push(`<div class="is-row ${r.ok ? "" : "is-bad"}"><span>${RESOURCE_ICONS[r.key] || ""} ${RESOURCE_NAMES[r.key] || r.key} لازم</span><b>${formatNumber(r.need)} <small>(موجود: ${formatNumber(r.have)})</small></b></div>`);
-    });
-
-    let okLabel = built ? "ارتقا" : "ساخت";
-    if (!need.moneyOk) okLabel = "پول کافی نیست";
-    else if (!need.powerOk) okLabel = "برق کافی نیست";
-    else if (!need.resOk) okLabel = "منابع کافی نیست";
-
-    const ov = document.createElement("div");
-    ov.id = "infra-sheet";
-    ov.className = "modal-overlay";
-    ov.innerHTML = `
-        <div class="ic-sheet">
-            <div class="is-head">
-                <div class="ic-hex"><span>${item.icon || "🏗️"}</span></div>
-                <div class="is-titles">
-                    <div class="is-name">${item.name}</div>
-                    <div class="is-sub">${built ? `ارتقا از سطح ${item.level} به ${lvlAfter}` : "ساخت جدید · سطح ۱"}</div>
-                </div>
-                <button class="is-close" aria-label="بستن">✕</button>
-            </div>
-            <p class="is-desc">${item.desc || ""}</p>
-            <div class="is-rows">${rows.join("")}</div>
-            <div class="is-price ${need.moneyOk ? "" : "is-bad"}">
-                <span>قیمت</span>
-                <b>${formatMoney(need.cost)}</b>
-            </div>
-            ${need.moneyOk ? "" : `<div class="is-lack">${formatMoney(need.cost - (player.money ?? 0))} کم دارید</div>`}
-            <div class="modal-actions">
-                <button class="modal-cancel">انصراف</button>
-                <button class="modal-ok" ${need.canBuild ? "" : "disabled"}>${okLabel}</button>
-            </div>
-        </div>`;
-    document.body.appendChild(ov);
-    ov.addEventListener("click", e => { if (e.target === ov) closeInfraSheet(); });
-    ov.querySelector(".is-close").onclick = closeInfraSheet;
-    ov.querySelector(".modal-cancel").onclick = closeInfraSheet;
-    const okBtn = ov.querySelector(".modal-ok");
-    okBtn.onclick = async () => {
-        if (!userId || okBtn.disabled) return;
-        okBtn.disabled = true;
-        try {
-            const d = await apiPost("/api/upgrade-infra", { category: iid });
-            if (!d.success) {
-                showToast(d.message || "امکان ساخت نیست.", "error");
-                okBtn.disabled = false;
-                return;
-            }
-            player = d.player; updateHomeStats(); closeInfraSheet();
-            showToast(built ? `✅ ${item.name} به سطح ${lvlAfter} ارتقا یافت.` : `✅ ${item.name} ساخته شد.`, "success");
-            const activeTab = document.querySelector(".infra-tab.active")?.dataset.infraTab || "power";
-            renderInfraTab(activeTab);
-        } catch (e) {
-            showToast("خطا در ارتباط با سرور.", "error");
-            okBtn.disabled = false;
-        }
-    };
+async function upgradeInfra(iid) {
+    if (!userId) return;
+    try {
+        const d = await apiPost("/api/upgrade-infra", { category: iid });
+        if (!d.success) { showToast(d.message || "امکان ارتقا نیست."); return; }
+        player = d.player; updateHomeStats();
+        const activeTab = document.querySelector(".infra-tab.active")?.dataset.infraTab || "power";
+        renderInfraTab(activeTab);
+    } catch (e) { showToast("خطا."); }
 }
 
 /* =========================================================
@@ -955,8 +703,6 @@ async function upgradeEconomy(iid) {
 ========================================================= */
 async function openArmyPage() {
     showGamePage("army");
-    currentArmyTab = "land";
-    document.querySelectorAll(".army-tab").forEach(t => t.classList.toggle("active", t.dataset.armyTab === "land"));
     await refreshPlayer();
     renderArmySummary();
     renderBaseCards();
@@ -982,10 +728,20 @@ function getGroupCapacity(group) {
     return t;
 }
 
-function getGroupUsed(group) {
+// تعداد یگان‌ها
+function getGroupCount(group) {
     let t = 0;
     Object.entries(ARMY_UNITS).forEach(([uid_, u]) => {
         if (u.group === group) t += player?.units?.[uid_] ?? 0;
+    });
+    return t;
+}
+
+// جای اشغال‌شده در پایگاه (جمع جای هر یگان × تعداد)
+function getGroupUsed(group) {
+    let t = 0;
+    Object.entries(ARMY_UNITS).forEach(([uid_, u]) => {
+        if (u.group === group) t += (player?.units?.[uid_] ?? 0) * (u.slots ?? 1);
     });
     return t;
 }
@@ -996,40 +752,81 @@ function renderArmySummary() {
     el.textContent = formatNumber(player.army);
 }
 
-const BASES = [
-    { key: "barracks", infra: "land_barracks", group: "land" },
-    { key: "airport", infra: "air_airport", group: "air" },
-    { key: "port", infra: "naval_port", group: "naval" },
-    { key: "missile", infra: "missile_depot", group: "missile" },
-];
-const STORAGE_INFRA = { land: "land_barracks", naval: "naval_port", air: "air_airport", missile: "missile_depot" };
-
 function renderBaseCards() {
     if (!player?.infra) return;
-    BASES.forEach(b => {
-        const it = player.infra[b.infra];
-        const v = document.getElementById(`base-${b.key}-value`);
-        const m = document.getElementById(`base-${b.key}-max`);
-        const f = document.getElementById(`base-${b.key}-fill`);
-        if (!v) return;
-        if (it && it.current) {
-            const cap = getGroupCapacity(b.group), used = getGroupUsed(b.group);
-            v.textContent = formatNumber(used);
-            m.textContent = `از ${formatNumber(cap)}`;
-            f.style.width = cap > 0 ? Math.min(100, used / cap * 100) + "%" : "0%";
-        } else {
-            v.textContent = "—"; m.textContent = "ساخته نشده"; f.style.width = "0%";
-        }
-    });
+
+    // پادگان
+    const barracks = player.infra["land_barracks"];
+    const bv = document.getElementById("base-barracks-value");
+    const bm = document.getElementById("base-barracks-max");
+    const bf = document.getElementById("base-barracks-fill");
+    if (barracks && barracks.current) {
+        const cap = getGroupCapacity("land");
+        const used = getGroupUsed("land");
+        bv.textContent = formatNumber(used);
+        bm.textContent = `از ${formatNumber(cap)} جا`;
+        if (bf) bf.style.width = cap > 0 ? Math.min(100, (used / cap) * 100) + "%" : "0%";
+    } else {
+        bv.textContent = "—";
+        bm.textContent = "ساخته نشده";
+        if (bf) bf.style.width = "0%";
+    }
+
+    // فرودگاه
+    const airport = player.infra["air_airport"];
+    const as = document.getElementById("base-airport-status");
+    if (airport && airport.current) {
+        const cap = getGroupCapacity("air");
+        const used = getGroupUsed("air");
+        as.innerHTML = `<span style="color:#f4f6f9;font-size:18px;font-weight:bold;">${formatNumber(used)}</span> از ${formatNumber(cap)} جا`;
+        as.classList.remove("base-card-empty");
+    } else {
+        as.textContent = "ساخته نشده";
+        as.classList.add("base-card-empty");
+    }
+
+    // بندر
+    const port = player.infra["naval_port"];
+    const pv = document.getElementById("base-port-value");
+    const pm = document.getElementById("base-port-max");
+    const pf = document.getElementById("base-port-fill");
+    if (port && port.current) {
+        const cap = getGroupCapacity("naval");
+        const used = getGroupUsed("naval");
+        pv.textContent = formatNumber(used);
+        pm.textContent = `از ${formatNumber(cap)} جا`;
+        if (pf) pf.style.width = cap > 0 ? Math.min(100, (used / cap) * 100) + "%" : "0%";
+    } else {
+        pv.textContent = "—";
+        pm.textContent = "ساخته نشده";
+        if (pf) pf.style.width = "0%";
+    }
+
+    // انبار موشک
+    const depot = player.infra["missile_depot"];
+    const mv = document.getElementById("base-missile-value");
+    const mm = document.getElementById("base-missile-max");
+    const mf = document.getElementById("base-missile-fill");
+    if (depot && depot.current) {
+        const cap = getGroupCapacity("missile");
+        const used = getGroupUsed("missile");
+        mv.textContent = formatNumber(used);
+        mm.textContent = `از ${formatNumber(cap)} جا`;
+        if (mf) mf.style.width = cap > 0 ? Math.min(100, (used / cap) * 100) + "%" : "0%";
+    } else {
+        mv.textContent = "—";
+        mm.textContent = "ساخته نشده";
+        if (mf) mf.style.width = "0%";
+    }
 }
 
 function renderArmyTabsCounts() {
     if (!player) return;
     const set = (id, n) => { const e = document.getElementById(id); if (e) e.textContent = formatNumber(n); };
-    set("army-count-land", getGroupUsed("land"));
-    set("army-count-air", getGroupUsed("air"));
-    set("army-count-naval", getGroupUsed("naval"));
-    set("army-count-missile", 0);
+    set("army-count-land", getGroupCount("land"));
+    set("army-count-air", getGroupCount("air"));
+    set("army-count-naval", getGroupCount("naval"));
+    set("army-count-missile", getGroupCount("missile"));
 }
 
 function unitLevelDots(count, max = 6) {
@@ -1061,86 +858,155 @@ function renderArmyUnitsNew() {
 
     unitsInGroup.forEach(([uid_, u]) => {
         const count = player.units?.[uid_] ?? 0;
-        const missing = missingReqs(u);
-        const full = used >= cap;
-        const totalPower = Math.round(count * (u.attack + u.defense * (player.def_mult?.[group] ?? 1)));
+        const req = player.infra?.[u.requires];
+        const hasReq = (req?.level ?? 0) > 0;
+        const full = (cap - used) < (u.slots ?? 1);
 
-        let statusText = "آماده آموزش";
-        if (missing.length) statusText = "🔒 قفل است — برای دیدن نیازها «تولید» را بزنید";
-        else if (full) statusText = "ظرفیت پر است.";
+        let statusText = "";
+        let disabled = false;
+        if (!hasReq) {
+            statusText = `برای باز شدن، «${req?.name || u.requires}» را بسازید.`;
+            disabled = true;
+        } else if (full) {
+            statusText = "جای خالی کافی نیست؛ پایگاه را ارتقا دهید.";
+            disabled = true;
+        }
 
         const card = document.createElement("div");
-        card.className = "unit-card-new" + (missing.length ? " locked" : "");
+        card.className = "unit-card-new unit-card-simple" + (disabled ? " locked" : "");
         card.innerHTML = `
-            <div class="unit-card-new-top">
-                <div class="unit-card-new-name">
-                    <div class="unit-card-new-title">${u.name}</div>
-                    ${unitLevelDots(count)}
-                </div>
-                <div class="unit-card-new-power ${totalPower === 0 ? "zero" : ""}">
-                    ${formatNumber(totalPower)}
-                </div>
+            <div class="unit-simple-info">
+                <div class="unit-card-new-title">${u.name}</div>
+                <div class="unit-simple-count">تعداد: ${formatNumber(count)}</div>
+                ${statusText ? `<div class="unit-simple-status">${statusText}</div>` : ""}
             </div>
-            <div class="unit-card-new-action">
-                <button class="unit-produce-btn" ${!missing.length && full ? "disabled" : ""}>⚙️ تولید</button>
-                <span class="unit-status-text">${statusText}</span>
-            </div>`;
-        card.querySelector(".unit-produce-btn").addEventListener("click", () => {
-            if (missing.length) openLockSheet(uid_); else openTrainSheet(uid_);
-        });
+            <button class="unit-produce-btn unit-simple-btn" ${disabled ? "disabled" : ""}>⚙️ تولید</button>
+        `;
 
+        if (!disabled) {
+            card.querySelector(".unit-produce-btn").addEventListener("click", () => openProduceModal(uid_));
+        }
         c.appendChild(card);
     });
 }
 
-const REQ_WHY = {
-    missile_depot: "محل نگهداری موشک‌ها",
-    missile_factory: "ساخت موشک",
-    land_barracks: "محل نگهداری نیروهای زمینی",
-    land_hq: "فرماندهی و آموزش نیروهای زمینی",
-    land_tank_factory: "ساخت تانک",
-    naval_port: "محل پهلو گرفتن ناوگان",
-    naval_shipyard: "ساخت ناوها و زیردریایی",
-    air_airport: "محل استقرار هواپیماها",
-    air_arsenal: "ساخت جنگنده، بمب‌افکن و بالگرد",
-};
-
-// ساختمان‌های لازمی که هنوز ساخته نشده‌اند
-function reqList(u) {
-    const ml = u.min_level || {};
-    return (Array.isArray(u.requires) ? u.requires : [u.requires]).map(r => ({ id: r, lvl: ml[r] || 1 }));
-}
-function missingReqs(u) {
-    return reqList(u).filter(r => (player?.infra?.[r.id]?.level ?? 0) < r.lvl);
+/* ---------- پنجرهٔ تولید ---------- */
+function toLatinDigits(str) {
+    return String(str)
+        .replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))
+        .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
 }
 
-function openLockSheet(uid_) {
-    const u = ARMY_UNITS[uid_]; if (!u || !player) return;
-    closeInfraSheet();
-    const rows = missingReqs(u).map(r => {
-        const it = player.infra?.[r.id], cur = it?.level ?? 0;
-        const name = (it?.name || r.id) + (r.lvl > 1 ? ` سطح ${r.lvl}` : "");
-        return `<div class="is-row is-bad"><span>🔒 ${name}</span><b>${REQ_WHY[r.id] || ""}${cur > 0 ? ` <small>(الان سطح ${cur})</small>` : ""}</b></div>`;
-    }).join("");
+// حداکثر تعدادی که با پول، نیروی انسانی و ظرفیت فعلی قابل تولید است
+function calcMaxProducible(u) {
+    let m = Math.floor((player.money ?? 0) / u.cost);
+    if (u.manpower > 0) m = Math.min(m, Math.floor((player.manpower ?? 0) / u.manpower));
+    m = Math.min(m, Math.floor((getGroupCapacity(u.group) - getGroupUsed(u.group)) / (u.slots ?? 1)));
+    return Number.isFinite(m) ? Math.max(0, m) : 0;
+}
+
+function openProduceModal(uid_) {
+    const u = ARMY_UNITS[uid_];
+    if (!u || !player) return;
+    document.querySelectorAll(".produce-overlay").forEach(e => e.remove());
+
+    let qty = 1;
+
+    const extra = [];
+    if (u.transport_capacity) extra.push(`<div class="produce-info-item"><span>🚚 ظرفیت حمل</span><strong>${formatNumber(u.transport_capacity)}</strong></div>`);
+    const slotWhere = u.needs_carrier ? "پایگاه و ناو" : (u.group === "air" ? "فرودگاه، بدون نیاز به ناو" : "پایگاه");
+    extra.push(`<div class="produce-info-item produce-res"><span>📦 جا (${slotWhere})</span><strong>${formatNumber(u.slots ?? 1)}</strong></div>`);
+
     const ov = document.createElement("div");
-    ov.id = "infra-sheet"; ov.className = "modal-overlay";
+    ov.className = "modal-overlay produce-overlay";
     ov.innerHTML = `
-        <div class="ic-sheet">
-            <div class="is-head">
-                <div class="ic-hex"><span>🔒</span></div>
-                <div class="is-titles">
-                    <div class="is-name">${u.name}</div>
-                    <div class="is-sub">برای تولید این یگان باید بسازید:</div>
-                </div>
-                <button class="is-close" aria-label="بستن">✕</button>
+        <div class="modal-box produce-box">
+            <div class="produce-head">
+                <div class="modal-title">${u.name}</div>
+                <button class="produce-close" aria-label="بستن">×</button>
             </div>
-            <div class="is-rows">${rows}</div>
-            <div class="modal-actions"><button class="modal-cancel">بستن</button></div>
+
+            <div class="produce-qty-row">
+                <button class="pq-btn" data-act="dec">−</button>
+                <input id="pq-input" class="pq-input" type="text" inputmode="numeric" autocomplete="off" value="1">
+                <button class="pq-btn" data-act="inc">+</button>
+                <button class="pq-max" data-act="max">حداکثر</button>
+            </div>
+
+            <div class="produce-quick-row">
+                <button class="pq-quick" data-set="10">10</button>
+                <button class="pq-quick" data-set="100">100</button>
+            </div>
+
+            <div class="produce-info">
+                <div class="produce-info-item"><span>⚔️ حمله</span><strong>${formatNumber(u.attack)}</strong></div>
+                <div class="produce-info-item"><span>🛡️ دفاع</span><strong>${formatNumber(u.defense)}</strong></div>
+                <div class="produce-info-item"><span>👥 نیروی انسانی</span><strong id="pq-mp">0</strong></div>
+                <div class="produce-info-item"><span>⏱️ زمان ساخت</span><strong>${formatDuration(u.build_time || 0)}</strong></div>
+                ${extra.join("")}
+                <div class="produce-info-item produce-res"><span>🍽️ مصرف روزانهٔ هر واحد</span><strong>${upkeepText(u, 1)}</strong></div>
+                <div class="produce-info-item produce-res"><span>مصرف روزانهٔ کل (برای تعداد انتخابی)</span><strong id="pq-res">—</strong></div>
+            </div>
+
+            <div class="produce-warn" id="pq-warn"></div>
+
+            <div class="produce-footer">
+                <button class="produce-go" id="pq-go">⚙️ تولید</button>
+                <div class="produce-price"><span>قیمت</span><strong id="pq-price">$0</strong></div>
+            </div>
         </div>`;
+
+    const $ = sel => ov.querySelector(sel);
+    const inp = $("#pq-input"), goBtn = $("#pq-go");
+
+    const warnFor = q => {
+        if ((player.money ?? 0) < u.cost * q) return "پول کافی نیست.";
+        if ((player.manpower ?? 0) < u.manpower * q) return "نیروی انسانی کافی نیست.";
+        const room = getGroupCapacity(u.group) - getGroupUsed(u.group);
+        if (q * (u.slots ?? 1) > room) return `جای خالی کافی نیست (${formatNumber(Math.max(0, room))} جا خالی است؛ پایگاه را ارتقا دهید).`;
+        return "";
+    };
+
+    const update = () => {
+        $("#pq-price").textContent = formatMoney(u.cost * qty);
+        $("#pq-mp").textContent = formatNumber(u.manpower * qty);
+        $("#pq-res").textContent = qty > 0 ? upkeepText(u, qty) : "—";
+        const warn = warnFor(Math.max(qty, 1));
+        $("#pq-warn").textContent = warn;
+        goBtn.disabled = qty < 1 || !!warn;
+    };
+
+    const setQty = (n, syncInput = true) => {
+        qty = Math.max(0, Math.min(Math.floor(n) || 0, 1_000_000_000));
+        if (syncInput) inp.value = String(qty);
+        update();
+    };
+
+    inp.addEventListener("input", () => {
+        const digits = toLatinDigits(inp.value).replace(/\D/g, "");
+        inp.value = digits;
+        setQty(digits === "" ? 0 : parseInt(digits, 10), false);
+    });
+    inp.addEventListener("blur", () => { inp.value = String(qty); });
+
+    $("[data-act='dec']").onclick = () => setQty(Math.max(1, qty - 1));
+    $("[data-act='inc']").onclick = () => setQty(qty + 1);
+    $("[data-act='max']").onclick = () => setQty(calcMaxProducible(u));
+    ov.querySelectorAll(".pq-quick").forEach(b => { b.onclick = () => setQty(Number(b.dataset.set)); });
+
+    const close = () => ov.remove();
+    $(".produce-close").onclick = close;
+    ov.addEventListener("click", e => { if (e.target === ov) close(); });
+
+    goBtn.onclick = async () => {
+        if (qty < 1) return;
+        goBtn.disabled = true;
+        const ok = await trainUnit(uid_, qty);
+        if (ok) close(); else update();
+    };
+
     document.body.appendChild(ov);
-    ov.addEventListener("click", e => { if (e.target === ov) closeInfraSheet(); });
-    ov.querySelector(".is-close").onclick = closeInfraSheet;
-    ov.querySelector(".modal-cancel").onclick = closeInfraSheet;
+    update();
 }
 
 async function trainUnit(uid_, count) {
@@ -1149,91 +1015,14 @@ async function trainUnit(uid_, count) {
         const d = await apiPost("/api/train-unit", { unit_id: uid_, count });
         if (!d.success) { showToast(d.message || "خطا", "error"); return false; }
         player = d.player;
-        updateHomeStats(); renderArmySummary(); renderBaseCards(); renderArmyTabsCounts(); renderArmyUnitsNew();
+        updateHomeStats();
+        renderArmySummary();
+        renderBaseCards();
+        renderArmyTabsCounts();
+        renderArmyUnitsNew();
+        showToast(`${formatNumber(count)} × ${ARMY_UNITS[uid_]?.name || ""} تولید شد.`, "success");
         return true;
     } catch (e) { showToast("خطا."); return false; }
-}
-
-function unitCost(u) { return u.cost; }
-function trainLimits(u) {
-    const c = unitCost(u);
-    const caps = [getGroupCapacity(u.group) - getGroupUsed(u.group),
-        Math.floor((player.money ?? 0) / c), Math.floor((player.manpower ?? 0) / u.manpower)];
-    Object.entries(u.resources || {}).forEach(([k, a]) => caps.push(Math.floor((player.resources?.[k] ?? 0) / a)));
-    return Math.max(0, Math.min(...caps));
-}
-
-// پنجرهٔ تولید: عدد با − / + / حداکثر، دکمه‌های ۱ و ۱۰، اطلاعات و قیمت کل بر اساس تعداد
-function openTrainSheet(uid_) {
-    const u = ARMY_UNITS[uid_]; if (!u || !player) return;
-    closeInfraSheet();
-    const cost = unitCost(u), capLeft = Math.max(0, getGroupCapacity(u.group) - getGroupUsed(u.group));
-    const ov = document.createElement("div");
-    ov.id = "infra-sheet"; ov.className = "modal-overlay";
-    ov.innerHTML = `
-        <div class="ic-sheet">
-            <div class="is-head">
-                <div class="ic-hex"><span>${GROUP_ICONS[u.group] || "🪖"}</span></div>
-                <div class="is-titles">
-                    <div class="is-name">${u.name}</div>
-                    <div class="is-sub">حمله ${u.attack} · دفاع ${Math.round(u.defense * (player.def_mult?.[u.group] ?? 1))} · ظرفیت آزاد ${formatNumber(capLeft)}</div>
-                </div>
-                <button class="is-close" aria-label="بستن">✕</button>
-            </div>
-            <div class="tr-qty">
-                <button class="tr-step" data-d="-1">−</button>
-                <input class="tr-input" type="number" inputmode="numeric" min="1" value="1">
-                <button class="tr-step" data-d="1">+</button>
-                <button class="tr-max">حداکثر</button>
-            </div>
-            <div class="tr-quick"><button data-n="1">۱</button><button data-n="10">۱۰</button></div>
-            <div class="is-rows" id="tr-rows"></div>
-            <div class="is-price" id="tr-price"></div>
-            <div class="modal-actions">
-                <button class="modal-cancel">انصراف</button>
-                <button class="modal-ok" id="tr-ok">تولید</button>
-            </div>
-        </div>`;
-    document.body.appendChild(ov);
-    const inp = ov.querySelector(".tr-input"), okBtn = ov.querySelector("#tr-ok");
-    const getN = () => Math.max(0, Math.floor(Number(inp.value) || 0));
-    const update = () => {
-        const n = getN(), rows = [];
-        rows.push(`<div class="is-row"><span>تعداد فعلی</span><b>${formatNumber(player.units?.[uid_] ?? 0)}</b></div>`);
-        Object.entries(u.daily || {}).forEach(([k, d]) =>
-            rows.push(`<div class="is-row"><span>🔁 مصرف روزانه · ${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}</span><b>${formatNumber(d * n)} <small>(هر عدد ${formatNumber(d)})</small></b></div>`));
-        if (u.transport_capacity) rows.push(`<div class="is-row"><span>🚚 ظرفیت حمل</span><b>${formatNumber(u.transport_capacity)}</b></div>`);
-        const row = (label, need, have, money) => {
-            const bad = need > have;
-            rows.push(`<div class="is-row ${bad ? "is-bad" : ""}"><span>${label}</span><b>${money ? formatMoney(need) : formatNumber(need)} <small>(موجود: ${money ? formatMoney(have) : formatNumber(have)})</small></b></div>`);
-            return bad;
-        };
-        let bad = false;
-        bad = row("💰 هزینه", cost * n, player.money ?? 0, true) || bad;
-        bad = row("👥 نیروی انسانی", u.manpower * n, Math.floor(player.manpower ?? 0), false) || bad;
-        Object.entries(u.resources || {}).forEach(([k, a]) => {
-            bad = row(`${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}`, a * n, Math.floor(player.resources?.[k] ?? 0), false) || bad;
-        });
-        if (n > capLeft) { bad = true; rows.push(`<div class="is-row is-bad"><span>📦 ظرفیت آزاد</span><b>${formatNumber(capLeft)}</b></div>`); }
-        ov.querySelector("#tr-rows").innerHTML = rows.join("");
-        ov.querySelector("#tr-price").className = "is-price" + (bad ? " is-bad" : "");
-        ov.querySelector("#tr-price").innerHTML = `<span>قیمت ${formatNumber(n)} عدد</span><b>${formatMoney(cost * n)}</b>`;
-        okBtn.disabled = bad || n < 1;
-        okBtn.textContent = n < 1 ? "تعداد را وارد کنید" : bad ? "امکان تولید نیست" : `تولید ${formatNumber(n)} عدد`;
-    };
-    ov.querySelectorAll(".tr-step").forEach(b => b.onclick = () => { inp.value = Math.max(1, getN() + Number(b.dataset.d)); update(); });
-    ov.querySelectorAll(".tr-quick button").forEach(b => b.onclick = () => { inp.value = b.dataset.n; update(); });
-    ov.querySelector(".tr-max").onclick = () => { inp.value = Math.max(1, trainLimits(u)); update(); };
-    inp.addEventListener("input", update);
-    ov.addEventListener("click", e => { if (e.target === ov) closeInfraSheet(); });
-    ov.querySelector(".is-close").onclick = closeInfraSheet;
-    ov.querySelector(".modal-cancel").onclick = closeInfraSheet;
-    okBtn.onclick = async () => {
-        if (okBtn.disabled) return;
-        okBtn.disabled = true;
-        if (await trainUnit(uid_, getN())) closeInfraSheet(); else update();
-    };
-    update();
 }
 
 /* =========================================================
@@ -1246,8 +1035,133 @@ document.querySelectorAll(".war-tab").forEach(tab => {
         document.querySelectorAll(".war-panel").forEach(p => p.classList.add("hidden"));
         const panel = document.getElementById(tab.dataset.warTab);
         if (panel) panel.classList.remove("hidden");
+        if (tab.dataset.warTab === "war-satellite-panel") renderSatellitePanel();
     });
 });
+
+/* ---------- ماهواره ---------- */
+let lastCountryScan = null;
+
+function satState() {
+    const built = (player?.infra?.satellite?.level ?? 0) > 0;
+    const sat = player?.satellite || { launched: false, scans: 0 };
+    return { built, launched: !!sat.launched, scans: sat.scans || 0 };
+}
+
+function unitChipsHtml(units) {
+    const parts = Object.entries(units || {}).filter(([, n]) => n > 0)
+        .map(([k, n]) => `<span class="sat-chip">${ARMY_UNITS[k]?.name || k} ${formatNumber(n)}</span>`);
+    return parts.length ? `<div class="sat-chips">${parts.join("")}</div>` : `<div class="sat-muted">نیرویی نیست</div>`;
+}
+
+function renderSatellitePanel() {
+    const c = document.getElementById("war-satellite-content");
+    if (!c || !player) return;
+    const { built, launched, scans } = satState();
+    const costs = player.satellite_costs || {};
+    c.innerHTML = "";
+
+    if (!built) {
+        const cost = player.infra?.satellite?.next?.cost ?? 0;
+        c.innerHTML = `<div class="sat-card">
+            <div class="sat-title">🛰️ ماهواره</div>
+            <div class="sat-text">ماهواره هنوز ساخته نشده. آن را در «زیرساخت › استراتژی» بسازید (${formatMoney(cost)}).</div>
+            <button class="sat-btn" id="sat-go-infra">رفتن به زیرساخت</button>
+        </div>`;
+        c.querySelector("#sat-go-infra").onclick = async () => { await openInfrastructureMenu(); renderInfraTab("strategic"); };
+        return;
+    }
+
+    if (launched) {
+        const badge = document.createElement("div");
+        badge.className = "sat-scans";
+        badge.innerHTML = `🛰️ <strong>${formatNumber(scans)}</strong> اسکن موجود`;
+        c.appendChild(badge);
+    }
+
+    const launch = document.createElement("div");
+    launch.className = "sat-card";
+    launch.innerHTML = `
+        <div class="sat-title">🚀 پرتاب ماهواره</div>
+        <div class="sat-text">${launched ? "برای دریافت اسکن‌های بیشتر دوباره پرتاب کنید." : "با پرتاب ماهواره اسکن‌ها فعال می‌شوند."} هر پرتاب ${formatNumber(costs.scans_per_launch ?? 5)} اسکن اضافه می‌کند.</div>
+        <button class="sat-btn" id="sat-launch">🚀 پرتاب — ${formatMoney(costs.launch ?? 0)}</button>`;
+    launch.querySelector("#sat-launch").onclick = launchSatellite;
+    c.appendChild(launch);
+
+    if (!launched) return;
+
+    const info = document.createElement("div");
+    info.className = "sat-text sat-section-title";
+    info.textContent = `🔍 اسکن کشور — ۱ اسکن + ${formatMoney(costs.country_scan ?? 0)}`;
+    c.appendChild(info);
+
+    if (lastCountryScan) c.appendChild(renderCountryScanCard(lastCountryScan));
+
+    let any = false;
+    Object.keys(COUNTRY_NAMES).forEach(cid => {
+        if (cid === selectedCountry || !countries[cid]?.taken) return;
+        any = true;
+        const card = document.createElement("div");
+        card.className = "war-target-card";
+        card.innerHTML = `
+            <div class="war-target-top">
+                <div class="flag-wrap"><img class="flag-img" src="${countryImageUrl(cid)}" alt=""></div>
+                <span class="war-target-name">${COUNTRY_NAMES[cid]}</span>
+            </div>
+            <button class="war-attack-button" ${scans < 1 ? "disabled" : ""}>🔍 اسکن</button>`;
+        card.querySelector("button").onclick = () => scanCountry(cid);
+        c.appendChild(card);
+    });
+    if (!any) {
+        const e = document.createElement("div");
+        e.className = "diplomacy-item-empty";
+        e.textContent = "هنوز بازیکن دیگری برای اسکن وجود ندارد.";
+        c.appendChild(e);
+    }
+}
+
+function renderCountryScanCard(s) {
+    const el = document.createElement("div");
+    el.className = "sat-result";
+    const sites = (s.sites || []).map(x => `
+        <div class="sat-site"><div class="sat-site-name">📍 ${x.name}</div>${unitChipsHtml(x.units)}</div>`).join("");
+    el.innerHTML = `
+        <div class="sat-result-head"><img class="flag-img" src="${countryImageUrl(s.country)}" alt="">
+            <strong>آخرین اسکن · ${COUNTRY_NAMES[s.country] || s.country}</strong></div>
+        <div class="sat-row"><span>💰 درآمد روزانه</span><strong>${formatMoney(s.daily_income)}</strong></div>
+        <div class="sat-row"><span>⚔️ قدرت کل نظامی</span><strong>${formatNumber(s.total_power)}</strong></div>
+        <div class="sat-sub">🏠 در خانه (قدرت ${formatNumber(s.home_power)})</div>
+        ${unitChipsHtml(s.home_units)}
+        <div class="sat-sub">📍 در مواضع (${formatNumber((s.sites || []).length)})</div>
+        ${sites || `<div class="sat-muted">موضعی در اختیار ندارد</div>`}`;
+    return el;
+}
+
+async function launchSatellite() {
+    const cost = player?.satellite_costs?.launch ?? 0;
+    if (!confirm(`پرتاب ماهواره (${formatMoney(cost)}). ادامه؟`)) return;
+    try {
+        const d = await apiPost("/api/satellite/launch", {});
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        player = d.player;
+        updateHomeStats();
+        renderSatellitePanel();
+        showToast("ماهواره پرتاب شد.", "success");
+    } catch (e) { showToast("خطا."); }
+}
+
+async function scanCountry(cid) {
+    const cost = player?.satellite_costs?.country_scan ?? 0;
+    if (!confirm(`اسکن ${COUNTRY_NAMES[cid]}: ۱ اسکن و ${formatMoney(cost)} مصرف می‌شود. ادامه؟`)) return;
+    try {
+        const d = await apiPost("/api/satellite/scan-country", { country: cid });
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        player = d.player;
+        lastCountryScan = d.scan;
+        updateHomeStats();
+        renderSatellitePanel();
+    } catch (e) { showToast("خطا."); }
+}
 
 function openWarPage() {
     showGamePage("war");
@@ -1352,8 +1266,13 @@ async function loadWarData() {
 }
 
 function openBattleModal(wid) {
-    const hasCarrier = (player?.units?.aircraft_carrier || 0) > 0;
-    const airLabel = hasCarrier ? "✈️ هوایی (تعداد)" : "✈️ هوایی — بدون ناو هواپیمابر غیرفعال";
+    const myUnits = player?.units || {};
+    const carriers = myUnits.aircraft_carrier || 0;
+    // بالگرد بدون ناو هم می‌تواند حمله کند؛ جنگنده و بمب‌افکن به ناو هواپیمابر نیاز دارند
+    const hasCarrier = Object.entries(ARMY_UNITS).some(([k, x]) =>
+        x.group === "air" && (myUnits[k] || 0) > 0 && (!x.needs_carrier || carriers > 0));
+    const carrierCap = ARMY_UNITS.aircraft_carrier?.transport_capacity ?? 50;
+    const airLabel = hasCarrier ? "✈️ هوایی (تعداد)" : "✈️ هوایی — بدون بالگرد یا ناو هواپیمابر غیرفعال";
     const ov = document.createElement("div");
     ov.className = "modal-overlay";
     ov.innerHTML = `
@@ -1365,6 +1284,7 @@ function openBattleModal(wid) {
             <input id="bt-naval" class="diplomacy-input" type="number" value="0" min="0">
             <label class="diplomacy-label">${airLabel}</label>
             <input id="bt-air" class="diplomacy-input" type="number" value="0" min="0" ${hasCarrier ? "" : "disabled"}>
+            <div class="produce-hint">جنگنده و بمب‌افکن فقط به اندازهٔ ظرفیت ناوها (هر ناو ${carrierCap} جا؛ الان ${formatNumber(carriers * carrierCap)} جا) شرکت می‌کنند. بالگرد به ناو نیاز ندارد.</div>
             <div class="modal-actions">
                 <button class="modal-cancel">انصراف</button>
                 <button class="modal-ok">اجرای نبرد</button>
@@ -2400,7 +2320,43 @@ function showSiteInfo(site) {
     } else {
         actionBtn.classList.add("hidden");
     }
+
+    // اسکن ماهواره‌ای (فقط موضعی که دست بازیکن دیگری است)
+    const scanBtn = document.getElementById("map-info-scan");
+    const scanRes = document.getElementById("map-info-scan-result");
+    scanRes.classList.add("hidden"); scanRes.innerHTML = "";
+    const st = satState();
+    if (st.built && site.owner && site.owner !== selectedCountry) {
+        scanBtn.classList.remove("hidden");
+        scanBtn.textContent = `🛰️ اسکن (${formatNumber(st.scans)} باقی)`;
+        scanBtn.onclick = () => scanSite(site);
+    } else {
+        scanBtn.classList.add("hidden");
+    }
     panel.classList.remove("hidden");
+}
+
+async function scanSite(site) {
+    const st = satState();
+    if (!st.launched) { showToast("ابتدا ماهواره را در جنگ › ماهواره پرتاب کنید."); return; }
+    if (st.scans < 1) { showToast("اسکن باقی نمانده؛ ماهواره جدید پرتاب کنید."); return; }
+    if (!confirm("۱ اسکن مصرف می‌شود. ادامه؟")) return;
+    try {
+        const d = await apiPost("/api/satellite/scan-site", { site_id: site.id });
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        player = d.player;
+        const s = d.scan;
+        const scanBtn = document.getElementById("map-info-scan");
+        const scanRes = document.getElementById("map-info-scan-result");
+        scanBtn.textContent = `🛰️ اسکن (${formatNumber(satState().scans)} باقی)`;
+        const hasUnits = Object.keys(s.units || {}).length > 0;
+        scanRes.innerHTML = hasUnits
+            ? `<div class="sat-row"><span>⚔️ قدرت کل مستقر</span><strong>${formatNumber(s.total_power)}</strong></div>
+               <div class="sat-row"><span>🛡️ قدرت دفاعی</span><strong>${formatNumber(s.defense_power)}</strong></div>
+               ${unitChipsHtml(s.units)}`
+            : `<div class="sat-muted">هیچ نیرویی مستقر نیست.</div>`;
+        scanRes.classList.remove("hidden");
+    } catch (e) { showToast("خطا."); }
 }
 
 async function captureSite(siteId) {
