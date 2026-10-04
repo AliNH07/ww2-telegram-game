@@ -1205,7 +1205,9 @@ function openTrainSheet(uid_) {
         rows.push(`<div class="is-row"><span>تعداد فعلی</span><b>${formatNumber(player.units?.[uid_] ?? 0)}</b></div>`);
         Object.entries(u.daily || {}).forEach(([k, d]) =>
             rows.push(`<div class="is-row"><span>🔁 مصرف روزانه · ${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}</span><b>${formatNumber(d * n)} <small>(هر عدد ${formatNumber(d)})</small></b></div>`));
-        if (u.transport_capacity) rows.push(`<div class="is-row"><span>🚚 ظرفیت حمل</span><b>${formatNumber(u.transport_capacity)}</b></div>`);
+        if (u.transport_capacity) rows.push(`<div class="is-row"><span>🚚 ظرفیت حمل (تانک/پیاده در دریا)</span><b>${formatNumber(u.transport_capacity)}</b></div>`);
+        if (u.aircraft_capacity) rows.push(`<div class="is-row"><span>🛬 ظرفیت هواپیما در دریا</span><b>${formatNumber(u.aircraft_capacity)}</b></div>`);
+        if (u.refuel_capacity) rows.push(`<div class="is-row"><span>⛽ ظرفیت سوخت‌رسانی در خشکی</span><b>${formatNumber(u.refuel_capacity)}</b></div>`);
         const row = (label, need, have, money) => {
             const bad = need > have;
             rows.push(`<div class="is-row ${bad ? "is-bad" : ""}"><span>${label}</span><b>${money ? formatMoney(need) : formatNumber(need)} <small>(موجود: ${money ? formatMoney(have) : formatNumber(have)})</small></b></div>`);
@@ -1383,6 +1385,41 @@ function dispatchPanelHtml() {
     return h + `</div>`;
 }
 
+/* قوانین اعزام (آینهٔ قوانین سرور): دریا/خشکی، ناو ترابری، ناو هواپیمابر، سوخت‌رسان */
+function dispatchRuleErrors(units, zone) {
+    const errs = [], U = k => ARMY_UNITS[k] || {}, n = k => Math.max(0, units[k] || 0);
+    const sum = (...ids) => ids.reduce((a, k) => a + n(k), 0);
+    const banned = Object.keys(units).filter(k => n(k) > 0 && U(k).group &&
+        (U(k).group === "missile" || (zone === "land" && U(k).group === "naval")));
+    if (banned.length) errs.push(`این یگان‌ها نمی‌توانند به ${zone === "land" ? "خشکی" : "این موضع"} بروند: ${banned.map(unitName).join("، ")}`);
+    if (zone === "sea") {
+        const g = sum("infantry", "tank"), c1 = n("transport_ship") * (U("transport_ship").transport_capacity || 0);
+        if (g > c1) errs.push(`در دریا، تانک و پیاده‌نظام به ${unitName("transport_ship")} نیاز دارند (ظرفیت ${formatNumber(c1)} از ${formatNumber(g)} یگان)`);
+        const p = sum("fighter", "bomber", "air_tanker"), c2 = n("aircraft_carrier") * (U("aircraft_carrier").aircraft_capacity || 0);
+        if (p > c2) errs.push(`در دریا، جنگنده و بمب‌افکن به ${unitName("aircraft_carrier")} نیاز دارند (ظرفیت ${formatNumber(c2)} از ${formatNumber(p)} هواپیما)`);
+    } else if (zone === "land") {
+        const jets = sum("fighter", "bomber"), c = n("air_tanker") * (U("air_tanker").refuel_capacity || 0);
+        if (jets > c) errs.push(`در خشکی، جنگنده و بمب‌افکن به ${unitName("air_tanker")} نیاز دارند (ظرفیت ${formatNumber(c)} از ${formatNumber(jets)} هواپیما)`);
+    }
+    return errs;
+}
+
+function dispatchErrorsFor(from, to, picked) {
+    if (!to || to === "home") return [];
+    const dst = warSites.find(s => s.id === to);
+    const combined = { ...picked };
+    if (dst?.owner === selectedCountry) Object.entries(poolOf(to)).forEach(([k, v]) => combined[k] = (combined[k] || 0) + v);
+    const errs = dispatchRuleErrors(combined, dst?.zone || (dst?.kind === "strait" ? "sea" : "land"));
+    if (from && from !== "home") {
+        const zs = warSites.find(s => s.id === from)?.zone || (warSites.find(s => s.id === from)?.kind === "strait" ? "sea" : "land");
+        const before = poolOf(from), after = {};
+        Object.keys(before).forEach(k => after[k] = before[k] - (picked[k] || 0));
+        if (!dispatchRuleErrors(before, zs).length && dispatchRuleErrors(after, zs).length)
+            errs.push("با خروج این یگان‌ها، نیروهای باقی‌مانده در مبدأ بدون پشتیبان می‌مانند");
+    }
+    return errs;
+}
+
 function updateDpSummary() {
     const sum = document.getElementById("dp-summary"), go = document.getElementById("dp-go");
     if (!sum || !go) return;
@@ -1399,8 +1436,11 @@ function updateDpSummary() {
     }
     const atk = Object.entries(dispatchSel.units).reduce((a, [k, n]) => a + n * (ARMY_UNITS[k]?.attack || 0), 0);
     const hostile = dst?.owner && dst.owner !== selectedCountry;
-    sum.innerHTML = `<div>${kind}</div><div>${formatNumber(total)} یگان انتخاب شده${hostile ? ` · قدرت حمله ${formatNumber(atk)}` : ""}</div>`;
-    go.disabled = total < 1;
+    const picked = Object.fromEntries(Object.entries(dispatchSel.units).filter(([, v]) => v > 0));
+    const errs = total > 0 ? dispatchErrorsFor(dispatchSel.from, to, picked) : [];
+    sum.innerHTML = `<div>${kind}</div><div>${formatNumber(total)} یگان انتخاب شده${hostile ? ` · قدرت حمله ${formatNumber(atk)}` : ""}</div>`
+        + errs.map(e => `<div class="dp-error">⚠️ ${e}</div>`).join("");
+    go.disabled = total < 1 || errs.length > 0;
 }
 
 function renderForcesTab() {
