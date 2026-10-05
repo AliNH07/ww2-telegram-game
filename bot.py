@@ -51,7 +51,7 @@ SEASON_HINTS = {
 STARTING_RESOURCES = {"food": 5_000, "steel": 0, "uranium": 0, "oil": 5_000}
 RESOURCE_NAMES = {"food": "غذا", "steel": "آهن", "uranium": "اورانیوم", "oil": "نفت"}
 GROUP_NAMES = {"land": "زمینی", "naval": "دریایی", "air": "هوایی",
-               "power": "برق", "manpower": "نیروی انسانی", "resource": "منابع", "missile": "موشکی"}
+               "power": "برق", "manpower": "نیروی انسانی", "resource": "منابع", "missile": "موشکی", "welfare": "رفاه"}
 TREATY_TYPE_NAMES = {"alliance": "پیمان اتحاد", "non_aggression": "پیمان عدم تجاوز"}
 ANN_COSTS = {1: 0, 2: 0, 3: 10_000, 4: 400_000}
 WAR_PENALTY_ALLIANCE = 2_000_000
@@ -159,7 +159,7 @@ INFRASTRUCTURE = {
     "resource_steel_mill": {
         "power_required": 5,
         "name": "کارخانه آهن", "group": "resource", "resource_key": "steel", "icon": "⚙️",
-        "desc": "آهن تولید می‌کند. پایهٔ صنعت و ساخت تانک است.",
+        "desc": "آهن تولید می‌کند؛ پایهٔ صنعت و ساخت تجهیزات سنگین است.",
         "levels": [L(cost=1_200_000, production=50_000), L(cost=2_700_000, production=130_000), L(cost=6_000_000, production=300_000), L(cost=12_000_000, production=700_000), L(cost=22_500_000, production=1_500_000)],
     },
     "resource_uranium_mine": {
@@ -229,6 +229,38 @@ INFRASTRUCTURE = {
         "bonus": {"defense": 0.05},
         "levels": [L(cost=2_400_000), L(cost=5_040_000), L(cost=10_560_000), L(cost=19_200_000), L(cost=32_400_000)],
     },
+    # ==================== رفاه ====================
+    "welfare_hospital": {
+        "power_required": 3, "name": "بیمارستان", "group": "welfare", "icon": "🏥",
+        "desc": "سلامت عمومی را بالا می‌برد و احتمال بیماری را کم می‌کند.",
+        "welfare": 2.0, "disaster_protection": {"disease": 0.10},
+        "levels": [L(cost=300_000), L(cost=650_000), L(cost=1_400_000), L(cost=2_900_000), L(cost=5_500_000)],
+    },
+    "welfare_police": {
+        "power_required": 2, "name": "ایستگاه پلیس", "group": "welfare", "icon": "👮",
+        "desc": "امنیت را بالا می‌برد و احتمال موج جرم و ناامنی را کم می‌کند.",
+        "welfare": 1.5, "disaster_protection": {"crime": 0.12},
+        "levels": [L(cost=220_000), L(cost=500_000), L(cost=1_050_000), L(cost=2_200_000), L(cost=4_200_000)],
+    },
+    "welfare_housing": {
+        "power_required": 2, "name": "شهرک مسکونی", "group": "welfare", "icon": "🏠",
+        "desc": "کیفیت زندگی و ثبات اجتماعی را افزایش می‌دهد.",
+        "welfare": 1.5, "disaster_protection": {"social": 0.08},
+        "levels": [L(cost=350_000), L(cost=800_000), L(cost=1_700_000), L(cost=3_600_000), L(cost=7_000_000)],
+    },
+    "welfare_metro": {
+        "power_required": 4, "name": "مترو", "group": "welfare", "icon": "🚇",
+        "desc": "حمل‌ونقل شهری را بهتر می‌کند و رفاه عمومی را بالا می‌برد.",
+        "welfare": 1.0, "disaster_protection": {"social": 0.05},
+        "levels": [L(cost=500_000), L(cost=1_100_000), L(cost=2_400_000), L(cost=5_000_000), L(cost=9_500_000)],
+    },
+    "welfare_university": {
+        "power_required": 3, "name": "دانشگاه", "group": "welfare", "icon": "🎓",
+        "desc": "دانش و سرمایه انسانی را بالا می‌برد و رفاه کشور را تقویت می‌کند.",
+        "welfare": 2.0, "disaster_protection": {"disease": 0.04, "social": 0.06},
+        "levels": [L(cost=450_000), L(cost=1_000_000), L(cost=2_200_000), L(cost=4_600_000), L(cost=8_800_000)],
+    },
+
     "satellite": {
         "power_required": 6,
         "name": "ماهواره", "group": "strategy", "icon": "🛰️",
@@ -265,8 +297,8 @@ ECONOMY = {
         "levels": [L(cost=280_000, income=70_000), L(cost=700_000, income=180_000), L(cost=1_600_000, income=420_000), L(cost=3_400_000, income=920_000), L(cost=6_800_000, income=1_850_000)],
     },
     "eco_steel": {
-        "name": "کارخانه آهن", "group": "eco", "icon": "⚙️",
-        "desc": "آهن را به محصولات صنعتی تبدیل می‌کند.",
+        "name": "کارخانه فولاد", "group": "eco", "icon": "⚙️",
+        "desc": "فولاد را به محصولات صنعتی تبدیل می‌کند.",
         "power_required": 18,
         "levels": [L(cost=420_000, income=100_000), L(cost=1_050_000, income=260_000), L(cost=2_400_000, income=600_000), L(cost=5_100_000, income=1_300_000), L(cost=10_200_000, income=2_600_000)],
     },
@@ -321,7 +353,7 @@ ARMY_UNITS = {
     "air_tanker": {"name": "هواپیمای سوخت‌رسان", "group": "air", "requires": ["air_airport", "air_arsenal"],
         "cost": 220_000, "manpower": 120, "resources": {"oil": 250, "steel": 120},
         "attack": 2, "defense": 20, "refuel_capacity": 20},
-    # موشک‌ها: علاوه بر هزینهٔ یک‌باره، هر موشکِ موجود هر روز غذا، نفت و آهن مصرف می‌کند
+    # موشک‌ها: علاوه بر هزینهٔ یک‌باره، هر موشکِ موجود هر روز غذا، نفت و فولاد مصرف می‌کند
     "cruise_missile": {"name": "موشک کروز", "group": "missile", "requires": ["missile_depot", "missile_factory"],
         "min_level": {"missile_factory": 1},
         "cost": 400_000, "manpower": 100, "resources": {"steel": 300, "oil": 200, "food": 50},
@@ -350,12 +382,12 @@ MAP_RESOURCES = {
     "oil_texas":      {"type": "oil", "zone": "land", "name": "میدان نفتی پرمین (تگزاس)",           "lon": -102.0,"lat": 31.9,  "production": 4_000_000},
     "oil_ghawar":     {"type": "oil", "zone": "land", "name": "میدان نفتی غوار (عربستان)",          "lon": 49.4,  "lat": 25.4,  "production": 5_000_000},
     "oil_siberia":    {"type": "oil", "zone": "land", "name": "میدان نفتی سیبری غربی",              "lon": 76.7,  "lat": 61.1,  "production": 4_000_000},
-    # ---------- آهن ----------
-    "steel_ural":     {"type": "steel", "zone": "land", "name": "معدن آهن اورال (ماگنیتوگورسک)",  "lon": 59.1,  "lat": 53.4,  "production": 3_000_000},
-    "steel_ruhr":     {"type": "steel", "zone": "land", "name": "معدن آهن رور",                    "lon": 7.0,   "lat": 51.4,  "production": 4_000_000},
-    "steel_brazil":   {"type": "steel", "zone": "land", "name": "معدن آهن برزیل (کاراجاس)",        "lon": -50.2, "lat": -6.1,  "production": 3_500_000},
-    "steel_mesabi":   {"type": "steel", "zone": "land", "name": "معدن آهن مسابی (آمریکا)",         "lon": -92.6, "lat": 47.5,  "production": 3_000_000},
-    "steel_anshan":   {"type": "steel", "zone": "land", "name": "معدن آهن آنشان (چین)",            "lon": 123.0, "lat": 41.1,  "production": 3_500_000},
+    # ---------- فولاد ----------
+    "steel_ural":     {"type": "steel", "zone": "land", "name": "معدن فولاد اورال (ماگنیتوگورسک)",  "lon": 59.1,  "lat": 53.4,  "production": 3_000_000},
+    "steel_ruhr":     {"type": "steel", "zone": "land", "name": "معدن فولاد رور",                    "lon": 7.0,   "lat": 51.4,  "production": 4_000_000},
+    "steel_brazil":   {"type": "steel", "zone": "land", "name": "معدن فولاد برزیل (کاراجاس)",        "lon": -50.2, "lat": -6.1,  "production": 3_500_000},
+    "steel_mesabi":   {"type": "steel", "zone": "land", "name": "معدن فولاد مسابی (آمریکا)",         "lon": -92.6, "lat": 47.5,  "production": 3_000_000},
+    "steel_anshan":   {"type": "steel", "zone": "land", "name": "معدن فولاد آنشان (چین)",            "lon": 123.0, "lat": 41.1,  "production": 3_500_000},
     # ---------- اورانیوم ----------
     "uranium_kazakh":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم قزاقستان",          "lon": 72.2,  "lat": 52.4,  "production": 2_500_000},
     "uranium_canada":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم کانادا (آتاباسکا)", "lon": -105.6,"lat": 57.2,  "production": 2_000_000},
@@ -481,10 +513,69 @@ def ensure_player_fields(player):
         elif k not in ECONOMY: del lv_map[k]
     player.setdefault("map_holdings", {})
     player.setdefault("strait_holdings", {})
-    player.setdefault("announcements", {}); player.setdefault("land_trade_open", True)
+    player.setdefault("announcements", {})
     player.setdefault("is_eliminated", False)
     player.setdefault("scans", 0)
     player.setdefault("scan_active", {})
+    player.setdefault("country_events", [])
+    player.setdefault("last_disaster_check", None)
+    player.setdefault("country_welfare_damage", 0.0)
+
+DISASTER_DEFS = {
+    "drought": {"title": "خشکسالی", "text": "خشکسالی بخشی از رفاه کشور را کاهش داد.", "base": 0.10, "loss": 1.2, "kind": "دشواری"},
+    "earthquake": {"title": "زلزله", "text": "زلزله به زیرساخت‌ها فشار وارد کرد و رفاه را کاهش داد.", "base": 0.07, "loss": 1.6, "kind": "فاجعه"},
+    "disease": {"title": "موج بیماری", "text": "موج بیماری رفاه عمومی را موقتاً کاهش داد.", "base": 0.09, "loss": 1.0, "kind": "سلامت"},
+    "flood": {"title": "سیل", "text": "سیل بخشی از زیرساخت‌های رفاهی را مختل کرد.", "base": 0.06, "loss": 1.3, "kind": "فاجعه"},
+    "crime": {"title": "موج جرم", "text": "افزایش جرم و ناامنی رفاه کشور را کاهش داد.", "base": 0.08, "loss": 0.9, "kind": "امنیت"},
+}
+COUNTRY_DISASTER_BIAS = {
+    "germany": {"drought": 0.75, "earthquake": 0.65, "disease": 1.0, "flood": 1.15, "crime": 0.9},
+    "britain": {"drought": 0.60, "earthquake": 0.35, "disease": 1.0, "flood": 1.35, "crime": 0.85},
+    "ussr": {"drought": 1.20, "earthquake": 0.85, "disease": 1.05, "flood": 1.10, "crime": 1.0},
+    "usa": {"drought": 1.25, "earthquake": 1.15, "disease": 0.95, "flood": 1.20, "crime": 0.95},
+    "france": {"drought": 1.10, "earthquake": 0.55, "disease": 1.0, "flood": 1.15, "crime": 0.9},
+    "italy": {"drought": 1.20, "earthquake": 1.35, "disease": 1.0, "flood": 1.05, "crime": 1.0},
+    "china": {"drought": 1.25, "earthquake": 1.25, "disease": 1.10, "flood": 1.35, "crime": 1.0},
+    "japan": {"drought": 0.75, "earthquake": 1.70, "disease": 1.0, "flood": 1.25, "crime": 0.85},
+}
+
+def welfare_stats(player):
+    total = 0.0; protection = {k: 0.0 for k in DISASTER_DEFS}
+    for iid, item in INFRASTRUCTURE.items():
+        if item.get("group") != "welfare": continue
+        lv = min(get_infra_level(player, iid), len(item["levels"]))
+        if lv <= 0: continue
+        total += float(item.get("welfare", 0)) * lv
+        for k, v in item.get("disaster_protection", {}).items(): protection[k] += v * lv
+    # 1 welfare point = 1% investment-income bonus, capped at +50%.
+    effective = max(0.0, total - float(player.get("country_welfare_damage", 0.0)))
+    bonus = min(50.0, effective)
+    return {"points": round(effective, 1), "bonus_pct": round(bonus, 1),
+            "protection": {k: round(min(0.90, v), 3) for k, v in protection.items()}}
+
+def maybe_trigger_disaster(player):
+    if not player.get("country") or player.get("is_eliminated"): return None
+    now = utcnow()
+    last = parse_dt(player.get("last_disaster_check"))
+    if last and (now - last).total_seconds() < 86400: return None
+    player["last_disaster_check"] = now.isoformat()
+    wf = welfare_stats(player)
+    bias = COUNTRY_DISASTER_BIAS.get(player.get("country"), {})
+    candidates = []
+    for key, d in DISASTER_DEFS.items():
+        chance = d["base"] * bias.get(key, 1.0)
+        chance *= (1.0 - wf["protection"].get(key, 0.0))
+        if random.random() < chance: candidates.append(key)
+    if not candidates: return None
+    key = random.choice(candidates); d = DISASTER_DEFS[key]
+    loss = d["loss"] * max(0.25, 1.0 - wf["points"] / 100.0)
+    ev = {"id": str(uuid.uuid4()), "title": d["title"], "text": d["text"],
+          "kind": d["kind"], "loss": round(loss, 1), "at": now.isoformat()}
+    events = player.setdefault("country_events", [])
+    events.append(ev)
+    player["country_welfare_damage"] = round(float(player.get("country_welfare_damage", 0)) + loss, 2)
+    del events[:-30]
+    return ev
 
 def compute_rates(player):
     power_capacity = get_power_total(player)
@@ -506,9 +597,12 @@ def compute_rates(player):
             key = item.get("resource_key")
             if key: resource_production[key] += lvl["production"]
 
+    investment_income = 0
     for item_id, item in ECONOMY.items():
         lv = get_infra_level(player, item_id)
-        if lv > 0: income += item["levels"][lv - 1]["income"]
+        if lv > 0: investment_income += item["levels"][lv - 1]["income"]
+    wf = welfare_stats(player)
+    income += int(investment_income * (1.0 + wf["bonus_pct"] / 100.0))
 
     country = player.get("country")
 
@@ -566,6 +660,7 @@ def accrue_player(player):
     player["money"] = max(0, player.get("money", STARTING_MONEY) + rates["net_income"] * f)
     player["manpower"] = player.get("manpower", STARTING_MANPOWER) + rates["manpower_production"] * f
     ensure_player_fields(player)
+    maybe_trigger_disaster(player)
     for key, amount in rates["resource_production"].items():
         player["resources"][key] = player["resources"].get(key, 0) + amount * f
     for key, amount in rates["resource_consumption"].items():
@@ -586,6 +681,7 @@ def build_catalog_status(player, catalog):
             "icon": item.get("icon", ""),
             "desc": item.get("desc", ""),
             "resource_key": item.get("resource_key"), "bonus": item.get("bonus"),
+            "welfare": item.get("welfare", 0), "disaster_protection": item.get("disaster_protection", {}),
             "power_required": item.get("power_required"),
             "level": lv, "max_level": len(levels),
             "current": current, "next": next_info,
@@ -605,6 +701,8 @@ def serialize_player(player):
     data["manpower_production"] = rates["manpower_production"]
     data["daily_income"] = rates["net_income"]
     data["daily_upkeep"] = rates["daily_upkeep"]
+    data["welfare"] = welfare_stats(player)
+    data["country_events"] = list(reversed(player.get("country_events", [])[-20:]))
     data["infra"] = build_catalog_status(player, INFRASTRUCTURE)
     data["economy"] = build_catalog_status(player, ECONOMY)
     data["satellite_built"] = get_infra_level(player, "satellite") > 0
@@ -636,8 +734,9 @@ def create_player(user_id):
     return {"user_id": user_id, "country": None, "money": STARTING_MONEY, "army": 0,
             "manpower": STARTING_MANPOWER, "infra_levels": {},
             "units": {uid_: 0 for uid_ in ARMY_UNITS}, "resources": dict(STARTING_RESOURCES),
-            "map_holdings": {}, "strait_holdings": {}, "announcements": {}, "land_trade_open": True,
-            "is_eliminated": False, "started_at": None, "last_update": None}
+            "map_holdings": {}, "strait_holdings": {}, "announcements": {},
+            "is_eliminated": False, "started_at": None, "last_update": None,
+            "country_events": [], "last_disaster_check": None, "country_welfare_damage": 0.0}
 
 def get_player_by_country(country_id):
     for uid_, p in players.items():
@@ -660,7 +759,6 @@ def save_state():
                  "announcements": announcements[-100:], "unions": unions,
                  "private_messages": private_messages, "market_listings": market_listings,
                  "news_feed": news_feed[-200:],
-                 "straits_data": STRAITS_DATA,
                  "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:]}
         tmp = STATE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
@@ -692,9 +790,6 @@ def load_state():
         private_messages = state.get("private_messages", {})
         market_listings = state.get("market_listings", {})
         news_feed = state.get("news_feed", [])
-        for _sid, _sv in state.get("straits_data", {}).items():
-            if _sid in STRAITS_DATA:
-                STRAITS_DATA[_sid].update({"toll": _sv.get("toll", STRAITS_DATA[_sid].get("toll",0)), "closed": _sv.get("closed", STRAITS_DATA[_sid].get("closed",False))})
         site_forces = state.get("site_forces", {})
         war_events = state.get("war_events", [])
         war_history = state.get("war_history", [])
@@ -1238,8 +1333,7 @@ async def get_map_sites(request):
     for k, info in STRAITS_DATA.items():
         sites.append({"id": k, "kind": "strait", "type": "strait", "name": info["name"],
                       "lon": info["lon"], "lat": info["lat"], "income": info["income"],
-                      "zone": "sea", "owner": strait_holdings.get(k),
-                      "toll": info.get("toll", 0), "closed": info.get("closed", False)})
+                      "zone": "sea", "owner": strait_holdings.get(k)})
     return web.json_response(sites)
 
 async def capture_site(request):
@@ -1764,267 +1858,76 @@ async def get_pm(request):
     return web.json_response({"conversations": list(private_messages.get(cid, {}).keys())})
 
 # =========================================================
-# API Market — international trade
+# API Market
 # =========================================================
-TRADE_COUNTRY_COORDS = {
-    "germany": (10.45, 51.16), "france": (2.21, 46.23), "italy": (12.57, 41.87),
-    "britain": (-3.44, 55.38), "ussr": (90.00, 55.00), "usa": (-100.00, 38.00),
-    "china": (103.82, 35.86), "japan": (138.25, 36.20),
-}
-# فقط همسایهٔ مستقیم؛ کشور واسطه برای تجارت زمینی استفاده نمی‌شود.
-LAND_NEIGHBORS = {
-    frozenset(("germany", "france")), frozenset(("germany", "ussr")),
-    frozenset(("germany", "italy")), frozenset(("france", "italy")),
-    frozenset(("ussr", "china")),
-}
-# مسیرهای دریایی ساده‌شدهٔ بازی. [] یعنی مسیر مستقیم و بدون تنگه.
-SEA_ROUTE_HINTS = {
-    frozenset(("germany", "britain")): [["dover"], []],
-    frozenset(("france", "britain")): [["dover"], []],
-    frozenset(("italy", "britain")): [["gibraltar", "dover"], ["gibraltar"], []],
-    frozenset(("germany", "italy")): [["gibraltar"], []],
-    frozenset(("france", "italy")): [["gibraltar"], []],
-    frozenset(("germany", "china")): [["suez", "malacca"], ["gibraltar", "suez", "malacca"], []],
-    frozenset(("france", "china")): [["suez", "malacca"], ["gibraltar", "suez", "malacca"], []],
-    frozenset(("italy", "china")): [["suez", "malacca"], []],
-    frozenset(("britain", "china")): [["suez", "malacca"], ["gibraltar", "suez", "malacca"], []],
-    frozenset(("ussr", "japan")): [["korea"], ["taiwan"], []],
-    frozenset(("china", "japan")): [["taiwan"], ["korea"], []],
-    frozenset(("usa", "japan")): [["panama"], []],
-    frozenset(("usa", "china")): [["panama", "malacca"], ["malacca"], []],
-    frozenset(("usa", "germany")): [["panama", "gibraltar"], ["panama", "suez"], []],
-    frozenset(("usa", "france")): [["panama", "gibraltar"], ["panama", "suez"], []],
-    frozenset(("usa", "italy")): [["panama", "gibraltar"], ["panama", "suez"], []],
-    frozenset(("usa", "britain")): [["panama", "gibraltar"], []],
-    frozenset(("usa", "ussr")): [["panama", "gibraltar"], ["panama", "suez"], []],
-}
-TRADE_MODE_FACTOR = {"land": 0.65, "sea": 1.0, "air": 2.75}
-TRADE_COST_PER_1000KM_PER_1000_UNITS = {"land": 900, "sea": 1500, "air": 4200}
-
-
-def _trade_distance_km(a, b):
-    from math import radians, sin, cos, asin, sqrt
-    if a not in TRADE_COUNTRY_COORDS or b not in TRADE_COUNTRY_COORDS: return 1000.0
-    lon1, lat1 = TRADE_COUNTRY_COORDS[a]; lon2, lat2 = TRADE_COUNTRY_COORDS[b]
-    r = 6371.0
-    dlon, dlat = radians(lon2-lon1), radians(lat2-lat1)
-    x = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
-    return r * 2 * asin(sqrt(max(0, min(1, x))))
-
-
-def _land_open(cid):
-    _, p = get_player_by_country(cid)
-    return bool((p or {}).get("land_trade_open", True))
-
-
-def _war_between(a, b):
-    if not a or not b: return False
-    return any({w.get("attacker"), w.get("defender")} == {a, b}
-               for w in active_wars.values() if not w.get("resolved"))
-
-
-def _infra_ready(country, infra_id):
-    _, p = get_player_by_country(country)
-    return bool(p and get_infra_level(p, infra_id) > 0)
-
-
-def _route_candidates(a, b):
-    key = frozenset((a, b))
-    out = []
-    if key in LAND_NEIGHBORS and _land_open(a) and _land_open(b):
-        out.append({"mode":"land", "straits":[]})
-    # دریایی: هر دو طرف باید بندر داشته باشند.
-    if _infra_ready(a, "naval_port") and _infra_ready(b, "naval_port"):
-        for route in SEA_ROUTE_HINTS.get(key, [[]]):
-            if all(not STRAITS_DATA.get(s, {}).get("closed", False) for s in route):
-                out.append({"mode":"sea", "straits":route})
-    # هوایی: هر دو طرف فرودگاه داشته باشند.
-    if _infra_ready(a, "air_airport") and _infra_ready(b, "air_airport"):
-        out.append({"mode":"air", "straits":[]})
-    return out
-
-
-def _route_quote(a, b, amount, preferred_mode=None):
-    if _war_between(a, b):
-        return None, "در زمان جنگ، تجارت مستقیم بین دو کشور تحریم است."
-    routes = _route_candidates(a, b)
-    if not routes:
-        return None, "هیچ مسیر قابل استفاده‌ای بین دو کشور وجود ندارد."
-    distance = max(100.0, _trade_distance_km(a, b))
-    quotes = []
-    for r in routes:
-        mode = r["mode"]
-        base = (max(1, amount) / 1000.0) * (distance / 1000.0) * TRADE_COST_PER_1000KM_PER_1000_UNITS[mode]
-        toll = sum(max(0, int(STRAITS_DATA[s].get("toll", 0))) for s in r["straits"] if s in STRAITS_DATA)
-        cost = int(round(base + toll))
-        quotes.append({**r, "distance_km": int(round(distance)), "transport_cost": cost, "toll": toll,
-                       "strait_costs":[{"id":s,"name":STRAITS_DATA[s]["name"],"cost":int(STRAITS_DATA[s].get("toll",0)),
-                                         "owner":strait_holdings.get(s)} for s in r["straits"]]})
-    if preferred_mode:
-        same = [q for q in quotes if q["mode"] == preferred_mode]
-        if not same: return None, "این نوع حمل برای این معامله ممکن نیست."
-        return min(same, key=lambda x: x["transport_cost"]), None
-    # ارزان‌ترین مسیر مجاز انتخاب می‌شود؛ اگر تنگه بسته باشد، مسیر دیگر خودکار انتخاب می‌شود.
-    return min(quotes, key=lambda x: x["transport_cost"]), None
-
-
-def _route_options(a, b, amount):
-    if _war_between(a, b): return [], "در زمان جنگ، تجارت مستقیم بین دو کشور تحریم است."
-    routes = _route_candidates(a, b)
-    if not routes: return [], "هیچ مسیر قابل استفاده‌ای بین دو کشور وجود ندارد."
-    distance = max(100.0, _trade_distance_km(a, b)); out=[]
-    for r in routes:
-        mode=r["mode"]; base=(max(1,amount)/1000.0)*(distance/1000.0)*TRADE_COST_PER_1000KM_PER_1000_UNITS[mode]
-        toll=sum(max(0,int(STRAITS_DATA[s].get("toll",0))) for s in r["straits"] if s in STRAITS_DATA)
-        out.append({**r,"distance_km":int(round(distance)),"transport_cost":int(round(base+toll)),"toll":toll,
-                    "strait_costs":[{"id":s,"name":STRAITS_DATA[s]["name"],"cost":int(STRAITS_DATA[s].get("toll",0)),"owner":strait_holdings.get(s)} for s in r["straits"]]})
-    return out, None
-
-def _listing_view(l):
-    side = l.get("side", "sell")
-    if side == "sell":
-        return {**l, "side":"sell", "country":l["seller"], "resource":l["sell_resource"],
-                "amount":l["sell_amount"], "price_resource":l["want_resource"], "price_amount":l["want_amount"]}
-    return {**l, "side":"buy", "country":l["buyer"], "resource":l["buy_resource"],
-            "amount":l["buy_amount"], "price_resource":l["offer_resource"], "price_amount":l["offer_amount"]}
-
-
 async def get_market(request):
-    rows = []
-    for l in market_listings.values():
-        if l.get("status") != "open": continue
-        v = _listing_view(l)
-        seller = v["country"]
-        # برای هر آگهی، مسیر و هزینهٔ حمل فعلی را هم نشان بده.
-        other = None
-        if v["side"] == "sell":
-            other = request.query.get("country")
-        else:
-            other = request.query.get("country")
-        if other and other in COUNTRIES and other != seller:
-            qs, err = _route_options(seller, other, v["amount"])
-            v["routes"] = qs; v["route_error"] = err
-        else:
-            v["routes"] = []
-        rows.append(v)
-    return web.json_response({"listings": rows,
-                              "trade_modes":{"land":True,"sea":True,"air":True}})
-
+    return web.json_response({"listings": [l for l in market_listings.values() if l["status"] == "open"]})
 
 async def create_listing(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
-    data = await read_json(request); side = data.get("side", "sell")
-    try: amount = int(data.get("amount", 0)); price_amount = int(data.get("price_amount", 0))
-    except: return web.json_response({"success":False,"error":"invalid_amount"}, status=400)
-    resource = data.get("resource"); price_resource = data.get("price_resource", "money")
-    if resource not in RESOURCE_NAMES or (price_resource != "money" and price_resource not in RESOURCE_NAMES):
-        return web.json_response({"success":False,"error":"invalid_res"}, status=400)
-    if side not in ("sell","buy") or amount <= 0 or price_amount <= 0:
-        return web.json_response({"success":False,"error":"invalid_amount"}, status=400)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    sr = data.get("sell_resource"); wr = data.get("want_resource")
+    try: sa = int(data.get("sell_amount", 0)); wa = int(data.get("want_amount", 0))
+    except: return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
+    if sr not in RESOURCE_NAMES: return web.json_response({"success": False, "error": "invalid_res"}, status=400)
+    if wr != "money" and wr not in RESOURCE_NAMES:
+        return web.json_response({"success": False, "error": "invalid_want"}, status=400)
+    if sa <= 0 or wa <= 0: return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
     if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]; cid = p.get("country")
-    if not cid: return web.json_response({"success":False,"error":"no_country"}, status=400)
-    if side == "sell" and p["resources"].get(resource,0) < amount:
-        return web.json_response({"success":False,"error":"not_enough_res"}, status=400)
-    if side == "buy":
-        if price_resource == "money" and p.get("money",0) < price_amount:
-            return web.json_response({"success":False,"error":"not_enough_money"}, status=400)
-        if price_resource != "money" and p["resources"].get(price_resource,0) < price_amount:
-            return web.json_response({"success":False,"error":"not_enough_res"}, status=400)
+    p = players[uid]
+    if not p.get("country"): return web.json_response({"success": False, "error": "no_country"}, status=400)
+    if p["resources"].get(sr, 0) < sa:
+        return web.json_response({"success": False, "error": "not_enough_res"}, status=400)
     lid = str(uuid.uuid4())
-    if side == "sell":
-        l = {"id":lid,"side":"sell","seller":cid,"sell_resource":resource,"sell_amount":amount,
-             "want_resource":price_resource,"want_amount":price_amount,"status":"open","created_at":utcnow().isoformat()}
-    else:
-        l = {"id":lid,"side":"buy","buyer":cid,"buy_resource":resource,"buy_amount":amount,
-             "offer_resource":price_resource,"offer_amount":price_amount,"status":"open","created_at":utcnow().isoformat()}
-    market_listings[lid] = l; save_state()
-    return web.json_response({"success":True,"listing_id":lid})
-
+    market_listings[lid] = {"id": lid, "seller": p["country"], "sell_resource": sr,
+                            "sell_amount": sa, "want_resource": wr, "want_amount": wa,
+                            "status": "open", "created_at": utcnow().isoformat()}
+    save_state()
+    return web.json_response({"success": True, "listing_id": lid})
 
 async def cancel_listing(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
     data = await read_json(request); lid = data.get("listing_id")
-    cid = players.get(uid,{}).get("country"); l = market_listings.get(lid)
-    owner = l.get("seller") if l and l.get("side","sell")=="sell" else (l.get("buyer") if l else None)
-    if not l: return web.json_response({"success":False,"error":"not_found"}, status=404)
-    if owner != cid: return web.json_response({"success":False,"error":"not_owner"}, status=403)
-    del market_listings[lid]; save_state(); return web.json_response({"success":True})
-
+    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    cid = players[uid].get("country")
+    l = market_listings.get(lid)
+    if not l: return web.json_response({"success": False, "error": "not_found"}, status=404)
+    if l["seller"] != cid: return web.json_response({"success": False, "error": "not_owner"}, status=403)
+    del market_listings[lid]; save_state()
+    return web.json_response({"success": True})
 
 async def accept_listing(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
     data = await read_json(request); lid = data.get("listing_id")
-    if uid not in players: players[uid] = create_player(uid)
-    actor = players[uid]; actor_cid = actor.get("country"); l = market_listings.get(lid)
-    if not l or l.get("status") != "open": return web.json_response({"success":False,"error":"closed"}, status=400)
-    side = l.get("side","sell")
-    owner_cid = l.get("seller") if side == "sell" else l.get("buyer")
-    if owner_cid == actor_cid: return web.json_response({"success":False,"error":"self_buy"}, status=400)
-    seller_cid = owner_cid if side == "buy" else actor_cid
-    buyer_cid = actor_cid if side == "sell" else owner_cid
-    _, seller = get_player_by_country(seller_cid); _, buyer = get_player_by_country(buyer_cid)
-    if not seller or not buyer: return web.json_response({"success":False,"error":"player_gone"}, status=400)
-    resource = l["sell_resource"] if side == "sell" else l["buy_resource"]
-    amount = l["sell_amount"] if side == "sell" else l["buy_amount"]
-    pay_res = l["want_resource"] if side == "sell" else l["offer_resource"]
-    pay_amount = l["want_amount"] if side == "sell" else l["offer_amount"]
-    route, route_err = _route_quote(seller_cid, buyer_cid, amount, data.get("mode"))
-    if route_err: return web.json_response({"success":False,"error":"no_route","message":route_err}, status=400)
-    if seller["resources"].get(resource,0) < amount:
-        return web.json_response({"success":False,"error":"seller_no_res"}, status=400)
-    if pay_res == "money":
-        if buyer.get("money",0) < pay_amount + route["transport_cost"]:
-            return web.json_response({"success":False,"error":"not_enough_money","message":f"پول کافی نیست؛ هزینه حمل {route['transport_cost']:,}$ است."}, status=400)
-        buyer["money"] -= pay_amount; seller["money"] = seller.get("money",0) + pay_amount
-        buyer["money"] -= route["transport_cost"]
+    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    buyer = players[uid]; bcid = buyer.get("country")
+    l = market_listings.get(lid)
+    if not l or l["status"] != "open":
+        return web.json_response({"success": False, "error": "closed"}, status=400)
+    if l["seller"] == bcid: return web.json_response({"success": False, "error": "self_buy"}, status=400)
+    suid, seller = get_player_by_country(l["seller"])
+    if not seller: return web.json_response({"success": False, "error": "seller_gone"}, status=400)
+    if l["want_resource"] == "money":
+        if buyer.get("money", 0) < l["want_amount"]:
+            return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
+        buyer["money"] -= l["want_amount"]; seller["money"] = seller.get("money", 0) + l["want_amount"]
     else:
-        if buyer["resources"].get(pay_res,0) < pay_amount:
-            return web.json_response({"success":False,"error":"not_enough_res"}, status=400)
-        if buyer.get("money",0) < route["transport_cost"]:
-            return web.json_response({"success":False,"error":"not_enough_money","message":f"پول کافی برای حمل نیست؛ هزینه حمل {route['transport_cost']:,}$ است."}, status=400)
-        buyer["resources"][pay_res] -= pay_amount; seller["resources"][pay_res] = seller["resources"].get(pay_res,0) + pay_amount
-        buyer["money"] -= route["transport_cost"]
-    seller["resources"][resource] -= amount; buyer["resources"][resource] = buyer["resources"].get(resource,0) + amount
-    l["status"]="filled"; l["actor"] = actor_cid; l["route"] = route
-    for s in route.get("strait_costs",[]):
-        owner = s.get("owner")
-        if owner and owner in players.values(): pass
-        if owner:
-            _, sp = get_player_by_country(owner)
-            if sp: sp["money"] = sp.get("money",0) + s["cost"]
-    push_news("معامله بازار جهانی", f"{COUNTRIES[buyer_cid]['name']} {amount:,} {RESOURCE_NAMES[resource]} را از {COUNTRIES[seller_cid]['name']} خرید؛ مسیر {route['mode']} و هزینه حمل {route['transport_cost']:,}$.")
+        if buyer["resources"].get(l["want_resource"], 0) < l["want_amount"]:
+            return web.json_response({"success": False, "error": "not_enough_res"}, status=400)
+        buyer["resources"][l["want_resource"]] -= l["want_amount"]
+        seller["resources"][l["want_resource"]] = seller["resources"].get(l["want_resource"], 0) + l["want_amount"]
+    if seller["resources"].get(l["sell_resource"], 0) < l["sell_amount"]:
+        return web.json_response({"success": False, "error": "seller_no_res"}, status=400)
+    seller["resources"][l["sell_resource"]] -= l["sell_amount"]
+    buyer["resources"][l["sell_resource"]] = buyer["resources"].get(l["sell_resource"], 0) + l["sell_amount"]
+    l["status"] = "filled"; l["buyer"] = bcid
+    push_news("معامله", f"{COUNTRIES[bcid]['name']} از {COUNTRIES[l['seller']]['name']} "
+                        f"{l['sell_amount']} {RESOURCE_NAMES[l['sell_resource']]} خرید.")
     save_state()
-    return web.json_response({"success":True,"route":route,"transport_cost":route["transport_cost"]})
-
-
-async def set_strait_settings(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
-    data = await read_json(request); sid = data.get("site_id")
-    if sid not in STRAITS_DATA: return web.json_response({"success":False,"error":"invalid_site"}, status=400)
-    cid = players.get(uid,{}).get("country")
-    if strait_holdings.get(sid) != cid: return web.json_response({"success":False,"error":"not_owner"}, status=403)
-    toll = max(0, int(data.get("toll", STRAITS_DATA[sid].get("toll",0))))
-    closed = bool(data.get("closed", STRAITS_DATA[sid].get("closed",False)))
-    STRAITS_DATA[sid]["toll"] = toll; STRAITS_DATA[sid]["closed"] = closed
-    state_word = "بسته" if closed else "باز"
-    push_news("تغییر وضعیت تنگه", f"{COUNTRIES[cid]['name']} {STRAITS_DATA[sid]['name']} را {state_word} کرد و عوارض عبور را {toll:,}$ تعیین کرد.")
-    save_state(); return web.json_response({"success":True,"toll":toll,"closed":closed})
-
-
-async def set_border_settings(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
-    if uid not in players: players[uid]=create_player(uid)
-    p=players[uid];
-    if not p.get("country"): return web.json_response({"success":False,"error":"no_country"}, status=400)
-    open_=bool((await read_json(request)).get("open",True)); p["land_trade_open"]=open_
-    push_news("مرز زمینی", f"{COUNTRIES[p['country']]['name']} مرزهای تجارت زمینی را {'باز' if open_ else 'بسته'} کرد.")
-    save_state(); return web.json_response({"success":True,"open":open_})
+    return web.json_response({"success": True})
 
 # =========================================================
 # API News / Rankings
@@ -2119,8 +2022,7 @@ async def create_web_app():
         ("/api/union/respond", respond_union_invite), ("/api/union/leave", leave_union),
         ("/api/union/message", send_union_message), ("/api/pm/send", send_pm),
         ("/api/market/create", create_listing), ("/api/market/cancel", cancel_listing),
-        ("/api/market/accept", accept_listing), ("/api/strait/settings", set_strait_settings),
-        ("/api/border/settings", set_border_settings)]:
+        ("/api/market/accept", accept_listing)]:
         app.router.add_post(path, h)
 
     app.router.add_route("OPTIONS", "/{tail:.*}", lambda r: web.Response())
