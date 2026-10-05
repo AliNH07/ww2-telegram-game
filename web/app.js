@@ -31,7 +31,7 @@ const COUNTRY_IDS = { germany: 276, britain: 826, ussr: 643, usa: 840,
 
 let ARMY_UNITS = {};
 
-const RESOURCE_NAMES = { food: "غذا", steel: "فولاد", uranium: "اورانیوم", oil: "نفت" };
+const RESOURCE_NAMES = { food: "غذا", steel: "آهن", uranium: "اورانیوم", oil: "نفت" };
 const RESOURCE_ICONS = { food: "🌾", steel: "⚙️", uranium: "☢️", oil: "🛢️" };
 const GROUP_ICONS = { land: "🪖", naval: "⚓", air: "✈️", missile: "🚀", strategy: "🛰️" };
 const GROUP_TITLES = { land: "زمینی", naval: "دریایی", air: "هوایی", missile: "موشکی", strategy: "استراتژیک" };
@@ -2218,93 +2218,87 @@ async function loadPM(target) {
 }
 
 /* =========================================================
-   Market
+   Market — global trade
 ========================================================= */
-document.querySelectorAll(".market-tab").forEach(tab => {
-    tab.addEventListener("click", () => {
-        document.querySelectorAll(".market-tab").forEach(t => t.classList.remove("active"));
-        tab.classList.add("active");
-        document.querySelectorAll(".market-panel").forEach(p => p.classList.add("hidden"));
-        const panel = document.getElementById(tab.dataset.marketTab);
-        if (panel) panel.classList.remove("hidden");
-        if (tab.dataset.marketTab === "market-list-panel") loadMarketListings();
-        else if (tab.dataset.marketTab === "market-mine-panel") loadMyListings();
-    });
-});
+let marketCreateSide = "sell", marketFilter = "all", marketRows = [];
+
+function marketResourceText(k, n) { return `${RESOURCE_ICONS[k] || "📦"} ${formatNumber(n)} ${RESOURCE_NAMES[k] || k}`; }
+function marketModeLabel(m) { return m === "land" ? "🚚 زمینی" : m === "sea" ? "🚢 دریایی" : "✈️ هوایی"; }
+function marketModeCost(route) { return route ? formatMoney(route.transport_cost) : "—"; }
 
 async function loadMarketListings() {
-    const c = document.getElementById("market-listings");
-    if (!c) return;
-    c.innerHTML = "";
+    const c = document.getElementById("market-listings"); if (!c) return;
+    c.innerHTML = `<div class="market-loading">در حال دریافت کالاها…</div>`;
     try {
-        const d = await apiGet("/api/market");
-        if (!d.listings?.length) { c.innerHTML = `<div class="diplomacy-item-empty">سفارشی نیست.</div>`; return; }
-        d.listings.forEach(l => {
-            const div = document.createElement("div");
-            div.className = "infra-card";
-            const wantText = l.want_resource === "money" ? formatMoney(l.want_amount)
-                : `${formatNumber(l.want_amount)} ${RESOURCE_NAMES[l.want_resource]}`;
-            div.innerHTML = `
-                <div class="infra-card-top">
-                    <span class="infra-card-name">${flagInline(l.seller, true)} ${COUNTRY_NAMES[l.seller]}</span>
-                    <span class="infra-card-level">${RESOURCE_ICONS[l.sell_resource]} ${formatNumber(l.sell_amount)}</span>
-                </div>
-                <div class="infra-card-detail">در ازای: ${wantText}</div>
-                <button class="infra-upgrade-button" data-buy="${l.id}">معامله</button>`;
-            c.appendChild(div);
-        });
-        c.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => acceptListing(b.dataset.buy));
-    } catch (e) {}
+        const d = await apiGet("/api/market", {country: selectedCountry || ""});
+        marketRows = d.listings || [];
+        renderMarketListings();
+    } catch (e) { c.innerHTML = `<div class="diplomacy-item-empty">بازار در دسترس نیست.</div>`; }
 }
 
-async function acceptListing(lid) {
-    try {
-        const d = await apiPost("/api/market/accept", { listing_id: lid });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
-        showToast("معامله انجام شد.");
-        loadMarketListings(); await refreshPlayer();
-    } catch (e) {}
+function renderMarketListings() {
+    const c = document.getElementById("market-listings"); if (!c) return;
+    const rows = marketRows.filter(l => marketFilter === "all" || l.side === marketFilter);
+    if (!rows.length) { c.innerHTML = `<div class="diplomacy-item-empty">آگهی‌ای برای این بخش نیست.</div>`; return; }
+    c.innerHTML = rows.map(l => {
+        const mine = l.country === selectedCountry;
+        const action = mine ? "آگهی شما" : (l.side === "sell" ? "می‌خرم" : "می‌فروشم");
+        const actionCls = mine ? "disabled" : (l.side === "sell" ? "buy" : "sell");
+        const price = l.price_resource === "money" ? formatMoney(l.price_amount) : marketResourceText(l.price_resource, l.price_amount);
+        const sideText = l.side === "sell" ? "فروشنده" : "خریدار";
+        const routes = (l.routes || []);
+        const modeChips = ["land","sea","air"].map(m => {
+            const q = routes.find(x => x.mode === m);
+            return `<span class="market-mode ${q ? "ok" : "off"}">${marketModeLabel(m)} ${q ? marketModeCost(q) : "ناممکن"}</span>`;
+        }).join("");
+        return `<div class="market-card">
+            <div class="market-card-head"><span>${flagInline(l.country, true)} ${COUNTRY_NAMES[l.country] || l.country}</span><b>${sideText}</b></div>
+            <div class="market-card-main"><div class="market-product"><strong>${RESOURCE_ICONS[l.resource] || "📦"} ${RESOURCE_NAMES[l.resource]}</strong><b>${formatNumber(l.amount)}</b></div>
+            <div class="market-price"><small>قیمت پیشنهادی</small><b>${price}</b></div></div>
+            <div class="market-route-row">${modeChips}</div>
+            ${l.route_error ? `<div class="market-route-error">⚠️ ${escapeHtml(l.route_error)}</div>` : `<div class="market-route-note">هزینه حمل را دریافت‌کننده کالا می‌پردازد.</div>`}
+            <button class="market-action ${actionCls}" data-market-action="${l.id}" ${mine ? "disabled" : ""}>${action}</button>
+        </div>`;
+    }).join("");
+    c.querySelectorAll("[data-market-action]").forEach(b => b.onclick = () => openTradeModal(b.dataset.marketAction));
 }
 
-document.getElementById("mk-submit").onclick = async () => {
-    const sr = document.getElementById("mk-sell-res").value;
-    const wr = document.getElementById("mk-want-res").value;
-    const sa = Number(document.getElementById("mk-sell-amt").value);
-    const wa = Number(document.getElementById("mk-want-amt").value);
-    try {
-        const d = await apiPost("/api/market/create", { sell_resource: sr, sell_amount: sa,
-            want_resource: wr, want_amount: wa });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
-        showToast("سفارش ثبت شد.");
-        loadMarketListings();
-    } catch (e) {}
-};
-
-async function loadMyListings() {
-    const c = document.getElementById("market-mine");
-    if (!c) return;
-    c.innerHTML = "";
-    try {
-        const d = await apiGet("/api/market");
-        const mine = (d.listings || []).filter(l => l.seller === selectedCountry);
-        if (!mine.length) { c.innerHTML = `<div class="diplomacy-item-empty">سفارشی ندارید.</div>`; return; }
-        mine.forEach(l => {
-            const div = document.createElement("div");
-            div.className = "infra-card";
-            div.innerHTML = `
-                <div class="infra-card-top">
-                    <span class="infra-card-name">${RESOURCE_ICONS[l.sell_resource]} ${formatNumber(l.sell_amount)}</span>
-                    <span class="infra-card-level">در ازای ${l.want_resource === "money" ? formatMoney(l.want_amount) : formatNumber(l.want_amount) + " " + RESOURCE_NAMES[l.want_resource]}</span>
-                </div>
-                <button class="infra-upgrade-button" data-cancel="${l.id}" style="background:rgba(248,113,113,.15);color:#f87171;border-color:rgba(248,113,113,.3);">لغو سفارش</button>`;
-            c.appendChild(div);
-        });
-        c.querySelectorAll("[data-cancel]").forEach(b => b.onclick = async () => {
-            await apiPost("/api/market/cancel", { listing_id: b.dataset.cancel });
-            loadMyListings();
-        });
-    } catch (e) {}
+async function openTradeModal(lid) {
+    const l = marketRows.find(x => x.id === lid); if (!l) return;
+    document.getElementById("market-trade-modal")?.remove();
+    const routes = l.routes || [];
+    const best = routes.slice().sort((a,b) => a.transport_cost-b.transport_cost)[0];
+    const price = l.price_resource === "money" ? formatMoney(l.price_amount) : marketResourceText(l.price_resource, l.price_amount);
+    const ov = document.createElement("div"); ov.id="market-trade-modal"; ov.className="modal-overlay";
+    ov.innerHTML = `<div class="market-trade-sheet">
+        <div class="is-head"><div class="is-titles"><div class="is-name">${l.side === "sell" ? "خرید" : "فروش"} ${RESOURCE_NAMES[l.resource]}</div><div class="is-sub">${formatNumber(l.amount)} واحد · قیمت ${price}</div></div><button class="is-close">✕</button></div>
+        <div class="market-trade-body"><div class="market-trade-title">روش حمل را انتخاب کن</div>
+        <div class="market-route-options">${["land","sea","air"].map(m=>{const q=routes.find(x=>x.mode===m); return `<button class="market-route-option ${q?"":"disabled"} ${best?.mode===m?"selected":""}" data-mode="${m}" ${q?"":"disabled"}><b>${marketModeLabel(m)}</b><span>${q?marketModeCost(q):"ناممکن"}</span>${q?.toll?`<small>عوارض تنگه: ${formatMoney(q.toll)}</small>`:""}</button>`}).join("")}</div>
+        <div id="market-route-detail" class="market-route-detail"></div><button id="market-confirm-trade" class="market-confirm" ${best?"":"disabled"}>${l.side === "sell" ? "خرید و انتقال کالا" : "فروش و انتقال کالا"}</button></div>
+    </div>`;
+    document.body.appendChild(ov); ov.querySelector(".is-close").onclick=()=>ov.remove(); ov.onclick=e=>{if(e.target===ov)ov.remove();};
+    let chosen=best?.mode || null;
+    const detail=ov.querySelector("#market-route-detail");
+    const paint=()=>{const q=routes.find(x=>x.mode===chosen); detail.innerHTML=q?`<b>هزینه حمل: ${formatMoney(q.transport_cost)}</b><br>${q.strait_costs?.length?`تنگه‌ها: ${q.strait_costs.map(x=>`${x.name} ${formatMoney(x.cost)}`).join("، ")}`:"بدون عوارض تنگه"}`:`هیچ مسیر فعالی نیست.`;};
+    paint();
+    ov.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{if(b.disabled)return;chosen=b.dataset.mode;ov.querySelectorAll("[data-mode]").forEach(x=>x.classList.toggle("selected",x===b));paint();});
+    ov.querySelector("#market-confirm-trade").onclick=async()=>{ if(!chosen)return; const d=await apiPost("/api/market/accept",{listing_id:lid,mode:chosen}); if(!d.success){showToast(d.message||"معامله انجام نشد");return;} ov.remove(); showToast(`معامله انجام شد · هزینه حمل ${formatMoney(d.transport_cost)}`); await refreshPlayer(); loadMarketListings(); loadMyListings(); };
 }
+
+function updateMarketCreateLabels() {
+    const buy=marketCreateSide==="buy";
+    document.getElementById("mk-resource-label").textContent=buy?"کالایی که می‌خرم":"کالایی که می‌فروشم";
+    document.getElementById("mk-price-label").textContent=buy?"در ازای کالای شما / پول":"در ازای";
+    document.getElementById("mk-submit").textContent=buy?"ثبت آگهی خرید":"ثبت آگهی فروش";
+}
+
+document.querySelectorAll(".market-tab").forEach(tab=>tab.addEventListener("click",()=>{document.querySelectorAll(".market-tab").forEach(t=>t.classList.remove("active"));tab.classList.add("active");document.querySelectorAll(".market-panel").forEach(p=>p.classList.add("hidden"));document.getElementById(tab.dataset.marketTab)?.classList.remove("hidden");if(tab.dataset.marketTab==="market-list-panel")loadMarketListings();else if(tab.dataset.marketTab==="market-mine-panel")loadMyListings();}));
+document.querySelectorAll(".mk-filter").forEach(b=>b.onclick=()=>{document.querySelectorAll(".mk-filter").forEach(x=>x.classList.remove("active"));b.classList.add("active");marketFilter=b.dataset.side;renderMarketListings();});
+document.querySelectorAll(".mk-side").forEach(b=>b.onclick=()=>{document.querySelectorAll(".mk-side").forEach(x=>x.classList.remove("active"));b.classList.add("active");marketCreateSide=b.dataset.createSide;updateMarketCreateLabels();});
+
+document.getElementById("mk-submit")?.addEventListener("click",async()=>{const body={side:marketCreateSide,resource:document.getElementById("mk-sell-res").value,amount:Number(document.getElementById("mk-sell-amt").value),price_resource:document.getElementById("mk-want-res").value,price_amount:Number(document.getElementById("mk-want-amt").value)};try{const d=await apiPost("/api/market/create",body);if(!d.success){showToast(d.message||"خطا");return;}showToast("آگهی ثبت شد.");document.querySelector('[data-market-tab="market-list-panel"]')?.click();loadMarketListings();}catch(e){showToast("خطا.");}});
+
+async function loadMyListings(){const c=document.getElementById("market-mine");if(!c)return;c.innerHTML="";try{const d=await apiGet("/api/market",{country:selectedCountry||""});const mine=(d.listings||[]).filter(l=>l.country===selectedCountry);if(!mine.length){c.innerHTML=`<div class="diplomacy-item-empty">آگهی‌ای ندارید.</div>`;return;}c.innerHTML=mine.map(l=>`<div class="market-card"><div class="market-card-head"><span>${l.side==="sell"?"فروش":"خرید"} ${RESOURCE_NAMES[l.resource]}</span><b>${formatNumber(l.amount)}</b></div><div class="market-card-detail">در ازای ${l.price_resource==="money"?formatMoney(l.price_amount):marketResourceText(l.price_resource,l.price_amount)}</div><button class="market-action cancel" data-cancel="${l.id}">لغو آگهی</button></div>`).join("");c.querySelectorAll("[data-cancel]").forEach(b=>b.onclick=async()=>{const d=await apiPost("/api/market/cancel",{listing_id:b.dataset.cancel});if(!d.success){showToast(d.message||"خطا");return;}loadMyListings();loadMarketListings();});}catch(e){}}
 
 /* =========================================================
    Map — World globe
@@ -2767,6 +2761,7 @@ function showCountryInfo(feature) {
     actionBtn.classList.add("hidden");
     document.getElementById("map-info-scan")?.classList.add("hidden");
     document.getElementById("map-info-scan-btn")?.classList.add("hidden");
+    const sc = document.getElementById("map-info-strait-controls"); if(sc){sc.classList.add("hidden");sc.innerHTML="";}
 
     if (!e) {
         flagEl.textContent = "🏳️"; nameEl.textContent = "منطقه ناشناخته";
@@ -2787,6 +2782,11 @@ function showCountryInfo(feature) {
     } else {
         statusEl.textContent = "غیرفعال"; descEl.textContent = "هنوز توسط هیچ بازیکنی انتخاب نشده.";
     }
+    if (key === selectedCountry) {
+        const open = player?.land_trade_open !== false;
+        actionBtn.classList.remove("hidden"); actionBtn.textContent = open ? "🔒 بستن تجارت زمینی" : "🔓 باز کردن تجارت زمینی";
+        actionBtn.onclick = async()=>{const d=await apiPost("/api/border/settings",{open:!open});if(!d.success){showToast(d.message||"خطا");return;}player.land_trade_open=d.open;showToast(d.open?"تجارت زمینی باز شد":"تجارت زمینی بسته شد");showCountryInfo(feature);};
+    }
     panel.classList.remove("hidden");
 }
 
@@ -2797,10 +2797,12 @@ function showSiteInfo(site) {
     const statusEl = document.getElementById("map-info-status");
     const descEl = document.getElementById("map-info-desc");
     const actionBtn = document.getElementById("map-info-action");
+    const controls = document.getElementById("map-info-strait-controls");
+    if(controls){controls.classList.add("hidden");controls.innerHTML="";}
 
     if (site.kind === "strait") {
         flagEl.textContent = "⚓";
-        descEl.textContent = `درآمد روزانه: ${formatMoney(site.income)}`;
+        descEl.textContent = `درآمد روزانه: ${formatMoney(site.income)} · عوارض عبور: ${formatMoney(site.toll || 0)} · ${site.closed ? "بسته" : "باز"}`;
     } else {
         flagEl.textContent = RESOURCE_ICONS[site.type] || "📍";
         const zoneTxt = site.zone === "sea" ? "🌊 در دریا" : (site.zone === "land" ? "⛰️ در خشکی" : "");
@@ -2816,6 +2818,12 @@ function showSiteInfo(site) {
     actionBtn.classList.remove("hidden");
     actionBtn.textContent = "🪖 فرستادن نیرو";
     actionBtn.onclick = () => openDispatchTo(site.id);
+    if (site.kind === "strait" && site.owner === selectedCountry && controls) {
+        controls.classList.remove("hidden");
+        controls.innerHTML = `<div class="strait-control-title">تنظیم تنگه</div><div class="strait-control-row"><input id="strait-toll-input" type="number" min="0" value="${Number(site.toll||0)}" placeholder="عوارض $"><button id="strait-open-toggle">${site.closed?"باز کردن":"بستن"}</button><button id="strait-save-btn">ذخیره</button></div><small>هر تغییر عوارض یا وضعیت، برای همه بازیکنان اعلان می‌شود.</small>`;
+        controls.querySelector("#strait-save-btn").onclick=async()=>{const toll=Math.max(0,Number(controls.querySelector("#strait-toll-input").value||0));const closed=site.closed;const d=await apiPost("/api/strait/settings",{site_id:site.id,toll,closed});if(!d.success){showToast(d.message||"خطا");return;}showToast("تنظیمات تنگه ذخیره شد و اعلان عمومی ارسال شد.");await loadMapSites();const ns=mapSites.find(x=>x.id===site.id);if(ns)showSiteInfo(ns);};
+        controls.querySelector("#strait-open-toggle").onclick=async()=>{const toll=Math.max(0,Number(controls.querySelector("#strait-toll-input").value||0));const closed=!site.closed;const d=await apiPost("/api/strait/settings",{site_id:site.id,toll,closed});if(!d.success){showToast(d.message||"خطا");return;}await loadMapSites();const ns=mapSites.find(x=>x.id===site.id);if(ns)showSiteInfo(ns);};
+    }
     renderSiteScan(site);
     panel.classList.remove("hidden");
 }
