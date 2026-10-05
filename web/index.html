@@ -452,7 +452,7 @@
             <div><span class="dot dot-inactive"></span> غیرفعال (انتخاب نشده)</div>
             <div><span class="dot dot-nogame"></span> هنوز به بازی اضافه نشده</div>
             <div><span class="dot dot-oil"></span> سکوی نفت</div>
-            <div><span class="dot dot-steel"></span> معدن فولاد</div>
+            <div><span class="dot dot-steel"></span> معدن آهن</div>
             <div><span class="dot dot-uranium"></span> معدن اورانیوم</div>
             <div><span class="dot dot-food"></span> دشت کشاورزی</div>
             <div><span class="dot dot-strait"></span> تنگه</div>
@@ -520,44 +520,30 @@
     <!-- ==================== بازار جهانی ==================== -->
     <main id="market" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🌐</span>بازار جهانی</span><span class="sb-money">$0</span></div>
-        <div class="page-title"><span>معاملات بین‌المللی</span><h1>بازار جهانی</h1></div>
-
+        <div class="page-title"><span>خرید و فروش بین کشورها</span><h1>بازار جهانی</h1></div>
+        <div class="market-hero"><div><b>بازار جهانی</b><p>منابع را از کشورهای دیگر بخر یا آگهی فروش بگذار. هزینه حمل همیشه با کشوری است که کالا به آن می‌رسد.</p></div><span>🌍</span></div>
         <div class="market-tabs">
-            <button class="market-tab active" data-market-tab="market-list-panel">سفارش‌ها</button>
-            <button class="market-tab" data-market-tab="market-create-panel">ثبت سفارش</button>
-            <button class="market-tab" data-market-tab="market-mine-panel">سفارش‌های من</button>
+            <button class="market-tab active" data-market-tab="market-list-panel">کالاها</button>
+            <button class="market-tab" data-market-tab="market-create-panel">مبادله</button>
+            <button class="market-tab" data-market-tab="market-mine-panel">معاملات من</button>
         </div>
-
         <div id="market-list-panel" class="market-panel">
+            <div class="market-filter"><button class="mk-filter active" data-side="all">همه کالاها</button><button class="mk-filter" data-side="sell">فروشندگان</button><button class="mk-filter" data-side="buy">خریداران</button></div>
             <div id="market-listings"></div>
         </div>
         <div id="market-create-panel" class="market-panel hidden">
+            <div class="market-order-switch"><button class="mk-side active" data-create-side="sell">می‌فروشم</button><button class="mk-side" data-create-side="buy">می‌خرم</button></div>
             <div class="market-form">
-                <label class="diplomacy-label">منبع فروش</label>
-                <select id="mk-sell-res" class="diplomacy-select">
-                    <option value="food">🌾 غذا</option>
-                    <option value="steel">⚙️ فولاد</option>
-                    <option value="uranium">☢️ اورانیوم</option>
-                    <option value="oil">🛢️ نفت</option>
-                </select>
-                <label class="diplomacy-label">مقدار فروش</label>
-                <input id="mk-sell-amt" class="diplomacy-input" type="number" value="1000" min="1">
-                <label class="diplomacy-label">در ازای</label>
-                <select id="mk-want-res" class="diplomacy-select">
-                    <option value="money">💰 پول</option>
-                    <option value="food">🌾 غذا</option>
-                    <option value="steel">⚙️ فولاد</option>
-                    <option value="uranium">☢️ اورانیوم</option>
-                    <option value="oil">🛢️ نفت</option>
-                </select>
-                <label class="diplomacy-label">مقدار درخواستی</label>
+                <label id="mk-resource-label" class="diplomacy-label">کالایی که می‌فروشم</label>
+                <select id="mk-sell-res" class="diplomacy-select"><option value="food">🌾 غذا</option><option value="steel">⚙️ آهن</option><option value="uranium">☢️ اورانیوم</option><option value="oil">🛢️ نفت</option></select>
+                <label id="mk-amount-label" class="diplomacy-label">مقدار</label><input id="mk-sell-amt" class="diplomacy-input" type="number" value="1000" min="1">
+                <label id="mk-price-label" class="diplomacy-label">در ازای</label>
+                <select id="mk-want-res" class="diplomacy-select"><option value="money">💰 پول</option><option value="food">🌾 غذا</option><option value="steel">⚙️ آهن</option><option value="uranium">☢️ اورانیوم</option><option value="oil">🛢️ نفت</option></select>
                 <input id="mk-want-amt" class="diplomacy-input" type="number" value="100000" min="1">
-                <button id="mk-submit" class="diplomacy-submit">ثبت سفارش</button>
+                <button id="mk-submit" class="diplomacy-submit">ثبت آگهی فروش</button>
             </div>
         </div>
-        <div id="market-mine-panel" class="market-panel hidden">
-            <div id="market-mine"></div>
-        </div>
+        <div id="market-mine-panel" class="market-panel hidden"><div id="market-mine"></div></div>
     </main>
 
     <!-- ==================== اشتراک ==================== -->
