@@ -232,6 +232,34 @@
         <div id="rankings-list" class="rankings-list"></div>
     </main>
 
+    <!-- ==================== آمار کشور ==================== -->
+    <main id="stats" class="game-page hidden country-stats-page">
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">📊</span>آمار کشور</span><span class="sb-money">$0</span></div>
+        <div class="cs-section-title"><h1>رفاه و درآمد</h1><button class="cs-help" id="welfare-help" aria-label="راهنمای رفاه">?</button></div>
+        <section class="cs-card cs-welfare-hero">
+            <div class="cs-inner-card cs-bonus-card"><span class="cs-bonus-value" id="stats-welfare-bonus">+0٪</span><span class="cs-bonus-label">🛡️ پاداش رفاه <small>روی درآمد سرمایه‌گذاری‌ها</small></span></div>
+            <div class="cs-progress"><span id="stats-welfare-progress"></span></div>
+            <p class="cs-muted">بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه — هرچه بیشتر ساخته شوند، رفاه بیشتر و احتمال بلاها کمتر می‌شود.</p>
+        </section>
+
+        <section class="cs-card">
+            <div class="cs-inner-card cs-effect-card"><div><strong id="stats-welfare-percent">0٪</strong><b>افزایش</b></div><span>اثر کل روی درآمد<br>سرمایه‌گذاری‌ها</span></div>
+            <div class="cs-row"><span>پاداش رفاه</span><strong id="stats-welfare-points">0٪ افزایش</strong></div>
+        </section>
+
+        <section class="cs-card">
+            <div class="cs-card-head"><h2>بلایای محتمل در کشور خودی</h2><span>⚠️</span></div>
+            <div id="stats-disaster-list" class="cs-disaster-list"></div>
+        </section>
+
+        <section class="cs-card">
+            <div class="cs-card-head"><h2>رویدادهای اخیر</h2></div>
+            <div id="stats-events" class="cs-events"></div>
+        </section>
+
+        <div class="cs-welfare-buildings" id="stats-welfare-buildings"></div>
+    </main>
+
     <!-- ==================== زیرساخت ==================== -->
     <main id="infrastructure" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🏗️</span>زیرساخت</span><span class="sb-money">$0</span></div>
@@ -247,6 +275,7 @@
             <button class="infra-tab" data-infra-tab="resource"><span class="infra-tab-label">🛢️ منابع</span><span class="infra-tab-count" id="infra-count-resource">0/3</span></button>
             <button class="infra-tab" data-infra-tab="military"><span class="infra-tab-label">🪖 نظامی</span><span class="infra-tab-count" id="infra-count-military">0/9</span></button>
             <button class="infra-tab" data-infra-tab="strategy"><span class="infra-tab-label">🛰️ استراتژی</span><span class="infra-tab-count" id="infra-count-strategy">0/1</span></button>
+            <button class="infra-tab" data-infra-tab="welfare"><span class="infra-tab-label">❤️ رفاه</span><span class="infra-tab-count" id="infra-count-welfare">0/5</span></button>
         </div>
 
         <div class="infra-panels">
@@ -265,6 +294,9 @@
             </div>
             <div id="infra-panel-strategy" class="infra-panel hidden">
                 <div id="infra-strategy-list" class="infra-card-list"></div>
+            </div>
+            <div id="infra-panel-welfare" class="infra-panel hidden">
+                <div class="infra-section"><h2 class="infra-section-title">❤️ رفاه</h2><div id="infra-welfare-list" class="infra-card-list"></div></div>
             </div>
             <div id="infra-panel-military" class="infra-panel hidden">
                 <div class="infra-section">
