@@ -49,7 +49,7 @@ SEASON_HINTS = {
 }
 
 STARTING_RESOURCES = {"food": 5_000, "steel": 0, "uranium": 0, "oil": 5_000}
-RESOURCE_NAMES = {"food": "غذا", "steel": "فولاد", "uranium": "اورانیوم", "oil": "نفت"}
+RESOURCE_NAMES = {"food": "غذا", "steel": "آهن", "uranium": "اورانیوم", "oil": "نفت"}
 GROUP_NAMES = {"land": "زمینی", "naval": "دریایی", "air": "هوایی",
                "power": "برق", "manpower": "نیروی انسانی", "resource": "منابع", "missile": "موشکی"}
 TREATY_TYPE_NAMES = {"alliance": "پیمان اتحاد", "non_aggression": "پیمان عدم تجاوز"}
@@ -58,13 +58,6 @@ WAR_PENALTY_ALLIANCE = 2_000_000
 NEGOTIATION_HOURS = 24
 DEFAULT_COST = 150_000
 DEFAULT_TIME = 0
-
-# ==================== LOAN SYSTEM CONSTANTS ====================
-MAX_LOAN_PERCENT = 0.5          # حداکثر ۵۰٪ درآمد روزانه
-COMMISSION_RATE = 0.05          # ۵٪ کمیسیون
-PROFIT_PER_12H = 0.10           # ۱۰٪ سود به ازای هر ۱۲ ساعت
-MAX_LOAN_DURATION = 72          # حداکثر ۷۲ ساعت
-MIN_LOAN_DURATION = 12          # حداقل ۱۲ ساعت
 
 def L(**kw):
     kw.setdefault("cost", DEFAULT_COST)
@@ -165,8 +158,8 @@ INFRASTRUCTURE = {
     },
     "resource_steel_mill": {
         "power_required": 5,
-        "name": "کارخانه فولاد", "group": "resource", "resource_key": "steel", "icon": "⚙️",
-        "desc": "آهن و فولاد تولید می‌کند. پایهٔ صنعت و ساخت تانک است.",
+        "name": "کارخانه آهن", "group": "resource", "resource_key": "steel", "icon": "⚙️",
+        "desc": "آهن تولید می‌کند. پایهٔ صنعت و ساخت تانک است.",
         "levels": [L(cost=1_200_000, production=50_000), L(cost=2_700_000, production=130_000), L(cost=6_000_000, production=300_000), L(cost=12_000_000, production=700_000), L(cost=22_500_000, production=1_500_000)],
     },
     "resource_uranium_mine": {
@@ -272,8 +265,8 @@ ECONOMY = {
         "levels": [L(cost=280_000, income=70_000), L(cost=700_000, income=180_000), L(cost=1_600_000, income=420_000), L(cost=3_400_000, income=920_000), L(cost=6_800_000, income=1_850_000)],
     },
     "eco_steel": {
-        "name": "کارخانه فولاد", "group": "eco", "icon": "⚙️",
-        "desc": "فولاد را به محصولات صنعتی تبدیل می‌کند.",
+        "name": "کارخانه آهن", "group": "eco", "icon": "⚙️",
+        "desc": "آهن را به محصولات صنعتی تبدیل می‌کند.",
         "power_required": 18,
         "levels": [L(cost=420_000, income=100_000), L(cost=1_050_000, income=260_000), L(cost=2_400_000, income=600_000), L(cost=5_100_000, income=1_300_000), L(cost=10_200_000, income=2_600_000)],
     },
@@ -328,7 +321,7 @@ ARMY_UNITS = {
     "air_tanker": {"name": "هواپیمای سوخت‌رسان", "group": "air", "requires": ["air_airport", "air_arsenal"],
         "cost": 220_000, "manpower": 120, "resources": {"oil": 250, "steel": 120},
         "attack": 2, "defense": 20, "refuel_capacity": 20},
-    # موشک‌ها: علاوه بر هزینهٔ یک‌باره، هر موشکِ موجود هر روز غذا، نفت و فولاد مصرف می‌کند
+    # موشک‌ها: علاوه بر هزینهٔ یک‌باره، هر موشکِ موجود هر روز غذا، نفت و آهن مصرف می‌کند
     "cruise_missile": {"name": "موشک کروز", "group": "missile", "requires": ["missile_depot", "missile_factory"],
         "min_level": {"missile_factory": 1},
         "cost": 400_000, "manpower": 100, "resources": {"steel": 300, "oil": 200, "food": 50},
@@ -357,12 +350,12 @@ MAP_RESOURCES = {
     "oil_texas":      {"type": "oil", "zone": "land", "name": "میدان نفتی پرمین (تگزاس)",           "lon": -102.0,"lat": 31.9,  "production": 4_000_000},
     "oil_ghawar":     {"type": "oil", "zone": "land", "name": "میدان نفتی غوار (عربستان)",          "lon": 49.4,  "lat": 25.4,  "production": 5_000_000},
     "oil_siberia":    {"type": "oil", "zone": "land", "name": "میدان نفتی سیبری غربی",              "lon": 76.7,  "lat": 61.1,  "production": 4_000_000},
-    # ---------- فولاد ----------
-    "steel_ural":     {"type": "steel", "zone": "land", "name": "معدن فولاد اورال (ماگنیتوگورسک)",  "lon": 59.1,  "lat": 53.4,  "production": 3_000_000},
-    "steel_ruhr":     {"type": "steel", "zone": "land", "name": "معدن فولاد رور",                    "lon": 7.0,   "lat": 51.4,  "production": 4_000_000},
-    "steel_brazil":   {"type": "steel", "zone": "land", "name": "معدن فولاد برزیل (کاراجاس)",        "lon": -50.2, "lat": -6.1,  "production": 3_500_000},
-    "steel_mesabi":   {"type": "steel", "zone": "land", "name": "معدن فولاد مسابی (آمریکا)",         "lon": -92.6, "lat": 47.5,  "production": 3_000_000},
-    "steel_anshan":   {"type": "steel", "zone": "land", "name": "معدن فولاد آنشان (چین)",            "lon": 123.0, "lat": 41.1,  "production": 3_500_000},
+    # ---------- آهن ----------
+    "steel_ural":     {"type": "steel", "zone": "land", "name": "معدن آهن اورال (ماگنیتوگورسک)",  "lon": 59.1,  "lat": 53.4,  "production": 3_000_000},
+    "steel_ruhr":     {"type": "steel", "zone": "land", "name": "معدن آهن رور",                    "lon": 7.0,   "lat": 51.4,  "production": 4_000_000},
+    "steel_brazil":   {"type": "steel", "zone": "land", "name": "معدن آهن برزیل (کاراجاس)",        "lon": -50.2, "lat": -6.1,  "production": 3_500_000},
+    "steel_mesabi":   {"type": "steel", "zone": "land", "name": "معدن آهن مسابی (آمریکا)",         "lon": -92.6, "lat": 47.5,  "production": 3_000_000},
+    "steel_anshan":   {"type": "steel", "zone": "land", "name": "معدن آهن آنشان (چین)",            "lon": 123.0, "lat": 41.1,  "production": 3_500_000},
     # ---------- اورانیوم ----------
     "uranium_kazakh":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم قزاقستان",          "lon": 72.2,  "lat": 52.4,  "production": 2_500_000},
     "uranium_canada":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم کانادا (آتاباسکا)", "lon": -105.6,"lat": 57.2,  "production": 2_000_000},
@@ -488,11 +481,10 @@ def ensure_player_fields(player):
         elif k not in ECONOMY: del lv_map[k]
     player.setdefault("map_holdings", {})
     player.setdefault("strait_holdings", {})
-    player.setdefault("announcements", {})
+    player.setdefault("announcements", {}); player.setdefault("land_trade_open", True)
     player.setdefault("is_eliminated", False)
     player.setdefault("scans", 0)
     player.setdefault("scan_active", {})
-    player.setdefault("debt", 0)
 
 def compute_rates(player):
     power_capacity = get_power_total(player)
@@ -639,15 +631,13 @@ news_feed = []
 site_forces = {}   # site_id -> {"owner": country, "units": {unit_id: n}}
 war_events = []    # خبرهای جنگ
 war_history = []   # تاریخچهٔ درگیری‌ها
-loans = {}         # loan_id -> loan data
-loan_ledger = []   # تاریخچهٔ وام‌ها
 
 def create_player(user_id):
     return {"user_id": user_id, "country": None, "money": STARTING_MONEY, "army": 0,
             "manpower": STARTING_MANPOWER, "infra_levels": {},
             "units": {uid_: 0 for uid_ in ARMY_UNITS}, "resources": dict(STARTING_RESOURCES),
-            "map_holdings": {}, "strait_holdings": {}, "announcements": {},
-            "is_eliminated": False, "started_at": None, "last_update": None, "debt": 0}
+            "map_holdings": {}, "strait_holdings": {}, "announcements": {}, "land_trade_open": True,
+            "is_eliminated": False, "started_at": None, "last_update": None}
 
 def get_player_by_country(country_id):
     for uid_, p in players.items():
@@ -670,8 +660,8 @@ def save_state():
                  "announcements": announcements[-100:], "unions": unions,
                  "private_messages": private_messages, "market_listings": market_listings,
                  "news_feed": news_feed[-200:],
-                 "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:],
-                 "loans": loans, "loan_ledger": loan_ledger[-200:]}
+                 "straits_data": STRAITS_DATA,
+                 "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:]}
         tmp = STATE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False)
@@ -683,7 +673,7 @@ def load_state():
     global diplomacy_proposals, active_treaties, map_holdings, strait_holdings
     global occupied_countries, war_declarations, active_wars, war_reports
     global announcements, unions, private_messages, market_listings, news_feed
-    global site_forces, war_events, war_history, loans, loan_ledger
+    global site_forces, war_events, war_history
     if not os.path.exists(STATE_FILE):
         logging.info("No state, fresh start."); return
     try:
@@ -702,12 +692,13 @@ def load_state():
         private_messages = state.get("private_messages", {})
         market_listings = state.get("market_listings", {})
         news_feed = state.get("news_feed", [])
+        for _sid, _sv in state.get("straits_data", {}).items():
+            if _sid in STRAITS_DATA:
+                STRAITS_DATA[_sid].update({"toll": _sv.get("toll", STRAITS_DATA[_sid].get("toll",0)), "closed": _sv.get("closed", STRAITS_DATA[_sid].get("closed",False))})
         site_forces = state.get("site_forces", {})
         war_events = state.get("war_events", [])
         war_history = state.get("war_history", [])
-        loans = state.get("loans", {})
-        loan_ledger = state.get("loan_ledger", [])
-        logging.info("State loaded: %d players, %d loans", len(players), len(loans))
+        logging.info("State loaded: %d players", len(players))
     except Exception as e:
         logging.error("load_state failed: %s", e)
 
@@ -820,44 +811,6 @@ async def war_cb(cb: types.CallbackQuery):
         push_war("declare", f"{COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} اعلان جنگ کرد.", [w["attacker"], w["defender"]])
     else:
         w["status"] = "rejected"; await cb.message.edit_text("❌ رد شد.")
-    save_state(); await cb.answer()
-
-@dp.callback_query(F.data.startswith("loan:"))
-async def loan_cb(cb: types.CallbackQuery):
-    _, action, lid = cb.data.split(":")
-    loan = loans.get(lid)
-    if not loan or loan["status"] != "pending_accept":
-        await cb.answer("منقضی شده"); return
-    tuid, tp = get_player_by_country(loan["borrower"])
-    if not tuid or tuid != cb.from_user.id:
-        await cb.answer("برای شما نیست."); return
-    if action == "accept":
-        luid, lp = get_player_by_country(loan["lender"])
-        if not luid or not lp:
-            await cb.message.edit_text("❌ وام‌دهنده دیگر در دسترس نیست."); return
-        accrue_player(tp)
-        rates = compute_rates(tp)
-        max_limit = int(max(0, rates["net_income"]) * MAX_LOAN_PERCENT)
-        if loan["amount"] > max_limit:
-            await cb.message.edit_text("❌ سقف وام تغییر کرده است."); return
-        if lp.get("money", 0) < loan["amount"]:
-            await cb.message.edit_text("❌ وام‌دهنده پول کافی ندارد."); return
-        commission = int(loan["amount"] * COMMISSION_RATE)
-        net_amount = loan["amount"] - commission
-        lp["money"] -= loan["amount"]
-        tp["money"] = tp.get("money", 0) + net_amount
-        loan["status"] = "active"
-        loan["accepted_at"] = utcnow().isoformat()
-        loan["due_at"] = (utcnow() + timedelta(hours=loan["duration_hours"])).isoformat()
-        loan_ledger.append({"id": loan["id"], "lender": loan["lender"], "borrower": loan["borrower"],
-                            "amount": loan["amount"], "repay_amount": loan["repay_amount"],
-                            "duration_hours": loan["duration_hours"], "profit_rate": PROFIT_PER_12H,
-                            "status": "active", "at": utcnow().isoformat()})
-        push_news("وام", f"{COUNTRIES[loan['lender']]['name']} به {COUNTRIES[loan['borrower']]['name']} وام داد.")
-        await cb.message.edit_text(f"✅ وام دریافت شد.\nمبلغ خالص: {net_amount:,}$")
-    else:
-        loan["status"] = "rejected"
-        await cb.message.edit_text("❌ وام رد شد.")
     save_state(); await cb.answer()
 
 # =========================================================
@@ -1285,7 +1238,8 @@ async def get_map_sites(request):
     for k, info in STRAITS_DATA.items():
         sites.append({"id": k, "kind": "strait", "type": "strait", "name": info["name"],
                       "lon": info["lon"], "lat": info["lat"], "income": info["income"],
-                      "zone": "sea", "owner": strait_holdings.get(k)})
+                      "zone": "sea", "owner": strait_holdings.get(k),
+                      "toll": info.get("toll", 0), "closed": info.get("closed", False)})
     return web.json_response(sites)
 
 async def capture_site(request):
@@ -1606,211 +1560,6 @@ async def sat_scan_country(request):
     return web.json_response({"success": True, "message": "اسکن کشور انجام شد و ۲۴ ساعت زنده است.", "player": serialize_player(p)})
 
 # =========================================================
-# API Loans
-# =========================================================
-async def get_loan_ledger(request):
-    return web.json_response({"ledger": list(reversed(loan_ledger))})
-
-async def get_my_loans(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
-    if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]
-    cid = p.get("country")
-    if not cid: return web.json_response({"my_loans": [], "max_loan_limit": 0, "daily_income": 0})
-    accrue_player(p)
-    rates = compute_rates(p)
-    daily_income = max(0, rates["net_income"])
-    max_loan = int(daily_income * MAX_LOAN_PERCENT)
-    my_loans = [l for l in loans.values()
-                if (l["lender"] == cid or l["borrower"] == cid)
-                and l["status"] in ("pending_accept", "active", "defaulted")]
-    active_as_borrower = len([l for l in my_loans if l["borrower"] == cid and l["status"] == "active"])
-    return web.json_response({"my_loans": my_loans, "max_loan_limit": max_loan,
-                              "daily_income": daily_income, "active_loan_count": active_as_borrower})
-
-async def propose_loan(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request)
-    target_country = data.get("target")
-    try:
-        amount = int(data.get("amount", 0))
-        duration_hours = int(data.get("duration_hours", 24))
-    except (TypeError, ValueError):
-        return web.json_response({"success": False, "error": "invalid_data"}, status=400)
-    if target_country not in COUNTRIES or amount <= 0:
-        return web.json_response({"success": False, "error": "invalid_data"}, status=400)
-    if duration_hours < MIN_LOAN_DURATION or duration_hours > MAX_LOAN_DURATION:
-        return web.json_response({"success": False, "error": "invalid_duration",
-                                  "message": f"مدت باید بین {MIN_LOAN_DURATION} و {MAX_LOAN_DURATION} ساعت باشد."}, status=400)
-    tuid, tp = get_player_by_country(target_country)
-    if not tuid: return web.json_response({"success": False, "error": "target_no_player"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]
-    cid = p.get("country")
-    if not cid or cid == target_country:
-        return web.json_response({"success": False, "error": "invalid_state"}, status=400)
-    accrue_player(p)
-    if p.get("money", 0) < amount:
-        return web.json_response({"success": False, "error": "not_enough_money",
-                                  "message": "پول کافی برای وام دادن ندارید."}, status=400)
-    for l in loans.values():
-        if l["borrower"] == target_country and l["status"] == "active":
-            return web.json_response({"success": False, "error": "borrower_has_active_loan",
-                                      "message": "این کشور یک وام فعال دارد."}, status=400)
-    accrue_player(tp)
-    rates = compute_rates(tp)
-    max_limit = int(max(0, rates["net_income"]) * MAX_LOAN_PERCENT)
-    if amount > max_limit:
-        return web.json_response({"success": False, "error": "exceeds_limit",
-                                  "message": f"سقف وام برای این کشور {max_limit:,} دلار است."}, status=400)
-    profit_multiplier = 1 + (PROFIT_PER_12H * (duration_hours / 12))
-    repay_amount = int(amount * profit_multiplier)
-    lid = str(uuid.uuid4())
-    loans[lid] = {"id": lid, "lender": cid, "borrower": target_country,
-                  "amount": amount, "repay_amount": repay_amount,
-                  "duration_hours": duration_hours,
-                  "created_at": utcnow().isoformat(),
-                  "due_at": None, "status": "pending_accept"}
-    try:
-        kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✅ قبول وام", callback_data=f"loan:accept:{lid}"),
-            InlineKeyboardButton(text="❌ رد", callback_data=f"loan:reject:{lid}")]])
-        await bot.send_message(tuid,
-            f"💰 پیشنهاد وام از {COUNTRIES[cid]['name']}\n"
-            f"مبلغ: {amount:,} دلار\n"
-            f"بازپرداخت: {repay_amount:,} دلار\n"
-            f"مدت: {duration_hours} ساعت\n"
-            f"کمیسیون: ۵٪", reply_markup=kb)
-    except Exception as e:
-        logging.warning("loan msg: %s", e)
-    save_state()
-    return web.json_response({"success": True, "message": "پیشنهاد وام ارسال شد."})
-
-async def accept_loan(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request)
-    lid = data.get("loan_id")
-    loan = loans.get(lid)
-    if not loan or loan["status"] != "pending_accept":
-        return web.json_response({"success": False, "error": "invalid_loan"}, status=400)
-    tuid, tp = get_player_by_country(loan["borrower"])
-    if not tuid or tuid != uid:
-        return web.json_response({"success": False, "error": "not_borrower"}, status=403)
-    luid, lp = get_player_by_country(loan["lender"])
-    if not luid or not lp:
-        return web.json_response({"success": False, "error": "lender_gone"}, status=400)
-    accrue_player(tp)
-    rates = compute_rates(tp)
-    max_limit = int(max(0, rates["net_income"]) * MAX_LOAN_PERCENT)
-    if loan["amount"] > max_limit:
-        return web.json_response({"success": False, "error": "exceeds_limit"}, status=400)
-    if lp.get("money", 0) < loan["amount"]:
-        return web.json_response({"success": False, "error": "lender_no_money"}, status=400)
-    commission = int(loan["amount"] * COMMISSION_RATE)
-    net_amount = loan["amount"] - commission
-    lp["money"] -= loan["amount"]
-    tp["money"] = tp.get("money", 0) + net_amount
-    loan["status"] = "active"
-    loan["accepted_at"] = utcnow().isoformat()
-    loan["due_at"] = (utcnow() + timedelta(hours=loan["duration_hours"])).isoformat()
-    loan_ledger.append({"id": loan["id"], "lender": loan["lender"], "borrower": loan["borrower"],
-                        "amount": loan["amount"], "repay_amount": loan["repay_amount"],
-                        "duration_hours": loan["duration_hours"], "profit_rate": PROFIT_PER_12H,
-                        "status": "active", "at": utcnow().isoformat()})
-    push_news("وام", f"{COUNTRIES[loan['lender']]['name']} به {COUNTRIES[loan['borrower']]['name']} وام داد.")
-    save_state()
-    return web.json_response({"success": True, "message": f"وام دریافت شد. مبلغ خالص: {net_amount:,} دلار"})
-
-async def repay_loan(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request)
-    lid = data.get("loan_id")
-    loan = loans.get(lid)
-    if not loan or loan["status"] != "active":
-        return web.json_response({"success": False, "error": "invalid_loan"}, status=400)
-    tuid, tp = get_player_by_country(loan["borrower"])
-    if not tuid or tuid != uid:
-        return web.json_response({"success": False, "error": "not_borrower"}, status=403)
-    luid, lp = get_player_by_country(loan["lender"])
-    if not luid or not lp:
-        return web.json_response({"success": False, "error": "lender_gone"}, status=400)
-    accrue_player(tp)
-    if tp.get("money", 0) < loan["repay_amount"]:
-        return web.json_response({"success": False, "error": "not_enough_money",
-                                  "message": "پول کافی برای تسویه ندارید."}, status=400)
-    commission = int(loan["repay_amount"] * COMMISSION_RATE)
-    net_repay = loan["repay_amount"] - commission
-    tp["money"] -= loan["repay_amount"]
-    lp["money"] = lp.get("money", 0) + net_repay
-    loan["status"] = "repaid"
-    loan["repaid_at"] = utcnow().isoformat()
-    for l in loan_ledger:
-        if l["id"] == lid: l["status"] = "repaid"; break
-    push_news("تسویه وام", f"{COUNTRIES[loan['borrower']]['name']} وام خود را تسویه کرد.")
-    save_state()
-    return web.json_response({"success": True, "message": "وام با موفقیت تسویه شد."})
-
-async def process_loans():
-    now = utcnow()
-    changed = False
-    for lid, loan in list(loans.items()):
-        if loan["status"] != "active": continue
-        due = parse_dt(loan.get("due_at"))
-        if not due or now < due: continue
-        tuid, tp = get_player_by_country(loan["borrower"])
-        luid, lp = get_player_by_country(loan["lender"])
-        if not tuid or not tp or not luid or not lp:
-            loan["status"] = "failed"; changed = True; continue
-        accrue_player(tp)
-        commission = int(loan["repay_amount"] * COMMISSION_RATE)
-        net_repay = loan["repay_amount"] - commission
-        if tp.get("money", 0) >= loan["repay_amount"]:
-            tp["money"] -= loan["repay_amount"]
-            lp["money"] = lp.get("money", 0) + net_repay
-            loan["status"] = "repaid"
-            loan["repaid_at"] = now.isoformat()
-            push_news("تسویه وام", f"{COUNTRIES[loan['borrower']]['name']} وام خود را تسویه کرد.")
-        else:
-            paid = tp.get("money", 0)
-            tp["money"] = 0
-            lp["money"] = lp.get("money", 0) + int(paid * (1 - COMMISSION_RATE))
-            remaining = loan["repay_amount"] - paid
-            loan["status"] = "defaulted"
-            loan["remaining_debt"] = remaining
-            tp["debt"] = tp.get("debt", 0) + remaining
-            push_news("نکول وام", f"{COUNTRIES[loan['borrower']]['name']} در بازپرداخت وام نکول کرد.")
-        for l in loan_ledger:
-            if l["id"] == lid: l["status"] = loan["status"]; break
-        changed = True
-    # پرداخت خودکار بدهی از درآمد
-    for uid_, p in players.items():
-        if p.get("debt", 0) > 0 and p.get("country"):
-            accrue_player(p)
-            rates = compute_rates(p)
-            income = max(0, rates["net_income"])
-            if income > 0:
-                pay = min(p["debt"], income)
-                p["debt"] -= pay
-                p["money"] = max(0, p.get("money", 0) - pay)
-                for loan in loans.values():
-                    if loan["borrower"] == p["country"] and loan["status"] == "defaulted":
-                        luid, lp = get_player_by_country(loan["lender"])
-                        if lp: lp["money"] = lp.get("money", 0) + int(pay * (1 - COMMISSION_RATE))
-                        break
-                changed = True
-    if changed: save_state()
-
-async def loan_tick_loop():
-    while True:
-        await asyncio.sleep(60)
-        try: await process_loans()
-        except Exception as e: logging.error("loan tick: %s", e)
-
-# =========================================================
 # API Announcements
 # =========================================================
 async def get_announcements(request):
@@ -1958,4 +1707,448 @@ async def respond_union_invite(request):
     save_state()
     return web.json_response({"success": True})
 
-async def leave_union
+async def leave_union(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    cid = players[uid].get("country")
+    for u in list(unions.values()):
+        if cid in u.get("members", []):
+            u["members"].remove(cid)
+            if not u["members"]: del unions[u["id"]]
+            save_state(); return web.json_response({"success": True})
+    return web.json_response({"success": False, "error": "not_member"}, status=400)
+
+async def send_union_message(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request); text = (data.get("text") or "").strip()[:500]
+    if not text: return web.json_response({"success": False, "error": "empty"}, status=400)
+    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    cid = players[uid].get("country")
+    for u in unions.values():
+        if cid in u.get("members", []):
+            u.setdefault("messages", []).append({"from_country": cid, "text": text, "at": utcnow().isoformat()})
+            if len(u["messages"]) > 200: del u["messages"][:50]
+            save_state(); return web.json_response({"success": True})
+    return web.json_response({"success": False, "error": "not_member"}, status=400)
+
+# =========================================================
+# API Private messages
+# =========================================================
+async def send_pm(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request); target = data.get("target"); text = (data.get("text") or "").strip()[:500]
+    if target not in COUNTRIES or not text:
+        return web.json_response({"success": False, "error": "invalid"}, status=400)
+    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    cid = players[uid].get("country")
+    if not cid or target == cid:
+        return web.json_response({"success": False, "error": "invalid"}, status=400)
+    msg = {"from": cid, "to": target, "text": text, "at": utcnow().isoformat()}
+    private_messages.setdefault(cid, {}).setdefault(target, []).append(msg)
+    private_messages.setdefault(target, {}).setdefault(cid, []).append(msg)
+    save_state()
+    return web.json_response({"success": True})
+
+async def get_pm(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    target = request.query.get("target")
+    if uid not in players: return web.json_response({"messages": []})
+    cid = players[uid].get("country")
+    if not cid: return web.json_response({"messages": []})
+    if target:
+        return web.json_response({"messages": private_messages.get(cid, {}).get(target, []), "with": target})
+    return web.json_response({"conversations": list(private_messages.get(cid, {}).keys())})
+
+# =========================================================
+# API Market — international trade
+# =========================================================
+TRADE_COUNTRY_COORDS = {
+    "germany": (10.45, 51.16), "france": (2.21, 46.23), "italy": (12.57, 41.87),
+    "britain": (-3.44, 55.38), "ussr": (90.00, 55.00), "usa": (-100.00, 38.00),
+    "china": (103.82, 35.86), "japan": (138.25, 36.20),
+}
+# فقط همسایهٔ مستقیم؛ کشور واسطه برای تجارت زمینی استفاده نمی‌شود.
+LAND_NEIGHBORS = {
+    frozenset(("germany", "france")), frozenset(("germany", "ussr")),
+    frozenset(("germany", "italy")), frozenset(("france", "italy")),
+    frozenset(("ussr", "china")),
+}
+# مسیرهای دریایی ساده‌شدهٔ بازی. [] یعنی مسیر مستقیم و بدون تنگه.
+SEA_ROUTE_HINTS = {
+    frozenset(("germany", "britain")): [["dover"], []],
+    frozenset(("france", "britain")): [["dover"], []],
+    frozenset(("italy", "britain")): [["gibraltar", "dover"], ["gibraltar"], []],
+    frozenset(("germany", "italy")): [["gibraltar"], []],
+    frozenset(("france", "italy")): [["gibraltar"], []],
+    frozenset(("germany", "china")): [["suez", "malacca"], ["gibraltar", "suez", "malacca"], []],
+    frozenset(("france", "china")): [["suez", "malacca"], ["gibraltar", "suez", "malacca"], []],
+    frozenset(("italy", "china")): [["suez", "malacca"], []],
+    frozenset(("britain", "china")): [["suez", "malacca"], ["gibraltar", "suez", "malacca"], []],
+    frozenset(("ussr", "japan")): [["korea"], ["taiwan"], []],
+    frozenset(("china", "japan")): [["taiwan"], ["korea"], []],
+    frozenset(("usa", "japan")): [["panama"], []],
+    frozenset(("usa", "china")): [["panama", "malacca"], ["malacca"], []],
+    frozenset(("usa", "germany")): [["panama", "gibraltar"], ["panama", "suez"], []],
+    frozenset(("usa", "france")): [["panama", "gibraltar"], ["panama", "suez"], []],
+    frozenset(("usa", "italy")): [["panama", "gibraltar"], ["panama", "suez"], []],
+    frozenset(("usa", "britain")): [["panama", "gibraltar"], []],
+    frozenset(("usa", "ussr")): [["panama", "gibraltar"], ["panama", "suez"], []],
+}
+TRADE_MODE_FACTOR = {"land": 0.65, "sea": 1.0, "air": 2.75}
+TRADE_COST_PER_1000KM_PER_1000_UNITS = {"land": 900, "sea": 1500, "air": 4200}
+
+
+def _trade_distance_km(a, b):
+    from math import radians, sin, cos, asin, sqrt
+    if a not in TRADE_COUNTRY_COORDS or b not in TRADE_COUNTRY_COORDS: return 1000.0
+    lon1, lat1 = TRADE_COUNTRY_COORDS[a]; lon2, lat2 = TRADE_COUNTRY_COORDS[b]
+    r = 6371.0
+    dlon, dlat = radians(lon2-lon1), radians(lat2-lat1)
+    x = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
+    return r * 2 * asin(sqrt(max(0, min(1, x))))
+
+
+def _land_open(cid):
+    _, p = get_player_by_country(cid)
+    return bool((p or {}).get("land_trade_open", True))
+
+
+def _war_between(a, b):
+    if not a or not b: return False
+    return any({w.get("attacker"), w.get("defender")} == {a, b}
+               for w in active_wars.values() if not w.get("resolved"))
+
+
+def _infra_ready(country, infra_id):
+    _, p = get_player_by_country(country)
+    return bool(p and get_infra_level(p, infra_id) > 0)
+
+
+def _route_candidates(a, b):
+    key = frozenset((a, b))
+    out = []
+    if key in LAND_NEIGHBORS and _land_open(a) and _land_open(b):
+        out.append({"mode":"land", "straits":[]})
+    # دریایی: هر دو طرف باید بندر داشته باشند.
+    if _infra_ready(a, "naval_port") and _infra_ready(b, "naval_port"):
+        for route in SEA_ROUTE_HINTS.get(key, [[]]):
+            if all(not STRAITS_DATA.get(s, {}).get("closed", False) for s in route):
+                out.append({"mode":"sea", "straits":route})
+    # هوایی: هر دو طرف فرودگاه داشته باشند.
+    if _infra_ready(a, "air_airport") and _infra_ready(b, "air_airport"):
+        out.append({"mode":"air", "straits":[]})
+    return out
+
+
+def _route_quote(a, b, amount, preferred_mode=None):
+    if _war_between(a, b):
+        return None, "در زمان جنگ، تجارت مستقیم بین دو کشور تحریم است."
+    routes = _route_candidates(a, b)
+    if not routes:
+        return None, "هیچ مسیر قابل استفاده‌ای بین دو کشور وجود ندارد."
+    distance = max(100.0, _trade_distance_km(a, b))
+    quotes = []
+    for r in routes:
+        mode = r["mode"]
+        base = (max(1, amount) / 1000.0) * (distance / 1000.0) * TRADE_COST_PER_1000KM_PER_1000_UNITS[mode]
+        toll = sum(max(0, int(STRAITS_DATA[s].get("toll", 0))) for s in r["straits"] if s in STRAITS_DATA)
+        cost = int(round(base + toll))
+        quotes.append({**r, "distance_km": int(round(distance)), "transport_cost": cost, "toll": toll,
+                       "strait_costs":[{"id":s,"name":STRAITS_DATA[s]["name"],"cost":int(STRAITS_DATA[s].get("toll",0)),
+                                         "owner":strait_holdings.get(s)} for s in r["straits"]]})
+    if preferred_mode:
+        same = [q for q in quotes if q["mode"] == preferred_mode]
+        if not same: return None, "این نوع حمل برای این معامله ممکن نیست."
+        return min(same, key=lambda x: x["transport_cost"]), None
+    # ارزان‌ترین مسیر مجاز انتخاب می‌شود؛ اگر تنگه بسته باشد، مسیر دیگر خودکار انتخاب می‌شود.
+    return min(quotes, key=lambda x: x["transport_cost"]), None
+
+
+def _route_options(a, b, amount):
+    if _war_between(a, b): return [], "در زمان جنگ، تجارت مستقیم بین دو کشور تحریم است."
+    routes = _route_candidates(a, b)
+    if not routes: return [], "هیچ مسیر قابل استفاده‌ای بین دو کشور وجود ندارد."
+    distance = max(100.0, _trade_distance_km(a, b)); out=[]
+    for r in routes:
+        mode=r["mode"]; base=(max(1,amount)/1000.0)*(distance/1000.0)*TRADE_COST_PER_1000KM_PER_1000_UNITS[mode]
+        toll=sum(max(0,int(STRAITS_DATA[s].get("toll",0))) for s in r["straits"] if s in STRAITS_DATA)
+        out.append({**r,"distance_km":int(round(distance)),"transport_cost":int(round(base+toll)),"toll":toll,
+                    "strait_costs":[{"id":s,"name":STRAITS_DATA[s]["name"],"cost":int(STRAITS_DATA[s].get("toll",0)),"owner":strait_holdings.get(s)} for s in r["straits"]]})
+    return out, None
+
+def _listing_view(l):
+    side = l.get("side", "sell")
+    if side == "sell":
+        return {**l, "side":"sell", "country":l["seller"], "resource":l["sell_resource"],
+                "amount":l["sell_amount"], "price_resource":l["want_resource"], "price_amount":l["want_amount"]}
+    return {**l, "side":"buy", "country":l["buyer"], "resource":l["buy_resource"],
+            "amount":l["buy_amount"], "price_resource":l["offer_resource"], "price_amount":l["offer_amount"]}
+
+
+async def get_market(request):
+    rows = []
+    for l in market_listings.values():
+        if l.get("status") != "open": continue
+        v = _listing_view(l)
+        seller = v["country"]
+        # برای هر آگهی، مسیر و هزینهٔ حمل فعلی را هم نشان بده.
+        other = None
+        if v["side"] == "sell":
+            other = request.query.get("country")
+        else:
+            other = request.query.get("country")
+        if other and other in COUNTRIES and other != seller:
+            qs, err = _route_options(seller, other, v["amount"])
+            v["routes"] = qs; v["route_error"] = err
+        else:
+            v["routes"] = []
+        rows.append(v)
+    return web.json_response({"listings": rows,
+                              "trade_modes":{"land":True,"sea":True,"air":True}})
+
+
+async def create_listing(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
+    data = await read_json(request); side = data.get("side", "sell")
+    try: amount = int(data.get("amount", 0)); price_amount = int(data.get("price_amount", 0))
+    except: return web.json_response({"success":False,"error":"invalid_amount"}, status=400)
+    resource = data.get("resource"); price_resource = data.get("price_resource", "money")
+    if resource not in RESOURCE_NAMES or (price_resource != "money" and price_resource not in RESOURCE_NAMES):
+        return web.json_response({"success":False,"error":"invalid_res"}, status=400)
+    if side not in ("sell","buy") or amount <= 0 or price_amount <= 0:
+        return web.json_response({"success":False,"error":"invalid_amount"}, status=400)
+    if uid not in players: players[uid] = create_player(uid)
+    p = players[uid]; cid = p.get("country")
+    if not cid: return web.json_response({"success":False,"error":"no_country"}, status=400)
+    if side == "sell" and p["resources"].get(resource,0) < amount:
+        return web.json_response({"success":False,"error":"not_enough_res"}, status=400)
+    if side == "buy":
+        if price_resource == "money" and p.get("money",0) < price_amount:
+            return web.json_response({"success":False,"error":"not_enough_money"}, status=400)
+        if price_resource != "money" and p["resources"].get(price_resource,0) < price_amount:
+            return web.json_response({"success":False,"error":"not_enough_res"}, status=400)
+    lid = str(uuid.uuid4())
+    if side == "sell":
+        l = {"id":lid,"side":"sell","seller":cid,"sell_resource":resource,"sell_amount":amount,
+             "want_resource":price_resource,"want_amount":price_amount,"status":"open","created_at":utcnow().isoformat()}
+    else:
+        l = {"id":lid,"side":"buy","buyer":cid,"buy_resource":resource,"buy_amount":amount,
+             "offer_resource":price_resource,"offer_amount":price_amount,"status":"open","created_at":utcnow().isoformat()}
+    market_listings[lid] = l; save_state()
+    return web.json_response({"success":True,"listing_id":lid})
+
+
+async def cancel_listing(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
+    data = await read_json(request); lid = data.get("listing_id")
+    cid = players.get(uid,{}).get("country"); l = market_listings.get(lid)
+    owner = l.get("seller") if l and l.get("side","sell")=="sell" else (l.get("buyer") if l else None)
+    if not l: return web.json_response({"success":False,"error":"not_found"}, status=404)
+    if owner != cid: return web.json_response({"success":False,"error":"not_owner"}, status=403)
+    del market_listings[lid]; save_state(); return web.json_response({"success":True})
+
+
+async def accept_listing(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
+    data = await read_json(request); lid = data.get("listing_id")
+    if uid not in players: players[uid] = create_player(uid)
+    actor = players[uid]; actor_cid = actor.get("country"); l = market_listings.get(lid)
+    if not l or l.get("status") != "open": return web.json_response({"success":False,"error":"closed"}, status=400)
+    side = l.get("side","sell")
+    owner_cid = l.get("seller") if side == "sell" else l.get("buyer")
+    if owner_cid == actor_cid: return web.json_response({"success":False,"error":"self_buy"}, status=400)
+    seller_cid = owner_cid if side == "buy" else actor_cid
+    buyer_cid = actor_cid if side == "sell" else owner_cid
+    _, seller = get_player_by_country(seller_cid); _, buyer = get_player_by_country(buyer_cid)
+    if not seller or not buyer: return web.json_response({"success":False,"error":"player_gone"}, status=400)
+    resource = l["sell_resource"] if side == "sell" else l["buy_resource"]
+    amount = l["sell_amount"] if side == "sell" else l["buy_amount"]
+    pay_res = l["want_resource"] if side == "sell" else l["offer_resource"]
+    pay_amount = l["want_amount"] if side == "sell" else l["offer_amount"]
+    route, route_err = _route_quote(seller_cid, buyer_cid, amount, data.get("mode"))
+    if route_err: return web.json_response({"success":False,"error":"no_route","message":route_err}, status=400)
+    if seller["resources"].get(resource,0) < amount:
+        return web.json_response({"success":False,"error":"seller_no_res"}, status=400)
+    if pay_res == "money":
+        if buyer.get("money",0) < pay_amount + route["transport_cost"]:
+            return web.json_response({"success":False,"error":"not_enough_money","message":f"پول کافی نیست؛ هزینه حمل {route['transport_cost']:,}$ است."}, status=400)
+        buyer["money"] -= pay_amount; seller["money"] = seller.get("money",0) + pay_amount
+        buyer["money"] -= route["transport_cost"]
+    else:
+        if buyer["resources"].get(pay_res,0) < pay_amount:
+            return web.json_response({"success":False,"error":"not_enough_res"}, status=400)
+        if buyer.get("money",0) < route["transport_cost"]:
+            return web.json_response({"success":False,"error":"not_enough_money","message":f"پول کافی برای حمل نیست؛ هزینه حمل {route['transport_cost']:,}$ است."}, status=400)
+        buyer["resources"][pay_res] -= pay_amount; seller["resources"][pay_res] = seller["resources"].get(pay_res,0) + pay_amount
+        buyer["money"] -= route["transport_cost"]
+    seller["resources"][resource] -= amount; buyer["resources"][resource] = buyer["resources"].get(resource,0) + amount
+    l["status"]="filled"; l["actor"] = actor_cid; l["route"] = route
+    for s in route.get("strait_costs",[]):
+        owner = s.get("owner")
+        if owner and owner in players.values(): pass
+        if owner:
+            _, sp = get_player_by_country(owner)
+            if sp: sp["money"] = sp.get("money",0) + s["cost"]
+    push_news("معامله بازار جهانی", f"{COUNTRIES[buyer_cid]['name']} {amount:,} {RESOURCE_NAMES[resource]} را از {COUNTRIES[seller_cid]['name']} خرید؛ مسیر {route['mode']} و هزینه حمل {route['transport_cost']:,}$.")
+    save_state()
+    return web.json_response({"success":True,"route":route,"transport_cost":route["transport_cost"]})
+
+
+async def set_strait_settings(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
+    data = await read_json(request); sid = data.get("site_id")
+    if sid not in STRAITS_DATA: return web.json_response({"success":False,"error":"invalid_site"}, status=400)
+    cid = players.get(uid,{}).get("country")
+    if strait_holdings.get(sid) != cid: return web.json_response({"success":False,"error":"not_owner"}, status=403)
+    toll = max(0, int(data.get("toll", STRAITS_DATA[sid].get("toll",0))))
+    closed = bool(data.get("closed", STRAITS_DATA[sid].get("closed",False)))
+    STRAITS_DATA[sid]["toll"] = toll; STRAITS_DATA[sid]["closed"] = closed
+    state_word = "بسته" if closed else "باز"
+    push_news("تغییر وضعیت تنگه", f"{COUNTRIES[cid]['name']} {STRAITS_DATA[sid]['name']} را {state_word} کرد و عوارض عبور را {toll:,}$ تعیین کرد.")
+    save_state(); return web.json_response({"success":True,"toll":toll,"closed":closed})
+
+
+async def set_border_settings(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
+    if uid not in players: players[uid]=create_player(uid)
+    p=players[uid];
+    if not p.get("country"): return web.json_response({"success":False,"error":"no_country"}, status=400)
+    open_=bool((await read_json(request)).get("open",True)); p["land_trade_open"]=open_
+    push_news("مرز زمینی", f"{COUNTRIES[p['country']]['name']} مرزهای تجارت زمینی را {'باز' if open_ else 'بسته'} کرد.")
+    save_state(); return web.json_response({"success":True,"open":open_})
+
+# =========================================================
+# API News / Rankings
+# =========================================================
+async def get_news(request):
+    return web.json_response(list(reversed(news_feed[-30:])) or [
+        {"title": "سال ۱۹۹۳", "text": "جهان در آستانه یک بحران بزرگ قرار دارد."}])
+
+def compute_rankings():
+    rows = []
+    for uid, p in players.items():
+        cid = p.get("country")
+        if not cid: continue
+        ensure_player_fields(p); recompute_army(p); rates = compute_rates(p)
+        eco = max(0, int(rates["net_income"] // 1000)); mil = p.get("army", 0)
+        dip = 0
+        for t in active_treaties:
+            if t["country_a"] == cid or t["country_b"] == cid: dip += 100
+        for u in unions.values():
+            if cid in u.get("members", []): dip += 150
+        dev = sum(p.get("infra_levels", {}).values()) * 50
+        terr = (sum(1 for o in map_holdings.values() if o == cid)
+                + sum(1 for o in strait_holdings.values() if o == cid)
+                + 5 * sum(1 for o in occupied_countries.values() if o == cid))
+        rows.append({"country": cid, "name": COUNTRIES[cid]["name"], "flag": COUNTRIES[cid]["flag"],
+                     "economy": eco, "military": mil, "territory": terr, "diplomacy": dip,
+                     "development": dev, "is_eliminated": p.get("is_eliminated", False)})
+    W = {"economy": 30, "military": 25, "territory": 20, "development": 15, "diplomacy": 10}
+    mx = {k: max([r[k] for r in rows] + [0]) for k in W}
+    for r in rows:
+        r["overall"] = round(sum(W[k] * r[k] / mx[k] for k in W if mx[k] > 0), 1)
+    rows.sort(key=lambda x: x["overall"], reverse=True)
+    for i, r in enumerate(rows): r["rank"] = i + 1
+    return rows
+
+async def get_rankings(request):
+    return web.json_response(compute_rankings())
+
+# =========================================================
+# Health / Debug
+# =========================================================
+async def health(request):
+    return web.json_response({"status": "ok", "players": len(players)})
+
+async def debug_auth(request):
+    init_data = request.headers.get("X-Telegram-Init-Data") or request.query.get("init_data") or ""
+    user = verify_init_data(init_data)
+    return web.json_response({"auth_required": AUTH_REQUIRED, "got_init_data": bool(init_data),
+                              "verified": user is not None, "user": user,
+                              "bot_token_set": bool(BOT_TOKEN), "players_count": len(players)})
+
+# =========================================================
+# Web Server
+# =========================================================
+WEB_DIR = os.path.join("web")
+
+NO_CACHE = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
+async def index(request): return web.FileResponse(os.path.join(WEB_DIR, "index.html"), headers=NO_CACHE)
+async def style(request): return web.FileResponse(os.path.join(WEB_DIR, "style.css"), headers=NO_CACHE)
+async def app_js(request): return web.FileResponse(os.path.join(WEB_DIR, "app.js"), headers=NO_CACHE)
+
+async def create_web_app():
+    app = web.Application(middlewares=[cors_middleware])
+    app.router.add_get("/", index)
+    app.router.add_get("/style.css", style)
+    app.router.add_get("/app.js", app_js)
+    app.router.add_static("/images/", path=os.path.join(WEB_DIR, "images"), name="images")
+
+    for path, h in [
+        ("/api/player", get_player), ("/api/countries", get_countries),
+        ("/api/army-units", get_army_units), ("/api/diplomacy", get_diplomacy),
+        ("/api/wars", get_wars), ("/api/map-sites", get_map_sites),
+        ("/api/announcements", get_announcements), ("/api/announcement", get_announcement_detail),
+        ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
+        ("/api/news", get_news), ("/api/rankings", get_rankings),
+        ("/api/war/forces", get_forces), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
+        ("/api/debug-auth", debug_auth), ("/health", health)]:
+        app.router.add_get(path, h)
+
+    for path, h in [
+        ("/api/select-country", select_country), ("/api/upgrade-infra", upgrade_infra),
+        ("/api/upgrade-economy", upgrade_economy), ("/api/train-unit", train_unit),
+        ("/api/propose-treaty", propose_treaty), ("/api/respond-treaty", respond_treaty),
+        ("/api/war/declare", declare_war), ("/api/war/battle", perform_battle),
+        ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces),
+        ("/api/satellite/launch", sat_launch), ("/api/satellite/scan-site", sat_scan_site),
+        ("/api/satellite/scan-country", sat_scan_country),
+        ("/api/announcements/create", create_announcement),
+        ("/api/announcements/react", react_announcement),
+        ("/api/announcements/comment", comment_announcement),
+        ("/api/union/create", create_union), ("/api/union/invite", invite_union),
+        ("/api/union/respond", respond_union_invite), ("/api/union/leave", leave_union),
+        ("/api/union/message", send_union_message), ("/api/pm/send", send_pm),
+        ("/api/market/create", create_listing), ("/api/market/cancel", cancel_listing),
+        ("/api/market/accept", accept_listing), ("/api/strait/settings", set_strait_settings),
+        ("/api/border/settings", set_border_settings)]:
+        app.router.add_post(path, h)
+
+    app.router.add_route("OPTIONS", "/{tail:.*}", lambda r: web.Response())
+    return app
+
+async def start_web_server():
+    app = await create_web_app()
+    runner = web.AppRunner(app); await runner.setup()
+    port = int(os.getenv("PORT", "10000"))
+    site = web.TCPSite(runner, "0.0.0.0", port); await site.start()
+    logging.info("WEB SERVER STARTED | port=%s", port)
+
+async def war_tick_loop():
+    while True:
+        await asyncio.sleep(30)
+        try: await check_wars_tick()
+        except Exception as e: logging.error("war tick: %s", e)
+
+async def main():
+    logging.info("FRONT-LINE 1993 GAME STARTING...")
+    load_state()
+    asyncio.create_task(autosave_loop())
+    asyncio.create_task(war_tick_loop())
+    await start_web_server()
+    await bot.delete_webhook(drop_pending_updates=True)
+    logging.info("BOT POLLING STARTED")
+    await dp.start_polling(bot, drop_pending_updates=True, handle_signals=False)
+
+if __name__ == "__main__":
+    try: asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit): save_state()
