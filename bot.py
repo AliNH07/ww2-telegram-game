@@ -627,6 +627,12 @@ announcements = []
 unions = {}
 private_messages = {}
 market_listings = {}
+market_orders = {}
+market_trades = []
+market_embargoes = []
+strait_free = {}
+market_dyn = {}
+market_hist = {}
 news_feed = []
 site_forces = {}   # site_id -> {"owner": country, "units": {unit_id: n}}
 war_events = []    # خبرهای جنگ
@@ -659,6 +665,9 @@ def save_state():
                  "active_wars": active_wars, "war_reports": war_reports[-50:],
                  "announcements": announcements[-100:], "unions": unions,
                  "private_messages": private_messages, "market_listings": market_listings,
+                 "market_orders": market_orders, "market_trades": market_trades[-200:],
+                 "market_embargoes": [list(pr) for pr in market_embargoes], "strait_free": strait_free,
+                 "market_dyn": market_dyn, "market_hist": market_hist,
                  "news_feed": news_feed[-200:],
                  "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:]}
         tmp = STATE_FILE + ".tmp"
@@ -672,6 +681,7 @@ def load_state():
     global diplomacy_proposals, active_treaties, map_holdings, strait_holdings
     global occupied_countries, war_declarations, active_wars, war_reports
     global announcements, unions, private_messages, market_listings, news_feed
+    global market_orders, market_trades, market_embargoes, strait_free, market_dyn, market_hist
     global site_forces, war_events, war_history
     if not os.path.exists(STATE_FILE):
         logging.info("No state, fresh start."); return
@@ -690,6 +700,12 @@ def load_state():
         unions = state.get("unions", {})
         private_messages = state.get("private_messages", {})
         market_listings = state.get("market_listings", {})
+        market_orders = state.get("market_orders", {})
+        market_trades = state.get("market_trades", [])
+        market_embargoes = [tuple(pr) for pr in state.get("market_embargoes", [])]
+        strait_free = state.get("strait_free", {})
+        market_dyn = state.get("market_dyn", {})
+        market_hist = state.get("market_hist", {})
         news_feed = state.get("news_feed", [])
         site_forces = state.get("site_forces", {})
         war_events = state.get("war_events", [])
@@ -1759,76 +1775,435 @@ async def get_pm(request):
     return web.json_response({"conversations": list(private_messages.get(cid, {}).keys())})
 
 # =========================================================
-# API Market
+# API Market v2 — بورس کالای جهانی
 # =========================================================
-async def get_market(request):
-    return web.json_response({"listings": [l for l in market_listings.values() if l["status"] == "open"]})
+MARKET_SEASON_OPEN = {"food": 0.52, "steel": 0.55, "uranium": 0.54, "oil": 0.55}
+MARKET_FEE = 0.05
+MARKET_TRANSPORT_PCT = {"land": 0.005, "sea": 0.01, "air": 0.02}
+MARKET_TOLL_PCT = 0.01
+MARKET_OFFSET_MAX = 5
+RES_ICONS = {"food": "🌾", "steel": "⚙️", "uranium": "☢️", "oil": "🛢️"}
+UNIT_GROUP_ICONS = {"land": "🪖", "naval": "⚓", "air": "✈️", "missile": "🚀"}
+LAND_PAIRS = {frozenset(("germany", "france")), frozenset(("france", "italy")), frozenset(("ussr", "china"))}
+SEA_ROUTES = {
+    frozenset(("britain", "france")): ["dover"],
+    frozenset(("germany", "italy")): ["gibraltar"],
+    frozenset(("britain", "italy")): ["gibraltar"],
+    frozenset(("usa", "italy")): ["gibraltar"],
+    frozenset(("germany", "china")): ["suez", "malacca"],
+    frozenset(("germany", "japan")): ["suez", "malacca"],
+    frozenset(("britain", "china")): ["suez", "malacca"],
+    frozenset(("britain", "japan")): ["suez", "malacca"],
+    frozenset(("france", "china")): ["suez", "malacca"],
+    frozenset(("france", "japan")): ["suez", "malacca"],
+    frozenset(("italy", "china")): ["suez", "malacca"],
+    frozenset(("italy", "japan")): ["suez", "malacca"],
+    frozenset(("usa", "china")): ["taiwan"],
+    frozenset(("ussr", "japan")): ["korea"],
+    frozenset(("china", "japan")): ["korea"],
+}
 
-async def create_listing(request):
+def market_keys():
+    return ["res:" + k for k in RESOURCE_NAMES] + ["unit:" + u for u in ARMY_UNITS]
+
+def mkey_info(key):
+    if key.startswith("res:"):
+        k = key[4:]
+        return {"key": key, "kind": "resource", "res": k, "name": RESOURCE_NAMES[k],
+                "icon": RES_ICONS[k], "floor": float(MARKET_SEASON_OPEN[k]), "group": None}
+    u = key[4:]
+    au = ARMY_UNITS[u]
+    return {"key": key, "kind": "unit", "unit": u, "name": au["name"],
+            "icon": UNIT_GROUP_ICONS.get(au["group"], "🪖"), "floor": float(au["cost"]), "group": au["group"]}
+
+def war_count():
+    n = 0
+    for w in war_declarations.values():
+        if w["status"] == "negotiation": n += 1
+    for w in active_wars.values():
+        if not w.get("resolved"): n += 1
+    return n
+
+def war_bonus():
+    return min(0.50, 0.05 * war_count())
+
+def market_ensure():
+    for key in market_keys():
+        if key not in market_dyn:
+            info = mkey_info(key)
+            market_dyn[key] = info["floor"] * (1.2 if info["kind"] == "unit" else 1.0)
+        market_hist.setdefault(key, [])
+
+def market_price(key):
+    market_ensure()
+    info = mkey_info(key)
+    return max(info["floor"], market_dyn.get(key, info["floor"]) * (1 + war_bonus()))
+
+def market_chg24(key):
+    h = market_hist.get(key) or []
+    now_p = market_price(key)
+    cutoff = (utcnow() - timedelta(hours=24)).isoformat()
+    old = None
+    for ts, p in h:
+        if ts >= cutoff: old = p; break
+    if old is None: old = h[0][1] if h else now_p
+    return 0.0 if not old else (now_p - old) / old
+
+def order_price(o):
+    return market_price(o["key"]) * (1 + o["offset_pct"] / 100.0)
+
+def embargoed(a, b):
+    return any(sorted(pr) == sorted((a, b)) for pr in market_embargoes)
+
+def infra_lv(cid, iid):
+    _, p = get_player_by_country(cid)
+    return get_infra_level(p, iid) if p else 0
+
+def trade_route(a, b):
+    if a == b: return ("land", [])
+    pr = frozenset((a, b))
+    if pr in LAND_PAIRS: return ("land", [])
+    if infra_lv(a, "naval_port") > 0 and infra_lv(b, "naval_port") > 0:
+        return ("sea", SEA_ROUTES.get(pr, []))
+    if infra_lv(a, "air_airport") > 0 and infra_lv(b, "air_airport") > 0:
+        return ("air", [])
+    return None
+
+def route_costs(mode, straits, value):
+    transport = value * MARKET_TRANSPORT_PCT[mode]
+    tolls = []
+    if mode == "sea":
+        for sid in straits:
+            owner = strait_holdings.get(sid)
+            if owner and not strait_free.get(sid):
+                tolls.append((owner, value * MARKET_TOLL_PCT))
+    return transport, tolls
+
+def escrow_take(cid, key, qty):
+    _, p = get_player_by_country(cid)
+    if not p or qty <= 0: return False
+    ensure_player_fields(p)
+    info = mkey_info(key)
+    if info["kind"] == "resource":
+        if p["resources"].get(info["res"], 0) < qty: return False
+        p["resources"][info["res"]] -= qty
+    else:
+        if p.get("units", {}).get(info["unit"], 0) < qty: return False
+        p["units"][info["unit"]] -= qty
+    return True
+
+def give_to(cid, key, qty):
+    _, p = get_player_by_country(cid)
+    if not p or qty <= 0: return
+    ensure_player_fields(p)
+    info = mkey_info(key)
+    if info["kind"] == "resource":
+        p["resources"][info["res"]] = p["resources"].get(info["res"], 0) + qty
+    else:
+        p["units"][info["unit"]] = p["units"].get(info["unit"], 0) + qty
+
+async def notify_fill(cid, text):
+    push_news("بازار جهانی", text)
+    uid, _ = get_player_by_country(cid)
+    if uid:
+        try: await bot.send_message(uid, "📈 " + text)
+        except Exception: pass
+
+def _match_candidates(key, side, taker_cid, taker_price):
+    opp = "sell" if side == "buy" else "buy"
+    out = []
+    for o in market_orders.values():
+        if o["status"] != "open" or o["key"] != key or o["side"] != opp: continue
+        if o["country"] == taker_cid: continue
+        op = order_price(o)
+        if side == "buy" and op <= taker_price: out.append(o)
+        elif side == "sell" and op >= taker_price: out.append(o)
+    out.sort(key=lambda o: order_price(o) if side == "buy" else -order_price(o))
+    return out
+
+async def fill_orders(taker_cid, key, side, qty, offset):
+    fills = []
+    remaining = int(qty)
+    taker_price = market_price(key) * (1 + offset / 100.0)
+    for o in _match_candidates(key, side, taker_cid, taker_price):
+        if remaining <= 0: break
+        q = min(remaining, o["remaining"])
+        P = order_price(o)
+        buyer_cid, seller_cid = (taker_cid, o["country"]) if side == "buy" else (o["country"], taker_cid)
+        if embargoed(buyer_cid, seller_cid): continue
+        route = trade_route(buyer_cid, seller_cid)
+        if not route: continue
+        mode, straits = route
+        value = P * q
+        transport, tolls = route_costs(mode, straits, value)
+        total_pay = value + transport + sum(t for _, t in tolls)
+        buid, bp = get_player_by_country(buyer_cid)
+        suid, sp = get_player_by_country(seller_cid)
+        if not bp or not sp: continue
+        accrue_player(bp); accrue_player(sp)
+        if o["side"] == "buy":
+            bp["money"] = bp.get("money", 0) + o.get("escrow_price", P) * q
+            o["escrow_held"] = max(0, o.get("escrow_held", 0) - o.get("escrow_price", P) * q)
+        if side == "sell":
+            if not escrow_take(taker_cid, key, q): continue
+        if bp.get("money", 0) < total_pay:
+            unit_all = P * (1 + MARKET_TRANSPORT_PCT[mode] +
+                            sum(1 for s in straits if strait_holdings.get(s) and not strait_free.get(s)) * MARKET_TOLL_PCT)
+            q2 = int(bp.get("money", 0) // unit_all) if unit_all > 0 else 0
+            if q2 <= 0:
+                if o["side"] == "buy":
+                    bp["money"] = bp.get("money", 0) - o.get("escrow_price", P) * q
+                    o["escrow_held"] = o.get("escrow_held", 0) + o.get("escrow_price", P) * q
+                if side == "sell": give_to(taker_cid, key, q)
+                continue
+            q = q2; value = P * q
+            transport, tolls = route_costs(mode, straits, value)
+            total_pay = value + transport + sum(t for _, t in tolls)
+        bp["money"] -= total_pay
+        sp["money"] = sp.get("money", 0) + value * (1 - MARKET_FEE)
+        for owner, t in tolls:
+            _, op = get_player_by_country(owner)
+            if op: op["money"] = op.get("money", 0) + t
+        give_to(buyer_cid, key, q)
+        o["remaining"] -= q
+        if o["remaining"] <= 0: o["status"] = "filled"
+        remaining -= q
+        market_dyn[key] = market_dyn.get(key, market_price(key)) * (1.0005 if side == "buy" else 0.9995)
+        fill = {"at": utcnow().isoformat(), "key": key, "qty": q, "price": P,
+                "buyer": buyer_cid, "seller": seller_cid, "mode": mode,
+                "transport": transport, "tolls": sum(t for _, t in tolls),
+                "fee": value * MARKET_FEE}
+        market_trades.append(fill)
+        fills.append(fill)
+        info = mkey_info(key)
+        if o["status"] == "filled":
+            await notify_fill(o["country"], f"آگهی {info['name']} شما کامل پر شد: {q} واحد به قیمت هر واحد ${P:.4f}")
+        else:
+            await notify_fill(o["country"], f"بخشی از آگهی {info['name']} شما پر شد: {q} واحد به قیمت هر واحد ${P:.4f}")
+    if len(market_trades) > 400: del market_trades[:200]
+    return fills, remaining
+
+async def get_market(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    market_ensure()
+    cid = players[uid].get("country") if uid in players else None
+    comps = []
+    for key in market_keys():
+        info = mkey_info(key)
+        sells = [order_price(o) for o in market_orders.values() if o["status"] == "open" and o["key"] == key and o["side"] == "sell"]
+        buys = [order_price(o) for o in market_orders.values() if o["status"] == "open" and o["key"] == key and o["side"] == "buy"]
+        ads = sum(1 for o in market_orders.values() if o["status"] == "open" and o["key"] == key)
+        comps.append({"key": key, "kind": info["kind"], "name": info["name"], "icon": info["icon"],
+                      "group": info["group"], "res": info.get("res"),
+                      "price": market_price(key), "chg24": market_chg24(key),
+                      "spark": market_hist.get(key, [])[-30:], "ads": ads,
+                      "best_ask": min(sells) if sells else None,
+                      "best_bid": max(buys) if buys else None})
+    res_keys = [k for k in market_keys() if k.startswith("res:")]
+    idx = 1000 * sum(market_price(k) / MARKET_SEASON_OPEN[k[4:]] for k in res_keys) / len(res_keys)
+    idx_chg = sum(market_chg24(k) for k in res_keys) / len(res_keys)
+    money = players[uid].get("money", 0) if uid in players else 0
+    return web.json_response({"commodities": comps, "index": int(idx), "index_chg": idx_chg,
+                              "war_bonus": war_bonus(), "war_count": war_count(),
+                              "money": money, "embargoes": [list(pr) for pr in market_embargoes],
+                              "strait_free": strait_free, "fee": MARKET_FEE,
+                              "transport_pct": MARKET_TRANSPORT_PCT, "toll_pct": MARKET_TOLL_PCT})
+
+async def get_market_book(request):
+    key = request.query.get("key", "")
+    if key not in market_keys(): return web.json_response({"error": "bad_key"}, status=400)
+    market_ensure()
+    sells, buys = [], []
+    for o in market_orders.values():
+        if o["status"] != "open" or o["key"] != key: continue
+        row = {"id": o["id"], "country": o["country"], "qty": o["remaining"], "price": order_price(o)}
+        (sells if o["side"] == "sell" else buys).append(row)
+    sells.sort(key=lambda r: r["price"]); buys.sort(key=lambda r: -r["price"])
+    cutoff = (utcnow() - timedelta(hours=24)).isoformat()
+    vol = sum(t["qty"] for t in market_trades if t["key"] == key and t["at"] >= cutoff)
+    return web.json_response({"key": key, "price": market_price(key), "chg24": market_chg24(key),
+                              "history": market_hist.get(key, [])[-48:], "sells": sells, "buys": buys,
+                              "volume24": vol, "war_bonus": war_bonus()})
+
+async def market_preview(request):
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
     data = await read_json(request)
-    sr = data.get("sell_resource"); wr = data.get("want_resource")
-    try: sa = int(data.get("sell_amount", 0)); wa = int(data.get("want_amount", 0))
-    except: return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
-    if sr not in RESOURCE_NAMES: return web.json_response({"success": False, "error": "invalid_res"}, status=400)
-    if wr != "money" and wr not in RESOURCE_NAMES:
-        return web.json_response({"success": False, "error": "invalid_want"}, status=400)
-    if sa <= 0 or wa <= 0: return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]
-    if not p.get("country"): return web.json_response({"success": False, "error": "no_country"}, status=400)
-    if p["resources"].get(sr, 0) < sa:
-        return web.json_response({"success": False, "error": "not_enough_res"}, status=400)
-    lid = str(uuid.uuid4())
-    market_listings[lid] = {"id": lid, "seller": p["country"], "sell_resource": sr,
-                            "sell_amount": sa, "want_resource": wr, "want_amount": wa,
-                            "status": "open", "created_at": utcnow().isoformat()}
+    key, side = data.get("key"), data.get("side")
+    try: qty = int(data.get("amount", 0)); offset = float(data.get("offset", 0))
+    except: return _bad("bad_amount")
+    if key not in market_keys() or side not in ("buy", "sell"): return _bad("bad_key")
+    offset = max(-MARKET_OFFSET_MAX, min(MARKET_OFFSET_MAX, offset))
+    cid = players[uid].get("country")
+    tp = market_price(key) * (1 + offset / 100.0)
+    matches, remaining, tot = [], qty, 0.0
+    for o in _match_candidates(key, side, cid, tp):
+        if remaining <= 0: break
+        q = min(remaining, o["remaining"]); P = order_price(o)
+        b_cid, s_cid = (cid, o["country"]) if side == "buy" else (o["country"], cid)
+        if embargoed(b_cid, s_cid): continue
+        route = trade_route(b_cid, s_cid)
+        if not route: continue
+        mode, straits = route
+        value = P * q
+        transport, tolls = route_costs(mode, straits, value)
+        net = (value + transport + sum(t for _, t in tolls)) if side == "buy" else value * (1 - MARKET_FEE)
+        matches.append({"country": o["country"], "qty": q, "price": P, "mode": mode, "net": net})
+        tot += net; remaining -= q
+    return web.json_response({"match_qty": qty - remaining, "matches": matches,
+                              "est_total": tot, "leftover": remaining, "unit_price": tp})
+
+async def market_order(request):
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    data = await read_json(request)
+    key, side = data.get("key"), data.get("side")
+    try: qty = int(data.get("amount", 0)); offset = float(data.get("offset", 0))
+    except: return _bad("عدد نامعتبر است.")
+    if key not in market_keys() or side not in ("buy", "sell"): return _bad("کالا نامعتبر است.")
+    if qty <= 0: return _bad("مقدار باید بیشتر از صفر باشد.")
+    offset = max(-MARKET_OFFSET_MAX, min(MARKET_OFFSET_MAX, offset))
+    p = _me(uid); cid = p.get("country")
+    if not cid or p.get("is_eliminated"): return _bad("کشوری ندارید.")
+    accrue_player(p)
+    info = mkey_info(key)
+    fills, leftover = await fill_orders(cid, key, side, qty, offset)
+    order_id = None
+    if leftover > 0:
+        tp = market_price(key) * (1 + offset / 100.0)
+        if side == "sell":
+            stock = p["resources"].get(info["res"], 0) if info["kind"] == "resource" else p.get("units", {}).get(info["unit"], 0)
+            leftover = min(leftover, stock)
+            if leftover > 0 and escrow_take(cid, key, leftover):
+                order_id = str(uuid.uuid4())
+                market_orders[order_id] = {"id": order_id, "country": cid, "side": side, "key": key,
+                                           "qty": leftover, "remaining": leftover, "offset_pct": offset,
+                                           "status": "open", "created_at": utcnow().isoformat()}
+        else:
+            afford = int(p.get("money", 0) // tp) if tp > 0 else 0
+            leftover = min(leftover, afford)
+            if leftover > 0:
+                p["money"] -= tp * leftover
+                order_id = str(uuid.uuid4())
+                market_orders[order_id] = {"id": order_id, "country": cid, "side": side, "key": key,
+                                           "qty": leftover, "remaining": leftover, "offset_pct": offset,
+                                           "escrow_price": tp, "escrow_held": tp * leftover,
+                                           "status": "open", "created_at": utcnow().isoformat()}
     save_state()
-    return web.json_response({"success": True, "listing_id": lid})
+    return web.json_response({"success": True, "fills": fills, "leftover": leftover if order_id else 0,
+                              "order_id": order_id, "player": serialize_player(p)})
 
 async def cancel_listing(request):
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); lid = data.get("listing_id")
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if not uid: return _bad("unauthorized", 401)
+    data = await read_json(request); oid = data.get("order_id") or data.get("listing_id")
+    o = market_orders.get(oid)
+    if not o: return _bad("یافت نشد.", 404)
     cid = players[uid].get("country")
-    l = market_listings.get(lid)
-    if not l: return web.json_response({"success": False, "error": "not_found"}, status=404)
-    if l["seller"] != cid: return web.json_response({"success": False, "error": "not_owner"}, status=403)
-    del market_listings[lid]; save_state()
-    return web.json_response({"success": True})
-
-async def accept_listing(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); lid = data.get("listing_id")
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
-    buyer = players[uid]; bcid = buyer.get("country")
-    l = market_listings.get(lid)
-    if not l or l["status"] != "open":
-        return web.json_response({"success": False, "error": "closed"}, status=400)
-    if l["seller"] == bcid: return web.json_response({"success": False, "error": "self_buy"}, status=400)
-    suid, seller = get_player_by_country(l["seller"])
-    if not seller: return web.json_response({"success": False, "error": "seller_gone"}, status=400)
-    if l["want_resource"] == "money":
-        if buyer.get("money", 0) < l["want_amount"]:
-            return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
-        buyer["money"] -= l["want_amount"]; seller["money"] = seller.get("money", 0) + l["want_amount"]
+    if o["country"] != cid: return _bad("مال شما نیست.", 403)
+    if o["status"] != "open": return _bad("بسته است.")
+    o["status"] = "canceled"
+    if o["side"] == "sell": give_to(cid, o["key"], o["remaining"])
     else:
-        if buyer["resources"].get(l["want_resource"], 0) < l["want_amount"]:
-            return web.json_response({"success": False, "error": "not_enough_res"}, status=400)
-        buyer["resources"][l["want_resource"]] -= l["want_amount"]
-        seller["resources"][l["want_resource"]] = seller["resources"].get(l["want_resource"], 0) + l["want_amount"]
-    if seller["resources"].get(l["sell_resource"], 0) < l["sell_amount"]:
-        return web.json_response({"success": False, "error": "seller_no_res"}, status=400)
-    seller["resources"][l["sell_resource"]] -= l["sell_amount"]
-    buyer["resources"][l["sell_resource"]] = buyer["resources"].get(l["sell_resource"], 0) + l["sell_amount"]
-    l["status"] = "filled"; l["buyer"] = bcid
-    push_news("معامله", f"{COUNTRIES[bcid]['name']} از {COUNTRIES[l['seller']]['name']} "
-                        f"{l['sell_amount']} {RESOURCE_NAMES[l['sell_resource']]} خرید.")
+        _, p = get_player_by_country(cid)
+        if p: p["money"] = p.get("money", 0) + o.get("escrow_held", 0)
+    o["remaining"] = 0
     save_state()
     return web.json_response({"success": True})
+
+async def get_market_mine(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"orders": [], "trades": []})
+    cid = players[uid].get("country")
+    orders = [{"id": o["id"], "side": o["side"], "key": o["key"], "name": mkey_info(o["key"])["name"],
+               "icon": mkey_info(o["key"])["icon"], "remaining": o["remaining"], "qty": o["qty"],
+               "price": order_price(o), "offset_pct": o["offset_pct"], "status": o["status"],
+               "created_at": o["created_at"]}
+              for o in market_orders.values() if o["country"] == cid and o["status"] == "open"]
+    trades = [t for t in market_trades if t["buyer"] == cid or t["seller"] == cid][-50:]
+    trades.reverse()
+    return web.json_response({"orders": orders, "trades": trades})
+
+async def market_swap(request):
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    data = await read_json(request)
+    gk, hk = data.get("give_key"), data.get("get_key")
+    try: amt = int(data.get("give_amount", 0))
+    except: return _bad("عدد نامعتبر است.")
+    if gk not in market_keys() or hk not in market_keys() or gk == hk: return _bad("کالا نامعتبر است.")
+    if amt <= 0: return _bad("مقدار باید بیشتر از صفر باشد.")
+    p = _me(uid); cid = p.get("country")
+    if not cid: return _bad("کشوری ندارید.")
+    accrue_player(p)
+    if not escrow_take(cid, gk, amt): return _bad("موجودی کافی نیست.")
+    vg = amt * market_price(gk)
+    ph = market_price(hk)
+    qget = int(vg // ph)
+    rem = vg - qget * ph
+    give_to(cid, hk, qget)
+    p["money"] = p.get("money", 0) + rem
+    save_state()
+    return web.json_response({"success": True, "got": qget, "money_back": rem, "player": serialize_player(p)})
+
+async def market_embargo(request):
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    data = await read_json(request); target = data.get("target")
+    p = _me(uid); cid = p.get("country")
+    if not cid or target not in COUNTRIES or target == cid: return _bad("کشور نامعتبر است.")
+    pr = tuple(sorted((cid, target)))
+    if pr in market_embargoes:
+        market_embargoes.remove(pr)
+        msg = f"تحریم {COUNTRIES[target]['name']} لغو شد."
+    else:
+        market_embargoes.append(pr)
+        msg = f"{COUNTRIES[target]['name']} تحریم شد؛ معاملهٔ بازار بین شما بسته است."
+    push_news("تحریم تجاری", f"{COUNTRIES[cid]['name']}: {msg}")
+    save_state()
+    return web.json_response({"success": True, "message": msg})
+
+async def market_strait_free(request):
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    data = await read_json(request); sid = data.get("strait_id")
+    free = bool(data.get("free"))
+    p = _me(uid); cid = p.get("country")
+    if sid not in STRAITS_DATA or strait_holdings.get(sid) != cid: return _bad("این تنگه مال شما نیست.")
+    strait_free[sid] = free
+    save_state()
+    return web.json_response({"success": True, "free": free})
+
+async def get_strait_free(request):
+    return web.json_response({"free": strait_free})
+
+async def market_tick():
+    market_ensure()
+    now = utcnow()
+    buyv, sellv = {}, {}
+    for o in market_orders.values():
+        if o["status"] != "open": continue
+        d = buyv if o["side"] == "buy" else sellv
+        d[o["key"]] = d.get(o["key"], 0) + o["remaining"]
+    stocks = {}
+    for pl in players.values():
+        if not pl.get("country"): continue
+        for k, v in pl.get("resources", {}).items(): stocks[k] = stocks.get(k, 0) + v
+    for key in market_keys():
+        info = mkey_info(key)
+        dyn = market_dyn.get(key, info["floor"])
+        b, s = buyv.get(key, 0), sellv.get(key, 0)
+        imb = (b - s) / (b + s) if (b + s) > 0 else 0.0
+        scar = 0.0
+        if info["kind"] == "resource":
+            base = 500_000
+            scar = max(-0.5, min(0.5, (base - stocks.get(info["res"], 0)) / base)) * 0.01
+        dyn *= (1 + 0.03 * imb + scar + random.uniform(-0.004, 0.004))
+        market_dyn[key] = dyn
+        h = market_hist.setdefault(key, [])
+        if not h or (now - parse_dt(h[-1][0])).total_seconds() >= 3500:
+            h.append([now.isoformat(), market_price(key)])
+            if len(h) > 60: del h[:len(h) - 60]
 
 # =========================================================
 # API News / Rankings
@@ -1903,6 +2278,8 @@ async def create_web_app():
         ("/api/wars", get_wars), ("/api/map-sites", get_map_sites),
         ("/api/announcements", get_announcements), ("/api/announcement", get_announcement_detail),
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
+        ("/api/market/book", get_market_book), ("/api/market/mine", get_market_mine),
+        ("/api/market/strait-free", get_strait_free),
         ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
         ("/api/debug-auth", debug_auth), ("/health", health)]:
@@ -1922,8 +2299,9 @@ async def create_web_app():
         ("/api/union/create", create_union), ("/api/union/invite", invite_union),
         ("/api/union/respond", respond_union_invite), ("/api/union/leave", leave_union),
         ("/api/union/message", send_union_message), ("/api/pm/send", send_pm),
-        ("/api/market/create", create_listing), ("/api/market/cancel", cancel_listing),
-        ("/api/market/accept", accept_listing)]:
+        ("/api/market/order", market_order), ("/api/market/preview", market_preview),
+        ("/api/market/cancel", cancel_listing), ("/api/market/swap", market_swap),
+        ("/api/market/embargo", market_embargo), ("/api/market/strait-free", market_strait_free)]:
         app.router.add_post(path, h)
 
     app.router.add_route("OPTIONS", "/{tail:.*}", lambda r: web.Response())
@@ -1942,11 +2320,18 @@ async def war_tick_loop():
         try: await check_wars_tick()
         except Exception as e: logging.error("war tick: %s", e)
 
+async def market_tick_loop():
+    while True:
+        await asyncio.sleep(300)
+        try: await market_tick()
+        except Exception as e: logging.error("market tick: %s", e)
+
 async def main():
     logging.info("FRONT-LINE 1993 GAME STARTING...")
     load_state()
     asyncio.create_task(autosave_loop())
     asyncio.create_task(war_tick_loop())
+    asyncio.create_task(market_tick_loop())
     await start_web_server()
     await bot.delete_webhook(drop_pending_updates=True)
     logging.info("BOT POLLING STARTED")
