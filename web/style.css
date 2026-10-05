@@ -1693,12 +1693,48 @@ img { -webkit-user-drag: none; user-select: none; }
 .map-info-scan small { color: #8d97a7; }
 .map-info-scan-btn { margin-top: 8px; }
 .dp-error { color: #ff8a80; font-size: 12px; line-height: 1.8; margin-top: 4px; }
-/* ===== Global Market v2 ===== */
-.market-hero{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:18px 20px;margin:0 0 14px;border:1px solid rgba(236,190,76,.34);border-radius:22px;background:linear-gradient(135deg,rgba(43,40,34,.9),rgba(17,20,29,.96));box-shadow:0 12px 35px rgba(0,0,0,.22)}
-.market-hero b{font-size:18px}.market-hero p{margin:6px 0 0;color:#b9bdc9;line-height:1.8;font-size:13px}.market-hero>span{font-size:34px}
-.market-filter,.market-order-switch{display:flex;gap:8px;margin:0 0 14px}.mk-filter,.mk-side{flex:1;border:1px solid rgba(210,177,91,.3);background:#171a23;color:#c7cad4;border-radius:14px;padding:11px 8px;font-weight:800}.mk-filter.active,.mk-side.active{background:#e7b94e;color:#11151c}
-.market-card{padding:16px;margin-bottom:12px;border:1px solid rgba(154,158,174,.25);border-radius:20px;background:linear-gradient(135deg,rgba(31,34,45,.98),rgba(20,22,30,.98));box-shadow:0 10px 28px rgba(0,0,0,.18)}
-.market-card-head,.market-card-main{display:flex;align-items:center;justify-content:space-between;gap:12px}.market-card-head{color:#d9dbe4;font-size:14px}.market-card-head b{color:#e8c365}.market-card-main{padding:14px 0}.market-product strong{display:block;font-size:18px}.market-product>b{display:block;font-size:24px;margin-top:5px}.market-price{text-align:left}.market-price small{display:block;color:#888e9f}.market-price b{display:block;margin-top:5px;font-size:17px;color:#f2f3f7}.market-route-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.market-mode{font-size:11px;text-align:center;padding:9px 4px;border-radius:11px;border:1px solid rgba(74,222,128,.28)}.market-mode.ok{color:#63e0b3;background:rgba(74,222,128,.06)}.market-mode.off{color:#555a67;background:rgba(0,0,0,.18);border-color:rgba(255,255,255,.07)}.market-route-note,.market-route-error{font-size:11px;color:#9298a7;margin:9px 0}.market-route-error{color:#e4a4a4}.market-action{width:100%;border:0;border-radius:13px;padding:12px;font-weight:900;font-size:15px}.market-action.buy{background:#e9bb50;color:#15171c}.market-action.sell{background:#49cda3;color:#0d1716}.market-action.cancel{background:rgba(248,113,113,.12);color:#f48d8d;border:1px solid rgba(248,113,113,.3)}.market-action.disabled{opacity:.55}.market-loading{text-align:center;color:#9ca1af;padding:30px}
-.market-trade-sheet{width:min(560px,calc(100vw - 28px));max-height:90vh;overflow:auto;background:#171a27;border:1px solid rgba(177,181,204,.38);border-radius:24px;box-shadow:0 30px 80px rgba(0,0,0,.55)}.market-trade-body{padding:18px}.market-trade-title{font-weight:900;margin-bottom:12px}.market-route-options{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.market-route-option{min-height:78px;border-radius:14px;border:1px solid rgba(206,178,95,.3);background:#202330;color:#eee;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}.market-route-option.selected{border-color:#efc55f;box-shadow:0 0 0 2px rgba(239,197,95,.15);background:rgba(239,197,95,.1)}.market-route-option.disabled{opacity:.25;filter:grayscale(1)}.market-route-option span{font-size:13px;color:#62ddb4}.market-route-option small{font-size:9px;color:#d8b65d}.market-route-detail{margin:14px 0;padding:12px;border-radius:13px;background:#11141d;color:#bfc3ce;line-height:1.8}.market-confirm{width:100%;padding:14px;border:0;border-radius:14px;background:#e9bb50;color:#11151c;font-size:16px;font-weight:900}
-.map-info-strait-controls{margin-top:10px;padding:12px;border-radius:14px;background:rgba(232,187,78,.07);border:1px solid rgba(232,187,78,.2)}.strait-control-title{font-weight:900;margin-bottom:8px}.strait-control-row{display:grid;grid-template-columns:1fr auto auto;gap:6px}.strait-control-row input,.strait-control-row button{min-width:0;border-radius:10px;border:1px solid rgba(180,184,202,.25);background:#1b1e29;color:#eee;padding:9px}.strait-control-row button{font-weight:800}.map-info-strait-controls small{display:block;color:#969baa;margin-top:8px;line-height:1.6}
-@media(max-width:430px){.market-route-options{grid-template-columns:1fr}.market-route-option{min-height:58px}.market-card-main{align-items:flex-start}.market-hero{padding:15px}}
+
+
+/* ==================== آمار کشور / رفاه ==================== */
+.country-stats-page { padding-bottom: 110px; }
+.cs-section-title { display:flex; align-items:center; justify-content:space-between; margin: 4px 0 12px; }
+.cs-section-title h1 { margin:0; font-size:22px; color:#f5f6f8; }
+.cs-help { width:34px; height:34px; border-radius:50%; border:1px solid rgba(255,255,255,.24); background:rgba(20,24,34,.72); color:#cbd1da; font-size:18px; }
+.cs-card { background:linear-gradient(145deg, rgba(26,29,39,.94), rgba(14,17,25,.96)); border:1px solid rgba(255,255,255,.14); border-radius:22px; padding:18px; margin-bottom:14px; box-shadow:0 10px 28px rgba(0,0,0,.25); }
+.cs-inner-card { border:1px solid rgba(255,255,255,.17); border-radius:18px; background:rgba(19,22,31,.56); }
+.cs-bonus-card { display:flex; align-items:center; gap:18px; padding:16px 18px; }
+.cs-bonus-value { color:#73e99b; font-size:29px; font-weight:900; direction:ltr; }
+.cs-bonus-label { color:#f4f5f7; font-size:19px; font-weight:700; flex:1; }
+.cs-bonus-label small { display:block; color:#aeb5c0; font-size:12px; font-weight:400; margin-top:5px; }
+.cs-progress { height:9px; border-radius:20px; margin:15px 2px 18px; background:#0b0e15; overflow:hidden; }
+.cs-progress span { display:block; height:100%; width:0; border-radius:20px; background:#74e69a; transition:width .35s ease; }
+.cs-muted { margin:0; color:#aeb5c0; line-height:2; font-size:13px; }
+.cs-effect-card { display:flex; align-items:center; justify-content:space-between; padding:20px; }
+.cs-effect-card > div { display:flex; flex-direction:column; align-items:center; gap:3px; color:#73e99b; }
+.cs-effect-card strong { font-size:28px; }
+.cs-effect-card b { font-size:18px; }
+.cs-effect-card > span { color:#f3f4f6; font-size:19px; line-height:1.9; text-align:right; }
+.cs-row { display:flex; justify-content:space-between; align-items:center; margin-top:14px; color:#c7cdd6; font-size:14px; }
+.cs-row strong { color:#5ed6b2; }
+.cs-card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.cs-card-head h2 { margin:0; font-size:17px; color:#f2f3f5; }
+.cs-disaster-row { display:grid; grid-template-columns:1fr auto; gap:3px 10px; padding:11px 0; border-bottom:1px solid rgba(255,255,255,.08); }
+.cs-disaster-row:last-child { border-bottom:0; }
+.cs-disaster-row span { color:#e5e7eb; font-size:14px; }
+.cs-disaster-row b { color:#e9c36a; font-size:13px; }
+.cs-disaster-row small { grid-column:1 / -1; color:#8f98a6; font-size:11px; }
+.cs-event-row { display:grid; grid-template-columns:24px 1fr auto; gap:8px; align-items:start; padding:11px 0; border-bottom:1px solid rgba(255,255,255,.08); color:#d5dae1; font-size:13px; line-height:1.8; }
+.cs-event-row:last-child { border-bottom:0; }
+.cs-event-row time { color:#8f98a6; font-size:10px; white-space:nowrap; direction:rtl; }
+.cs-empty { text-align:center; color:#8f98a6; padding:18px 5px; }
+.cs-welfare-buildings { background:linear-gradient(145deg, rgba(26,29,39,.94), rgba(14,17,25,.96)); border:1px solid rgba(255,255,255,.14); border-radius:22px; padding:18px; margin-bottom:14px; }
+.cs-building { display:flex; align-items:center; gap:11px; padding:12px 0; border-top:1px solid rgba(255,255,255,.08); }
+.cs-building-icon { width:38px; height:38px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:rgba(227,176,75,.1); border:1px solid rgba(227,176,75,.22); font-size:20px; }
+.cs-building div { flex:1; display:flex; flex-direction:column; gap:3px; }
+.cs-building b { color:#f3f4f6; font-size:14px; }
+.cs-building small { color:#8f98a6; font-size:11px; }
+.cs-building strong { color:#73e99b; font-size:14px; }
+.cs-help-modal { max-height:78vh; overflow:auto; position:relative; }
+.cs-help-modal .is-close { position:absolute; left:16px; top:14px; width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,.18); background:transparent; color:#c7cdd6; font-size:18px; }
+.cs-help-text { color:#d6dae2; line-height:2.1; font-size:14px; padding-top:10px; }
+@media (max-width:420px){ .cs-bonus-label{font-size:17px}.cs-effect-card > span{font-size:17px}.cs-event-row{grid-template-columns:22px 1fr}.cs-event-row time{grid-column:2}.cs-bonus-value{font-size:25px} }
