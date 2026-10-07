@@ -1766,3 +1766,152 @@ img { -webkit-user-drag: none; user-select: none; }
 .st-sheet-body p { font-size: 15.5px; line-height: 2.3; color: #e6e9f0; margin-bottom: 16px; }
 .st-sheet-body p:last-child { margin-bottom: 0; }
 .st-sheet-body b { color: #fff; }
+
+/* ==================== بازار جهانی — ظاهر جدید (فقط این صفحه) ==================== */
+#market .market-hero {
+    position: relative; overflow: hidden; flex-direction: row; justify-content: flex-start;
+    gap: 16px; padding: 20px 18px; margin: 0 0 16px; border-radius: 24px;
+    border: 1px solid rgba(var(--brand-rgb), 0.38);
+    background:
+        radial-gradient(circle at 12% 20%, rgba(var(--brand-rgb), 0.22), rgba(var(--brand-rgb), 0) 55%),
+        linear-gradient(135deg, rgba(46, 40, 30, 0.92), rgba(14, 18, 28, 0.97));
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3);
+}
+#market .mk-hero-ico {
+    flex: none; width: 62px; height: 62px; border-radius: 20px; font-size: 32px;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(145deg, rgba(var(--brand-rgb), 0.3), rgba(var(--brand-rgb), 0.08));
+    border: 1px solid rgba(var(--brand-rgb), 0.45);
+    box-shadow: 0 0 22px rgba(var(--brand-rgb), 0.25);
+}
+#market .mk-hero-text { min-width: 0; }
+#market .mk-hero-text small { display: block; font-size: 11px; color: var(--brand); letter-spacing: 0.2px; margin-bottom: 3px; }
+#market .market-hero b { font-size: 21px; font-weight: 800; color: #f4f6f9; }
+#market .market-hero p { margin: 7px 0 0; font-size: 12.5px; line-height: 1.95; color: #aab1be; }
+
+/* تب‌ها: نوار یک‌تکه */
+#market .market-tabs {
+    gap: 4px; padding: 5px; margin-bottom: 14px; border-radius: 16px;
+    background: rgba(10, 13, 21, 0.85); border: 1px solid rgba(255, 255, 255, 0.08);
+}
+#market .market-tab {
+    padding: 12px 6px; border-radius: 12px; font-size: 13px; font-weight: 700;
+    background: transparent; border: 1px solid transparent; color: #8d97a7;
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+#market .market-tab.active {
+    background: linear-gradient(135deg, #e9bb50, #c4912f); color: #15171c; border-color: transparent;
+    box-shadow: 0 4px 14px rgba(var(--brand-rgb), 0.3);
+}
+
+/* فیلترها و کلید خرید/فروش */
+#market .market-filter { gap: 8px; margin: 0 0 14px; }
+#market .mk-filter {
+    flex: none; padding: 9px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
+    background: rgba(18, 22, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); color: #aab1be;
+}
+#market .mk-filter.active { background: rgba(var(--brand-rgb), 0.16); border-color: rgba(var(--brand-rgb), 0.6); color: var(--brand); }
+#market .market-order-switch {
+    gap: 4px; padding: 5px; margin: 0 0 14px; border-radius: 16px;
+    background: rgba(10, 13, 21, 0.85); border: 1px solid rgba(255, 255, 255, 0.08);
+}
+#market .mk-side {
+    padding: 12px 8px; border-radius: 12px; font-size: 14px; font-weight: 800;
+    background: transparent; border: 1px solid transparent; color: #8d97a7;
+}
+#market .mk-side.active { background: linear-gradient(135deg, #e9bb50, #c4912f); color: #15171c; box-shadow: 0 4px 14px rgba(var(--brand-rgb), 0.3); }
+
+/* کارت آگهی */
+#market .market-card {
+    position: relative; overflow: hidden; padding: 16px 16px 16px 14px; margin-bottom: 14px;
+    border-radius: 22px; border: 1px solid rgba(255, 255, 255, 0.13);
+    background: linear-gradient(160deg, rgba(30, 33, 44, 0.96), rgba(15, 18, 27, 0.98));
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.25);
+}
+#market .market-card::before {
+    content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 4px; background: var(--brand);
+}
+#market .market-card.side-buy::before { background: #49cda3; }
+#market .market-card-head { padding-bottom: 12px; margin-bottom: 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+#market .mk-country { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 700; color: #f4f6f9; }
+#market .mk-badge {
+    padding: 4px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 800;
+    color: var(--brand); background: rgba(var(--brand-rgb), 0.14); border: 1px solid rgba(var(--brand-rgb), 0.4);
+}
+#market .market-card.side-buy .mk-badge { color: #63e0b3; background: rgba(73, 205, 163, 0.12); border-color: rgba(73, 205, 163, 0.4); }
+#market .market-card-main { padding: 14px 0 12px; align-items: stretch; gap: 10px; }
+#market .market-product { display: flex; align-items: center; gap: 12px; min-width: 0; }
+#market .mk-ico {
+    flex: none; width: 54px; height: 54px; border-radius: 16px; font-size: 27px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+}
+#market .mk-prod-text strong { display: block; font-size: 14px; font-weight: 600; color: #aab1be; }
+#market .mk-prod-text b { display: block; margin-top: 3px; font-size: 24px; font-weight: 800; color: #f4f6f9; }
+#market .market-price {
+    flex: none; min-width: 108px; padding: 10px 12px; border-radius: 14px; text-align: center;
+    background: rgba(var(--brand-rgb), 0.07); border: 1px solid rgba(var(--brand-rgb), 0.22);
+    display: flex; flex-direction: column; justify-content: center;
+}
+#market .market-price small { font-size: 10.5px; color: #8d97a7; }
+#market .market-price b { margin-top: 4px; font-size: 16px; font-weight: 800; color: var(--brand); direction: ltr; }
+#market .market-route-row { gap: 6px; }
+#market .market-mode { padding: 10px 4px; border-radius: 12px; font-size: 11px; line-height: 1.6; font-weight: 600; }
+#market .market-mode.ok { background: rgba(73, 205, 163, 0.08); border-color: rgba(73, 205, 163, 0.32); }
+#market .market-route-note, #market .market-route-error { margin: 11px 2px 12px; font-size: 11px; line-height: 1.8; }
+#market .market-action {
+    padding: 14px; border-radius: 15px; font-size: 15px; font-weight: 800; letter-spacing: 0.2px;
+}
+#market .market-action.buy { background: linear-gradient(135deg, #edc45c, #c4912f); box-shadow: 0 6px 16px rgba(var(--brand-rgb), 0.22); }
+#market .market-action.sell { background: linear-gradient(135deg, #56d9ae, #2fae85); box-shadow: 0 6px 16px rgba(73, 205, 163, 0.2); }
+#market .market-action:active { transform: scale(0.98); }
+#market .market-card-detail { padding: 12px 2px 14px; font-size: 13.5px; color: #aab1be; }
+#market .market-loading { padding: 40px 0; font-size: 13px; }
+#market .diplomacy-item-empty {
+    padding: 34px 16px; text-align: center; font-size: 13px; color: #8d97a7; line-height: 2;
+    border: 1px dashed rgba(255, 255, 255, 0.16); border-radius: 18px; background: rgba(14, 18, 28, 0.5);
+}
+
+/* فرم ثبت آگهی */
+#market .market-form {
+    display: flex; flex-direction: column; gap: 8px; padding: 18px 16px; border-radius: 22px;
+    background: linear-gradient(160deg, rgba(30, 33, 44, 0.96), rgba(15, 18, 27, 0.98));
+    border: 1px solid rgba(255, 255, 255, 0.13); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.25);
+}
+#market .market-form .diplomacy-label { margin-top: 8px; font-size: 12.5px; font-weight: 700; color: #c2c8d4; }
+#market .market-form .diplomacy-label:first-child { margin-top: 0; }
+#market .market-form .diplomacy-select, #market .market-form .diplomacy-input {
+    width: 100%; height: 48px; padding: 0 14px; font-size: 14.5px; border-radius: 14px;
+    background: rgba(8, 11, 20, 0.7); border: 1px solid rgba(255, 255, 255, 0.14); color: #f4f6f9;
+}
+#market .market-form .diplomacy-select:focus, #market .market-form .diplomacy-input:focus {
+    border-color: rgba(var(--brand-rgb), 0.7); box-shadow: 0 0 0 3px rgba(var(--brand-rgb), 0.12);
+}
+#market .market-form .diplomacy-submit {
+    margin-top: 14px; height: 52px; border-radius: 16px; font-size: 15.5px; font-weight: 800;
+    background: linear-gradient(135deg, #edc45c, #c4912f); color: #15171c;
+    box-shadow: 0 8px 20px rgba(var(--brand-rgb), 0.25);
+}
+
+/* پنجرهٔ انتخاب روش حمل */
+.modal-overlay .market-trade-sheet {
+    width: min(420px, 100%); border-radius: 26px; background: #11162a;
+    border: 1px solid rgba(180, 190, 220, 0.34);
+}
+.market-trade-sheet .is-head { padding: 18px 18px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.market-trade-body { padding: 18px; }
+.market-trade-title { font-size: 14px; font-weight: 800; color: #e6e9f0; margin-bottom: 12px; }
+.market-trade-sheet .market-route-options { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.market-trade-sheet .market-route-option { min-height: 84px; border-radius: 16px; padding: 8px 4px; }
+.market-trade-sheet .market-route-option b { font-size: 14px; }
+.market-trade-sheet .market-route-option span { font-size: 12.5px; font-weight: 700; }
+.market-trade-sheet .market-route-option.selected { border-color: #efc55f; background: rgba(239, 197, 95, 0.12); }
+.market-trade-sheet .market-route-detail { margin: 14px 0; padding: 14px; border-radius: 14px; font-size: 13px; line-height: 2; background: rgba(8, 11, 20, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); }
+.market-trade-sheet .market-confirm { height: 52px; padding: 0; border-radius: 16px; font-size: 15.5px; font-weight: 800; background: linear-gradient(135deg, #edc45c, #c4912f); box-shadow: 0 8px 20px rgba(var(--brand-rgb), 0.25); }
+.market-trade-sheet .market-confirm:disabled { opacity: 0.45; }
+@media (max-width: 430px) {
+    .market-trade-sheet .market-route-options { grid-template-columns: repeat(3, 1fr); }
+    .market-trade-sheet .market-route-option { min-height: 84px; }
+    #market .market-card-main { align-items: stretch; }
+    #market .market-hero { padding: 18px 16px; }
+}
