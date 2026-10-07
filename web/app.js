@@ -1693,7 +1693,7 @@ async function sendDispatch() {
     if (!Object.keys(picked).length) return;
     const dst = warSites.find(s => s.id === to);
     if (dst?.owner && dst.owner !== selectedCountry &&
-        !confirm(`در «${dst.name}» به ${COUNTRY_NAMES[dst.owner] || dst.owner} حمله می‌شود. ادامه؟`)) return;
+        !(await gameConfirm(`در «${dst.name}» به ${COUNTRY_NAMES[dst.owner] || dst.owner} حمله می‌شود. ادامه؟`, { title: "حمله", danger: true }))) return;
     const btn = document.getElementById("dp-go"); if (btn) btn.disabled = true;
     try {
         const d = await apiPost("/api/war/dispatch", { from, to, units: picked });
@@ -1734,7 +1734,7 @@ function renderWarTargets() {
 }
 
 async function declareWar(target) {
-    if (!confirm(`اعلام جنگ به ${COUNTRY_NAMES[target]}؟\nاین درخواست به سازمان ملل (ادمین) می‌رود.`)) return;
+    if (!(await gameConfirm(`اعلام جنگ به ${COUNTRY_NAMES[target]}؟\nاین درخواست به سازمان ملل (ادمین) می‌رود.`, { title: "اعلام جنگ", ok: "اعلام جنگ", danger: true }))) return;
     try {
         const d = await apiPost("/api/war/declare", { target });
         if (!d.success) { showToast(d.message || "امکان اعلام جنگ نیست."); return; }
@@ -2268,7 +2268,7 @@ async function loadUnion() {
             loadUnion();
         };
         document.getElementById("union-leave").onclick = async () => {
-            if (!confirm("از اتحادیه خارج می‌شوید؟")) return;
+            if (!(await gameConfirm("از اتحادیه خارج می‌شوید؟", { title: "خروج از اتحادیه", ok: "خروج", danger: true }))) return;
             await apiPost("/api/union/leave", {});
             loadUnion();
         };
@@ -2998,7 +2998,7 @@ async function renderSiteScan(site) {
 }
 
 async function captureSite(siteId) {
-    if (!confirm("۱ ناو برای تصرف فرستاده می‌شود. ادامه؟")) return;
+    if (!(await gameConfirm("۱ ناو برای تصرف فرستاده می‌شود. ادامه؟", { title: "تصرف" }))) return;
     try {
         const d = await apiPost("/api/map/capture", { site_id: siteId });
         if (!d.success) { showToast(d.message || "خطا"); return; }
@@ -3183,3 +3183,87 @@ document.getElementById("st-help-btn")?.addEventListener("click", () => {
     ov.addEventListener("click", e => { if (e.target === ov) closeStatsHelp(); });
     ov.querySelector(".st-sheet-close").onclick = closeStatsHelp;
 });
+
+
+/* =========================================================
+   In-game UI: custom dropdowns + confirm dialogs
+   (جایگزین منوی سیستمی select و پنجرهٔ confirm مرورگر)
+========================================================= */
+function gameConfirm(message, opts = {}) {
+    return new Promise(resolve => {
+        const ov = document.createElement("div");
+        ov.className = "gs-overlay";
+        ov.innerHTML = `<div class="gs-dialog">
+            <div class="gs-dialog-title">${escapeHtml(opts.title || "تأیید")}</div>
+            <div class="gs-dialog-msg">${escapeHtml(message).replace(/\n/g, "<br>")}</div>
+            <div class="gs-dialog-actions">
+                <button class="gs-dbtn ${opts.danger ? "danger" : "ok"}" data-r="1">${escapeHtml(opts.ok || "ادامه")}</button>
+                <button class="gs-dbtn cancel" data-r="0">${escapeHtml(opts.cancel || "انصراف")}</button>
+            </div></div>`;
+        const done = v => { ov.remove(); resolve(v); };
+        ov.addEventListener("click", e => {
+            const b = e.target.closest(".gs-dbtn");
+            if (b) done(b.dataset.r === "1"); else if (e.target === ov) done(false);
+        });
+        document.body.appendChild(ov);
+    });
+}
+
+function openSelectSheet(sel) {
+    const title = sel.dataset.title || (sel.options[0] && !sel.options[0].value ? sel.options[0].textContent : "انتخاب");
+    const ov = document.createElement("div");
+    ov.className = "gs-overlay gs-bottom";
+    const items = Array.from(sel.options).map((o, i) => o.value === "" && i === 0 && sel.options.length > 1 && false ? "" :
+        `<button type="button" class="gs-opt ${o.selected ? "sel" : ""}" data-i="${i}" ${o.disabled ? "disabled" : ""}>
+            <span>${escapeHtml(o.textContent)}</span>${o.selected ? "<i>✓</i>" : ""}</button>`).join("");
+    ov.innerHTML = `<div class="gs-sheet"><div class="gs-sheet-head"><button type="button" class="gs-x" aria-label="بستن">✕</button><span>${escapeHtml(title)}</span></div>
+        <div class="gs-sheet-list">${items || '<div class="gs-none">گزینه‌ای موجود نیست.</div>'}</div></div>`;
+    ov.addEventListener("click", e => {
+        if (e.target === ov || e.target.closest(".gs-x")) { ov.remove(); return; }
+        const b = e.target.closest(".gs-opt");
+        if (!b || b.disabled) return;
+        sel.selectedIndex = Number(b.dataset.i);
+        sel.dispatchEvent(new Event("input", { bubbles: true }));
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        ov.remove();
+    });
+    document.body.appendChild(ov);
+    const cur = ov.querySelector(".gs-opt.sel"); if (cur) cur.scrollIntoView({ block: "center" });
+}
+
+function enhanceSelect(sel) {
+    if (sel._gs || sel.multiple) return;
+    sel._gs = true;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "gs-btn " + sel.className;
+    sel.classList.add("gs-hidden");
+    sel.parentNode.insertBefore(btn, sel);
+    const refresh = () => {
+        const o = sel.options[sel.selectedIndex];
+        btn.textContent = o ? o.textContent : "";
+        btn.classList.toggle("gs-placeholder", !o || o.value === "");
+        btn.disabled = sel.disabled;
+    };
+    for (const prop of ["value", "selectedIndex"]) {
+        const d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, prop);
+        Object.defineProperty(sel, prop, { configurable: true,
+            get() { return d.get.call(this); },
+            set(v) { d.set.call(this, v); refresh(); } });
+    }
+    btn.addEventListener("click", () => { if (!sel.disabled) openSelectSheet(sel); });
+    sel.addEventListener("change", refresh);
+    new MutationObserver(refresh).observe(sel, { childList: true, subtree: true, attributes: true, characterData: true });
+    refresh();
+}
+
+function enhanceAllSelects(root = document) {
+    root.querySelectorAll?.("select").forEach(enhanceSelect);
+}
+enhanceAllSelects();
+new MutationObserver(muts => {
+    for (const m of muts) m.addedNodes.forEach(n => {
+        if (n.nodeType !== 1) return;
+        if (n.tagName === "SELECT") enhanceSelect(n); else enhanceAllSelects(n);
+    });
+}).observe(document.body, { childList: true, subtree: true });
