@@ -610,15 +610,11 @@ document.querySelectorAll(".action-card").forEach(card => {
 
 
 /* =========================================================
-   Loan page (visual only)
+   Loan page (وام)
 ========================================================= */
 let loanTab = "mine";
-const LOAN_BOOK = [
-    { from: "ترکیه", ff: "🇹🇷", to: "سوریه", tf: "🇸🇾", amount: 20000000, hours: 24, rate: 20, repay: 24000000, early: true, status: "active", date: "1405/7/15 · 11:29" },
-    { from: "ترکیه", ff: "🇹🇷", to: "سوریه", tf: "🇸🇾", amount: 20000000, hours: 24, rate: 20, repay: 24000000, early: true, status: "settled", date: "1405/7/15 · 2:26" },
-    { from: "کانادا", ff: "🇨🇦", to: "یونان", tf: "🇬🇷", amount: 20000000, hours: 24, rate: 20, repay: 24000000, early: false, status: "active", date: "1405/7/15 · 0:17" },
-    { from: "هند", ff: "🇮🇳", to: "پاکستان", tf: "🇵🇰", amount: 20000000, hours: 72, rate: 60, repay: 32000000, early: false, status: "active", date: "1405/7/13 · 22:33" },
-];
+let loanData = null;
+let loanDraft = { to: "", amount: "", hours: 24, early: false };
 const LOAN_HELP = `
 <p>پول فقط از راه وام بین کشورها جابه‌جا می‌شود. وام‌دهنده مبلغ و مهلت را تعیین می‌کند؛ سود و کارمزد را قانون تعیین می‌کند.</p>
 <p><b>سود:</b> برای هر ۱۲ ساعت کامل، ۱۰٪ مبلغ؛ زیر ۱۲ ساعت بدون سود. حداکثر مهلت ۷۲ ساعت (۶۰٪).</p>
@@ -628,38 +624,125 @@ const LOAN_HELP = `
 <p>در سررسید کل بدهی برداشته می‌شود. اگر خزانه کافی نباشد، هرچه هست برداشته می‌شود و تا تسویه، تمام درآمد وام‌گیرنده به وام‌دهنده می‌رسد.</p>
 <p>همه کشورهای دنیا دفتر وام‌ها را می‌بینند.</p>`;
 
-function renderLoanPage() {
+
+const LOAN_STATUS = { pending: "پیشنهاد", active: "جاری", overdue: "معوق", settled: "تسویه شد",
+    declined: "رد شد", cancelled: "لغو شد", expired: "منقضی" };
+
+function loanDate(iso) {
+    try {
+        const d = new Date(iso);
+        const p = new Intl.DateTimeFormat("en-u-ca-persian-nu-latn", { timeZone: "Asia/Tehran",
+            year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit", hour12: false })
+            .formatToParts(d).reduce((o, x) => (o[x.type] = x.value, o), {});
+        return `${p.year}/${p.month}/${p.day} · ${p.hour}:${p.minute}`;
+    } catch { return ""; }
+}
+function loanRate(h) { return Math.min(Math.floor(h / 12) * 10, 60); }
+
+function loanItemHtml(r, mine) {
+    let actions = "";
+    if (mine) {
+        if (r.can_accept) actions += `<button class="ln-btn ok" data-act="accept" data-id="${r.id}">پذیرش</button><button class="ln-btn no" data-act="decline" data-id="${r.id}">رد</button>`;
+        if (r.can_cancel) actions += `<button class="ln-btn no" data-act="cancel" data-id="${r.id}">لغو پیشنهاد</button>`;
+        if (r.can_repay) actions += `<button class="ln-btn ok" data-act="repay" data-id="${r.id}">بازپرداخت ${formatMoney(r.remaining)}</button>`;
+    }
+    const role = r.role === "lender" ? "وام‌دهنده: شما" : r.role === "borrower" ? "وام‌گیرنده: شما" : "";
+    const live = r.status === "active" || r.status === "overdue";
+    const rem = live ? ` · مانده ${formatMoney(r.remaining)}` : "";
+    const due = live && r.due_at ? ` · سررسید ${loanDate(r.due_at)}` : "";
+    return `<div class="ln-item ${r.status}">
+        <div class="ln-amt">${formatMoney(r.amount)}</div>
+        <div class="ln-info">
+            <div class="ln-route"><span>${r.lender_flag} ${escapeHtml(r.lender_name)}</span> ← <span>${r.borrower_flag} ${escapeHtml(r.borrower_name)}</span></div>
+            <div class="ln-meta">${r.hours} ساعت · سود ${r.rate}٪ · بازپرداخت ${formatMoney(r.repay)}${r.early ? " · بازپرداخت زودتر مجاز" : ""}</div>
+            <div class="ln-meta"><span class="ln-st ${r.status}">${LOAN_STATUS[r.status] || r.status}</span> · ${loanDate(r.at)}${rem}${due}${role ? " · " + role : ""}</div>
+            ${actions ? `<div class="ln-actions">${actions}</div>` : ""}
+        </div>
+    </div>`;
+}
+
+async function loadLoans() {
+    const d = await apiGet("/api/loans");
+    if (d && !d.error) loanData = d;
+    return loanData;
+}
+
+async function renderLoanPage(reload = true) {
     document.querySelectorAll("#ln-tabs .ln-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === loanTab));
     const p = document.getElementById("ln-panel");
+    if (reload) {
+        if (!loanData) p.innerHTML = `<div class="ln-card"><div class="ln-empty">در حال بارگذاری…</div></div>`;
+        try { await loadLoans(); } catch (e) { console.error(e); }
+    }
+    if (!loanData) { p.innerHTML = `<div class="ln-card"><div class="ln-empty">خطا در دریافت اطلاعات وام.</div></div>`; return; }
+    const d = loanData;
+
     if (loanTab === "mine") {
-        p.innerHTML = `<div class="ln-card"><div class="ln-card-title">💰 وام‌های من</div><div class="ln-empty">هنوز وامی ندارید.</div></div>`;
+        const debt = d.owes > 0 ? `<div class="ln-debt">بدهی فعلی شما: <b>${formatMoney(d.owes)}</b></div>` : "";
+        p.innerHTML = `<div class="ln-card"><div class="ln-card-title">💰 وام‌های من</div>${debt}` +
+            (d.mine.length ? d.mine.map(r => loanItemHtml(r, true)).join("") : `<div class="ln-empty">هنوز وامی ندارید.</div>`) + `</div>`;
     } else if (loanTab === "offer") {
+        const closed = !d.lending_open;
+        const opts = d.countries.map(c => `<option value="${c.id}" ${loanDraft.to === c.id ? "selected" : ""} ${c.busy ? "disabled" : ""}>${c.flag} ${escapeHtml(c.name)}${c.busy ? " (بدهکار)" : ""}</option>`).join("");
         p.innerHTML = `<div class="ln-card ln-gold">
             <div class="ln-card-title">💰 پیشنهاد وام</div>
-            <div class="ln-row"><span>سقف هر وام (۵۰٪ درآمد روزانه)</span><b>$4,502,816</b></div>
-            <div class="ln-row"><span>حداکثر مهلت اکنون</span><b>72 ساعت</b></div>
-            <select class="ln-input ln-select"><option>کشور وام‌گیرنده</option></select>
-            <input class="ln-input" type="number" inputmode="numeric" placeholder="مبلغ ($)">
-            <input class="ln-input" type="number" inputmode="numeric" value="24">
-            <div class="ln-seg"><button class="active" type="button">فقط سر موعد</button><button type="button">بازپرداخت زودتر مجاز</button></div>
-            <button class="ln-submit" type="button">پیشنهاد دهید</button>
+            <div class="ln-row"><span>سقف هر وام (۵۰٪ درآمد روزانه)</span><b>${formatMoney(d.cap)}</b></div>
+            <div class="ln-row"><span>حداکثر مهلت اکنون</span><b>${Math.floor(d.max_hours)} ساعت</b></div>
+            ${closed ? `<div class="ln-warn">${escapeHtml(d.block_reason || "وام‌دهی فعلاً ممکن نیست.")}</div>` : ""}
+            <select id="ln-to" class="ln-input ln-select"><option value="">کشور وام‌گیرنده</option>${opts}</select>
+            <input id="ln-amount" class="ln-input" type="number" inputmode="numeric" placeholder="مبلغ ($)" value="${loanDraft.amount}">
+            <input id="ln-hours" class="ln-input" type="number" inputmode="numeric" min="1" max="${Math.floor(d.max_hours)}" placeholder="مهلت (ساعت)" value="${loanDraft.hours}">
+            <div class="ln-seg"><button type="button" data-early="0" class="${loanDraft.early ? "" : "active"}">فقط سر موعد</button><button type="button" data-early="1" class="${loanDraft.early ? "active" : ""}">بازپرداخت زودتر مجاز</button></div>
+            <div class="ln-preview" id="ln-preview"></div>
+            <button class="ln-submit" id="ln-submit" type="button" ${closed ? "disabled" : ""}>پیشنهاد دهید</button>
         </div>`;
+        const upd = () => {
+            loanDraft.to = p.querySelector("#ln-to").value;
+            loanDraft.amount = p.querySelector("#ln-amount").value;
+            loanDraft.hours = p.querySelector("#ln-hours").value;
+            const amt = Number(loanDraft.amount) || 0, h = Number(loanDraft.hours) || 0;
+            const rate = loanRate(h), repay = Math.round(amt * (1 + rate / 100));
+            const fee = h >= 12 ? "کارمزد ۵٪ از هر دریافت" : "بدون کارمزد (زیر ۱۲ ساعت)";
+            p.querySelector("#ln-preview").innerHTML = amt > 0 && h > 0
+                ? `سود ${rate}٪ · بازپرداخت <b>${formatMoney(repay)}</b> · ${fee}` : "";
+        };
+        p.querySelectorAll("#ln-to, #ln-amount, #ln-hours").forEach(el => el.addEventListener("input", upd));
         p.querySelectorAll(".ln-seg button").forEach(b => b.addEventListener("click", () => {
-            p.querySelectorAll(".ln-seg button").forEach(x => x.classList.remove("active")); b.classList.add("active");
+            loanDraft.early = b.dataset.early === "1";
+            p.querySelectorAll(".ln-seg button").forEach(x => x.classList.toggle("active", x === b));
         }));
+        upd();
+        p.querySelector("#ln-submit").addEventListener("click", async (ev) => {
+            const btn = ev.currentTarget; upd();
+            if (!loanDraft.to) { showToast("کشور وام‌گیرنده را انتخاب کنید."); return; }
+            btn.disabled = true;
+            try {
+                const r = await apiPost("/api/loans/propose", { to: loanDraft.to, amount: Number(loanDraft.amount),
+                    hours: Number(loanDraft.hours), early: loanDraft.early });
+                showToast(r.message || (r.success ? "ارسال شد." : "خطا"), r.success ? undefined : "error");
+                if (r.success) { loanDraft = { to: "", amount: "", hours: 24, early: false }; loanTab = "mine"; refreshPlayer(); renderLoanPage(); return; }
+            } catch (e) { showToast("خطای شبکه", "error"); }
+            btn.disabled = false;
+        });
     } else {
-        p.innerHTML = `<div class="ln-card"><div class="ln-card-title">🧾 دفتر وام‌های دنیا</div>` + LOAN_BOOK.map(r => `
-            <div class="ln-item">
-                <div class="ln-amt">${formatMoney(r.amount)}</div>
-                <div class="ln-info">
-                    <div class="ln-route"><span>${r.ff} ${r.from}</span> ← <span>${r.tf} ${r.to}</span></div>
-                    <div class="ln-meta">${r.hours} ساعت · سود ${r.rate}٪ · بازپرداخت ${formatMoney(r.repay)}${r.early ? " · بازپرداخت زودتر مجاز" : ""}</div>
-                    <div class="ln-meta">${r.status === "active" ? "جاری" : "تسویه شد"} · ${r.date}</div>
-                </div>
-            </div>`).join("") + `</div>`;
+        p.innerHTML = `<div class="ln-card"><div class="ln-card-title">🧾 دفتر وام‌های دنیا</div>` +
+            (d.book.length ? d.book.map(r => loanItemHtml(r, false)).join("") : `<div class="ln-empty">هنوز وامی ثبت نشده است.</div>`) + `</div>`;
     }
 }
-document.querySelectorAll("#ln-tabs .ln-tab").forEach(b => b.addEventListener("click", () => { loanTab = b.dataset.tab; renderLoanPage(); }));
+
+document.getElementById("ln-panel")?.addEventListener("click", async (ev) => {
+    const b = ev.target.closest(".ln-btn"); if (!b) return;
+    const id = b.dataset.id, act = b.dataset.act;
+    const map = { accept: ["/api/loans/respond", { loan_id: id, accept: true }], decline: ["/api/loans/respond", { loan_id: id, accept: false }],
+        cancel: ["/api/loans/cancel", { loan_id: id }], repay: ["/api/loans/repay", { loan_id: id }] };
+    const [path, body] = map[act]; b.disabled = true;
+    try {
+        const r = await apiPost(path, body);
+        showToast(r.message || (r.success ? "انجام شد." : "خطا"), r.success ? undefined : "error");
+        refreshPlayer(); renderLoanPage();
+    } catch (e) { showToast("خطای شبکه", "error"); b.disabled = false; }
+});
+document.querySelectorAll("#ln-tabs .ln-tab").forEach(b => b.addEventListener("click", () => { loanTab = b.dataset.tab; renderLoanPage(loanTab !== "offer" || !loanData); }));
 document.getElementById("ln-help")?.addEventListener("click", () => {
     const ov = document.createElement("div");
     ov.className = "modal-overlay";
