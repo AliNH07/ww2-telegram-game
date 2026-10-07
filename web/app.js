@@ -2252,9 +2252,9 @@ function renderMarketListings() {
             const q = routes.find(x => x.mode === m);
             return `<span class="market-mode ${q ? "ok" : "off"}">${marketModeLabel(m)} ${q ? marketModeCost(q) : "ناممکن"}</span>`;
         }).join("");
-        return `<div class="market-card">
-            <div class="market-card-head"><span>${flagInline(l.country, true)} ${COUNTRY_NAMES[l.country] || l.country}</span><b>${sideText}</b></div>
-            <div class="market-card-main"><div class="market-product"><strong>${RESOURCE_ICONS[l.resource] || "📦"} ${RESOURCE_NAMES[l.resource]}</strong><b>${formatNumber(l.amount)}</b></div>
+        return `<div class="market-card side-${l.side}">
+            <div class="market-card-head"><span class="mk-country">${flagInline(l.country, true)} ${COUNTRY_NAMES[l.country] || l.country}</span><b class="mk-badge">${sideText}</b></div>
+            <div class="market-card-main"><div class="market-product"><span class="mk-ico">${RESOURCE_ICONS[l.resource] || "📦"}</span><div class="mk-prod-text"><strong>${RESOURCE_NAMES[l.resource]}</strong><b>${formatNumber(l.amount)}</b></div></div>
             <div class="market-price"><small>قیمت پیشنهادی</small><b>${price}</b></div></div>
             <div class="market-route-row">${modeChips}</div>
             ${l.route_error ? `<div class="market-route-error">⚠️ ${escapeHtml(l.route_error)}</div>` : `<div class="market-route-note">هزینه حمل را دریافت‌کننده کالا می‌پردازد.</div>`}
