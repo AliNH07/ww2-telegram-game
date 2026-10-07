@@ -5,7 +5,7 @@ from urllib.parse import parse_qsl
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp
 from aiogram.client.default import DefaultBotProperties
 from dotenv import load_dotenv
 
@@ -2414,6 +2414,12 @@ async def main():
     asyncio.create_task(war_tick_loop())
     await start_web_server()
     await bot.delete_webhook(drop_pending_updates=True)
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="🎮 بازی", web_app=WebAppInfo(url=WEB_APP_URL)))
+        logging.info("MENU BUTTON SET")
+    except Exception as e:
+        logging.warning("set_chat_menu_button failed: %s", e)
     logging.info("BOT POLLING STARTED")
     await dp.start_polling(bot, drop_pending_updates=True, handle_signals=False)
 
