@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261004a">
+<link rel="stylesheet" href="/style.css?v=20261007a">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -230,6 +230,51 @@
         <div class="rk-tabs" id="rk-tabs"></div>
         <div class="rk-info" id="rk-info"></div>
         <div id="rankings-list" class="rankings-list"></div>
+    </main>
+
+    <!-- ==================== آمار کشور (فقط ظاهر) ==================== -->
+    <main id="stats" class="game-page hidden">
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">📊</span>آمار کشور</span><span class="sb-money">$0</span></div>
+
+        <div class="st-section-head">
+            <h2>رفاه و امنیت</h2>
+            <button class="st-help" id="st-help-btn" aria-label="راهنما">?</button>
+        </div>
+
+        <div class="st-card">
+            <div class="st-box st-box-row">
+                <div class="st-box-title"><span class="st-shield">🛡️</span><b>پاداش رفاه</b><small>روی درآمد سرمایه‌گذاری‌ها</small></div>
+                <strong class="st-good">+4٪</strong>
+            </div>
+            <div class="st-bar"><div class="st-bar-fill" style="width:8%"></div></div>
+            <p class="st-text">بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه — ارتقای هرکدام این پاداش را بالا می‌برد، تا سقفِ 50٪.</p>
+        </div>
+
+        <div class="st-card">
+            <div class="st-box st-box-split">
+                <span class="st-box-label">اثرِ کل روی درآمدِ سرمایه‌گذاری‌ها</span>
+                <strong class="st-good st-big">4٪<br>افزایش</strong>
+            </div>
+            <div class="st-line">
+                <span>پاداش رفاه</span>
+                <span class="st-good-soft">4٪ افزایش</span>
+            </div>
+        </div>
+
+        <div class="st-card st-card-plain">
+            <p class="st-muted">بلایای محتمل در کشورِ خودی: خشکسالی</p>
+            <p class="st-text">هر سطح ساختمان هم احتمالش را کم می‌کند هم افتِ موقتِ رفاه را.</p>
+        </div>
+
+        <div class="st-card st-card-plain">
+            <p class="st-muted">رویدادهای اخیر:</p>
+            <ul class="st-events">
+                <li><span class="st-ev-text">⚠️ خشکسالی — رفاه 2.6 واحد کم شد</span><span class="st-ev-time">3 ساعت پیش</span></li>
+                <li><span class="st-ev-text">• موج سرقت — رضایت 4.0 کم شد (پوشش پلیس 20٪ — ایستگاه سطح 1 از 5)</span><span class="st-ev-time">6 ساعت پیش</span></li>
+                <li><span class="st-ev-text">• موج سرقت — رضایت 4.0 کم شد (پوشش پلیس 20٪ — ایستگاه سطح 1 از 5)</span><span class="st-ev-time">6 ساعت پیش</span></li>
+                <li><span class="st-ev-text">• موج سرقت — رضایت 4.0 کم شد (پوشش پلیس 20٪ — ایستگاه سطح 1 از 5)</span><span class="st-ev-time">6 ساعت پیش</span></li>
+            </ul>
+        </div>
     </main>
 
     <!-- ==================== زیرساخت ==================== -->
@@ -607,6 +652,6 @@
 
 </section>
 
-<script src="/app.js?v=20261004a"></script>
+<script src="/app.js?v=20261007a"></script>
 </body>
 </html>
