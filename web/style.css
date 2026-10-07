@@ -1948,3 +1948,16 @@ img { -webkit-user-drag: none; user-select: none; }
 .ln-x { width:42px; height:42px; border-radius:50%; background:transparent; border:1.5px solid rgba(180,190,220,.5); color:#ddd; font-size:16px; cursor:pointer; }
 .ln-sheet-body { padding:16px 18px 22px; overflow-y:auto; font-size:14px; line-height:2.1; color:#e6e9f0; }
 .ln-sheet-body p { margin-bottom:12px; }
+
+.ln-debt { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.4); color:#fca5a5; border-radius:12px; padding:10px 12px; font-size:13px; margin-bottom:8px; }
+.ln-warn { background:rgba(var(--brand-rgb),.1); border:1px solid rgba(var(--brand-rgb),.4); color:#e8d49a; border-radius:12px; padding:10px 12px; font-size:12.5px; line-height:1.8; margin-bottom:12px; }
+.ln-preview { min-height:18px; font-size:12.5px; color:#9aa0b0; margin:-6px 0 14px; text-align:right; }
+.ln-preview b { color:var(--brand); }
+.ln-submit:disabled { opacity:.45; cursor:not-allowed; }
+.ln-st { font-weight:700; color:#c9cdd8; }
+.ln-st.active { color:var(--brand); } .ln-st.settled { color:var(--green); } .ln-st.overdue, .ln-st.declined { color:var(--red); }
+.ln-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.ln-btn { padding:8px 14px; border-radius:12px; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; border:1px solid; }
+.ln-btn.ok { background:var(--brand); color:#1a1405; border-color:var(--brand); }
+.ln-btn.no { background:transparent; color:#e6a0a0; border-color:rgba(248,113,113,.5); }
+.ln-btn:disabled { opacity:.5; }
