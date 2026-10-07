@@ -32,6 +32,16 @@ BASE_DAILY_INCOME = 500_000
 BASE_MANPOWER_PRODUCTION = 10_000
 DAYS_PER_SEASON = 3
 GAME_TOTAL_DAYS = 12
+
+# ---- وام ----
+LOAN_INTEREST_STEP_HOURS = 12      # به ازای هر ۱۲ ساعت کامل
+LOAN_INTEREST_PER_STEP = 0.10      # ۱۰٪ مبلغ
+LOAN_MAX_HOURS = 72                # حداکثر مهلت (=۶۰٪)
+LOAN_FEE = 0.05                    # کارمزد ۵٪ از هر دریافت
+LOAN_CAP_FRACTION = 0.50           # سقف هر وام: ۵۰٪ درآمد روزانهٔ وام‌دهنده
+LOAN_CLOSED_HOURS_AT_START = 24    # «هفتهٔ اول فصل» (متناسب با طول بازی) وام‌دهی بسته است
+LOAN_END_MARGIN_SECONDS = 60       # سررسید همه وام‌ها ۱ دقیقه پیش از جنگ جهانی (پایان بازی)
+LOAN_PENDING_TTL_HOURS = 24        # پیشنهادهای بی‌پاسخ منقضی می‌شوند
 SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
 
 # اثر هر فصل روی تولید غذا و نفت (ضریب)
@@ -485,6 +495,7 @@ def ensure_player_fields(player):
     player.setdefault("is_eliminated", False)
     player.setdefault("scans", 0)
     player.setdefault("scan_active", {})
+    player.setdefault("vip", False)
 
 def compute_rates(player):
     power_capacity = get_power_total(player)
@@ -563,7 +574,10 @@ def accrue_player(player):
     elapsed = max(0, (now - last).total_seconds())
     rates = compute_rates(player)
     f = elapsed / 86400
-    player["money"] = max(0, player.get("money", STARTING_MONEY) + rates["net_income"] * f)
+    _gain = rates["net_income"] * f
+    player["money"] = max(0, player.get("money", STARTING_MONEY) + _gain)
+    if _gain > 0:
+        player["money"] -= loan_garnish(player, min(_gain, player["money"]))
     player["manpower"] = player.get("manpower", STARTING_MANPOWER) + rates["manpower_production"] * f
     ensure_player_fields(player)
     for key, amount in rates["resource_production"].items():
@@ -631,6 +645,7 @@ news_feed = []
 site_forces = {}   # site_id -> {"owner": country, "units": {unit_id: n}}
 war_events = []    # خبرهای جنگ
 war_history = []   # تاریخچهٔ درگیری‌ها
+loans = {}         # وام‌ها
 
 def create_player(user_id):
     return {"user_id": user_id, "country": None, "money": STARTING_MONEY, "army": 0,
@@ -661,7 +676,8 @@ def save_state():
                  "private_messages": private_messages, "market_listings": market_listings,
                  "news_feed": news_feed[-200:],
                  "straits_data": STRAITS_DATA,
-                 "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:]}
+                 "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:],
+                 "loans": loans}
         tmp = STATE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False)
@@ -673,7 +689,7 @@ def load_state():
     global diplomacy_proposals, active_treaties, map_holdings, strait_holdings
     global occupied_countries, war_declarations, active_wars, war_reports
     global announcements, unions, private_messages, market_listings, news_feed
-    global site_forces, war_events, war_history
+    global site_forces, war_events, war_history, loans
     if not os.path.exists(STATE_FILE):
         logging.info("No state, fresh start."); return
     try:
@@ -698,6 +714,7 @@ def load_state():
         site_forces = state.get("site_forces", {})
         war_events = state.get("war_events", [])
         war_history = state.get("war_history", [])
+        loans = state.get("loans", {})
         logging.info("State loaded: %d players", len(players))
     except Exception as e:
         logging.error("load_state failed: %s", e)
@@ -2066,6 +2083,251 @@ async def get_rankings(request):
 # =========================================================
 # Health / Debug
 # =========================================================
+# =========================================================
+# Loans (وام بین کشورها)
+# =========================================================
+def _game_window():
+    starts = [parse_dt(p.get("started_at")) for p in players.values() if p.get("started_at")]
+    starts = [s for s in starts if s]
+    if not starts: return None, None
+    start = min(starts)
+    return start, start + timedelta(days=GAME_TOTAL_DAYS)
+
+def loan_rate_for_hours(hours):
+    steps = int(hours // LOAN_INTEREST_STEP_HOURS)
+    return min(steps * LOAN_INTEREST_PER_STEP, LOAN_MAX_HOURS // LOAN_INTEREST_STEP_HOURS * LOAN_INTEREST_PER_STEP)
+
+def loan_max_hours_now():
+    _, end = _game_window()
+    if not end: return float(LOAN_MAX_HOURS)
+    left = (end - timedelta(seconds=LOAN_END_MARGIN_SECONDS) - utcnow()).total_seconds() / 3600
+    return max(0.0, min(float(LOAN_MAX_HOURS), left))
+
+def loan_lending_open():
+    """(open, reason)"""
+    start, end = _game_window()
+    if not start: return False, "بازی هنوز شروع نشده است."
+    now = utcnow()
+    if now < start + timedelta(hours=LOAN_CLOSED_HOURS_AT_START):
+        return False, "وام‌دهی در هفته اول فصل بسته است."
+    if now >= end - timedelta(seconds=LOAN_END_MARGIN_SECONDS):
+        return False, "وام‌دهی بسته شده است؛ جنگ جهانی نزدیک است."
+    return True, ""
+
+def _is_vip(p): return bool(p and p.get("vip"))
+
+def _active_debt(cid):
+    for l in loans.values():
+        if l["borrower"] == cid and l["status"] in ("active", "overdue"): return l
+    return None
+
+def _loan_fee_rates(lender_p, borrower_p, hours):
+    if hours < LOAN_INTEREST_STEP_HOURS: return 0.0, 0.0   # وام زیر ۱۲ ساعت بدون کارمزد
+    return (0.0 if _is_vip(lender_p) else LOAN_FEE), (0.0 if _is_vip(borrower_p) else LOAN_FEE)
+
+def _daily_income(p):
+    ensure_player_fields(p); recompute_army(p)
+    return max(0.0, compute_rates(p)["net_income"])
+
+def loan_lender_cap(p): return int(_daily_income(p) * LOAN_CAP_FRACTION)
+
+def _loan_check(lender_cid, borrower_cid, amount, hours, ignore_pending_id=None):
+    """اعتبارسنجی کامل؛ پیام خطا یا None."""
+    ok, why = loan_lending_open()
+    if not ok: return why
+    if lender_cid == borrower_cid: return "نمی‌توانید به خودتان وام بدهید."
+    lu, lp = get_player_by_country(lender_cid); bu, bp = get_player_by_country(borrower_cid)
+    if not lp or lp.get("is_eliminated"): return "کشور وام‌دهنده معتبر نیست."
+    if not bp or bp.get("is_eliminated"): return "کشور وام‌گیرنده معتبر نیست."
+    if _active_debt(lender_cid): return "تا تسویه وام فعلی‌تان نمی‌توانید وام بدهید."
+    if _active_debt(borrower_cid): return "این کشور هم‌اکنون یک وام تسویه‌نشده دارد."
+    if amount <= 0: return "مبلغ نامعتبر است."
+    maxh = loan_max_hours_now()
+    if hours <= 0 or hours > maxh + 1e-9: return f"مهلت باید حداکثر {maxh:.1f} ساعت باشد."
+    accrue_player(lp); accrue_player(bp)
+    cap = loan_lender_cap(lp)
+    if amount > cap: return f"مبلغ از سقف هر وام ({cap:,}$) بیشتر است."
+    if lp.get("money", 0) < amount: return "موجودی خزانه برای این وام کافی نیست."
+    repay = amount * (1 + loan_rate_for_hours(hours))
+    ability = bp.get("money", 0) + _daily_income(bp) * hours / 24
+    if ability < repay: return "وام‌گیرنده با خزانه و درآمدش نمی‌تواند در این مهلت بازپرداخت کند."
+    return None
+
+def _lname(cid): return f"{COUNTRIES[cid]['flag']} {COUNTRIES[cid]['name']}" if cid in COUNTRIES else "—"
+
+async def notify_user(uid, text):
+    try: await bot.send_message(uid, text)
+    except Exception as e: logging.warning("notify_user %s: %s", uid, e)
+
+def _credit_lender(l, amount):
+    """بازگشت پول به وام‌دهنده (کارمزد ۵٪ از دریافت)."""
+    _, lp = get_player_by_country(l["lender"])
+    if lp is None: return
+    lp["money"] = lp.get("money", 0) + amount * (1 - l.get("fee_lender", 0))
+
+def _apply_payment(l, amount):
+    amount = min(amount, l["remaining"])
+    if amount <= 0: return 0
+    _credit_lender(l, amount)
+    l["remaining"] = max(0.0, l["remaining"] - amount)
+    l["paid"] = l.get("paid", 0) + amount
+    if l["remaining"] <= 0.5:
+        l["remaining"] = 0.0; l["status"] = "settled"; l["settled_at"] = utcnow().isoformat()
+        push_news("تسویه وام", f"{_lname(l['borrower'])} وام خود از {_lname(l['lender'])} را تسویه کرد.")
+    return amount
+
+def loan_garnish(player, available):
+    """وام معوق: تا تسویه، درآمد وام‌گیرنده به وام‌دهنده می‌رسد. مقدار برداشت‌شده را برمی‌گرداند."""
+    cid = player.get("country")
+    if not cid or available <= 0: return 0
+    l = _active_debt(cid)
+    if not l or l["status"] != "overdue": return 0
+    return _apply_payment(l, available)
+
+def loan_tick():
+    now = utcnow(); changed = False
+    _, end = _game_window()
+    lending_ok, _why = loan_lending_open()
+    for l in list(loans.values()):
+        if l["status"] == "pending":
+            created = parse_dt(l["created_at"])
+            if (created and now - created > timedelta(hours=LOAN_PENDING_TTL_HOURS)) or not lending_ok:
+                l["status"] = "expired"; l["closed_at"] = now.isoformat(); changed = True
+        elif l["status"] == "active":
+            due = parse_dt(l["due_at"])
+            if due and now >= due:
+                _, bp = get_player_by_country(l["borrower"])
+                if bp is not None: accrue_player(bp)
+                pay = min(bp.get("money", 0) if bp else 0, l["remaining"])
+                if bp is not None: bp["money"] = bp.get("money", 0) - pay
+                _apply_payment(l, pay)
+                if l["status"] != "settled":
+                    l["status"] = "overdue"
+                    push_news("وام معوق", f"{_lname(l['borrower'])} نتوانست وام خود را کامل بپردازد؛ درآمدش تا تسویه به {_lname(l['lender'])} می‌رسد.", "warning")
+                changed = True
+    if changed: save_state()
+
+def _loan_view(l, my_cid):
+    ts = l.get("settled_at") or l.get("closed_at") or l.get("accepted_at") or l["created_at"]
+    v = {"id": l["id"], "lender": l["lender"], "borrower": l["borrower"],
+         "lender_name": COUNTRIES[l["lender"]]["name"], "lender_flag": COUNTRIES[l["lender"]]["flag"],
+         "borrower_name": COUNTRIES[l["borrower"]]["name"], "borrower_flag": COUNTRIES[l["borrower"]]["flag"],
+         "amount": l["amount"], "hours": l["hours"], "rate": round(l["rate"] * 100),
+         "repay": l["repay"], "remaining": l.get("remaining", l["repay"]), "early": l["early"],
+         "status": l["status"], "at": ts, "due_at": l.get("due_at"),
+         "role": "lender" if l["lender"] == my_cid else ("borrower" if l["borrower"] == my_cid else None)}
+    v["can_accept"] = l["status"] == "pending" and l["borrower"] == my_cid
+    v["can_cancel"] = l["status"] == "pending" and l["lender"] == my_cid
+    v["can_repay"] = l["status"] == "active" and l["borrower"] == my_cid and l["early"]
+    return v
+
+async def get_loans(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    p = _me(uid); cid = p.get("country")
+    if not cid: return web.json_response({"error": "no_country"}, status=400)
+    loan_tick(); accrue_player(p)
+    is_open, reason = loan_lending_open()
+    debt = _active_debt(cid)
+    block = reason if not is_open else ("تا تسویه وام فعلی‌تان نمی‌توانید وام بدهید." if debt else "")
+    opts = []
+    for ouid, op in players.items():
+        oc = op.get("country")
+        if oc and oc != cid and not op.get("is_eliminated"):
+            opts.append({"id": oc, "name": COUNTRIES[oc]["name"], "flag": COUNTRIES[oc]["flag"],
+                         "busy": _active_debt(oc) is not None})
+    rows = sorted(loans.values(), key=lambda x: x["created_at"], reverse=True)
+    return web.json_response({
+        "now": utcnow().isoformat(), "my_country": cid, "lending_open": is_open and not debt,
+        "block_reason": block, "cap": loan_lender_cap(p), "max_hours": round(loan_max_hours_now(), 2),
+        "vip": _is_vip(p), "countries": opts, "owes": debt["remaining"] if debt else 0,
+        "mine": [_loan_view(l, cid) for l in rows if cid in (l["lender"], l["borrower"])][:60],
+        "book": [_loan_view(l, cid) for l in rows][:100]})
+
+async def propose_loan(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "message": "unauthorized"}, status=401)
+    p = _me(uid); cid = p.get("country")
+    if not cid: return _bad("ابتدا کشور انتخاب کنید.")
+    data = await read_json(request); to = data.get("to")
+    try: amount = int(float(data.get("amount", 0))); hours = float(data.get("hours", 0))
+    except Exception: return _bad("مقدار نامعتبر است.")
+    if to not in COUNTRIES: return _bad("کشور وام‌گیرنده را انتخاب کنید.")
+    loan_tick()
+    err = _loan_check(cid, to, amount, hours)
+    if err: return _bad(err)
+    rate = loan_rate_for_hours(hours)
+    lid = str(uuid.uuid4())
+    loans[lid] = {"id": lid, "lender": cid, "borrower": to, "amount": amount, "hours": hours,
+                  "rate": rate, "repay": round(amount * (1 + rate)), "remaining": round(amount * (1 + rate)),
+                  "early": bool(data.get("early")), "status": "pending", "created_at": utcnow().isoformat()}
+    save_state()
+    bu, _ = get_player_by_country(to)
+    if bu: await notify_user(bu, f"💰 {_lname(cid)} پیشنهاد وام {amount:,}$ با مهلت {hours:g} ساعت و بازپرداخت {loans[lid]['repay']:,}$ داد. از بخش وام پاسخ دهید.")
+    return web.json_response({"success": True, "message": "پیشنهاد وام ارسال شد."})
+
+async def respond_loan(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "message": "unauthorized"}, status=401)
+    p = _me(uid); cid = p.get("country"); data = await read_json(request)
+    l = loans.get(data.get("loan_id"))
+    if not l or l["status"] != "pending": return _bad("پیشنهاد معتبر نیست.", 404)
+    if l["borrower"] != cid: return _bad("این پیشنهاد برای شما نیست.", 403)
+    if not data.get("accept"):
+        l["status"] = "declined"; l["closed_at"] = utcnow().isoformat(); save_state()
+        lu, _ = get_player_by_country(l["lender"])
+        if lu: await notify_user(lu, f"❌ {_lname(cid)} پیشنهاد وام شما را رد کرد.")
+        return web.json_response({"success": True, "message": "پیشنهاد رد شد."})
+    err = _loan_check(l["lender"], cid, l["amount"], l["hours"])
+    if err: return _bad(err)
+    _, lp = get_player_by_country(l["lender"]); bp = p
+    fee_l, fee_b = _loan_fee_rates(lp, bp, l["hours"])
+    now = utcnow()
+    lp["money"] -= l["amount"]
+    bp["money"] = bp.get("money", 0) + l["amount"] * (1 - fee_b)
+    l.update({"status": "active", "accepted_at": now.isoformat(),
+              "due_at": (now + timedelta(hours=l["hours"])).isoformat(),
+              "fee_lender": fee_l, "fee_borrower": fee_b, "remaining": l["repay"]})
+    push_news("وام جدید", f"{_lname(l['lender'])} به {_lname(cid)} مبلغ {l['amount']:,}$ وام داد.")
+    save_state()
+    lu, _ = get_player_by_country(l["lender"])
+    if lu: await notify_user(lu, f"✅ {_lname(cid)} وام {l['amount']:,}$ را پذیرفت.")
+    return web.json_response({"success": True, "message": f"وام دریافت شد (کارمزد {fee_b*100:g}٪)."})
+
+async def cancel_loan(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "message": "unauthorized"}, status=401)
+    p = _me(uid); cid = p.get("country"); data = await read_json(request)
+    l = loans.get(data.get("loan_id"))
+    if not l or l["status"] != "pending": return _bad("پیشنهاد معتبر نیست.", 404)
+    if l["lender"] != cid: return _bad("این پیشنهاد مال شما نیست.", 403)
+    l["status"] = "cancelled"; l["closed_at"] = utcnow().isoformat(); save_state()
+    return web.json_response({"success": True, "message": "پیشنهاد لغو شد."})
+
+async def repay_loan(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "message": "unauthorized"}, status=401)
+    p = _me(uid); cid = p.get("country"); data = await read_json(request)
+    l = loans.get(data.get("loan_id"))
+    if not l or l["status"] != "active": return _bad("وام فعالی پیدا نشد.", 404)
+    if l["borrower"] != cid: return _bad("این وام مال شما نیست.", 403)
+    if not l["early"]: return _bad("این وام فقط سر موعد قابل بازپرداخت است.")
+    accrue_player(p)
+    if p.get("money", 0) < l["remaining"]: return _bad("موجودی خزانه برای بازپرداخت کافی نیست.")
+    p["money"] -= l["remaining"]; _apply_payment(l, l["remaining"]); save_state()
+    return web.json_response({"success": True, "message": "وام تسویه شد."})
+
+async def vip_command(message: types.Message):
+    if not ADMIN_ID or message.from_user.id != ADMIN_ID: return
+    parts = (message.text or "").split()
+    if len(parts) < 2: await message.answer("/vip <user_id> [on|off]"); return
+    try: tid = int(parts[1])
+    except ValueError: await message.answer("user_id نامعتبر"); return
+    on = not (len(parts) > 2 and parts[2].lower() == "off")
+    if tid not in players: await message.answer("بازیکن پیدا نشد"); return
+    players[tid]["vip"] = on; save_state()
+    await message.answer(f"VIP {'فعال' if on else 'غیرفعال'} شد برای {tid}")
+
 async def health(request):
     return web.json_response({"status": "ok", "players": len(players)})
 
@@ -2099,7 +2361,7 @@ async def create_web_app():
         ("/api/wars", get_wars), ("/api/map-sites", get_map_sites),
         ("/api/announcements", get_announcements), ("/api/announcement", get_announcement_detail),
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
-        ("/api/news", get_news), ("/api/rankings", get_rankings),
+        ("/api/loans", get_loans), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
         ("/api/debug-auth", debug_auth), ("/health", health)]:
         app.router.add_get(path, h)
@@ -2120,6 +2382,8 @@ async def create_web_app():
         ("/api/union/message", send_union_message), ("/api/pm/send", send_pm),
         ("/api/market/create", create_listing), ("/api/market/cancel", cancel_listing),
         ("/api/market/accept", accept_listing), ("/api/strait/settings", set_strait_settings),
+        ("/api/loans/propose", propose_loan), ("/api/loans/respond", respond_loan),
+        ("/api/loans/cancel", cancel_loan), ("/api/loans/repay", repay_loan),
         ("/api/border/settings", set_border_settings)]:
         app.router.add_post(path, h)
 
@@ -2138,6 +2402,10 @@ async def war_tick_loop():
         await asyncio.sleep(30)
         try: await check_wars_tick()
         except Exception as e: logging.error("war tick: %s", e)
+        try: loan_tick()
+        except Exception as e: logging.error("loan tick: %s", e)
+
+dp.message.register(vip_command, Command("vip"))
 
 async def main():
     logging.info("FRONT-LINE 1993 GAME STARTING...")
