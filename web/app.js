@@ -603,7 +603,8 @@ document.querySelectorAll(".action-card").forEach(card => {
         else if (s === "economy") openEconomyPage();
         else if (s === "market") { showGamePage("market"); loadMarketListings(); }
         else if (s === "ranking") { showGamePage("ranking"); loadRankings(); }
-        else if (s === "transfer" || s === "stats") showToast("به‌زودی فعال می‌شود");
+        else if (s === "stats") showGamePage("stats");
+        else if (s === "transfer") showToast("به‌زودی فعال می‌شود");
     });
 });
 
@@ -3013,3 +3014,29 @@ async function createPreviewGlobe(containerId, svgId, selected) {
         showCountrySelection();
     }
 })();
+
+/* =========================================================
+   آمار کشور — فقط ظاهر (راهنمای «رفاه و درآمد»)
+========================================================= */
+function closeStatsHelp() { document.getElementById("stats-help-sheet")?.remove(); }
+document.getElementById("st-help-btn")?.addEventListener("click", () => {
+    closeStatsHelp();
+    const ov = document.createElement("div");
+    ov.id = "stats-help-sheet";
+    ov.className = "modal-overlay";
+    ov.innerHTML = `
+        <div class="st-sheet">
+            <div class="st-sheet-head">
+                <h3>رفاه و درآمد</h3>
+                <button class="st-sheet-close" aria-label="بستن">✕</button>
+            </div>
+            <div class="st-sheet-body">
+                <p>بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه با هم امتیازِ <b>رفاه</b> را می‌سازند. هرچه بیشتر و بالاتر ساخته شوند، <b>درآمدِ سرمایه‌گذاری‌ها</b> تا +50٪ پاداش می‌گیرد.</p>
+                <p>این پاداش فقط اضافه می‌کند؛ نساختنِ این ساختمان‌ها چیزی از درآمد کم نمی‌کند.</p>
+                <p>زلزله، موجِ جرم، همه‌گیری و قحطی پاداشِ رفاه را موقتاً کم می‌کنند (نه زیرِ صفر)؛ هر دوره 3 واحد جبران می‌شود. زیرساختِ بیشتر هم احتمالِ این رویدادها را کم می‌کند و هم افتِ آن‌ها را.</p>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener("click", e => { if (e.target === ov) closeStatsHelp(); });
+    ov.querySelector(".st-sheet-close").onclick = closeStatsHelp;
+});
