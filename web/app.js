@@ -604,8 +604,68 @@ document.querySelectorAll(".action-card").forEach(card => {
         else if (s === "market") { showGamePage("market"); loadMarketListings(); }
         else if (s === "ranking") { showGamePage("ranking"); loadRankings(); }
         else if (s === "stats") showGamePage("stats");
-        else if (s === "transfer") showToast("به‌زودی فعال می‌شود");
+        else if (s === "transfer") { showGamePage("loan"); renderLoanPage(); }
     });
+});
+
+
+/* =========================================================
+   Loan page (visual only)
+========================================================= */
+let loanTab = "mine";
+const LOAN_BOOK = [
+    { from: "ترکیه", ff: "🇹🇷", to: "سوریه", tf: "🇸🇾", amount: 20000000, hours: 24, rate: 20, repay: 24000000, early: true, status: "active", date: "1405/7/15 · 11:29" },
+    { from: "ترکیه", ff: "🇹🇷", to: "سوریه", tf: "🇸🇾", amount: 20000000, hours: 24, rate: 20, repay: 24000000, early: true, status: "settled", date: "1405/7/15 · 2:26" },
+    { from: "کانادا", ff: "🇨🇦", to: "یونان", tf: "🇬🇷", amount: 20000000, hours: 24, rate: 20, repay: 24000000, early: false, status: "active", date: "1405/7/15 · 0:17" },
+    { from: "هند", ff: "🇮🇳", to: "پاکستان", tf: "🇵🇰", amount: 20000000, hours: 72, rate: 60, repay: 32000000, early: false, status: "active", date: "1405/7/13 · 22:33" },
+];
+const LOAN_HELP = `
+<p>پول فقط از راه وام بین کشورها جابه‌جا می‌شود. وام‌دهنده مبلغ و مهلت را تعیین می‌کند؛ سود و کارمزد را قانون تعیین می‌کند.</p>
+<p><b>سود:</b> برای هر ۱۲ ساعت کامل، ۱۰٪ مبلغ؛ زیر ۱۲ ساعت بدون سود. حداکثر مهلت ۷۲ ساعت (۶۰٪).</p>
+<p><b>کارمزد:</b> ۵٪ از هر دریافت — وام‌گیرنده هنگام گرفتن، وام‌دهنده هنگام بازگشت. وام زیر ۱۲ ساعت و دریافت‌کننده VIP کارمزد ندارد.</p>
+<p><b>سقف:</b> هر وام حداکثر ۵۰٪ درآمد روزانه وام‌دهنده، و وام‌گیرنده باید بتواند با خزانه و درآمدش در همان مهلت بازپرداخت کند.</p>
+<p>هر کشور هم‌زمان فقط یک وام می‌گیرد و تا تسویه وام نمی‌دهد. وام‌دهی در هفته اول فصل بسته است و همه وام‌ها تا ۱ دقیقه پیش از جنگ جهانی سررسید می‌شوند.</p>
+<p>در سررسید کل بدهی برداشته می‌شود. اگر خزانه کافی نباشد، هرچه هست برداشته می‌شود و تا تسویه، تمام درآمد وام‌گیرنده به وام‌دهنده می‌رسد.</p>
+<p>همه کشورهای دنیا دفتر وام‌ها را می‌بینند.</p>`;
+
+function renderLoanPage() {
+    document.querySelectorAll("#ln-tabs .ln-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === loanTab));
+    const p = document.getElementById("ln-panel");
+    if (loanTab === "mine") {
+        p.innerHTML = `<div class="ln-card"><div class="ln-card-title">💰 وام‌های من</div><div class="ln-empty">هنوز وامی ندارید.</div></div>`;
+    } else if (loanTab === "offer") {
+        p.innerHTML = `<div class="ln-card ln-gold">
+            <div class="ln-card-title">💰 پیشنهاد وام</div>
+            <div class="ln-row"><span>سقف هر وام (۵۰٪ درآمد روزانه)</span><b>$4,502,816</b></div>
+            <div class="ln-row"><span>حداکثر مهلت اکنون</span><b>72 ساعت</b></div>
+            <select class="ln-input ln-select"><option>کشور وام‌گیرنده</option></select>
+            <input class="ln-input" type="number" inputmode="numeric" placeholder="مبلغ ($)">
+            <input class="ln-input" type="number" inputmode="numeric" value="24">
+            <div class="ln-seg"><button class="active" type="button">فقط سر موعد</button><button type="button">بازپرداخت زودتر مجاز</button></div>
+            <button class="ln-submit" type="button">پیشنهاد دهید</button>
+        </div>`;
+        p.querySelectorAll(".ln-seg button").forEach(b => b.addEventListener("click", () => {
+            p.querySelectorAll(".ln-seg button").forEach(x => x.classList.remove("active")); b.classList.add("active");
+        }));
+    } else {
+        p.innerHTML = `<div class="ln-card"><div class="ln-card-title">🧾 دفتر وام‌های دنیا</div>` + LOAN_BOOK.map(r => `
+            <div class="ln-item">
+                <div class="ln-amt">${formatMoney(r.amount)}</div>
+                <div class="ln-info">
+                    <div class="ln-route"><span>${r.ff} ${r.from}</span> ← <span>${r.tf} ${r.to}</span></div>
+                    <div class="ln-meta">${r.hours} ساعت · سود ${r.rate}٪ · بازپرداخت ${formatMoney(r.repay)}${r.early ? " · بازپرداخت زودتر مجاز" : ""}</div>
+                    <div class="ln-meta">${r.status === "active" ? "جاری" : "تسویه شد"} · ${r.date}</div>
+                </div>
+            </div>`).join("") + `</div>`;
+    }
+}
+document.querySelectorAll("#ln-tabs .ln-tab").forEach(b => b.addEventListener("click", () => { loanTab = b.dataset.tab; renderLoanPage(); }));
+document.getElementById("ln-help")?.addEventListener("click", () => {
+    const ov = document.createElement("div");
+    ov.className = "modal-overlay";
+    ov.innerHTML = `<div class="ln-sheet"><div class="ln-sheet-head"><button class="ln-x" aria-label="بستن">✕</button><span>وام</span></div><div class="ln-sheet-body">${LOAN_HELP}</div></div>`;
+    ov.addEventListener("click", e => { if (e.target === ov || e.target.closest(".ln-x")) ov.remove(); });
+    document.body.appendChild(ov);
 });
 
 document.querySelectorAll(".sub-back-button").forEach(b => {
