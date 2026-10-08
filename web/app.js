@@ -603,7 +603,7 @@ document.querySelectorAll(".action-card").forEach(card => {
         else if (s === "economy") openEconomyPage();
         else if (s === "market") { showGamePage("market"); loadMarketListings(); }
         else if (s === "ranking") { showGamePage("ranking"); loadRankings(); }
-        else if (s === "stats") showGamePage("stats");
+        else if (s === "stats") { showGamePage("stats"); loadStats(); }
         else if (s === "transfer") { showGamePage("loan"); renderLoanPage(); }
     });
 });
@@ -764,6 +764,7 @@ const INFRA_TAB_FILTERS = {
     food:     i => i.group === "resource" && i.resource_key === "food",
     resource: i => i.group === "resource" && i.resource_key !== "food",
     military: i => ["land", "naval", "air", "missile"].includes(i.group),
+    welfare:  i => i.group === "welfare",
     strategy: i => i.group === "strategy",
 };
 
@@ -824,6 +825,8 @@ function renderInfraTab(tab) {
         renderInfraList("infra-food-list", INFRA_TAB_FILTERS.food);
     else if (tab === "resource")
         renderInfraList("infra-resource-list", INFRA_TAB_FILTERS.resource);
+    else if (tab === "welfare")
+        renderInfraList("infra-welfare-list", INFRA_TAB_FILTERS.welfare);
     else if (tab === "strategy")
         renderInfraList("infra-strategy-list", INFRA_TAB_FILTERS.strategy);
     else if (tab === "military") {
@@ -866,6 +869,9 @@ function buildStatsHtml(item, levelData) {
     }
     if ((g === "land" || g === "naval" || g === "air") && levelData.capacity !== undefined) {
         boxes.push(statBox("📦", formatNumber(levelData.capacity), "ظرفیت"));
+    }
+    if (g === "welfare" && levelData.welfare !== undefined) {
+        boxes.push(statBox("🛡️", "+" + levelData.welfare + "٪", "پاداش رفاه"));
     }
     if (levelData.income !== undefined) {
         boxes.push(statBox("💰", "+" + formatMoney(levelData.income), "در روز"));
@@ -2450,11 +2456,11 @@ async function loadMyListings(){const c=document.getElementById("market-mine");i
 const WORLD_NAMES_FA = {4:"افغانستان",8:"آلبانی",10:"جنوبگان",12:"الجزایر",16:"ساموآی امریکا",20:"آندورا",24:"آنگولا",28:"آنتیگوا و باربودا",31:"جمهوری آذربایجان",32:"آرژانتین",36:"استرالیا",40:"اتریش",44:"باهاما",48:"بحرین",50:"بنگلادش",51:"ارمنستان",52:"باربادوس",56:"بلژیک",60:"برمودا",64:"بوتان",68:"بولیوی",70:"بوسنی",72:"بوتسوانا",76:"برزیل",84:"بلیز",90:"جزایر سلیمان",92:"جزایر ویرجین",96:"برونئی",100:"بلغارستان",104:"میانمار (برمه)",108:"بوروندی",112:"بلاروس",116:"کامبوج",120:"کامرون",124:"کانادا",132:"کیپ‌ورد",140:"آفریقای مرکزی",144:"سری‌لانکا",148:"چاد",152:"شیلی",156:"چین",158:"تایوان",170:"کلمبیا",174:"کومور",178:"کنگو",180:"کنگو (دموکراتیک)",184:"جزایر کوک",188:"کاستاریکا",191:"کرواسی",192:"کوبا",196:"قبرس",203:"چک",204:"بنین",208:"دانمارک",212:"دومینیکا",214:"جمهوری دومینیکن",218:"اکوادور",222:"السالوادور",226:"گینه استوایی",231:"اتیوپی",232:"اریتره",233:"استونی",234:"جزایر فارو",238:"فالکلند",239:"جورجیای جنوبی",242:"فیجی",246:"فنلاند",250:"فرانسه",254:"گویان فرانسه",258:"پلی‌نزی فرانسه",260:"سرزمین‌های فرانسوی جنوبی",262:"جیبوتی",266:"گابن",268:"گرجستان",270:"گامبیا",275:"فلسطین",276:"آلمان",288:"غنا",296:"کیریباتی",300:"یونان",304:"گرینلند",308:"گرنادا",316:"گوام",320:"گواتمالا",324:"گینه",328:"گویان",332:"هائیتی",340:"هندوراس",344:"هنگ‌کنگ",348:"مجارستان",352:"ایسلند",356:"هند",360:"اندونزی",364:"ایران",368:"عراق",372:"ایرلند",376:"اسرائیل",380:"ایتالیا",384:"ساحل عاج",388:"جامائیکا",392:"ژاپن",398:"قزاقستان",400:"اردن",404:"کنیا",408:"کره شمالی",410:"کره جنوبی",414:"کویت",417:"قرقیزستان",418:"لائوس",422:"لبنان",426:"لسوتو",428:"لتونی",430:"لیبریا",434:"لیبی",438:"لیختن‌اشتاین",440:"لیتوانی",442:"لوکزامبورگ",446:"ماکائو، منطقهٔ ویژهٔ اداری چین",450:"ماداگاسکار",454:"مالاوی",458:"مالزی",462:"مالدیو",466:"مالی",470:"مالت",478:"موریتانی",480:"موریس",484:"مکزیک",492:"موناکو",496:"مغولستان",498:"مولداوی",499:"مونته‌نگرو",504:"مراکش",508:"موزامبیک",512:"عمان",516:"نامیبیا",520:"نائورو",524:"نپال",528:"هلند",531:"کوراسائو",533:"آروبا",534:"سنت مارتن",535:"جزایر کارائیب هلند",540:"کالدونیای جدید",548:"وانواتو",554:"نیوزیلند",558:"نیکاراگوئه",562:"نیجر",566:"نیجریه",578:"نروژ",580:"ماریانای شمالی",583:"میکرونزی",584:"جزایر مارشال",585:"پالائو",586:"پاکستان",591:"پاناما",598:"پاپوآ گینه نو",600:"پاراگوئه",604:"پرو",608:"فیلیپین",612:"جزایر پیت‌کرن",616:"لهستان",620:"پرتغال",624:"گینه بیسائو",626:"تیمور شرقی",630:"پورتوریکو",634:"قطر",642:"رومانی",643:"شوروی",646:"رواندا",654:"سنت هلن",659:"سنت کیتس",660:"آنگویلا",662:"سنت لوسیا",670:"سنت وینسنت",674:"سان‌مارینو",678:"سائوتومه",682:"عربستان سعودی",686:"سنگال",688:"صربستان",690:"سیشل",694:"سیرالئون",702:"سنگاپور",703:"اسلواکی",704:"ویتنام",705:"اسلوونی",706:"سومالی",710:"افریقای جنوبی",716:"زیمبابوه",724:"اسپانیا",728:"سودان جنوبی",729:"سودان",732:"صحرای غربی",740:"سورینام",748:"اسواتینی",752:"سوئد",756:"سوئیس",760:"سوریه",762:"تاجیکستان",764:"تایلند",768:"توگو",776:"تونگا",780:"ترینیداد",784:"امارات",788:"تونس",792:"ترکیه",795:"ترکمنستان",796:"جزایر تورکس و کایکوس",798:"تووالو",800:"اوگاندا",804:"اوکراین",807:"مقدونیه شمالی",818:"مصر",826:"بریتانیا",834:"تانزانیا",840:"آمریکا",850:"جزایر ویرجین",854:"بورکینافاسو",858:"اروگوئه",860:"ازبکستان",862:"ونزوئلا",882:"ساموآ",887:"یمن",894:"زامبیا"};
 const MAP_ODD_NAMES = { "Kosovo": "کوزوو", "N. Cyprus": "قبرس شمالی", "Somaliland": "سومالیلند" };
 const MAP_COLORS = {
-    own: "#ffd21f",        // کشوری که خود بازیکن انتخاب کرده → زرد
-    other: "#2f7fe8",      // کشوری که بازیکن دیگری انتخاب کرده (فعال) → آبی
-    inactive: "#0b0b0e",   // در بازی هست ولی کسی انتخابش نکرده (غیرفعال) → سیاه
-    ownOcc: "#34b36b", otherOcc: "#9b5de5",
-    hatchBase: "#2c3544", hatchLine: "rgba(150,165,188,0.75)"   // هنوز به بازی اضافه نشده → هاشور
+    own: "#2ecc71",        // کشور من و تصرف‌های من (تنگه، سکو، معدن) → سبز
+    other: "#9fd8ff",      // بازیکنان فعال و منابع/تنگه‌های آزاد → آبی کمرنگ
+    taken: "#ff9f1a",      // تصرف‌شده توسط بازیکن دیگر → نارنجی
+    inactive: "pattern:inactive",   // در بازی هست ولی کسی انتخابش نکرده → سیاه و طوسیِ قاطی
+    nogame: "#6e7683"      // هنوز به بازی اضافه نشده → طوسی ساده، بدون خط‌کشی
 };
 const MAP_SPHERE = { type: "Sphere" };
 
@@ -2490,25 +2496,23 @@ function combineFeatures(feats, id) {
     });
     return { type: "Feature", id, properties: { name: "" }, geometry: { type: "MultiPolygon", coordinates: polys } };
 }
-// الگوی هاشور (خط‌خطی مورب) برای کشورهای اضافه‌نشده
-let mapHatch = null;
-function getHatchPattern(ctx) {
-    if (mapHatch) return mapHatch;
-    const S = 8, d = mapDpr;
+// الگوی «سیاه و طوسیِ قاطی» برای کشورهای فعالِ انتخاب‌نشده
+let mapInactivePat = null;
+function getInactivePattern(ctx) {
+    if (mapInactivePat) return mapInactivePat;
+    const C = 3, d = mapDpr, N = 4;               // خانه‌های ۳ پیکسلی، بلوک ۴×۴ با چینش نامنظم
     const c = document.createElement("canvas");
-    c.width = c.height = Math.round(S * d);
+    c.width = c.height = Math.round(C * N * d);
     const g = c.getContext("2d");
     g.scale(d, d);
-    g.fillStyle = MAP_COLORS.hatchBase; g.fillRect(0, 0, S, S);
-    g.strokeStyle = MAP_COLORS.hatchLine; g.lineWidth = 1.2;
-    g.beginPath();
-    g.moveTo(-2, S + 2); g.lineTo(S + 2, -2);
-    g.moveTo(-2, 2);     g.lineTo(2, -2);
-    g.moveTo(S - 2, S + 2); g.lineTo(S + 2, S - 2);
-    g.stroke();
-    mapHatch = ctx.createPattern(c, "repeat");
-    try { mapHatch.setTransform(new DOMMatrix().scale(1 / d)); } catch (e) {}
-    return mapHatch;
+    const mix = [1,0,0,1, 0,1,1,0, 1,1,0,0, 0,0,1,1];
+    for (let i = 0; i < N * N; i++) {
+        g.fillStyle = mix[i] ? "#0b0b0e" : "#8f98a8";
+        g.fillRect((i % N) * C, Math.floor(i / N) * C, C, C);
+    }
+    mapInactivePat = ctx.createPattern(c, "repeat");
+    try { mapInactivePat.setTransform(new DOMMatrix().scale(1 / d)); } catch (e) {}
+    return mapInactivePat;
 }
 
 let mapProjection = null, mapPath = null, mapSvg = null;
@@ -2574,7 +2578,11 @@ async function initWorldMap() {
         r.feats.push(f);
     });
     // فقط مرزِ بین دو قلمرو مختلف + ساحل کشیده می‌شود (مرز داخلی شوروی/یوگسلاوی دیده نمی‌شود)
-    mapBorders = topojson.mesh(world, world.objects.countries, (x, y) => realmOfGeom.get(x) !== realmOfGeom.get(y));
+    const inGameRealm = rid => typeof rid === "number" && !!keyById[rid];
+    mapBorders = topojson.mesh(world, world.objects.countries, (x, y) => {
+        const rx = realmOfGeom.get(x), ry = realmOfGeom.get(y);
+        return rx !== ry && (inGameRealm(rx) || inGameRealm(ry));
+    });
     mapCoast = topojson.mesh(world, world.objects.countries, (x, y) => x === y);
 
     // اطلاعات ثابت هر قلمرو یک‌بار محاسبه می‌شود (نه در هر فریم)
@@ -2654,7 +2662,7 @@ function renderMapSites() {
     mapSitesSvg.selectAll("*").remove();
     const g = mapSitesSvg.selectAll(".map-site").data(mapSites).enter().append("g")
         .attr("class", d => `map-site map-site-${d.kind === "strait" ? "strait" : d.type}` +
-            (d.owner && d.owner === selectedCountry ? " mine" : ""))
+            (!d.owner ? " site-free" : d.owner === selectedCountry ? " site-mine" : " site-other"))
         .style("display", "none")
         .on("click", (e, d) => { e.stopPropagation(); showSiteInfo(d); });
     g.append("rect").attr("class", "site-hit")
@@ -2796,9 +2804,10 @@ function drawMapNow() {
     for (const g of mapGroups) {
         ctx.beginPath();
         for (const m of g.items) mapPath(m.f);
-        ctx.fillStyle = g.hatch ? getHatchPattern(ctx) : g.fill;
+        const isPat = g.fill === MAP_COLORS.inactive;
+        ctx.fillStyle = isPat ? getInactivePattern(ctx) : g.fill;
         ctx.fill();
-        if (!g.hatch) { ctx.lineWidth = 0.5; ctx.strokeStyle = g.fill; ctx.stroke(); }   // پوشاندن درز
+        if (!isPat) { ctx.lineWidth = 0.5; ctx.strokeStyle = g.fill; ctx.stroke(); }   // پوشاندن درز
     }
     // مرز کشورها و ساحل
     if (mapBorders) {
@@ -2868,13 +2877,9 @@ function updateMapLabels() {
 }
 
 function mapFillFor(m) {
-    if (!m.key) return null;   // هنوز به بازی اضافه نشده → هاشور
+    if (!m.key) return MAP_COLORS.nogame;   // هنوز به بازی اضافه نشده → طوسی ساده
     const info = countries[m.key];
-    if (info?.occupier) {
-        if (info.occupier === selectedCountry) return MAP_COLORS.ownOcc;
-        if (info.taken && m.key === selectedCountry) return MAP_COLORS.ownOcc;
-        return MAP_COLORS.otherOcc;
-    }
+    if (info?.occupier) return info.occupier === selectedCountry ? MAP_COLORS.own : MAP_COLORS.taken;
     if (m.key === selectedCountry) return MAP_COLORS.own;
     if (info?.taken) return MAP_COLORS.other;
     return MAP_COLORS.inactive;
@@ -2884,9 +2889,8 @@ function updateMapColors() {
     const groups = new Map();
     mapFeatures.forEach(m => {
         const fill = mapFillFor(m);
-        const gk = fill || "hatch";
-        let g = groups.get(gk);
-        if (!g) { g = { fill, hatch: !fill, game: !!m.key, items: [] }; groups.set(gk, g); }
+        let g = groups.get(fill);
+        if (!g) { g = { fill, items: [] }; groups.set(fill, g); }
         g.items.push(m);
     });
     mapGroups = Array.from(groups.values());
@@ -3158,8 +3162,69 @@ async function createPreviewGlobe(containerId, svgId, selected) {
     }
 })();
 
+
+/* ---------- آمار کشور: دادهٔ زنده ---------- */
+let statsData = null, statsTimer = null;
+function timeAgo(iso, now) {
+    const sec = Math.max(0, (new Date(now || Date.now()) - new Date(iso)) / 1000);
+    if (sec < 90) return "لحظاتی پیش";
+    const m = Math.round(sec / 60); if (m < 60) return `${m} دقیقه پیش`;
+    const h = Math.round(sec / 3600); if (h < 48) return `${h} ساعت پیش`;
+    return `${Math.round(sec / 86400)} روز پیش`;
+}
+const fmt1 = v => (Math.round(v * 10) / 10).toString();
+async function loadStats() {
+    const body = document.getElementById("st-body");
+    try {
+        const d = await apiGet("/api/stats");
+        if (d && !d.error) statsData = d;
+    } catch (e) { console.error(e); }
+    if (!statsData) { body.innerHTML = `<div class="st-card st-card-plain"><p class="st-muted">خطا در دریافت آمار.</p></div>`; return; }
+    renderStats();
+    clearInterval(statsTimer);
+    statsTimer = setInterval(() => {
+        if (document.getElementById("stats")?.classList.contains("hidden")) { clearInterval(statsTimer); return; }
+        loadStats();
+    }, 30000);
+}
+function renderStats() {
+    const d = statsData, body = document.getElementById("st-body");
+    const pct = Math.min(100, d.bonus / d.max * 100);
+    const blds = d.buildings.map(b => `<div class="st-line"><span>${b.icon} ${escapeHtml(b.name)}</span><span>سطح ${b.level} از ${b.max_level}</span></div>`).join("");
+    const events = d.events.length
+        ? d.events.map(e => `<li><span class="st-ev-text">${escapeHtml(e.text)}</span><span class="st-ev-time">${timeAgo(e.at, d.now)}</span></li>`).join("")
+        : `<li><span class="st-ev-text">هنوز رویدادی رخ نداده است.</span></li>`;
+    body.innerHTML = `
+        <div class="st-card">
+            <div class="st-box st-box-row">
+                <div class="st-box-title"><span class="st-shield">🛡️</span><b>پاداش رفاه</b><small>روی درآمد سرمایه‌گذاری‌ها</small></div>
+                <strong class="st-good">+${fmt1(d.bonus)}٪</strong>
+            </div>
+            <div class="st-bar"><div class="st-bar-fill" style="width:${pct}%"></div></div>
+            <p class="st-text">بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه — ارتقای هرکدام این پاداش را بالا می‌برد، تا سقفِ ${d.max}٪.</p>
+            ${blds}
+        </div>
+        <div class="st-card">
+            <div class="st-box st-box-split">
+                <span class="st-box-label">اثرِ کل روی درآمدِ سرمایه‌گذاری‌ها</span>
+                <strong class="st-good st-big">${fmt1(d.bonus)}٪<br>افزایش</strong>
+            </div>
+            <div class="st-line"><span>پاداش رفاه</span><span class="st-good-soft">${fmt1(d.gross)}٪ افزایش</span></div>
+            ${d.penalty > 0 ? `<div class="st-line"><span>افت موقتِ رویدادها</span><span class="st-bad-soft">${fmt1(d.penalty)}٪ کاهش</span></div>` : ""}
+            <div class="st-line"><span>درآمدِ اضافه</span><span class="st-good-soft">+${formatMoney(d.extra_income)} در روز</span></div>
+        </div>
+        <div class="st-card st-card-plain">
+            <p class="st-muted">بلایای محتمل در کشورِ خودی: ${d.risks.length ? escapeHtml(d.risks.join("، ")) : "—"}</p>
+            <p class="st-text">هر سطح ساختمان هم احتمالش را کم می‌کند هم افتِ موقتِ رفاه را.</p>
+        </div>
+        <div class="st-card st-card-plain">
+            <p class="st-muted">رویدادهای اخیر:</p>
+            <ul class="st-events">${events}</ul>
+        </div>`;
+}
+
 /* =========================================================
-   آمار کشور — فقط ظاهر (راهنمای «رفاه و درآمد»)
+   آمار کشور (راهنمای «رفاه و درآمد»)
 ========================================================= */
 function closeStatsHelp() { document.getElementById("stats-help-sheet")?.remove(); }
 document.getElementById("st-help-btn")?.addEventListener("click", () => {
@@ -3176,7 +3241,7 @@ document.getElementById("st-help-btn")?.addEventListener("click", () => {
             <div class="st-sheet-body">
                 <p>بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه با هم امتیازِ <b>رفاه</b> را می‌سازند. هرچه بیشتر و بالاتر ساخته شوند، <b>درآمدِ سرمایه‌گذاری‌ها</b> تا +50٪ پاداش می‌گیرد.</p>
                 <p>این پاداش فقط اضافه می‌کند؛ نساختنِ این ساختمان‌ها چیزی از درآمد کم نمی‌کند.</p>
-                <p>زلزله، موجِ جرم، همه‌گیری و قحطی پاداشِ رفاه را موقتاً کم می‌کنند (نه زیرِ صفر)؛ هر دوره 3 واحد جبران می‌شود. زیرساختِ بیشتر هم احتمالِ این رویدادها را کم می‌کند و هم افتِ آن‌ها را.</p>
+                <p>زلزله، موجِ جرم، همه‌گیری، قحطی و خشکسالی پاداشِ رفاه را موقتاً کم می‌کنند (نه زیرِ صفر)؛ هر دوره (۶ ساعت) 3 واحد جبران می‌شود. زیرساختِ بیشتر هم احتمالِ این رویدادها را کم می‌کند و هم افتِ آن‌ها را.</p>
             </div>
         </div>`;
     document.body.appendChild(ov);
