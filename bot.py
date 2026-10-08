@@ -245,6 +245,32 @@ INFRASTRUCTURE = {
         "desc": "پایگاه ماهواره‌ای. تب «ماهواره» در بخش جنگ را باز می‌کند: پرتاب ماهواره، اسکن سکوها و تنگه‌ها و اسکن کشورها.",
         "levels": [L(cost=6_000_000)],
     },
+    # ==================== رفاه و امنیت ====================
+    "hospital": {
+        "power_required": 6, "name": "بیمارستان", "group": "welfare", "icon": "🏥",
+        "desc": "هر سطح ۲٪ به پاداش رفاه اضافه می‌کند و اثر همه‌گیری را کم می‌کند.",
+        "levels": [L(cost=500_000, welfare=2), L(cost=1_100_000, welfare=2), L(cost=2_200_000, welfare=2), L(cost=4_200_000, welfare=2), L(cost=7_500_000, welfare=2)],
+    },
+    "police": {
+        "power_required": 4, "name": "ایستگاه پلیس", "group": "welfare", "icon": "🚓",
+        "desc": "هر سطح ۲٪ به پاداش رفاه اضافه می‌کند و اثر موج سرقت را کم می‌کند.",
+        "levels": [L(cost=350_000, welfare=2), L(cost=800_000, welfare=2), L(cost=1_600_000, welfare=2), L(cost=3_100_000, welfare=2), L(cost=5_600_000, welfare=2)],
+    },
+    "housing": {
+        "power_required": 8, "name": "شهرک مسکونی", "group": "welfare", "icon": "🏘️",
+        "desc": "هر سطح ۲٪ به پاداش رفاه اضافه می‌کند و اثر زلزله را کم می‌کند.",
+        "levels": [L(cost=600_000, welfare=2), L(cost=1_300_000, welfare=2), L(cost=2_600_000, welfare=2), L(cost=5_000_000, welfare=2), L(cost=9_000_000, welfare=2)],
+    },
+    "metro": {
+        "power_required": 12, "name": "مترو", "group": "welfare", "icon": "🚇",
+        "desc": "هر سطح ۲٪ به پاداش رفاه اضافه می‌کند و اثر قحطی را کم می‌کند.",
+        "levels": [L(cost=800_000, welfare=2), L(cost=1_800_000, welfare=2), L(cost=3_600_000, welfare=2), L(cost=6_800_000, welfare=2), L(cost=12_000_000, welfare=2)],
+    },
+    "university": {
+        "power_required": 10, "name": "دانشگاه", "group": "welfare", "icon": "🎓",
+        "desc": "هر سطح ۲٪ به پاداش رفاه اضافه می‌کند و اثر خشکسالی را کم می‌کند.",
+        "levels": [L(cost=700_000, welfare=2), L(cost=1_500_000, welfare=2), L(cost=3_000_000, welfare=2), L(cost=5_800_000, welfare=2), L(cost=10_000_000, welfare=2)],
+    },
 }
 
 UPKEEP_RATE = 0.005   # هزینهٔ نگهداری روزانه = ۰٫۵٪ مجموع پولِ خرج‌شده روی ساخت و ارتقا
@@ -350,31 +376,49 @@ ARMY_UNITS = {
 }
 
 MAP_RESOURCES = {
-    # مختصات بر اساس میدان‌ها و معدن‌های فعال در سال ۱۹۹۳ — zone: sea = دریا / land = خشکی
+    # همهٔ سکوها و معدن‌ها در دریا هستند (روی خشکی کشور فعال نمی‌افتند) — zone: sea
     # ---------- نفت ----------
-    "oil_gulf":       {"type": "oil", "zone": "sea",  "name": "سکوی نفتی خلیج فارس",               "lon": 51.5,  "lat": 27.0,  "production": 5_000_000},
-    "oil_caspian":    {"type": "oil", "zone": "sea",  "name": "سکوی نفتی خزر (نفت‌داشلاری، باکو)",  "lon": 50.8,  "lat": 40.2,  "production": 3_000_000},
-    "oil_northsea":   {"type": "oil", "zone": "sea",  "name": "سکوی نفتی دریای شمال (اکوفیسک)",     "lon": 3.2,   "lat": 56.5,  "production": 4_000_000},
-    "oil_gom":        {"type": "oil", "zone": "sea",  "name": "سکوی نفتی خلیج مکزیک",              "lon": -90.5, "lat": 28.2,  "production": 4_000_000},
-    "oil_campos":     {"type": "oil", "zone": "sea",  "name": "سکوی نفتی حوضه کامپوس (برزیل)",      "lon": -40.0, "lat": -22.5, "production": 2_500_000},
-    "oil_texas":      {"type": "oil", "zone": "land", "name": "میدان نفتی پرمین (تگزاس)",           "lon": -102.0,"lat": 31.9,  "production": 4_000_000},
-    "oil_ghawar":     {"type": "oil", "zone": "land", "name": "میدان نفتی غوار (عربستان)",          "lon": 49.4,  "lat": 25.4,  "production": 5_000_000},
-    "oil_siberia":    {"type": "oil", "zone": "land", "name": "میدان نفتی سیبری غربی",              "lon": 76.7,  "lat": 61.1,  "production": 4_000_000},
+    "oil_gulf": {"type": "oil", "zone": "sea", "name": "سکوی نفتی خلیج فارس", "lon": 51.5, "lat": 27.0, "production": 5_000_000},
+    "oil_caspian": {"type": "oil", "zone": "sea", "name": "سکوی نفتی خزر (نفت‌داشلاری، باکو)", "lon": 50.8, "lat": 40.2, "production": 3_000_000},
+    "oil_northsea": {"type": "oil", "zone": "sea", "name": "سکوی نفتی دریای شمال (اکوفیسک)", "lon": 3.2, "lat": 56.5, "production": 4_000_000},
+    "oil_gom": {"type": "oil", "zone": "sea", "name": "سکوی نفتی خلیج مکزیک", "lon": -90.5, "lat": 28.2, "production": 4_000_000},
+    "oil_campos": {"type": "oil", "zone": "sea", "name": "سکوی نفتی حوضه کامپوس (برزیل)", "lon": -40.0, "lat": -22.5, "production": 2_500_000},
+    "oil_texas": {"type": "oil", "zone": "sea", "name": "سکوی نفتی غرب خلیج مکزیک (تگزاس)", "lon": -94.5, "lat": 26.5, "production": 4_000_000},
+    "oil_ghawar": {"type": "oil", "zone": "sea", "name": "سکوی نفتی جنوب خلیج فارس (غوار)", "lon": 53.2, "lat": 26.4, "production": 5_000_000},
+    "oil_siberia": {"type": "oil", "zone": "sea", "name": "سکوی نفتی دریای کارا (سیبری)", "lon": 74.0, "lat": 76.0, "production": 4_000_000},
+    "oil_westafrica": {"type": "oil", "zone": "sea", "name": "سکوی نفتی خلیج گینه (نیجریه)", "lon": 5.0, "lat": 3.0, "production": 3_500_000},
+    "oil_angola": {"type": "oil", "zone": "sea", "name": "سکوی نفتی آنگولا", "lon": 11.0, "lat": -9.0, "production": 3_000_000},
+    "oil_barents": {"type": "oil", "zone": "sea", "name": "سکوی نفتی دریای بارنتس", "lon": 38.0, "lat": 73.0, "production": 3_000_000},
+    "oil_southchina": {"type": "oil", "zone": "sea", "name": "سکوی نفتی دریای چین جنوبی", "lon": 111.0, "lat": 13.0, "production": 3_500_000},
+    "oil_beaufort": {"type": "oil", "zone": "sea", "name": "سکوی نفتی دریای بوفورت (آلاسکا)", "lon": -145.0, "lat": 71.5, "production": 3_000_000},
+    "oil_norway": {"type": "oil", "zone": "sea", "name": "سکوی نفتی شمال دریای شمال (نروژ)", "lon": 2.0, "lat": 60.5, "production": 3_500_000},
+    "oil_medeast": {"type": "oil", "zone": "sea", "name": "سکوی نفتی و گاز مدیترانه شرقی", "lon": 29.5, "lat": 33.0, "production": 2_500_000},
     # ---------- آهن ----------
-    "steel_ural":     {"type": "steel", "zone": "land", "name": "معدن آهن اورال (ماگنیتوگورسک)",  "lon": 59.1,  "lat": 53.4,  "production": 3_000_000},
-    "steel_ruhr":     {"type": "steel", "zone": "land", "name": "معدن آهن رور",                    "lon": 7.0,   "lat": 51.4,  "production": 4_000_000},
-    "steel_brazil":   {"type": "steel", "zone": "land", "name": "معدن آهن برزیل (کاراجاس)",        "lon": -50.2, "lat": -6.1,  "production": 3_500_000},
-    "steel_mesabi":   {"type": "steel", "zone": "land", "name": "معدن آهن مسابی (آمریکا)",         "lon": -92.6, "lat": 47.5,  "production": 3_000_000},
-    "steel_anshan":   {"type": "steel", "zone": "land", "name": "معدن آهن آنشان (چین)",            "lon": 123.0, "lat": 41.1,  "production": 3_500_000},
+    "steel_ural": {"type": "steel", "zone": "sea", "name": "معدن آهن کف دریای خزر", "lon": 50.5, "lat": 42.5, "production": 3_000_000},
+    "steel_ruhr": {"type": "steel", "zone": "sea", "name": "معدن آهن کف دریای شمال", "lon": 3.0, "lat": 53.5, "production": 4_000_000},
+    "steel_brazil": {"type": "steel", "zone": "sea", "name": "معدن آهن دریایی اقیانوس اطلس جنوبی", "lon": -33.0, "lat": -8.0, "production": 3_500_000},
+    "steel_mesabi": {"type": "steel", "zone": "sea", "name": "معدن آهن دریایی گرند بنکس", "lon": -51.0, "lat": 44.0, "production": 3_000_000},
+    "steel_anshan": {"type": "steel", "zone": "sea", "name": "معدن آهن دریای زرد", "lon": 123.5, "lat": 35.5, "production": 3_500_000},
+    "steel_japan": {"type": "steel", "zone": "sea", "name": "معدن آهن دریایی اقیانوس آرام (ژاپن)", "lon": 145.0, "lat": 35.0, "production": 3_500_000},
+    "steel_tasman": {"type": "steel", "zone": "sea", "name": "معدن آهن دریای تاسمان", "lon": 156.0, "lat": -30.0, "production": 3_000_000},
+    "steel_arabian": {"type": "steel", "zone": "sea", "name": "معدن آهن دریای عرب", "lon": 68.0, "lat": 18.0, "production": 3_000_000},
+    "steel_biscay": {"type": "steel", "zone": "sea", "name": "معدن آهن خلیج بیسکای", "lon": -6.0, "lat": 45.5, "production": 3_000_000},
     # ---------- اورانیوم ----------
-    "uranium_kazakh":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم قزاقستان",          "lon": 72.2,  "lat": 52.4,  "production": 2_500_000},
-    "uranium_canada":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم کانادا (آتاباسکا)", "lon": -105.6,"lat": 57.2,  "production": 2_000_000},
-    "uranium_aussie":  {"type": "uranium", "zone": "land", "name": "معدن اورانیوم استرالیا (رنجر)",    "lon": 132.9, "lat": -12.7, "production": 2_200_000},
-    "uranium_niger":   {"type": "uranium", "zone": "land", "name": "معدن اورانیوم نیجر (آرلیت)",       "lon": 7.4,   "lat": 18.7,  "production": 2_000_000},
-    "uranium_namibia": {"type": "uranium", "zone": "land", "name": "معدن اورانیوم نامیبیا (روسینگ)",   "lon": 15.0,  "lat": -22.5, "production": 2_000_000},
-    # ---------- غذا ----------
-    "food_ukraine":   {"type": "food", "zone": "land", "name": "دشت‌های کشاورزی اوکراین",            "lon": 32.0,  "lat": 49.0,  "production": 2_500_000},
-    "food_india":     {"type": "food", "zone": "land", "name": "دشت‌های هند",                        "lon": 78.0,  "lat": 22.0,  "production": 2_500_000},
+    "uranium_kazakh": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم دریای یونان", "lon": 18.0, "lat": 35.5, "production": 2_500_000},
+    "uranium_canada": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم خلیج هادسون", "lon": -85.0, "lat": 59.5, "production": 2_000_000},
+    "uranium_aussie": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم دریای تیمور", "lon": 128.0, "lat": -11.5, "production": 2_200_000},
+    "uranium_niger": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم اطلس شرقی (موریتانی)", "lon": -20.0, "lat": 18.0, "production": 2_000_000},
+    "uranium_namibia": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم اطلس جنوبی (نامیبیا)", "lon": 7.0, "lat": -22.0, "production": 2_000_000},
+    "uranium_indian": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم اقیانوس هند", "lon": 75.0, "lat": -10.0, "production": 2_200_000},
+    "uranium_pacific": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم اقیانوس آرام مرکزی", "lon": -150.0, "lat": 0.0, "production": 2_200_000},
+    "uranium_baltic": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم دریای بالتیک", "lon": 19.5, "lat": 55.5, "production": 2_000_000},
+    # ---------- غذا (آبزیان) ----------
+    "food_ukraine": {"type": "food", "zone": "sea", "name": "آب‌های ماهیگیری دریای سیاه", "lon": 31.0, "lat": 43.5, "production": 2_500_000},
+    "food_india": {"type": "food", "zone": "sea", "name": "آب‌های ماهیگیری خلیج بنگال", "lon": 88.0, "lat": 14.0, "production": 2_500_000},
+    "food_peru": {"type": "food", "zone": "sea", "name": "آب‌های ماهیگیری پرو", "lon": -80.0, "lat": -12.5, "production": 2_500_000},
+    "food_norway": {"type": "food", "zone": "sea", "name": "آب‌های ماهیگیری دریای نروژ", "lon": 5.0, "lat": 67.0, "production": 2_500_000},
+    "food_japansea": {"type": "food", "zone": "sea", "name": "آب‌های ماهیگیری دریای ژاپن", "lon": 135.0, "lat": 40.0, "production": 2_500_000},
+    "food_bering": {"type": "food", "zone": "sea", "name": "آب‌های ماهیگیری دریای برینگ", "lon": -170.0, "lat": 58.0, "production": 2_500_000},
 }
 
 STRAITS_DATA = {
@@ -496,6 +540,42 @@ def ensure_player_fields(player):
     player.setdefault("scans", 0)
     player.setdefault("scan_active", {})
     player.setdefault("vip", False)
+    player.setdefault("welfare_events", [])
+
+# ---------------- رفاه و امنیت ----------------
+WELFARE_PER_LEVEL = 2.0                 # هر سطح ساختمان = ۲ واحد (٪)
+WELFARE_MAX = 50.0                      # سقف پاداش
+WELFARE_RECOVERY_PER_PERIOD = 3.0       # هر دوره ۳ واحد جبران می‌شود
+WELFARE_RECOVERY_PERIOD_HOURS = 6
+WELFARE_EVENT_MIN_H, WELFARE_EVENT_MAX_H = 2, 6
+WELFARE_EVENTS = {
+    "earthquake": {"name": "زلزله",     "icon": "🌋", "bld": "housing",    "drop": 6.0, "chance": 0.7},
+    "pandemic":   {"name": "همه‌گیری",   "icon": "🦠", "bld": "hospital",   "drop": 5.0, "chance": 0.7},
+    "crime":      {"name": "موج سرقت",  "icon": "🚨", "bld": "police",     "drop": 4.0, "chance": 0.8},
+    "drought":    {"name": "خشکسالی",   "icon": "⚠️", "bld": "university", "drop": 3.0, "chance": 0.7},
+    "famine":     {"name": "قحطی",      "icon": "🍞", "bld": "metro",      "drop": 5.0, "chance": 0.6},
+}
+COUNTRY_RISKS = {"germany": ["crime"], "britain": ["pandemic"], "ussr": ["famine", "drought"],
+                 "usa": ["crime", "earthquake"], "france": ["drought"], "italy": ["earthquake"],
+                 "china": ["pandemic", "earthquake"], "japan": ["earthquake"]}
+
+def welfare_gross(player):
+    total = 0
+    for item_id, item in INFRASTRUCTURE.items():
+        if item.get("group") != "welfare": continue
+        lv = min(get_infra_level(player, item_id), len(item["levels"]))
+        total += lv * WELFARE_PER_LEVEL
+    return min(WELFARE_MAX, total)
+
+def welfare_penalty_now(player):
+    pen = player.get("welfare_penalty", 0) or 0
+    at = parse_dt(player.get("welfare_pen_at"))
+    if pen <= 0 or not at: return 0.0
+    hours = max(0.0, (utcnow() - at).total_seconds() / 3600)
+    return max(0.0, pen - WELFARE_RECOVERY_PER_PERIOD * hours / WELFARE_RECOVERY_PERIOD_HOURS)
+
+def welfare_bonus(player):
+    return max(0.0, welfare_gross(player) - welfare_penalty_now(player))
 
 def compute_rates(player):
     power_capacity = get_power_total(player)
@@ -504,6 +584,7 @@ def compute_rates(player):
     resource_production = {k: 0 for k in RESOURCE_NAMES}
     resource_consumption = {k: 0 for k in RESOURCE_NAMES}
     income = BASE_DAILY_INCOME
+    eco_income = 0
     upkeep = 0
 
     for item_id, item in INFRASTRUCTURE.items():
@@ -519,7 +600,9 @@ def compute_rates(player):
 
     for item_id, item in ECONOMY.items():
         lv = get_infra_level(player, item_id)
-        if lv > 0: income += item["levels"][lv - 1]["income"]
+        if lv > 0: eco_income += item["levels"][lv - 1]["income"]
+    wb = welfare_bonus(player)
+    income += eco_income * (1 + wb / 100.0)
 
     country = player.get("country")
 
@@ -2328,6 +2411,67 @@ async def vip_command(message: types.Message):
     players[tid]["vip"] = on; save_state()
     await message.answer(f"VIP {'فعال' if on else 'غیرفعال'} شد برای {tid}")
 
+# =========================================================
+# Stats (آمار کشور: رفاه و امنیت)
+# =========================================================
+def welfare_tick():
+    import random
+    now = utcnow(); changed = False
+    for uid_, p in players.items():
+        cid = p.get("country")
+        if not cid or not p.get("started_at") or p.get("is_eliminated"): continue
+        ensure_player_fields(p)
+        nxt = parse_dt(p.get("welfare_next_at"))
+        if nxt is None:
+            p["welfare_next_at"] = (now + timedelta(hours=random.uniform(1, WELFARE_EVENT_MAX_H - 2))).isoformat()
+            changed = True; continue
+        if now < nxt: continue
+        risks = COUNTRY_RISKS.get(cid, [])
+        keys = list(WELFARE_EVENTS)
+        key = random.choices(keys, weights=[3 if k in risks else 1 for k in keys])[0]
+        ev = WELFARE_EVENTS[key]
+        lvl = min(get_infra_level(p, ev["bld"]), len(INFRASTRUCTURE[ev["bld"]]["levels"]))
+        p["welfare_next_at"] = (now + timedelta(hours=random.uniform(WELFARE_EVENT_MIN_H, WELFARE_EVENT_MAX_H))).isoformat()
+        changed = True
+        if random.random() > ev["chance"] * (1 - 0.15 * lvl): continue   # زیرساخت احتمال را کم می‌کند
+        drop = ev["drop"] * (1 - 0.12 * lvl)                              # و افت را هم
+        cur_pen = welfare_penalty_now(p); gross = welfare_gross(p)
+        eff = max(0.0, min(drop, gross - cur_pen))                        # نه زیرِ صفر
+        if eff < 0.05: eff = 0.0
+        if eff > 0:
+            p["welfare_penalty"] = cur_pen + eff; p["welfare_pen_at"] = now.isoformat()
+        bname = INFRASTRUCTURE[ev["bld"]]["name"]
+        text = (f"{ev['icon']} {ev['name']} — رفاه {eff:.1f} واحد کم شد ({bname} سطح {lvl} از 5)" if eff > 0
+                else f"{ev['icon']} {ev['name']} — خسارتی به رفاه نزد ({bname} سطح {lvl} از 5)")
+        evs = p.setdefault("welfare_events", [])
+        evs.append({"at": now.isoformat(), "text": text, "key": key, "drop": round(eff, 2)})
+        del evs[:-30]
+    if changed: save_state()
+
+async def get_stats(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    p = _me(uid); cid = p.get("country")
+    if not cid: return web.json_response({"error": "no_country"}, status=400)
+    accrue_player(p)
+    gross, pen = welfare_gross(p), welfare_penalty_now(p)
+    bonus = max(0.0, gross - pen)
+    eco_base = 0
+    for item_id, item in ECONOMY.items():
+        lv = get_infra_level(p, item_id)
+        if lv > 0: eco_base += item["levels"][lv - 1]["income"]
+    blds = []
+    for bid, item in INFRASTRUCTURE.items():
+        if item.get("group") != "welfare": continue
+        blds.append({"id": bid, "name": item["name"], "icon": item["icon"],
+                     "level": min(get_infra_level(p, bid), len(item["levels"])), "max_level": len(item["levels"])})
+    return web.json_response({
+        "now": utcnow().isoformat(), "bonus": round(bonus, 1), "gross": round(gross, 1),
+        "penalty": round(min(pen, gross), 1), "max": WELFARE_MAX, "eco_base": eco_base,
+        "extra_income": int(eco_base * bonus / 100), "buildings": blds,
+        "risks": [WELFARE_EVENTS[k]["name"] for k in COUNTRY_RISKS.get(cid, [])],
+        "events": list(reversed(p.get("welfare_events", [])))[:20]})
+
 async def health(request):
     return web.json_response({"status": "ok", "players": len(players)})
 
@@ -2361,7 +2505,7 @@ async def create_web_app():
         ("/api/wars", get_wars), ("/api/map-sites", get_map_sites),
         ("/api/announcements", get_announcements), ("/api/announcement", get_announcement_detail),
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
-        ("/api/loans", get_loans), ("/api/news", get_news), ("/api/rankings", get_rankings),
+        ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
         ("/api/debug-auth", debug_auth), ("/health", health)]:
         app.router.add_get(path, h)
@@ -2402,6 +2546,8 @@ async def war_tick_loop():
         await asyncio.sleep(30)
         try: await check_wars_tick()
         except Exception as e: logging.error("war tick: %s", e)
+        try: welfare_tick()
+        except Exception as e: logging.error("welfare tick: %s", e)
         try: loan_tick()
         except Exception as e: logging.error("loan tick: %s", e)
 
