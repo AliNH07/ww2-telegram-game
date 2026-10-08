@@ -2535,6 +2535,7 @@ async def create_web_app():
     app.router.add_get("/style.css", style)
     app.router.add_get("/app.js", app_js)
     app.router.add_static("/images/", path=os.path.join(WEB_DIR, "images"), name="images")
+    app.router.add_static("/fonts/", path=os.path.join(WEB_DIR, "fonts"), name="fonts")
 
     for path, h in [
         ("/api/player", get_player), ("/api/countries", get_countries),
