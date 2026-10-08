@@ -1499,17 +1499,48 @@ function locCardHtml(l) {
     const ico = isHome ? flagInline(selectedCountry) : siteIcon(l);
     const title = isHome ? `خانه · ${COUNTRY_NAMES[selectedCountry] || ""}` : l.name;
     const sub = isHome ? "خانه" : (l.kind === "strait" ? "تنگه" : "سکو / معدن");
-    return `<div class="wf-loc ${open ? "open" : ""}">
+    return `<div class="wf-loc">
         <div class="wf-loc-top" data-toggle="${l.id}">
             <span class="wf-ico">${ico}</span>
             <div class="wf-loc-name"><b>${title}</b><small>${sub}</small></div>
-            <div class="wf-loc-count"><b>${formatNumber(total)}</b> یگان <i>${open ? "⌃" : "⌄"}</i></div>
+            <div class="wf-loc-count"><b>${formatNumber(total)}</b> یگان <i>⌃</i></div>
         </div>
-        <div class="wf-loc-chips">${unitChips(l.units) || `<span class="wf-empty">بدون نیرو</span>`}</div>
-        ${open && total > 0 ? `<div class="wf-loc-actions">
-            <button data-from="${l.id}">🧭 اعزام از این‌جا</button>
-            ${isHome ? "" : `<button data-home="${l.id}">🏠 بازگشت به خانه</button>`}</div>` : ""}
     </div>`;
+}
+
+function closeLocSheet() { document.getElementById("loc-sheet")?.remove(); }
+
+// پنجرهٔ پایین: از پایین تا وسط صفحه بالا می‌آید و همهٔ اطلاعات آن موضع را نشان می‌دهد
+function openLocSheet(id) {
+    const locs = [{ id: "home", kind: "home", name: "خانه", units: warForces.home }, ...warForces.sites];
+    const l = locs.find(x => x.id === id); if (!l) return;
+    closeLocSheet();
+    const isHome = l.kind === "home";
+    const total = sumVals(l.units);
+    const ico = isHome ? flagInline(selectedCountry) : siteIcon(l);
+    const title = isHome ? `خانه · ${COUNTRY_NAMES[selectedCountry] || ""}` : l.name;
+    const sub = isHome ? "خانه" : (l.kind === "strait" ? "تنگه" : "سکو / معدن");
+    const rows = Object.entries(l.units || {}).filter(([, n]) => n > 0)
+        .map(([k, n]) => `<div class="is-row"><span>${unitName(k)}</span><b>${formatNumber(n)}</b></div>`).join("")
+        || `<div class="gs-none">بدون نیرو</div>`;
+    const ov = document.createElement("div");
+    ov.id = "loc-sheet"; ov.className = "gs-overlay gs-bottom";
+    ov.innerHTML = `<div class="gs-sheet loc-sheet">
+        <div class="gs-sheet-head"><button type="button" class="gs-x" aria-label="بستن">✕</button>
+            <span class="loc-head"><span class="wf-ico">${ico}</span><span><b>${title}</b><small>${sub} · ${formatNumber(total)} یگان</small></span></span></div>
+        <div class="gs-sheet-list"><div class="is-rows">${rows}</div>
+        ${total > 0 ? `<div class="wf-loc-actions">
+            <button data-from="${l.id}">🧭 اعزام از این‌جا</button>
+            ${isHome ? "" : `<button data-home="${l.id}">🏠 بازگشت به خانه</button>`}</div>` : ""}</div></div>`;
+    ov.addEventListener("click", e => {
+        if (e.target === ov || e.target.closest(".gs-x")) { closeLocSheet(); return; }
+        const f = e.target.closest("[data-from]"), h = e.target.closest("[data-home]");
+        if (f) { dispatchOpen = true; dispatchSel = { from: f.dataset.from, to: null, units: {} }; }
+        else if (h) { dispatchOpen = true; dispatchSel = { from: h.dataset.home, to: "home", units: {} }; }
+        else return;
+        closeLocSheet(); renderForcesTab(); showGamePage("war");
+    });
+    document.body.appendChild(ov);
 }
 
 function dispatchPanelHtml() {
@@ -1616,15 +1647,7 @@ function renderForcesTab() {
     };
     root.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { forcesFilter = b.dataset.f; renderForcesTab(); });
     root.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
-        expandedLoc = expandedLoc === b.dataset.toggle ? null : b.dataset.toggle; renderForcesTab();
-    });
-    root.querySelectorAll("[data-from]").forEach(b => b.onclick = () => {
-        dispatchOpen = true; dispatchSel = { from: b.dataset.from, to: null, units: {} };
-        renderForcesTab(); showGamePage("war");
-    });
-    root.querySelectorAll("[data-home]").forEach(b => b.onclick = () => {
-        dispatchOpen = true; dispatchSel = { from: b.dataset.home, to: "home", units: {} };
-        renderForcesTab(); showGamePage("war");
+        openLocSheet(b.dataset.toggle);
     });
     if (dispatchOpen) {
         root.querySelector("#dp-from").onclick = () => openPlaceSheet("from");
@@ -2500,6 +2523,23 @@ function combineFeatures(feats, id) {
 let mapProjection = null, mapPath = null, mapSvg = null;
 let mapSize = 0, mapMinScale = 0, mapMaxScale = 0;
 let mapRotation = [0, -10];
+let mapSpinning = false, mapSpinRaf = 0;
+function setMapSpin(on) {
+    mapSpinning = on;
+    document.getElementById("map-reset")?.classList.toggle("active", on);
+    cancelAnimationFrame(mapSpinRaf);
+    if (!on) return;
+    const step = () => {
+        if (!mapSpinning) return;
+        const page = document.getElementById("map");
+        if (mapProjection && page && !page.classList.contains("hidden")) {
+            mapRotation[0] += 0.12;
+            mapProjection.rotate(mapRotation); redrawMap();
+        }
+        mapSpinRaf = requestAnimationFrame(step);
+    };
+    mapSpinRaf = requestAnimationFrame(step);
+}
 let mapInitialized = false, mapInitializing = false;
 let mapAbort = null;
 let mapSites = [];
@@ -2619,9 +2659,7 @@ async function initWorldMap() {
 
     document.getElementById("map-zoom-in").onclick = () => zoomMap(1.35);
     document.getElementById("map-zoom-out").onclick = () => zoomMap(1 / 1.35);
-    document.getElementById("map-reset").onclick = () => {
-        mapProjection.scale(mapSize); mapRotation = [0, -10]; mapProjection.rotate(mapRotation); redrawMap();
-    };
+    document.getElementById("map-reset").onclick = () => setMapSpin(!mapSpinning);
     document.getElementById("map-info-close").onclick = () => {
         document.getElementById("map-info-panel").classList.add("hidden");
     };
@@ -2708,6 +2746,11 @@ function attachMapInteractions(svgEl) {
         mapProjection.rotate(mapRotation); redrawMap();
     };
 
+    // با اولین لمس کاربر، چرخش خودکار متوقف می‌شود
+    const stopSpin = () => { if (mapSpinning) setMapSpin(false); };
+    svgEl.addEventListener("mousedown", stopSpin, { signal });
+    svgEl.addEventListener("touchstart", stopSpin, { passive: true, signal });
+    svgEl.addEventListener("wheel", stopSpin, { passive: true, signal });
     svgEl.addEventListener("mousedown", e => { dragging = true; moved = 0; lx = e.clientX; ly = e.clientY; }, { signal });
     window.addEventListener("mouseup", () => { dragging = false; }, { signal });
     window.addEventListener("mousemove", e => {
