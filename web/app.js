@@ -2522,7 +2522,7 @@ async function initWorldMap() {
     mapW = w; mapH = h;
     mapSize = Math.min(w, h) * 0.46;
     mapMinScale = mapSize * 0.8;
-    mapMaxScale = mapSize * 6;
+    mapMaxScale = mapSize * 20;   // زوم بیشتر برای کشورهای کوچک (آلمان، فرانسه، انگلیس)
 
     let world;
     try { world = await loadWorldAtlas(); }
@@ -2662,12 +2662,13 @@ function renderMapSites() {
     g.each(function (d) {
         const s = d3.select(this);
         if (d.kind === "strait") s.append("circle").attr("class", "site-shape").attr("r", 4.8);
-        else if (d.type === "oil") {
-            s.append("circle").attr("class", "site-shape").attr("r", 8);
+        else {
+            const big = d.type === "oil";
+            s.append("circle").attr("class", "site-shape").attr("r", big ? 8 : 6);
             s.append("text").attr("class", "site-emoji").attr("text-anchor", "middle")
-                .attr("dominant-baseline", "central").attr("font-size", 11).text("🛢️");
-        } else s.append("rect").attr("class", "site-shape")
-            .attr("x", -5).attr("y", -5).attr("width", 10).attr("height", 10).attr("rx", 0.5);
+                .attr("dominant-baseline", "central").attr("font-size", big ? 11 : 8)
+                .text(RESOURCE_ICONS[d.type] || "📍");
+        }
     });
 }
 
@@ -2675,8 +2676,10 @@ function updateMapSitePositions() {
     if (!mapSitesSvg || !mapProjection) return;
     const rot = mapProjection.rotate();
     const zoom = mapProjection.scale() / mapSize;
-    const k = (1 + Math.min(0.7, (zoom - 1) * 0.15)).toFixed(2);
+    const kBig = 1 + Math.min(0.7, (zoom - 1) * 0.15);                 // نفت و تنگه
+    const kSmall = 0.5 * (1 + Math.min(3.2, (zoom - 1) * 0.55));        // معدن و غذا: ریز، با نزدیک شدن بزرگ می‌شوند
     mapSitesSvg.selectAll(".map-site").each(function (d) {
+        const k = ((d.kind === "strait" || d.type === "oil") ? kBig : kSmall).toFixed(2);
         const p = viewCos(d.lon, d.lat, rot) > 0.02 ? mapProjection([d.lon, d.lat]) : null;
         if (p) {
             this.setAttribute("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)}) scale(${k})`);
