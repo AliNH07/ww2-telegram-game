@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261007g">
+<link rel="stylesheet" href="/style.css?v=20261007h">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -465,6 +465,7 @@
 
         <div class="map-box">
             <svg id="map-globe"></svg>
+            <button id="map-help-btn" class="map-help-btn" aria-label="راهنمای نقشه">?</button>
             <div class="map-controls">
                 <button id="map-zoom-in" class="map-control-btn">+</button>
                 <button id="map-zoom-out" class="map-control-btn">−</button>
@@ -472,14 +473,15 @@
             </div>
         </div>
 
-        <div class="map-legend">
+        <div id="map-legend-src" class="map-legend hidden">
             <div><span class="dot dot-own"></span> کشور من و تصرف‌های من (تنگه، سکو، معدن)</div>
             <div><span class="dot dot-other"></span> بازیکنان فعال</div>
             <div><span class="dot dot-taken"></span> تصرف‌شده توسط بازیکن دیگر (کشور، تنگه، سکو، معدن)</div>
             <div><span class="dot dot-inactive"></span> کشور بدون بازیکن (انتخاب نشده)</div>
             <div><span class="dot dot-nogame"></span> هنوز به بازی اضافه نشده</div>
-            <div><span class="dot dot-site"></span> سکو یا معدنِ آزاد (آبی کمرنگ، مربع)</div>
-            <div><span class="dot dot-strait"></span> تنگهٔ آزاد (آبی کمرنگ، دایره)</div>
+            <div><span class="dot dot-oil">🛢️</span> سکوی نفتِ آزاد (زمینهٔ آبی کمرنگ؛ سبز = مال من، نارنجی = مال دیگری)</div>
+            <div><span class="dot dot-site"></span> معدن یا منبع آزاد (مربع آبی کمرنگ) — معدن را فقط با ارتش و ناو ترابری می‌شود گرفت</div>
+            <div><span class="dot dot-strait"></span> تنگهٔ آزاد (زرد)</div>
         </div>
 
         <div id="map-info-panel" class="map-info-panel hidden">
