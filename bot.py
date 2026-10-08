@@ -378,21 +378,22 @@ ARMY_UNITS = {
 MAP_RESOURCES = {
     # همهٔ سکوها و معدن‌ها در دریا هستند (روی خشکی کشور فعال نمی‌افتند) — zone: sea
     # ---------- نفت ----------
-    "oil_gulf": {"type": "oil", "zone": "sea", "name": "سکوی نفتی خلیج فارس", "lon": 51.5, "lat": 27.0, "production": 5_000_000},
-    "oil_caspian": {"type": "oil", "zone": "sea", "name": "سکوی نفتی خزر (نفت‌داشلاری، باکو)", "lon": 50.8, "lat": 40.2, "production": 3_000_000},
-    "oil_northsea": {"type": "oil", "zone": "sea", "name": "سکوی نفتی دریای شمال (اکوفیسک)", "lon": 3.2, "lat": 56.5, "production": 4_000_000},
-    "oil_gom": {"type": "oil", "zone": "sea", "name": "سکوی نفتی خلیج مکزیک", "lon": -90.5, "lat": 28.2, "production": 4_000_000},
-    "oil_campos": {"type": "oil", "zone": "sea", "name": "سکوی نفتی حوضه کامپوس (برزیل)", "lon": -40.0, "lat": -22.5, "production": 2_500_000},
-    "oil_texas": {"type": "oil", "zone": "sea", "name": "سکوی نفتی غرب خلیج مکزیک (تگزاس)", "lon": -94.5, "lat": 26.5, "production": 4_000_000},
-    "oil_ghawar": {"type": "oil", "zone": "sea", "name": "سکوی نفتی جنوب خلیج فارس (غوار)", "lon": 53.2, "lat": 26.4, "production": 5_000_000},
-    "oil_siberia": {"type": "oil", "zone": "sea", "name": "سکوی نفتی دریای کارا (سیبری)", "lon": 74.0, "lat": 76.0, "production": 4_000_000},
-    "oil_westafrica": {"type": "oil", "zone": "sea", "name": "سکوی نفتی خلیج گینه (نیجریه)", "lon": 5.0, "lat": 3.0, "production": 3_500_000},
-    "oil_angola": {"type": "oil", "zone": "sea", "name": "سکوی نفتی آنگولا", "lon": 11.0, "lat": -9.0, "production": 3_000_000},
-    "oil_barents": {"type": "oil", "zone": "sea", "name": "سکوی نفتی دریای بارنتس", "lon": 38.0, "lat": 73.0, "production": 3_000_000},
-    "oil_southchina": {"type": "oil", "zone": "sea", "name": "سکوی نفتی دریای چین جنوبی", "lon": 111.0, "lat": 13.0, "production": 3_500_000},
-    "oil_beaufort": {"type": "oil", "zone": "sea", "name": "سکوی نفتی دریای بوفورت (آلاسکا)", "lon": -145.0, "lat": 71.5, "production": 3_000_000},
-    "oil_norway": {"type": "oil", "zone": "sea", "name": "سکوی نفتی شمال دریای شمال (نروژ)", "lon": 2.0, "lat": 60.5, "production": 3_500_000},
-    "oil_medeast": {"type": "oil", "zone": "sea", "name": "سکوی نفتی و گاز مدیترانه شرقی", "lon": 29.5, "lat": 33.0, "production": 2_500_000},
+    "oil_gulf": {"type": "oil", "zone": "sea", "name": "سکوی قطر", "lon": 51.5, "lat": 27.0, "production": 5_000_000},
+    "oil_caspian": {"type": "oil", "zone": "sea", "name": "سکوی آذربایجان", "lon": 50.8, "lat": 40.2, "production": 3_000_000},
+    "oil_northsea": {"type": "oil", "zone": "sea", "name": "سکوی دانمارک", "lon": 3.2, "lat": 56.5, "production": 4_000_000},
+    "oil_gom": {"type": "oil", "zone": "sea", "name": "سکوی آمریکا (خلیج مکزیک)", "lon": -90.5, "lat": 28.2, "production": 4_000_000},
+    "oil_campos": {"type": "oil", "zone": "sea", "name": "سکوی برزیل", "lon": -40.0, "lat": -22.5, "production": 2_500_000},
+    "oil_texas": {"type": "oil", "zone": "sea", "name": "سکوی مکزیک", "lon": -94.5, "lat": 26.5, "production": 4_000_000},
+    "oil_ghawar": {"type": "oil", "zone": "sea", "name": "سکوی امارات", "lon": 54.0, "lat": 25.6, "production": 5_000_000},
+    "oil_siberia": {"type": "oil", "zone": "sea", "name": "سکوی روسیه (کارا)", "lon": 74.0, "lat": 76.0, "production": 4_000_000},
+    "oil_westafrica": {"type": "oil", "zone": "sea", "name": "سکوی نیجریه", "lon": 5.0, "lat": 3.0, "production": 3_500_000},
+    "oil_angola": {"type": "oil", "zone": "sea", "name": "سکوی آنگولا", "lon": 11.0, "lat": -9.0, "production": 3_000_000},
+    "oil_barents": {"type": "oil", "zone": "sea", "name": "سکوی روسیه (بارنتس)", "lon": 38.0, "lat": 73.0, "production": 3_000_000},
+    "oil_southchina": {"type": "oil", "zone": "sea", "name": "سکوی ویتنام", "lon": 111.0, "lat": 13.0, "production": 3_500_000},
+    "oil_beaufort": {"type": "oil", "zone": "sea", "name": "سکوی آمریکا (بوفورت)", "lon": -145.0, "lat": 71.5, "production": 3_000_000},
+    "oil_norway": {"type": "oil", "zone": "sea", "name": "سکوی نروژ", "lon": 2.0, "lat": 60.5, "production": 3_500_000},
+    "oil_india": {"type": "oil", "zone": "sea", "name": "سکوی هند", "lon": 70.5, "lat": 19.5, "production": 3_500_000},
+    "oil_medeast": {"type": "oil", "zone": "sea", "name": "سکوی مصر", "lon": 29.5, "lat": 33.0, "production": 2_500_000},
     # ---------- آهن ----------
     "steel_ural": {"type": "steel", "zone": "sea", "name": "معدن آهن کف دریای خزر", "lon": 50.5, "lat": 42.5, "production": 3_000_000},
     "steel_ruhr": {"type": "steel", "zone": "sea", "name": "معدن آهن کف دریای شمال", "lon": 3.0, "lat": 53.5, "production": 4_000_000},
@@ -1348,6 +1349,9 @@ async def capture_site(request):
     data = await read_json(request); site_id = data.get("site_id")
     if site_id not in MAP_RESOURCES and site_id not in STRAITS_DATA:
         return web.json_response({"success": False, "error": "invalid_site"}, status=400)
+    if is_mine(site_id):
+        return web.json_response({"success": False, "error": "need_army",
+            "message": "معدن را فقط با ارتش (پیاده‌نظام/تانک) و ناو ترابری می‌شود گرفت؛ از بخش جنگ نیرو اعزام کنید."}, status=400)
     if uid not in players: players[uid] = create_player(uid)
     p = players[uid]
     if not p.get("country"): return web.json_response({"success": False, "error": "no_country"}, status=400)
@@ -1420,6 +1424,10 @@ def dispatch_rule_errors(units, zone):
             errs.append(f"در خشکی، جنگنده و بمب‌افکن به {nm('air_tanker')} نیاز دارند "
                         f"(ظرفیت سوخت‌رسانی {cap} از {jets} هواپیما). بالگرد نیازی ندارد.")
     return errs
+
+def is_mine(site_id):
+    i = MAP_RESOURCES.get(site_id)
+    return bool(i and i.get("type") in ("steel", "uranium"))
 
 def site_owner(site_id):
     return map_holdings.get(site_id) or strait_holdings.get(site_id)
@@ -1512,6 +1520,8 @@ async def dispatch_forces(request):
             for k, n in garrison(dst).items(): combined[k] = combined.get(k, 0) + n
         errs = dispatch_rule_errors(combined, site_zone(dst))
         if errs: return _bad(errs[0])
+        if is_mine(dst) and owner != cid and (units.get("infantry", 0) + units.get("tank", 0)) < 1:
+            return _bad("برای تصرف معدن باید ارتش (پیاده‌نظام یا تانک) با ناو ترابری اعزام شود؛ ناو و زیردریایی به‌تنهایی کافی نیست.")
     if src != "home":  # با رفتن این یگان‌ها، نیروهای باقی‌مانده نباید بی‌پشتیبان بمانند
         zs = site_zone(src)
         after = {k: pool.get(k, 0) - units.get(k, 0) for k in pool}
