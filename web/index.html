@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261007e">
+<link rel="stylesheet" href="/style.css?v=20261007g">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -245,7 +245,7 @@
         <div id="ln-panel" class="ln-panel"></div>
     </main>
 
-    <!-- ==================== آمار کشور (فقط ظاهر) ==================== -->
+    <!-- ==================== آمار کشور ==================== -->
     <main id="stats" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">📊</span>آمار کشور</span><span class="sb-money">$0</span></div>
 
@@ -253,41 +253,7 @@
             <h2>رفاه و امنیت</h2>
             <button class="st-help" id="st-help-btn" aria-label="راهنما">?</button>
         </div>
-
-        <div class="st-card">
-            <div class="st-box st-box-row">
-                <div class="st-box-title"><span class="st-shield">🛡️</span><b>پاداش رفاه</b><small>روی درآمد سرمایه‌گذاری‌ها</small></div>
-                <strong class="st-good">+4٪</strong>
-            </div>
-            <div class="st-bar"><div class="st-bar-fill" style="width:8%"></div></div>
-            <p class="st-text">بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه — ارتقای هرکدام این پاداش را بالا می‌برد، تا سقفِ 50٪.</p>
-        </div>
-
-        <div class="st-card">
-            <div class="st-box st-box-split">
-                <span class="st-box-label">اثرِ کل روی درآمدِ سرمایه‌گذاری‌ها</span>
-                <strong class="st-good st-big">4٪<br>افزایش</strong>
-            </div>
-            <div class="st-line">
-                <span>پاداش رفاه</span>
-                <span class="st-good-soft">4٪ افزایش</span>
-            </div>
-        </div>
-
-        <div class="st-card st-card-plain">
-            <p class="st-muted">بلایای محتمل در کشورِ خودی: خشکسالی</p>
-            <p class="st-text">هر سطح ساختمان هم احتمالش را کم می‌کند هم افتِ موقتِ رفاه را.</p>
-        </div>
-
-        <div class="st-card st-card-plain">
-            <p class="st-muted">رویدادهای اخیر:</p>
-            <ul class="st-events">
-                <li><span class="st-ev-text">⚠️ خشکسالی — رفاه 2.6 واحد کم شد</span><span class="st-ev-time">3 ساعت پیش</span></li>
-                <li><span class="st-ev-text">• موج سرقت — رضایت 4.0 کم شد (پوشش پلیس 20٪ — ایستگاه سطح 1 از 5)</span><span class="st-ev-time">6 ساعت پیش</span></li>
-                <li><span class="st-ev-text">• موج سرقت — رضایت 4.0 کم شد (پوشش پلیس 20٪ — ایستگاه سطح 1 از 5)</span><span class="st-ev-time">6 ساعت پیش</span></li>
-                <li><span class="st-ev-text">• موج سرقت — رضایت 4.0 کم شد (پوشش پلیس 20٪ — ایستگاه سطح 1 از 5)</span><span class="st-ev-time">6 ساعت پیش</span></li>
-            </ul>
-        </div>
+        <div id="st-body"><div class="st-card st-card-plain"><p class="st-muted">در حال بارگذاری…</p></div></div>
     </main>
 
     <!-- ==================== زیرساخت ==================== -->
@@ -304,6 +270,7 @@
             <button class="infra-tab" data-infra-tab="food"><span class="infra-tab-label">🌾 غذا</span><span class="infra-tab-count" id="infra-count-food">0/3</span></button>
             <button class="infra-tab" data-infra-tab="resource"><span class="infra-tab-label">🛢️ منابع</span><span class="infra-tab-count" id="infra-count-resource">0/3</span></button>
             <button class="infra-tab" data-infra-tab="military"><span class="infra-tab-label">🪖 نظامی</span><span class="infra-tab-count" id="infra-count-military">0/9</span></button>
+            <button class="infra-tab" data-infra-tab="welfare"><span class="infra-tab-label">🛡️ رفاه</span><span class="infra-tab-count" id="infra-count-welfare">0/5</span></button>
             <button class="infra-tab" data-infra-tab="strategy"><span class="infra-tab-label">🛰️ استراتژی</span><span class="infra-tab-count" id="infra-count-strategy">0/1</span></button>
         </div>
 
@@ -320,6 +287,9 @@
             </div>
             <div id="infra-panel-resource" class="infra-panel hidden">
                 <div id="infra-resource-list" class="infra-card-list"></div>
+            </div>
+            <div id="infra-panel-welfare" class="infra-panel hidden">
+                <div id="infra-welfare-list" class="infra-card-list"></div>
             </div>
             <div id="infra-panel-strategy" class="infra-panel hidden">
                 <div id="infra-strategy-list" class="infra-card-list"></div>
@@ -503,17 +473,13 @@
         </div>
 
         <div class="map-legend">
-            <div><span class="dot dot-own"></span> کشور من</div>
-            <div><span class="dot dot-own-occupied"></span> تحت تصرفِ خودی</div>
-            <div><span class="dot dot-other"></span> کشور بازیکن فعال</div>
-            <div><span class="dot dot-other-occupied"></span> تحت تصرف دیگری</div>
-            <div><span class="dot dot-inactive"></span> غیرفعال (انتخاب نشده)</div>
+            <div><span class="dot dot-own"></span> کشور من و تصرف‌های من (تنگه، سکو، معدن)</div>
+            <div><span class="dot dot-other"></span> بازیکنان فعال</div>
+            <div><span class="dot dot-taken"></span> تصرف‌شده توسط بازیکن دیگر (کشور، تنگه، سکو، معدن)</div>
+            <div><span class="dot dot-inactive"></span> کشور بدون بازیکن (انتخاب نشده)</div>
             <div><span class="dot dot-nogame"></span> هنوز به بازی اضافه نشده</div>
-            <div><span class="dot dot-oil"></span> سکوی نفت</div>
-            <div><span class="dot dot-steel"></span> معدن آهن</div>
-            <div><span class="dot dot-uranium"></span> معدن اورانیوم</div>
-            <div><span class="dot dot-food"></span> دشت کشاورزی</div>
-            <div><span class="dot dot-strait"></span> تنگه</div>
+            <div><span class="dot dot-site"></span> سکو یا معدنِ آزاد (آبی کمرنگ، مربع)</div>
+            <div><span class="dot dot-strait"></span> تنگهٔ آزاد (آبی کمرنگ، دایره)</div>
         </div>
 
         <div id="map-info-panel" class="map-info-panel hidden">
