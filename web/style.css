@@ -866,6 +866,8 @@ img { -webkit-user-drag: none; user-select: none; }
 .map-site.site-mine .site-shape { fill: #2ecc71; }
 .map-site.site-other .site-shape { fill: #ff9f1a; }
 .map-site-strait .site-shape { stroke: #07121f; }
+.map-site-strait.site-free .site-shape { fill: #ffd60a; filter: drop-shadow(0 0 3px rgba(255,214,10,.85)); }
+.map-site .site-emoji { pointer-events: none; }
 .map-legend {
     display: flex; flex-wrap: wrap; gap: 10px 16px;
     margin-top: 14px; font-size: 10.5px; color: #a0a8b3;
@@ -875,9 +877,11 @@ img { -webkit-user-drag: none; user-select: none; }
 .dot-own            { background: #2ecc71; }
 .dot-other          { background: #9fd8ff; }
 .dot-taken          { background: #ff9f1a; }
-.dot-inactive       { background: repeating-conic-gradient(#0b0b0e 0 25%, #8f98a8 0 50%) 0 0 / 6px 6px; border: 1px solid #6b7480; }
+.dot-inactive       { background: #2a2e35; border: 1px solid #6b7480; }
 .dot-nogame         { background: #6e7683; border: 1px solid #6b7480; }
-.dot-site, .dot-strait { border: 1px solid #e8eef6; background: #9fd8ff; }
+.dot-site, .dot-strait, .dot-oil { border: 1px solid #e8eef6; background: #9fd8ff; }
+.dot-strait { background: #ffd60a; }
+.dot-oil { width: 16px; height: 16px; font-size: 10px; line-height: 14px; text-align: center; }
 .dot-site { border-radius: 2px; }
 
 /* ==================== پنل اطلاعات نقشه ==================== */
@@ -1977,3 +1981,7 @@ input, textarea, button { -webkit-touch-callout:none; }
 
 .st-bad-soft { color: var(--red); font-weight: 700; }
 .st-card .st-line { margin-top: 8px; }
+
+.map-help-btn { position:absolute; top:10px; right:10px; z-index:6; width:26px; height:26px; border-radius:50%; background:rgba(10,16,28,.8); border:1px solid rgba(255,255,255,.35); color:#e8eef6; font-size:14px; font-weight:800; cursor:pointer; line-height:1; }
+.map-legend.hidden { display:none; }
+.map-legend-pop { flex-direction:column; flex-wrap:nowrap; font-size:13px; color:#e6e9f0; gap:14px; margin:6px 4px 10px; line-height:1.7; }
