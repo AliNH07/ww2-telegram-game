@@ -1708,6 +1708,7 @@ async function sendDispatch() {
         if (d.player) { player = d.player; updateHomeStats(); }
         dispatchOpen = false; dispatchSel = { from: null, to: null, units: {} };
         await loadForces();
+        refreshMapSites();
     } catch (e) { showToast("خطا."); }
 }
 
@@ -2459,7 +2460,7 @@ const MAP_COLORS = {
     own: "#2ecc71",        // کشور من و تصرف‌های من (تنگه، سکو، معدن) → سبز
     other: "#9fd8ff",      // بازیکنان فعال و منابع/تنگه‌های آزاد → آبی کمرنگ
     taken: "#ff9f1a",      // تصرف‌شده توسط بازیکن دیگر → نارنجی
-    inactive: "pattern:inactive",   // در بازی هست ولی کسی انتخابش نکرده → سیاه و طوسیِ قاطی
+    inactive: "#2a2e35",   // در بازی هست ولی بازیکنی ندارد → سیاهِ مایل به طوسی
     nogame: "#6e7683"      // هنوز به بازی اضافه نشده → طوسی ساده، بدون خط‌کشی
 };
 const MAP_SPHERE = { type: "Sphere" };
@@ -2496,25 +2497,6 @@ function combineFeatures(feats, id) {
     });
     return { type: "Feature", id, properties: { name: "" }, geometry: { type: "MultiPolygon", coordinates: polys } };
 }
-// الگوی «سیاه و طوسیِ قاطی» برای کشورهای فعالِ انتخاب‌نشده
-let mapInactivePat = null;
-function getInactivePattern(ctx) {
-    if (mapInactivePat) return mapInactivePat;
-    const C = 3, d = mapDpr, N = 4;               // خانه‌های ۳ پیکسلی، بلوک ۴×۴ با چینش نامنظم
-    const c = document.createElement("canvas");
-    c.width = c.height = Math.round(C * N * d);
-    const g = c.getContext("2d");
-    g.scale(d, d);
-    const mix = [1,0,0,1, 0,1,1,0, 1,1,0,0, 0,0,1,1];
-    for (let i = 0; i < N * N; i++) {
-        g.fillStyle = mix[i] ? "#0b0b0e" : "#8f98a8";
-        g.fillRect((i % N) * C, Math.floor(i / N) * C, C, C);
-    }
-    mapInactivePat = ctx.createPattern(c, "repeat");
-    try { mapInactivePat.setTransform(new DOMMatrix().scale(1 / d)); } catch (e) {}
-    return mapInactivePat;
-}
-
 let mapProjection = null, mapPath = null, mapSvg = null;
 let mapSize = 0, mapMinScale = 0, mapMaxScale = 0;
 let mapRotation = [0, -10];
@@ -2531,7 +2513,7 @@ async function initWorldMap() {
     const svgEl = document.getElementById("map-globe");
     if (!box || !svgEl) return;
 
-    if (mapInitialized) { updateMapColors(); redrawMap(); return; }
+    if (mapInitialized) { updateMapColors(); redrawMap(); refreshMapSites(); return; }
     if (mapInitializing) return;
     mapInitializing = true;
 
@@ -2651,6 +2633,16 @@ async function initWorldMap() {
     redrawMap();
 }
 
+async function refreshMapSites() {
+    if (!mapSitesSvg) return;
+    await loadMapSites();
+    renderMapSites();
+    updateMapSitePositions();
+}
+setInterval(() => {
+    if (mapInitialized && !document.getElementById("map")?.classList.contains("hidden")) refreshMapSites();
+}, 15000);
+
 async function loadMapSites() {
     try { mapSites = await apiGet("/api/map-sites"); }
     catch (e) { mapSites = []; }
@@ -2669,8 +2661,12 @@ function renderMapSites() {
         .attr("x", -11).attr("y", -11).attr("width", 22).attr("height", 22);
     g.each(function (d) {
         const s = d3.select(this);
-        if (d.kind === "strait") s.append("circle").attr("class", "site-shape").attr("r", 4.4);
-        else s.append("rect").attr("class", "site-shape")
+        if (d.kind === "strait") s.append("circle").attr("class", "site-shape").attr("r", 4.8);
+        else if (d.type === "oil") {
+            s.append("circle").attr("class", "site-shape").attr("r", 8);
+            s.append("text").attr("class", "site-emoji").attr("text-anchor", "middle")
+                .attr("dominant-baseline", "central").attr("font-size", 11).text("🛢️");
+        } else s.append("rect").attr("class", "site-shape")
             .attr("x", -5).attr("y", -5).attr("width", 10).attr("height", 10).attr("rx", 0.5);
     });
 }
@@ -2804,10 +2800,9 @@ function drawMapNow() {
     for (const g of mapGroups) {
         ctx.beginPath();
         for (const m of g.items) mapPath(m.f);
-        const isPat = g.fill === MAP_COLORS.inactive;
-        ctx.fillStyle = isPat ? getInactivePattern(ctx) : g.fill;
+        ctx.fillStyle = g.fill;
         ctx.fill();
-        if (!isPat) { ctx.lineWidth = 0.5; ctx.strokeStyle = g.fill; ctx.stroke(); }   // پوشاندن درز
+        ctx.lineWidth = 0.5; ctx.strokeStyle = g.fill; ctx.stroke();   // پوشاندن درز
     }
     // مرز کشورها و ساحل
     if (mapBorders) {
@@ -2954,7 +2949,8 @@ function showSiteInfo(site) {
     } else {
         flagEl.textContent = RESOURCE_ICONS[site.type] || "📍";
         const zoneTxt = site.zone === "sea" ? "🌊 در دریا" : (site.zone === "land" ? "⛰️ در خشکی" : "");
-        descEl.textContent = `تولید: ${formatNumber(site.production)} در روز` + (zoneTxt ? ` — ${zoneTxt}` : "");
+        descEl.textContent = `تولید: ${formatNumber(site.production)} در روز` + (zoneTxt ? ` — ${zoneTxt}` : "")
+            + ((site.type === "steel" || site.type === "uranium") ? " — تصرف: ارتش + ناو ترابری" : "");
     }
     nameEl.textContent = site.name;
     if (site.owner) {
@@ -3332,3 +3328,15 @@ new MutationObserver(muts => {
         if (n.tagName === "SELECT") enhanceSelect(n); else enhanceAllSelects(n);
     });
 }).observe(document.body, { childList: true, subtree: true });
+
+
+/* ---------- راهنمای نقشه (دکمهٔ ؟ بالا-راست باکس نقشه) ---------- */
+document.getElementById("map-help-btn")?.addEventListener("click", () => {
+    const src = document.getElementById("map-legend-src");
+    const ov = document.createElement("div");
+    ov.className = "gs-overlay gs-bottom";
+    ov.innerHTML = `<div class="gs-sheet"><div class="gs-sheet-head"><button type="button" class="gs-x" aria-label="بستن">✕</button><span>راهنمای نقشه</span></div>
+        <div class="gs-sheet-list"><div class="map-legend map-legend-pop">${src ? src.innerHTML : ""}</div></div></div>`;
+    ov.addEventListener("click", e => { if (e.target === ov || e.target.closest(".gs-x")) ov.remove(); });
+    document.body.appendChild(ov);
+});
