@@ -859,47 +859,26 @@ img { -webkit-user-drag: none; user-select: none; }
 .map-sea-label   { fill: rgba(205, 232, 255, 0.78); font-style: italic; stroke: rgba(5, 25, 50, 0.6); stroke-width: 2.2px; }
 .map-country-label { fill: #ffffff; font-weight: 600; stroke: rgba(8, 18, 30, 0.85); stroke-width: 2.4px; }
 
-/* سکوها: مربعی و رنگی */
+/* سکوها و معدن‌ها: مربع | تنگه‌ها: دایره — آبی کمرنگ؛ مال من سبز؛ مال دیگری نارنجی */
 .map-site { cursor: pointer; }
 .map-site .site-hit { fill: transparent; }
-.map-site .site-shape { stroke: #ffffff; stroke-width: 1.3; }
-.map-site-oil     .site-shape { fill: #000000; }   /* سکوی نفتی: سیاه، مربع */
-.map-site-steel   .site-shape { fill: #a8e0ff; }   /* معدن فولاد: آبی کمرنگ، مربع */
-.map-site-uranium .site-shape { fill: #0a3dff; }   /* معدن اورانیوم: آبی، مربع */
-.map-site-food    .site-shape { fill: #7ed957; }
-.map-site-strait  .site-shape { fill: #ffd21f; stroke: #07121f; }   /* تنگه: زرد */
-.map-site.mine .site-shape { stroke: #f0b429; stroke-width: 2.4; }
-.map-controls {
-    position: absolute; left: 12px; bottom: 12px;
-    display: flex; flex-direction: column; gap: 8px; z-index: 5;
-}
-.map-control-btn {
-    width: 34px; height: 34px; border-radius: 50%;
-    background: rgba(15, 20, 30, 0.85);
-    border: 1px solid rgba(var(--brand-rgb), 0.15);
-    color: #f4f6f9; font-size: 17px;
-    display: flex; align-items: center; justify-content: center;
-}
-.map-control-btn:active { transform: scale(0.92); }
-.map-reset-btn { font-size: 14px; }
+.map-site .site-shape { stroke: #ffffff; stroke-width: 1.3; fill: #9fd8ff; }
+.map-site.site-mine .site-shape { fill: #2ecc71; }
+.map-site.site-other .site-shape { fill: #ff9f1a; }
+.map-site-strait .site-shape { stroke: #07121f; }
 .map-legend {
     display: flex; flex-wrap: wrap; gap: 10px 16px;
     margin-top: 14px; font-size: 10.5px; color: #a0a8b3;
 }
 .map-legend div { display: flex; align-items: center; gap: 6px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.dot-own            { background: #ffd21f; }
-.dot-own-occupied   { background: #34b36b; }
-.dot-other          { background: #2f7fe8; }
-.dot-other-occupied { background: #9b5de5; }
-.dot-inactive       { background: #0b0b0e; border: 1px solid #6b7480; }
-.dot-nogame         { background: repeating-linear-gradient(135deg, #2c3544 0 2px, #96a5bc 2px 3px); border: 1px solid #6b7480; }
-.dot-oil, .dot-steel, .dot-uranium, .dot-food { border-radius: 2px; border: 1px solid #e8eef6; }
-.dot-oil     { background: #000000; }
-.dot-steel   { background: #a8e0ff; }
-.dot-uranium { background: #0a3dff; }
-.dot-food    { background: #7ed957; }
-.dot-strait  { background: #ffd21f; border: 1px solid #07121f; }
+.dot-own            { background: #2ecc71; }
+.dot-other          { background: #9fd8ff; }
+.dot-taken          { background: #ff9f1a; }
+.dot-inactive       { background: repeating-conic-gradient(#0b0b0e 0 25%, #8f98a8 0 50%) 0 0 / 6px 6px; border: 1px solid #6b7480; }
+.dot-nogame         { background: #6e7683; border: 1px solid #6b7480; }
+.dot-site, .dot-strait { border: 1px solid #e8eef6; background: #9fd8ff; }
+.dot-site { border-radius: 2px; }
 
 /* ==================== پنل اطلاعات نقشه ==================== */
 .map-info-panel {
@@ -1995,3 +1974,6 @@ img { -webkit-user-drag: none; user-select: none; }
 input[type=number] { -moz-appearance:textfield; appearance:textfield; }
 input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 input, textarea, button { -webkit-touch-callout:none; }
+
+.st-bad-soft { color: var(--red); font-weight: 700; }
+.st-card .st-line { margin-top: 8px; }
