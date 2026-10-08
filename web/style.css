@@ -1985,3 +1985,8 @@ input, textarea, button { -webkit-touch-callout:none; }
 .map-help-btn { position:absolute; top:10px; right:10px; z-index:6; width:26px; height:26px; border-radius:50%; background:rgba(10,16,28,.8); border:1px solid rgba(255,255,255,.35); color:#e8eef6; font-size:14px; font-weight:800; cursor:pointer; line-height:1; }
 .map-legend.hidden { display:none; }
 .map-legend-pop { flex-direction:column; flex-wrap:nowrap; font-size:13px; color:#e6e9f0; gap:14px; margin:6px 4px 10px; line-height:1.7; }
+
+.map-controls { position:absolute; left:10px; bottom:10px; z-index:6; display:flex; flex-direction:column; gap:6px; }
+.map-control-btn { width:34px; height:34px; border-radius:10px; background:rgba(10,16,28,.82); border:1px solid rgba(255,255,255,.28); color:#e8eef6; font-size:18px; font-weight:700; cursor:pointer; line-height:1; display:flex; align-items:center; justify-content:center; }
+.map-control-btn:active { background:rgba(var(--brand-rgb),.35); }
+.map-reset-btn { font-size:16px; }
