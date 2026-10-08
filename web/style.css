@@ -1,3 +1,6 @@
+@font-face { font-family: "Vazirmatn"; src: url("/fonts/Vazirmatn-Regular.woff2") format("woff2"), url("/fonts/Vazirmatn-Regular.ttf") format("truetype"); font-weight: 400 600; font-display: swap; }
+@font-face { font-family: "Vazirmatn"; src: url("/fonts/Vazirmatn-Bold.woff2") format("woff2"), url("/fonts/Vazirmatn-Bold.ttf") format("truetype"); font-weight: 700 900; font-display: swap; }
+input, textarea, select, button { font-family: inherit; }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 :root {
@@ -20,7 +23,7 @@
 html, body { width: 100%; height: 100%; overflow: hidden; }
 
 body {
-    font-family: Tahoma, Arial, sans-serif;
+    font-family: Vazirmatn, Tahoma, Arial, sans-serif;
     color: #f4f6f9;
     direction: rtl;
     min-height: 100vh;
@@ -192,7 +195,7 @@ img { -webkit-user-drag: none; user-select: none; }
     font-size: 14px; font-weight: bold; letter-spacing: 3px;
     color: var(--brand);
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 20px rgba(var(--brand-rgb), 0.3);
-    font-family: Tahoma, Arial, sans-serif;
+    font-family: Vazirmatn, Tahoma, Arial, sans-serif;
 }
 .header-button {
     width: 38px; height: 38px; border-radius: 50%;
@@ -1468,7 +1471,7 @@ img { -webkit-user-drag: none; user-select: none; }
     position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%);
     min-width: 22px; height: 18px; padding: 0 6px; border-radius: 9px;
     background: linear-gradient(180deg, var(--brand), var(--brand-dark));
-    color: #1a1205; font: 800 11px/16px Tahoma, Arial, sans-serif; text-align: center;
+    color: #1a1205; font: 800 11px/16px Vazirmatn, Tahoma, Arial, sans-serif; text-align: center;
     border: 1.5px solid var(--bg-deep); cursor: pointer;
 }
 .header-rank-badge:active { transform: translateX(-50%) scale(0.92); }
@@ -1482,7 +1485,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .rk-live-card p { font-size: 13px; line-height: 2; color: #8d97a7; }
 .rk-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .rk-tab {
-    padding: 11px 16px; border-radius: 12px; font: 600 14px Tahoma, Arial, sans-serif;
+    padding: 11px 16px; border-radius: 12px; font: 600 14px Vazirmatn, Tahoma, Arial, sans-serif;
     background: rgba(40, 28, 14, 0.7); color: #f4f6f9; border: 1.5px solid rgba(var(--brand-rgb), 0.5);
 }
 .rk-tab.active { background: var(--brand); color: #1a1205; border-color: var(--brand); }
@@ -1505,17 +1508,17 @@ img { -webkit-user-drag: none; user-select: none; }
 /* ---------- پنجرهٔ تولید ---------- */
 .tr-qty { display: flex; gap: 8px; align-items: stretch; }
 .tr-step, .tr-max {
-    border-radius: 12px; font: bold 18px Tahoma, Arial, sans-serif; color: #f4f6f9;
+    border-radius: 12px; font: bold 18px Vazirmatn, Tahoma, Arial, sans-serif; color: #f4f6f9;
     background: #16233a; border: 1px solid rgba(var(--brand-rgb), 0.25); padding: 0 16px;
 }
 .tr-max { font-size: 12.5px; color: var(--brand); }
 .tr-input {
-    flex: 1; min-width: 0; text-align: center; font: bold 20px Tahoma, Arial, sans-serif; color: #f4f6f9;
+    flex: 1; min-width: 0; text-align: center; font: bold 20px Vazirmatn, Tahoma, Arial, sans-serif; color: #f4f6f9;
     background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(var(--brand-rgb), 0.35); border-radius: 12px; padding: 12px 6px;
 }
 .tr-quick { display: flex; gap: 8px; }
 .tr-quick button {
-    flex: 1; padding: 9px; border-radius: 10px; font: bold 14px Tahoma, Arial, sans-serif; color: #c3cad3;
+    flex: 1; padding: 9px; border-radius: 10px; font: bold 14px Vazirmatn, Tahoma, Arial, sans-serif; color: #c3cad3;
     background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
@@ -1692,7 +1695,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .st-help {
     width: 30px; height: 30px; border-radius: 50%; flex: none;
     border: 1.5px solid rgba(255, 255, 255, 0.4); color: #cfd5de;
-    font: 700 15px Tahoma, Arial, sans-serif; background: rgba(255, 255, 255, 0.04);
+    font: 700 15px Vazirmatn, Tahoma, Arial, sans-serif; background: rgba(255, 255, 255, 0.04);
 }
 .st-help:active { transform: scale(0.92); }
 .st-card {
@@ -1990,3 +1993,12 @@ input, textarea, button { -webkit-touch-callout:none; }
 .map-control-btn { width:34px; height:34px; border-radius:10px; background:rgba(10,16,28,.82); border:1px solid rgba(255,255,255,.28); color:#e8eef6; font-size:18px; font-weight:700; cursor:pointer; line-height:1; display:flex; align-items:center; justify-content:center; }
 .map-control-btn:active { background:rgba(var(--brand-rgb),.35); }
 .map-reset-btn { font-size:16px; }
+
+/* چرخش خودکار کره */
+.map-reset-btn.active { background: rgba(var(--brand-rgb), .45); border-color: var(--brand); }
+/* پنجرهٔ پایین نیروها: تا وسط صفحه */
+.loc-sheet { height: 50vh; max-height: 50vh; }
+.loc-head { display: flex; align-items: center; gap: 10px; }
+.loc-head b { display: block; font-size: 15px; }
+.loc-head small { font-size: 11.5px; color: #8d97a7; font-weight: normal; }
+.loc-sheet .wf-loc-actions { margin-top: 14px; }
