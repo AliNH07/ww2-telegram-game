@@ -416,6 +416,7 @@ function setNotifBadge(count) {
 }
 
 async function refreshNotificationBadge() {
+    refreshPmBadge();
     try {
         const news = await apiGet("/api/news");
         const list = Array.isArray(news) ? news : [];
@@ -2185,7 +2186,7 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
         if (tid === "comm-announcements") loadAnnouncements();
         else if (tid === "comm-unions") loadUnion();
         else if (tid === "comm-news") loadNews();
-        else if (tid === "comm-contacts") renderContactList();
+        else if (tid === "comm-contacts") openPmHome();
     });
 });
 
@@ -2412,6 +2413,63 @@ async function loadNews() {
 /* =========================================================
    Private Messages
 ========================================================= */
+function setPmBadges(n) {
+    ["pm-tab-badge", "pm-sub-badge"].forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        el.textContent = n > 99 ? "99+" : String(n);
+        el.classList.toggle("hidden", !(n > 0));
+    });
+}
+
+async function refreshPmBadge() {
+    try {
+        const d = await apiGet("/api/pm");
+        if (typeof d.unread_total === "number") setPmBadges(d.unread_total);
+    } catch (e) {}
+}
+
+function setPmSub(sub) {
+    document.querySelectorAll(".pm-subtab").forEach(t => t.classList.toggle("active", t.dataset.pmSub === sub));
+    document.getElementById("pm-inbox").classList.toggle("hidden", sub !== "inbox");
+    document.getElementById("contact-list").classList.toggle("hidden", sub !== "chat");
+    if (sub === "inbox") renderPmInbox(); else renderContactList();
+}
+document.querySelectorAll(".pm-subtab").forEach(t => t.addEventListener("click", () => setPmSub(t.dataset.pmSub)));
+
+function openPmHome() { setPmSub("inbox"); }
+
+async function renderPmInbox() {
+    const c = document.getElementById("pm-inbox");
+    if (!c) return;
+    try {
+        const d = await apiGet("/api/pm");
+        const list = d.conversations || [];
+        setPmBadges(d.unread_total || 0);
+        c.innerHTML = "";
+        if (!list.length) {
+            c.innerHTML = `<div class="diplomacy-item-empty">هنوز پیامی نیست. از تب «چت» یک کشور را انتخاب کنید.</div>`;
+            return;
+        }
+        list.forEach(cv => {
+            if (!COUNTRY_NAMES[cv.with]) return;
+            const div = document.createElement("div");
+            div.className = "contact-item pm-conv-item";
+            div.innerHTML = `
+                <div class="contact-info">
+                    ${flagInline(cv.with, true)}
+                    <div class="pm-conv-text">
+                        <span class="contact-name">${COUNTRY_NAMES[cv.with]}</span>
+                        <span class="pm-conv-last"></span>
+                    </div>
+                </div>
+                ${cv.unread > 0 ? `<span class="pm-badge pm-badge-static">${cv.unread > 99 ? "99+" : cv.unread}</span>` : ""}`;
+            div.querySelector(".pm-conv-last").textContent = (cv.last_from === selectedCountry ? "شما: " : "") + cv.last;
+            div.onclick = () => openPM(cv.with);
+            c.appendChild(div);
+        });
+    } catch (e) { c.innerHTML = `<div class="diplomacy-item-empty">پیام‌ها در دسترس نیست.</div>`; }
+}
+
 function renderContactList() {
     const c = document.getElementById("contact-list");
     if (!c) return;
@@ -2425,7 +2483,7 @@ function renderContactList() {
                 ${flagInline(cid, true)}
                 <span class="contact-name">${COUNTRY_NAMES[cid]}</span>
             </div>
-            <button class="message-button" data-open-pm="${cid}">گفتگو</button>`;
+            <button class="message-button" data-open-pm="${cid}">چت</button>`;
         c.appendChild(div);
     });
     c.querySelectorAll("[data-open-pm]").forEach(b => b.onclick = () => openPM(b.dataset.openPm));
@@ -2433,41 +2491,65 @@ function renderContactList() {
 
 function openPM(target) {
     currentPMTarget = target;
-    document.getElementById("contact-list").classList.add("hidden");
-    document.getElementById("pm-conversation").classList.remove("hidden");
+    pmLastSig = "";
     document.getElementById("pm-target-name").textContent = COUNTRY_NAMES[target];
-    loadPM(target);
+    document.getElementById("pm-target-flag").innerHTML = flagInline(target, true);
+    document.getElementById("pm-messages").innerHTML = "";
+    document.getElementById("pm-conversation").classList.remove("hidden");
+    loadPM(target, true);
 }
 
-document.getElementById("pm-back").onclick = () => {
+function closePM() {
     currentPMTarget = null;
-    document.getElementById("contact-list").classList.remove("hidden");
     document.getElementById("pm-conversation").classList.add("hidden");
-};
+    const panel = document.getElementById("comm-contacts");
+    if (panel && !panel.classList.contains("hidden")) {
+        const inboxVisible = !document.getElementById("pm-inbox").classList.contains("hidden");
+        if (inboxVisible) renderPmInbox(); else refreshPmBadge();
+    } else refreshPmBadge();
+}
+document.getElementById("pm-back").onclick = closePM;
 
-document.getElementById("pm-send").onclick = async () => {
+async function sendPM() {
     const ta = document.getElementById("pm-input");
     const text = ta.value.trim();
     if (!text || !currentPMTarget) return;
+    ta.value = ""; ta.style.height = "";
     await apiPost("/api/pm/send", { target: currentPMTarget, text });
-    ta.value = "";
-    loadPM(currentPMTarget);
-};
+    loadPM(currentPMTarget, true);
+}
+document.getElementById("pm-send").onclick = sendPM;
+document.getElementById("pm-input").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendPM(); }
+});
+document.getElementById("pm-input").addEventListener("input", e => {
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 90) + "px";
+});
 
-async function loadPM(target) {
+let pmLastSig = "";
+async function loadPM(target, forceScroll = false) {
     try {
         const d = await apiGet("/api/pm", { target });
+        if (target !== currentPMTarget) return;
+        const list = d.messages || [];
+        const sig = list.length + "|" + (list.length ? list[list.length - 1].at : "");
         const c = document.getElementById("pm-messages");
+        if (!forceScroll && sig === pmLastSig) return;
+        pmLastSig = sig;
+        const nearBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 80;
         c.innerHTML = "";
-        (d.messages || []).forEach(m => {
+        list.forEach(m => {
             const mine = m.from === selectedCountry;
             const div = document.createElement("div");
             div.className = `pm-msg ${mine ? "pm-mine" : "pm-other"}`;
             div.textContent = m.text;
             c.appendChild(div);
         });
+        if (forceScroll || nearBottom) c.scrollTop = c.scrollHeight;
     } catch (e) { console.error(e); }
 }
+setInterval(() => { if (currentPMTarget) loadPM(currentPMTarget); }, 4000);
 
 /* =========================================================
    Market — global trade
