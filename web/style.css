@@ -2226,3 +2226,122 @@ input, textarea, button { -webkit-touch-callout:none; }
     .ann-modal-actions .modal-cancel { flex-basis: 82px; }
     .ann-modal-actions .modal-cancel, .ann-publish-button { padding: 9px 8px; font-size: 10.5px; }
 }
+
+
+/* ==================== به‌روزرسانی رابط بیانیه‌ها ==================== */
+.ann-text.is-collapsed {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+}
+.ann-text.is-expanded { display: block; overflow: visible; }
+.ann-expand-button, .ann-original-expand {
+    display: inline-flex; align-items: center; gap: 5px; margin: -6px 0 11px;
+    padding: 4px 8px; border-radius: 8px; color: #e6c36b;
+    background: rgba(var(--brand-rgb), .07); border: 1px solid rgba(var(--brand-rgb), .16);
+    font-size: 10.5px; font-weight: 700;
+}
+.ann-expand-button span { font-size: 13px; line-height: 1; }
+.ann-react.selected { cursor: default; opacity: 1; font-weight: 800; }
+.ann-react.selected.support { border: 1px solid rgba(59, 211, 145, .43); background: rgba(37, 170, 113, .16); color: #65e7ad; }
+.ann-react.selected.accuse { border: 1px solid rgba(244, 91, 99, .45); background: rgba(193, 56, 65, .16); color: #ff9298; }
+.ann-locked-mark { font-size: 9px; opacity: .8; }
+.ann-balance { margin: 4px 0 10px; }
+.ann-balance-track { height: 6px; width: 100%; display: flex; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.075); box-shadow: inset 0 1px 2px rgba(0,0,0,.32); }
+.ann-balance-support { display: block; height: 100%; background: linear-gradient(90deg, #1cbd7f, #64e5a9); transition: width .35s ease; }
+.ann-balance-accuse { display: block; height: 100%; background: linear-gradient(90deg, #e74e58, #ff838a); transition: width .35s ease; }
+.ann-balance.is-empty .ann-balance-track { background: rgba(255,255,255,.055); }
+.ann-balance-legend { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; font-size: 9px; color: #8993a2; }
+.ann-balance-legend .support-legend { color: #62dca3; }
+.ann-balance-legend .accuse-legend { color: #ff858c; }
+
+/* پنجرهٔ پاسخ تمام‌صفحه که از پایین باز می‌شود */
+.ann-thread-overlay {
+    align-items: flex-end; justify-content: center; padding: 0 !important; overflow: hidden;
+    background: rgba(3, 6, 12, .74);
+}
+.ann-thread-box {
+    display: flex; flex-direction: column; gap: 0 !important;
+    width: 100% !important; max-width: 100% !important; height: 100vh; height: 100dvh;
+    max-height: 100vh !important; max-height: 100dvh !important;
+    padding: 0 !important; margin: 0; border-radius: 22px 22px 0 0 !important;
+    overflow: hidden; animation: annThreadSlideUp .3s cubic-bezier(.2,.8,.2,1) both;
+    background: linear-gradient(180deg, #151c29, #0b1019 45%);
+    border: 1px solid rgba(var(--brand-rgb), .22); border-bottom: 0;
+    box-shadow: 0 -16px 70px rgba(0,0,0,.5);
+}
+@keyframes annThreadSlideUp { from { transform: translateY(100%); opacity: .7; } to { transform: translateY(0); opacity: 1; } }
+.ann-thread-head { flex: 0 0 auto; padding: 8px 17px 13px; border-bottom: 1px solid rgba(255,255,255,.07); background: rgba(14,19,29,.97); }
+.ann-thread-grabber { width: 42px; height: 4px; margin: 0 auto 12px; border-radius: 999px; background: rgba(255,255,255,.2); }
+.ann-thread-head .ann-modal-head { align-items: center; }
+.ann-thread-head .modal-title { font-size: 16px; }
+.ann-thread-head p { margin-top: 4px; font-size: 11px; color: #99a3b1; }
+.ann-thread-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 15px 14px 22px; }
+.ann-thread-original { padding: 13px 14px; border-radius: 15px; margin-bottom: 18px; border: 1px solid rgba(var(--brand-rgb), .14); background: linear-gradient(145deg, rgba(var(--brand-rgb),.065), rgba(255,255,255,.018)); }
+.ann-thread-original-label { color: #d8b863; font-size: 10px; font-weight: 800; margin-bottom: 8px; }
+.ann-thread-original-text { color: #dce1e9; font-size: 12px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ann-thread-original-text.is-collapsed { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.ann-thread-original-text.is-expanded { display: block; }
+.ann-thread-original .ann-original-expand { margin: 8px 0 0; }
+.ann-thread-section-title { display: flex; justify-content: space-between; align-items: center; padding: 0 2px 11px; color: #eef1f6; font-size: 12px; }
+.ann-thread-count { color: #8591a1; font-size: 10px; }
+.ann-thread-comments { display: flex; flex-direction: column; gap: 11px; padding-bottom: 9px; }
+.ann-thread-comment { min-width: 0; margin-right: calc(var(--thread-depth, 0) * 10px); padding: 11px 12px 8px; border-radius: 13px 13px 4px 13px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.055); border-right: 2px solid rgba(var(--brand-rgb), calc(.12 + (var(--thread-depth, 0) * .025))); }
+.ann-thread-comment-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.ann-thread-comment-head strong { font-size: 10px; color: #e1c77f; }
+.ann-thread-comment-head time { margin-right: auto; font-size: 9px; color: #657183; }
+.ann-thread-comment-text { margin: 9px 0 5px; color: #e4e8ef; font-size: 12px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ann-thread-comment-actions { display: flex; justify-content: flex-start; }
+.ann-thread-comment-actions button { padding: 4px 8px; border-radius: 7px; color: #d9bd6b; font-size: 10px; background: rgba(var(--brand-rgb),.07); }
+.ann-thread-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 40px 12px; color: #8893a2; }
+.ann-thread-empty > span { display: grid; place-items: center; width: 45px; height: 45px; margin-bottom: 12px; border-radius: 50%; color: #e6c36b; border: 1px solid rgba(var(--brand-rgb),.24); background: rgba(var(--brand-rgb),.075); font-size: 20px; }
+.ann-thread-empty strong { color: #cbd1dc; font-size: 12px; }
+.ann-thread-empty p { margin-top: 5px; font-size: 10.5px; }
+.ann-thread-composer { flex: 0 0 auto; padding: 11px 13px calc(11px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,.075); background: rgba(10,15,24,.98); box-shadow: 0 -7px 24px rgba(0,0,0,.2); }
+.ann-thread-composer .ann-reply-text { display: block; width: 100%; min-height: 76px; max-height: 25vh; resize: none; border-radius: 14px; font-size: 12px; padding: 11px 12px; }
+.ann-reply-target { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; padding: 7px 10px; border-radius: 9px; color: #dfc575; background: rgba(var(--brand-rgb),.075); border: 1px solid rgba(var(--brand-rgb),.15); font-size: 10px; }
+.ann-reply-target button { color: #aab3c0; font-size: 17px; line-height: 1; }
+.ann-thread-composer-bottom { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 8px; }
+.ann-thread-composer-bottom .ann-reply-counter { color: #6f7b8c; font-size: 9px; }
+.ann-thread-composer-bottom .ann-publish-button { flex: 0 0 auto; min-width: 140px; padding: 9px 14px; border-radius: 11px; font-size: 11px; }
+.ann-thread-composer-bottom .ann-publish-button span { margin-right: 5px; }
+
+/* راهنمای بازار فقط در پنجرهٔ علامت سؤال */
+#market .market-help-btn { flex: 0 0 auto; display: inline-grid; place-items: center; width: 26px; height: 26px; margin-inline: 7px; border-radius: 50%; color: #f4d580; border: 1px solid rgba(var(--brand-rgb), .45); background: rgba(var(--brand-rgb), .09); font-size: 15px; font-weight: 800; }
+#market .market-help-btn:active { transform: scale(.94); }
+.market-help-overlay { z-index: 660; }
+.market-help-dialog { width: min(440px, 100%); padding: 20px; gap: 15px; border-radius: 20px; background: linear-gradient(155deg, #151c29, #0d121c 80%); border-color: rgba(var(--brand-rgb), .22); }
+.market-help-content { display: flex; flex-direction: column; gap: 12px; color: #bdc5d1; font-size: 12px; line-height: 1.9; }
+.market-help-content > p { color: #e5e9ef; margin-bottom: 2px; }
+.market-help-content > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 11px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.055); }
+.market-help-content b { color: #e9c978; font-size: 11px; }
+.market-help-content span { color: #a8b2c0; font-size: 11px; }
+.market-help-close { width: 100%; min-height: 43px; border-radius: 12px; }
+
+/* خانه کمی بزرگ‌تر و برجسته‌تر از آیتم‌های دیگر فوتر */
+:root { --nav-h: 54px; --nav-icon: 20px; --nav-home: 44px; --nav-home-lift: 13px; }
+.bottom-nav .nav-home { position: relative; justify-content: center; gap: 0; overflow: visible; }
+.bottom-nav .nav-home .nav-icon {
+    width: var(--nav-home); height: var(--nav-home); flex: 0 0 var(--nav-home);
+    margin-top: calc(var(--nav-home-lift) * -1); border-radius: 50%;
+    background: linear-gradient(145deg, #30230c, #101018 82%);
+    border: 2px solid rgba(var(--brand-rgb), .62); color: #e8c56c;
+    box-shadow: 0 8px 22px rgba(0,0,0,.46), 0 0 0 5px #0b0e15, inset 0 1px 0 rgba(255,255,255,.12);
+    transform: translateY(-2px); transition: transform .25s ease, background .25s ease, box-shadow .25s ease;
+}
+.bottom-nav .nav-home .nav-icon svg { width: 23px; height: 23px; }
+.bottom-nav .nav-home small { margin-top: -10px; font-size: 9px; line-height: 1.1; font-weight: 700; color: #d6bd79; }
+.bottom-nav .nav-home.active .nav-icon {
+    background: linear-gradient(145deg, #f5d477, #bd8b2b); color: #11151b;
+    border-color: rgba(255,255,255,.43); transform: translateY(-3px) scale(1.04);
+    box-shadow: 0 10px 24px rgba(var(--brand-rgb), .36), 0 0 0 5px #0b0e15, inset 0 1px 0 rgba(255,255,255,.45);
+}
+@media (max-width: 480px) {
+    .ann-thread-head { padding-left: 13px; padding-right: 13px; }
+    .ann-thread-scroll { padding-left: 11px; padding-right: 11px; }
+    .ann-thread-comment { margin-right: calc(var(--thread-depth, 0) * 7px); }
+    .ann-thread-composer { padding-left: 10px; padding-right: 10px; }
+    .market-help-dialog { padding: 16px; }
+}
