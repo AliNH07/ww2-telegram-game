@@ -1635,34 +1635,54 @@ function renderForcesTab() {
     root.innerHTML = `
         <div class="wf-stats">${wfStat(homeN, "در خانه")}${wfStat(siteN, `در ${formatNumber(warForces.sites.length)} موضع`)}${wfStat(homeN + siteN, "کل نیروها")}</div>
         <button class="wf-send-btn" id="wf-send-toggle">🧭 اعزام نیرو</button>
-        ${dispatchOpen ? dispatchPanelHtml() : ""}
-        <div class="wf-section"><span>🗺️ مواضع</span><small>${formatNumber(locs.length)} مکان</small></div>
+        <div class="wf-section"><span>مواضع</span><small>${formatNumber(locs.length)} مکان</small></div>
         <div class="wf-chips">${chips.map(([k, l]) => `<button class="wf-fchip ${forcesFilter === k ? "active" : ""}" data-f="${k}">${l}</button>`).join("")}</div>
         <div>${shown.map(locCardHtml).join("")}</div>`;
 
     root.querySelector("#wf-send-toggle").onclick = () => {
-        dispatchOpen = !dispatchOpen;
-        if (!dispatchOpen) dispatchSel = { from: null, to: null, units: {} };
+        dispatchOpen = true;
         renderForcesTab();
     };
     root.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { forcesFilter = b.dataset.f; renderForcesTab(); });
     root.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
         openLocSheet(b.dataset.toggle);
     });
-    if (dispatchOpen) {
-        root.querySelector("#dp-from").onclick = () => openPlaceSheet("from");
-        root.querySelector("#dp-to").onclick = () => openPlaceSheet("to");
-        root.querySelectorAll(".dp-unit").forEach(row => {
-            const k = row.dataset.u, max = poolOf(dispatchSel.from)[k] || 0, inp = row.querySelector("input");
-            const clamp = v => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
-            const set = v => { v = clamp(v); dispatchSel.units[k] = v; inp.value = v; updateDpSummary(); };
-            row.querySelectorAll("[data-d]").forEach(b => b.onclick = () => set((Number(inp.value) || 0) + Number(b.dataset.d)));
-            row.querySelector(".dp-all").onclick = () => set(max);
-            inp.oninput = () => { dispatchSel.units[k] = clamp(inp.value); updateDpSummary(); };
+    renderDispatchSheet();
+}
+
+function closeDispatchSheet() { document.getElementById("dp-sheet")?.remove(); }
+
+// پنجرهٔ اعزام: از پایین تا وسط صفحه بالا می‌آید و همهٔ مراحل اعزام داخل آن است
+function renderDispatchSheet() {
+    let ov = document.getElementById("dp-sheet");
+    if (!dispatchOpen) { ov?.remove(); return; }
+    const prevScroll = ov?.querySelector(".gs-sheet-list")?.scrollTop || 0;
+    if (!ov) {
+        ov = document.createElement("div");
+        ov.id = "dp-sheet"; ov.className = "gs-overlay gs-bottom";
+        ov.addEventListener("click", e => {
+            if (e.target === ov || e.target.closest(".gs-x")) {
+                dispatchOpen = false; dispatchSel = { from: null, to: null, units: {} }; closeDispatchSheet();
+            }
         });
-        const go = root.querySelector("#dp-go");
-        if (go) { go.onclick = sendDispatch; updateDpSummary(); }
+        document.body.appendChild(ov);
     }
+    ov.innerHTML = `<div class="gs-sheet loc-sheet">
+        <div class="gs-sheet-head"><button type="button" class="gs-x" aria-label="بستن">✕</button><span>اعزام نیرو</span></div>
+        <div class="gs-sheet-list">${dispatchPanelHtml()}</div></div>`;
+    ov.querySelector(".gs-sheet-list").scrollTop = prevScroll;
+    ov.querySelector("#dp-from")?.addEventListener("click", () => openPlaceSheet("from"));
+    ov.querySelector("#dp-to")?.addEventListener("click", () => openPlaceSheet("to"));
+    ov.querySelectorAll(".dp-unit").forEach(row => {
+        const k = row.dataset.u, max = poolOf(dispatchSel.from)[k] || 0, inp = row.querySelector("input");
+        const clamp = v => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
+        const set = v => { v = clamp(v); dispatchSel.units[k] = v; inp.value = v; updateDpSummary(); };
+        row.querySelectorAll("[data-d]").forEach(b => b.onclick = () => set((Number(inp.value) || 0) + Number(b.dataset.d)));
+        row.querySelector(".dp-all").onclick = () => set(max);
+        inp.oninput = () => { dispatchSel.units[k] = clamp(inp.value); updateDpSummary(); };
+    });
+    const go = ov.querySelector("#dp-go");
+    if (go) { go.onclick = sendDispatch; updateDpSummary(); }
 }
 
 function placeRow(id, icon, name, sub) {
@@ -1730,6 +1750,7 @@ async function sendDispatch() {
         showToast(d.message);
         if (d.player) { player = d.player; updateHomeStats(); }
         dispatchOpen = false; dispatchSel = { from: null, to: null, units: {} };
+        closeDispatchSheet();
         await loadForces();
         refreshMapSites();
     } catch (e) { showToast("خطا."); }
@@ -1920,7 +1941,7 @@ async function renderSatTab() {
         ${eligible.length ? eligible.map(([cid, nm]) => {
             const a = sc.countries?.[cid];
             return `<div class="sat-country"><div class="sat-c-top">${flagInline(cid)}<b>${nm}</b>
-                ${a ? `<span class="sat-live">🟢 زنده · ${timeLeft(a.expires_at)}</span>` : `<button class="war-attack-button sat-scan" data-c="${cid}">🛰️ اسکن</button>`}</div>
+                ${a ? `<span class="sat-live">زنده · ${timeLeft(a.expires_at)}</span>` : `<button class="war-attack-button sat-scan" data-c="${cid}">اسکن</button>`}</div>
                 ${a ? satCountryData(a) : ""}</div>`;
         }).join("") : `<div class="diplomacy-item-empty">کشوری با بازیکن فعال نیست.</div>`}
         <div class="wf-section"><span>📍 اسکن مکان‌ها</span></div>
@@ -2533,7 +2554,7 @@ function setMapSpin(on) {
         if (!mapSpinning) return;
         const page = document.getElementById("map");
         if (mapProjection && page && !page.classList.contains("hidden")) {
-            mapRotation[0] += 0.12;
+            mapRotation[0] += 0.4;
             mapProjection.rotate(mapRotation); redrawMap();
         }
         mapSpinRaf = requestAnimationFrame(step);
