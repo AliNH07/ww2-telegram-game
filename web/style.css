@@ -2002,3 +2002,6 @@ input, textarea, button { -webkit-touch-callout:none; }
 .loc-head b { display: block; font-size: 15px; }
 .loc-head small { font-size: 11.5px; color: #8d97a7; font-weight: normal; }
 .loc-sheet .wf-loc-actions { margin-top: 14px; }
+
+#infra-sheet.modal-overlay { z-index: 600; }
+.gs-overlay { background: rgba(4,6,10,.72); }
