@@ -2615,10 +2615,10 @@ input, textarea, button { -webkit-touch-callout:none; }
 .resource-chip-value { font-size: clamp(15px, 4vw, 19px); font-weight: 800; line-height: 1.35; color: #f8fafc; overflow-wrap: anywhere; }
 .resource-chip-rate { font-size: 10px; line-height: 1.7; }
 
-/* All infrastructure categories visible without horizontal scrolling; text-only tabs. */
+/* Infrastructure categories: four compact tabs on row one and three on row two. */
 .infra-tabs {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 7px;
     overflow: visible;
     padding: 0;
@@ -2634,14 +2634,15 @@ input, textarea, button { -webkit-touch-callout:none; }
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     border-radius: 13px;
     background: linear-gradient(145deg, rgba(26,31,43,.92), rgba(12,16,25,.92));
     border: 1px solid rgba(255,255,255,.08);
     box-shadow: 0 4px 12px rgba(0,0,0,.13);
 }
-.infra-tab-label { font-size: 11.5px; font-weight: 750; line-height: 1.4; }
-.infra-tab-count { font-size: 10px; color: #98a4b4; line-height: 1.25; }
+ .infra-tab-sticker { display: inline-grid; place-items: center; width: 19px; height: 19px; border-radius: 6px; font-size: 12px; line-height: 1; background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.055); }
+.infra-tab-label { font-size: 10.5px; font-weight: 750; line-height: 1.3; text-align: center; }
+.infra-tab-count { font-size: 9px; color: #98a4b4; line-height: 1.15; }
 .infra-tab.active { background: linear-gradient(145deg, rgba(var(--brand-rgb), .2), rgba(23,26,35,.95)); border-color: rgba(var(--brand-rgb), .55); }
 .infra-tab.active .infra-tab-count { color: var(--brand); }
 
@@ -2679,8 +2680,61 @@ input, textarea, button { -webkit-touch-callout:none; }
 #market .market-mine-card .mk-prod-text small { display: block; margin-top: 4px; color: #aab1be; font-size: 11px; }
 #market .market-mine-card .market-action.cancel { font-size: 13px; background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.28); }
 @media (max-width: 360px) {
-    .infra-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #army .base-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #army .base-card { min-height: 90px; padding: 9px; }
     #army .army-tab { font-size: 10px; }
+}
+
+
+/* Home quick-access tiles: a four-card row on wide layouts, two-by-two on phones. */
+.action-grid-3 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.action-welfare { background-color:#123127; background-image:linear-gradient(150deg,rgba(74,222,128,.23),rgba(7,24,22,.68)),url('/images/categories/stats.jpg'); background-size:cover; background-position:center; }
+.action-welfare .action-icon { background:#287b5c; }
+@media (max-width: 520px) {
+    .action-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Economy investment cards */
+#economy .economy-list-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:stretch; }
+#economy .eco-investment-card { min-width:0; padding:14px; border-radius:18px; border:1px solid rgba(227,176,75,.14); background:linear-gradient(155deg,rgba(25,31,44,.96),rgba(11,15,24,.97)); box-shadow:0 8px 22px rgba(0,0,0,.16); display:flex; flex-direction:column; gap:10px; }
+#economy .eco-card-top { display:flex; gap:9px; align-items:center; min-width:0; }
+#economy .eco-card-icon { flex:none; width:38px; height:38px; display:grid; place-items:center; border-radius:12px; background:rgba(227,176,75,.1); border:1px solid rgba(227,176,75,.18); font-size:19px; }
+#economy .eco-card-title { flex:1; min-width:0; }
+#economy .eco-card-title h3 { font-size:12.5px; line-height:1.6; color:#f0f2f7; overflow-wrap:anywhere; }
+#economy .eco-card-title small { display:block; color:#8e9aab; font-size:10px; margin-top:2px; }
+#economy .eco-card-level { flex:none; padding:4px 6px; border-radius:7px; color:#e5c46e; background:rgba(227,176,75,.09); font-size:9px; }
+#economy .eco-card-desc { min-height:39px; font-size:10.5px; color:#a3adbd; line-height:1.8; }
+#economy .eco-level-pips { display:flex; gap:4px; }
+#economy .eco-level-pips i { height:4px; flex:1; border-radius:5px; background:rgba(255,255,255,.08); }
+#economy .eco-level-pips i.on { background:#dcb45a; }
+#economy .eco-income-panel { display:flex; flex-direction:column; gap:3px; padding:11px; border-radius:12px; background:rgba(74,222,128,.055); border:1px solid rgba(74,222,128,.1); }
+#economy .eco-income-panel small { color:#94a99d; font-size:9px; }
+#economy .eco-income-panel strong { color:#86e3a0; font-size:17px; line-height:1.5; direction:ltr; text-align:right; }
+#economy .eco-income-panel > span { color:#9aa6b5; font-size:9px; line-height:1.6; }
+#economy .eco-income-panel > span i { color:#86e3a0; font-style:normal; }
+#economy .eco-card-facts { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+#economy .eco-card-facts > span { min-width:0; padding:8px 7px; border-radius:9px; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.05); color:#8994a6; font-size:9px; line-height:1.6; }
+#economy .eco-card-facts b { display:block; color:#dce2ec; font-size:10px; margin-top:3px; overflow-wrap:anywhere; }
+#economy .eco-invest-button { margin-top:auto; padding:11px 8px; border-radius:11px; color:#21190a; font-size:10.5px; font-weight:800; background:linear-gradient(135deg,#f0d078,#bd8e2d); box-shadow:0 5px 14px rgba(227,176,75,.1); }
+#economy .eco-invest-button:disabled { opacity:.45; box-shadow:none; }
+@media(max-width:440px) { #economy .economy-list-grid { grid-template-columns:1fr; } #economy .eco-card-desc { min-height:0; } }
+
+/* Clear separation between the finance report and the welfare/security dashboard. */
+.st-upkeep-toggle { width:100%; display:flex; justify-content:center; align-items:center; gap:8px; margin-top:7px; padding:9px; border-radius:10px; border:1px solid rgba(255,255,255,.07); background:rgba(255,255,255,.025); color:#d8c17d; font-size:11px; }
+.st-upkeep-toggle span { font-size:15px; }
+.welfare-buildings-card { border-color:rgba(74,222,128,.12); }
+.welfare-card-heading { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.welfare-card-heading > span { width:37px; height:37px; display:grid; place-items:center; border-radius:12px; background:rgba(74,222,128,.08); font-size:19px; }
+.welfare-card-heading b,.welfare-card-heading small { display:block; }
+.welfare-card-heading b { color:#e8edf5; font-size:13px; }
+.welfare-card-heading small { margin-top:3px; color:#8995a7; font-size:10px; line-height:1.7; }
+.welfare-building-chips { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:13px; }
+.welfare-building-chips span { padding:7px 9px; border-radius:9px; font-size:10px; color:#c5d1df; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.06); }
+.welfare-events-card h3 { font-size:14px; margin-bottom:10px; color:#e5ebf5; }
+.welfare-events-heading { font-size:12px; color:#d5bd74; margin:13px 0 8px; }
+@media(max-width:360px) {
+    .infra-tab { padding:8px 2px; min-height:46px; }
+    .infra-tab-sticker { width:16px; height:16px; font-size:10px; }
+    .infra-tab-label { font-size:9px; }
+    .infra-tab-count { font-size:8px; }
 }
