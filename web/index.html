@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261009m">
+<link rel="stylesheet" href="/style.css?v=20261009n">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -263,13 +263,13 @@
         <div class="resource-bar"></div>
 
         <div class="infra-tabs">
-            <button class="infra-tab active" data-infra-tab="power"><span class="infra-tab-label">⚡ برق</span><span class="infra-tab-count" id="infra-count-power">0/4</span></button>
-            <button class="infra-tab" data-infra-tab="manpower"><span class="infra-tab-label">👥 نیرو</span><span class="infra-tab-count" id="infra-count-manpower">0/6</span></button>
-            <button class="infra-tab" data-infra-tab="food"><span class="infra-tab-label">🌾 غذا</span><span class="infra-tab-count" id="infra-count-food">0/3</span></button>
-            <button class="infra-tab" data-infra-tab="resource"><span class="infra-tab-label">🛢️ منابع</span><span class="infra-tab-count" id="infra-count-resource">0/3</span></button>
-            <button class="infra-tab" data-infra-tab="military"><span class="infra-tab-label">🪖 نظامی</span><span class="infra-tab-count" id="infra-count-military">0/9</span></button>
-            <button class="infra-tab" data-infra-tab="welfare"><span class="infra-tab-label">🛡️ رفاه</span><span class="infra-tab-count" id="infra-count-welfare">0/5</span></button>
-            <button class="infra-tab" data-infra-tab="strategy"><span class="infra-tab-label">🛰️ استراتژی</span><span class="infra-tab-count" id="infra-count-strategy">0/1</span></button>
+            <button class="infra-tab active" data-infra-tab="power"><span class="infra-tab-label">برق</span><span class="infra-tab-count" id="infra-count-power">0/4</span></button>
+            <button class="infra-tab" data-infra-tab="manpower"><span class="infra-tab-label">نیروی انسانی</span><span class="infra-tab-count" id="infra-count-manpower">0/6</span></button>
+            <button class="infra-tab" data-infra-tab="food"><span class="infra-tab-label">غذا</span><span class="infra-tab-count" id="infra-count-food">0/3</span></button>
+            <button class="infra-tab" data-infra-tab="resource"><span class="infra-tab-label">منابع</span><span class="infra-tab-count" id="infra-count-resource">0/3</span></button>
+            <button class="infra-tab" data-infra-tab="military"><span class="infra-tab-label">نظامی</span><span class="infra-tab-count" id="infra-count-military">0/9</span></button>
+            <button class="infra-tab" data-infra-tab="welfare"><span class="infra-tab-label">رفاه</span><span class="infra-tab-count" id="infra-count-welfare">0/5</span></button>
+            <button class="infra-tab" data-infra-tab="strategy"><span class="infra-tab-label">استراتژی</span><span class="infra-tab-count" id="infra-count-strategy">0/1</span></button>
         </div>
 
         <div class="infra-panels">
@@ -326,33 +326,31 @@
     <!-- ==================== ارتش ==================== -->
     <main id="army" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🛡️</span>ارتش</span><span class="sb-money">$0</span></div>
-        <div class="page-title"><h1>ارتش</h1></div>
-
         <div class="army-summary-card">
             <div class="army-summary-label">🛡️ قدرت کل ارتش</div>
             <div class="army-summary-power" id="army-total-power">0</div>
         </div>
 
         <div class="base-cards-grid">
-            <div class="base-card">
+            <div class="base-card" data-army-jump="land" role="button" tabindex="0" aria-label="نمایش یگان‌های زمینی">
                 <div class="base-card-head"><div class="base-card-name">پادگان</div><div class="base-card-icon">🪖</div></div>
                 <div class="base-card-value" id="base-barracks-value">—</div>
                 <div class="base-card-max" id="base-barracks-max"></div>
                 <div class="base-card-progress"><div class="base-card-progress-fill" id="base-barracks-fill" style="width:0%"></div></div>
             </div>
-            <div class="base-card">
+            <div class="base-card" data-army-jump="air" role="button" tabindex="0" aria-label="نمایش یگان‌های هوایی">
                 <div class="base-card-head"><div class="base-card-name">فرودگاه</div><div class="base-card-icon">✈️</div></div>
                 <div class="base-card-value" id="base-airport-value">—</div>
                 <div class="base-card-max" id="base-airport-max"></div>
                 <div class="base-card-progress"><div class="base-card-progress-fill" id="base-airport-fill" style="width:0%"></div></div>
             </div>
-            <div class="base-card">
+            <div class="base-card" data-army-jump="naval" role="button" tabindex="0" aria-label="نمایش یگان‌های دریایی">
                 <div class="base-card-head"><div class="base-card-name">بندر</div><div class="base-card-icon">⚓</div></div>
                 <div class="base-card-value" id="base-port-value">—</div>
                 <div class="base-card-max" id="base-port-max"></div>
                 <div class="base-card-progress"><div class="base-card-progress-fill" id="base-port-fill" style="width:0%"></div></div>
             </div>
-            <div class="base-card">
+            <div class="base-card" data-army-jump="missile" role="button" tabindex="0" aria-label="نمایش یگان‌های موشکی">
                 <div class="base-card-head"><div class="base-card-name">انبار موشک</div><div class="base-card-icon">🚀</div></div>
                 <div class="base-card-value" id="base-missile-value">—</div>
                 <div class="base-card-max" id="base-missile-max"></div>
@@ -600,12 +598,23 @@
             <div class="market-order-switch"><button class="mk-side active" data-create-side="sell">می‌فروشم</button><button class="mk-side" data-create-side="buy">می‌خرم</button></div>
             <div class="market-form">
                 <label id="mk-resource-label" class="diplomacy-label">کالایی که می‌فروشم</label>
-                <select id="mk-sell-res" class="diplomacy-select"><option value="food">🌾 غذا</option><option value="steel">⚙️ آهن</option><option value="uranium">☢️ اورانیوم</option><option value="oil">🛢️ نفت</option></select>
-                <label id="mk-amount-label" class="diplomacy-label">مقدار</label><input id="mk-sell-amt" class="diplomacy-input" type="number" value="1000" min="1">
+                <select id="mk-sell-res" class="diplomacy-select" required>
+                    <option value="" selected disabled>ابتدا کالا را انتخاب کنید</option>
+                    <option value="food">غذا</option><option value="steel">آهن</option><option value="uranium">اورانیوم</option><option value="oil">نفت</option>
+                </select>
+                <div id="mk-sell-res-error" class="market-field-error" aria-live="polite"></div>
+                <label id="mk-amount-label" class="diplomacy-label">مقدار</label>
+                <input id="mk-sell-amt" class="diplomacy-input" type="number" value="" min="1" step="1" inputmode="numeric" placeholder="مقدار را وارد کنید">
+                <div id="mk-sell-amt-error" class="market-field-error" aria-live="polite"></div>
                 <label id="mk-price-label" class="diplomacy-label">در ازای</label>
-                <select id="mk-want-res" class="diplomacy-select"><option value="money">💰 پول</option><option value="food">🌾 غذا</option><option value="steel">⚙️ آهن</option><option value="uranium">☢️ اورانیوم</option><option value="oil">🛢️ نفت</option></select>
-                <input id="mk-want-amt" class="diplomacy-input" type="number" value="100000" min="1">
-                <button id="mk-submit" class="diplomacy-submit">ثبت آگهی فروش</button>
+                <select id="mk-want-res" class="diplomacy-select" required>
+                    <option value="" selected disabled>ابتدا پول یا کالا را انتخاب کنید</option>
+                    <option value="money">پول</option><option value="food">غذا</option><option value="steel">آهن</option><option value="uranium">اورانیوم</option><option value="oil">نفت</option>
+                </select>
+                <div id="mk-want-res-error" class="market-field-error" aria-live="polite"></div>
+                <input id="mk-want-amt" class="diplomacy-input" type="number" value="" min="1" step="1" inputmode="numeric" placeholder="مقدار پول یا کالای پیشنهادی">
+                <div id="mk-want-amt-error" class="market-field-error" aria-live="polite"></div>
+                <button id="mk-submit" class="diplomacy-submit">ثبت آگهی</button>
             </div>
         </div>
         <div id="market-mine-panel" class="market-panel hidden"><div id="market-mine"></div></div>
@@ -672,6 +681,6 @@
 
 </section>
 
-<script src="/app.js?v=20261009m"></script>
+<script src="/app.js?v=20261009n"></script>
 </body>
 </html>
