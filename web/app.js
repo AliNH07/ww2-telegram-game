@@ -2590,6 +2590,17 @@ function realm1993(f) {
     return id !== null ? id : "n:" + nm;
 }
 // چند فیچر → یک MultiPolygon (بدون دست‌زدن به جهت حلقه‌ها، مناسب کره)
+// برای اسم و مرکز کشور فقط بزرگ‌ترین تکه (سرزمین اصلی) حساب می‌شود؛ مثلاً گویان فرانسه اسم فرانسه را جابه‌جا نکند
+function mainLandFeature(f) {
+    const g = f.geometry;
+    if (!g || g.type !== "MultiPolygon" || g.coordinates.length < 2) return f;
+    let best = null, bestA = -1;
+    g.coordinates.forEach(c => {
+        const poly = { type: "Polygon", coordinates: c }, a = d3.geoArea(poly);
+        if (a > bestA) { bestA = a; best = poly; }
+    });
+    return { type: "Feature", id: f.id, properties: f.properties, geometry: best };
+}
 function combineFeatures(feats, id) {
     const polys = [];
     feats.forEach(ft => {
@@ -2693,10 +2704,11 @@ async function initWorldMap() {
         const key = keyById[id] || null;
         // اسم فقط برای کشورهایی که در بازی هستند؛ بقیه بی‌نام
         const name = key ? COUNTRY_NAMES[key] : "";
-        const bb = d3.geoBounds(f);
+        const mf = mainLandFeature(f);
+        const bb = d3.geoBounds(mf);
         let dLon = bb[1][0] - bb[0][0]; if (dLon < 0) dLon += 360;
-        const c = d3.geoCentroid(f);
-        const sArea = Math.sqrt(d3.geoArea(f)) * 1.7;
+        const c = d3.geoCentroid(mf);
+        const sArea = Math.sqrt(d3.geoArea(mf)) * 1.7;
         return {
             f, id, key, name, c, label: null, shown: false, tw: 0,
             sw: Math.min(dLon * R * Math.max(0.2, Math.cos(c[1] * R)), sArea),
@@ -2793,8 +2805,9 @@ function updateMapSitePositions() {
     if (!mapSitesSvg || !mapProjection) return;
     const rot = mapProjection.rotate();
     const zoom = mapProjection.scale() / mapSize;
-    const kBig = 1 + Math.min(0.7, (zoom - 1) * 0.15);                 // نفت و تنگه
-    const kSmall = 0.5 * (1 + Math.min(3.2, (zoom - 1) * 0.55));        // معدن و غذا: ریز، با نزدیک شدن بزرگ می‌شوند
+    // با دورشدن کوچک می‌شوند تا روی کشورهای کوچک نیفتند؛ با نزدیک‌شدن کمی بزرگ‌تر
+    const kBig = Math.max(0.32, Math.min(1.5, 0.6 * Math.pow(zoom, 0.6)));   // نفت و تنگه
+    const kSmall = kBig * 0.8;                                                // معدن و غذا
     mapSitesSvg.selectAll(".map-site").each(function (d) {
         const k = ((d.kind === "strait" || d.type === "oil") ? kBig : kSmall).toFixed(2);
         const p = viewCos(d.lon, d.lat, rot) > 0.02 ? mapProjection([d.lon, d.lat]) : null;
