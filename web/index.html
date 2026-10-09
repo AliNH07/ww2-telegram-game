@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261009n">
+<link rel="stylesheet" href="/style.css?v=20261009o">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -220,6 +220,13 @@
                     <p>جزئیات و وضعیت</p>
                 </div>
             </button>
+            <button class="action-card action-mini action-welfare" data-section="welfare">
+                <div class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/stats.jpg" alt=""></span>
+                    <h3>رفاه و امنیت</h3>
+                    <p>سلامت، امنیت و رویدادها</p>
+                </div>
+            </button>
         </div>
     </main>
 
@@ -243,15 +250,18 @@
         <div id="ln-panel" class="ln-panel"></div>
     </main>
 
-    <!-- ==================== آمار کشور ==================== -->
+    <!-- ==================== آمار کشور: درآمدها ==================== -->
     <main id="stats" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">📊</span>آمار کشور</span><span class="sb-money">$0</span></div>
-
-        <div class="st-section-head">
-            <h2>رفاه و امنیت</h2>
-            <button class="st-help" id="st-help-btn" aria-label="راهنما">?</button>
-        </div>
+        <div class="st-section-head"><h2>درآمد و هزینه‌های روزانه</h2></div>
         <div id="st-body"><div class="st-card st-card-plain"><p class="st-muted">در حال بارگذاری…</p></div></div>
+    </main>
+
+    <!-- ==================== رفاه و امنیت ==================== -->
+    <main id="welfare" class="game-page hidden">
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🛡️</span>رفاه و امنیت</span><span class="sb-money">$0</span></div>
+        <div class="st-section-head"><h2>وضعیت رفاه و امنیت کشور</h2><button class="st-help" id="st-help-btn" aria-label="راهنما">?</button></div>
+        <div id="welfare-body"><div class="st-card st-card-plain"><p class="st-muted">در حال بارگذاری…</p></div></div>
     </main>
 
     <!-- ==================== زیرساخت ==================== -->
@@ -263,13 +273,13 @@
         <div class="resource-bar"></div>
 
         <div class="infra-tabs">
-            <button class="infra-tab active" data-infra-tab="power"><span class="infra-tab-label">برق</span><span class="infra-tab-count" id="infra-count-power">0/4</span></button>
-            <button class="infra-tab" data-infra-tab="manpower"><span class="infra-tab-label">نیروی انسانی</span><span class="infra-tab-count" id="infra-count-manpower">0/6</span></button>
-            <button class="infra-tab" data-infra-tab="food"><span class="infra-tab-label">غذا</span><span class="infra-tab-count" id="infra-count-food">0/3</span></button>
-            <button class="infra-tab" data-infra-tab="resource"><span class="infra-tab-label">منابع</span><span class="infra-tab-count" id="infra-count-resource">0/3</span></button>
-            <button class="infra-tab" data-infra-tab="military"><span class="infra-tab-label">نظامی</span><span class="infra-tab-count" id="infra-count-military">0/9</span></button>
-            <button class="infra-tab" data-infra-tab="welfare"><span class="infra-tab-label">رفاه</span><span class="infra-tab-count" id="infra-count-welfare">0/5</span></button>
-            <button class="infra-tab" data-infra-tab="strategy"><span class="infra-tab-label">استراتژی</span><span class="infra-tab-count" id="infra-count-strategy">0/1</span></button>
+            <button class="infra-tab active" data-infra-tab="power"><span class="infra-tab-sticker">⚡</span><span class="infra-tab-label">برق</span><span class="infra-tab-count" id="infra-count-power">0/4</span></button>
+            <button class="infra-tab" data-infra-tab="manpower"><span class="infra-tab-sticker">👥</span><span class="infra-tab-label">نیروی انسانی</span><span class="infra-tab-count" id="infra-count-manpower">0/6</span></button>
+            <button class="infra-tab" data-infra-tab="food"><span class="infra-tab-sticker">🌾</span><span class="infra-tab-label">غذا</span><span class="infra-tab-count" id="infra-count-food">0/3</span></button>
+            <button class="infra-tab" data-infra-tab="resource"><span class="infra-tab-sticker">🛢️</span><span class="infra-tab-label">منابع</span><span class="infra-tab-count" id="infra-count-resource">0/3</span></button>
+            <button class="infra-tab" data-infra-tab="military"><span class="infra-tab-sticker">🪖</span><span class="infra-tab-label">نظامی</span><span class="infra-tab-count" id="infra-count-military">0/9</span></button>
+            <button class="infra-tab" data-infra-tab="welfare"><span class="infra-tab-sticker">🛡️</span><span class="infra-tab-label">رفاه</span><span class="infra-tab-count" id="infra-count-welfare">0/5</span></button>
+            <button class="infra-tab" data-infra-tab="strategy"><span class="infra-tab-sticker">🛰️</span><span class="infra-tab-label">استراتژی</span><span class="infra-tab-count" id="infra-count-strategy">0/1</span></button>
         </div>
 
         <div class="infra-panels">
@@ -681,6 +691,6 @@
 
 </section>
 
-<script src="/app.js?v=20261009n"></script>
+<script src="/app.js?v=20261009o"></script>
 </body>
 </html>
