@@ -2345,3 +2345,87 @@ input, textarea, button { -webkit-touch-callout:none; }
     .ann-thread-composer { padding-left: 10px; padding-right: 10px; }
     .market-help-dialog { padding: 16px; }
 }
+
+/* ==================== اصلاحات تکمیلی رابط کاربری ==================== */
+/* دکمهٔ خانه فقط چند پیکسل برجسته‌تر از قبل باشد. */
+:root { --nav-home-lift: 16px; }
+
+/* هدر با اسکرول به پایین نرم محو می‌شود و در اسکرول رو به بالا برمی‌گردد. */
+#game .game-header {
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden;
+    transition: height .2s ease, min-height .2s ease, margin .2s ease, padding .2s ease, opacity .16s ease;
+}
+#game.header-collapsed .game-header {
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    opacity: 0;
+    pointer-events: none;
+}
+#game.header-collapsed .game-page {
+    height: calc(100vh - var(--nav-h) - env(safe-area-inset-bottom));
+}
+
+/* اعلان‌ها: پاک کردن اعلان‌ها، مستقل از فهرست اخبار */
+.notif-head-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.notif-clear-all {
+    padding: 7px 10px; border-radius: 9px; color: #ffb0b0; font-size: 10px; font-weight: 700;
+    background: rgba(248, 113, 113, .08); border: 1px solid rgba(248, 113, 113, .2);
+    transition: opacity .15s ease, background .15s ease;
+}
+.notif-clear-all:active { background: rgba(248, 113, 113, .16); }
+.notif-clear-all:disabled, .notif-clear-all.is-empty { opacity: .42; }
+
+/* عکس کشور در سربرگ بیانیه بزرگ‌تر نمایش داده می‌شود. */
+.ann-header .ann-flag { width: 42px; height: 42px; flex: 0 0 42px; display: flex; align-items: center; justify-content: center; }
+.ann-header .ann-flag .flag-inline { width: 40px !important; height: 40px !important; margin: 0 !important; border-width: 1.5px; }
+.ann-header .ann-flag .flag-inline .flag-img { width: 130%; height: 130%; }
+.ann-header { min-height: 46px; }
+.ann-reactions:empty { display: none !important; }
+
+/* سازمان ملل: مخاطب نمایشی، بدون ارسال به هیچ بازیکن */
+.un-pm-item { border-color: rgba(var(--brand-rgb), .22) !important; background: linear-gradient(120deg, rgba(var(--brand-rgb), .08), rgba(255,255,255,.018)) !important; }
+.un-pm-icon { width: 36px; height: 36px; flex: 0 0 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #e8d18c; background: rgba(var(--brand-rgb), .1); border: 1px solid rgba(var(--brand-rgb), .25); font-size: 19px; }
+.un-pm-icon-large { width: 30px; height: 30px; font-size: 18px; }
+.un-pm-tag { padding: 4px 7px; border-radius: 7px; color: #dfc77c; background: rgba(var(--brand-rgb), .08); border: 1px solid rgba(var(--brand-rgb), .18); font-size: 9px; white-space: nowrap; }
+.un-pm-placeholder { margin: auto; width: min(340px, 90%); padding: 25px 20px; text-align: center; border-radius: 20px; background: linear-gradient(145deg, rgba(var(--brand-rgb), .07), rgba(255,255,255,.018)); border: 1px solid rgba(var(--brand-rgb), .16); color: #9ca7b5; }
+.un-pm-placeholder > span { display: grid; place-items: center; width: 58px; height: 58px; margin: 0 auto 14px; border-radius: 50%; background: rgba(var(--brand-rgb), .1); border: 1px solid rgba(var(--brand-rgb), .24); font-size: 28px; }
+.un-pm-placeholder strong { display: block; color: #eee4c8; font-size: 14px; margin-bottom: 8px; }
+.un-pm-placeholder p { font-size: 11px; line-height: 2; }
+.pm-conversation.un-pm-local .pm-input-row { opacity: 1; }
+.un-pm-local-msg { border: 1px solid rgba(var(--brand-rgb), .16); }
+
+/* ساخت اتحادیه فقط با باز شدن پنجره انجام می‌شود. */
+.union-create-launch {
+    display: flex; width: 100%; align-items: center; gap: 13px; padding: 16px 15px; margin: 0 0 17px;
+    text-align: right; border-radius: 17px; color: #f1f4f8;
+    background: linear-gradient(130deg, rgba(var(--brand-rgb), .12), rgba(16, 23, 35, .92) 62%);
+    border: 1px solid rgba(var(--brand-rgb), .27); box-shadow: 0 10px 25px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.035);
+    transition: transform .16s ease, border-color .16s ease;
+}
+.union-create-launch:active { transform: scale(.99); border-color: rgba(var(--brand-rgb), .48); }
+.union-create-launch-icon { display: grid; place-items: center; width: 46px; height: 46px; flex: 0 0 46px; border-radius: 15px; color: #16120a; background: linear-gradient(140deg, #f0d47e, #b9892e); font-size: 29px; box-shadow: 0 7px 18px rgba(var(--brand-rgb), .15); }
+.union-create-launch-copy { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
+.union-create-launch-copy strong { font-size: 13px; font-weight: 800; }
+.union-create-launch-copy small { font-size: 10px; line-height: 1.7; color: #9ba5b3; }
+.union-create-launch-arrow { color: #e9c876; font-size: 19px; }
+.union-create-overlay { z-index: 680; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); }
+.union-create-dialog { width: min(460px, 100%); padding: 20px; gap: 15px; border-radius: 22px; background: linear-gradient(155deg, #171f2e, #0b1019 82%); border-color: rgba(var(--brand-rgb), .25); box-shadow: 0 24px 80px rgba(0,0,0,.62); }
+.union-create-hero { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 15px; background: rgba(var(--brand-rgb), .065); border: 1px solid rgba(var(--brand-rgb), .12); }
+.union-create-hero > span { display: grid; place-items: center; width: 45px; height: 45px; flex: 0 0 45px; border-radius: 13px; background: rgba(var(--brand-rgb), .1); font-size: 24px; }
+.union-create-hero strong { display: block; color: #e9d49b; font-size: 12px; }
+.union-create-hero p { margin-top: 4px; color: #9da8b7; font-size: 10px; line-height: 1.8; }
+.union-modal-name { width: 100%; min-height: 45px; }
+.union-create-modal-actions { display: flex; gap: 9px; }
+.union-create-modal-actions > * { flex: 1; min-height: 44px; border-radius: 12px; }
+.union-create-modal-actions .diplomacy-submit:disabled { opacity: .6; }
+@media (max-width: 480px) {
+    .ann-header .ann-flag { width: 39px; height: 39px; flex-basis: 39px; }
+    .ann-header .ann-flag .flag-inline { width: 37px !important; height: 37px !important; }
+    .union-create-dialog { padding: 16px; }
+    .notif-clear-all { padding: 7px 8px; }
+}
