@@ -1,4 +1,4 @@
-import os, json, hmac, hashlib, uuid, logging, asyncio, random
+import os, json, hmac, hashlib, uuid, logging, asyncio, random, math
 from datetime import datetime, timezone, timedelta
 from urllib.parse import parse_qsl
 
@@ -756,6 +756,7 @@ news_feed = []
 site_forces = {}   # site_id -> {"owner": country, "units": {unit_id: n}}
 war_events = []    # خبرهای جنگ
 war_history = []   # تاریخچهٔ درگیری‌ها
+transits = []      # نیروهای در راه
 loans = {}         # وام‌ها
 
 def create_player(user_id):
@@ -787,7 +788,7 @@ def save_state():
                  "private_messages": private_messages, "market_listings": market_listings,
                  "news_feed": news_feed[-200:],
                  "straits_data": STRAITS_DATA,
-                 "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:],
+                 "transits": transits, "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:],
                  "loans": loans}
         tmp = STATE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
@@ -800,7 +801,7 @@ def load_state():
     global diplomacy_proposals, active_treaties, map_holdings, strait_holdings
     global occupied_countries, war_declarations, active_wars, war_reports
     global announcements, unions, private_messages, market_listings, news_feed
-    global site_forces, war_events, war_history, loans
+    global site_forces, war_events, war_history, loans, transits
     if not os.path.exists(STATE_FILE):
         logging.info("No state, fresh start."); return
     try:
@@ -825,6 +826,7 @@ def load_state():
         site_forces = state.get("site_forces", {})
         war_events = state.get("war_events", [])
         war_history = state.get("war_history", [])
+        transits = state.get("transits", [])
         loans = state.get("loans", {})
         logging.info("State loaded: %d players", len(players))
     except Exception as e:
@@ -1391,6 +1393,7 @@ async def capture_site(request):
         return web.json_response({"success": False, "error": "already_own"}, status=400)
     if p["units"].get("ship", 0) > 0: p["units"]["ship"] -= 1
     else: p["units"]["submarine"] -= 1
+    divert_transits(site_id, country)
     if site_id in MAP_RESOURCES:
         map_holdings[site_id] = country
         push_news("تصرف منبع", f"{COUNTRIES[country]['name']} {MAP_RESOURCES[site_id]['name']} را تصرف کرد.")
@@ -1510,17 +1513,144 @@ def _bad(msg, code=400):
 async def get_forces(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    process_transits()
     p = _me(uid); cid = p.get("country"); sites = []
     for sid in list(site_forces):
         if cid and site_owner(sid) == cid:
             g = garrison(sid)
             if units_count(g) > 0:
                 sites.append({**site_meta(sid), "units": {k: n for k, n in g.items() if n > 0}})
-    return web.json_response({"home": {k: n for k, n in p["units"].items() if n > 0}, "sites": sites})
+    mine = [{"id": t["id"], "from": t["from"], "to": t["to"], "from_name": "میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"]),
+             "to_name": loc_label(t["to"]), "kind": t["kind"], "units": t["units"], "start": t["start"], "arrive": t["arrive"]}
+            for t in transits if t["owner"] == cid]
+    return web.json_response({"home": {k: n for k, n in p["units"].items() if n > 0}, "sites": sites,
+                              "transits": mine, "now": utcnow().isoformat()})
+
+# ---------------- زمان سفر نیروها ----------------
+TRAVEL_KM_PER_MIN = 40      # سرعت: ۴۰ کیلومتر در دقیقه (۱۰٬۰۰۰ کیلومتر ≈ ۴ ساعت)
+TRAVEL_MIN_MINUTES = 3
+TRAVEL_MAX_MINUTES = 480
+
+def loc_coords(cid, loc):
+    if loc == "home": return TRADE_COUNTRY_COORDS.get(cid)
+    i = MAP_RESOURCES.get(loc) or STRAITS_DATA.get(loc)
+    return (i["lon"], i["lat"]) if i else None
+
+def travel_minutes(cid, a, b):
+    ca, cb = loc_coords(cid, a), loc_coords(cid, b)
+    if not ca or not cb: return TRAVEL_MIN_MINUTES
+    lon1, lat1, lon2, lat2 = map(math.radians, (ca[0], ca[1], cb[0], cb[1]))
+    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    km = 6371 * 2 * math.asin(min(1, math.sqrt(h)))
+    return max(TRAVEL_MIN_MINUTES, min(TRAVEL_MAX_MINUTES, km / TRAVEL_KM_PER_MIN))
+
+def loc_label(loc):
+    if loc == "home": return "خانه"
+    m = site_meta(loc); return m["name"] if m else "—"
+
+def _add_units(dest, sent):
+    for k, n in sent.items(): dest[k] = dest.get(k, 0) + n
+
+def start_transit(cid, src, dst, units, minutes, kind="go", dst_free=False, origin=None):
+    now = utcnow()
+    t = {"id": str(uuid.uuid4()), "owner": cid, "from": src, "to": dst, "units": dict(units), "kind": kind,
+         "dst_free": dst_free, "origin": origin or src,
+         "start": now.isoformat(), "arrive": (now + timedelta(minutes=minutes)).isoformat()}
+    transits.append(t); return t
+
+def divert_transits(site_id, new_owner):
+    """کسی موضع آزاد را گرفت: نیروهای دیگرانی که به آن می‌رفتند از میانهٔ راه برمی‌گردند."""
+    now = utcnow()
+    for t in list(transits):
+        if t["to"] != site_id or t["kind"] != "go" or not t.get("dst_free") or t["owner"] == new_owner: continue
+        _turn_back(t, now, f"{cname(new_owner)} {loc_label(site_id)} را گرفت")
+
+def _turn_back(t, now, reason=None):
+    """نیرو از همان نقطهٔ میانهٔ راه برمی‌گردد؛ زمان بازگشت = زمانی که تا اینجا رفته است."""
+    st, ar = parse_dt(t["start"]), parse_dt(t["arrive"])
+    elapsed = max(0.0, (now - st).total_seconds() / 60) if st else 0.0
+    cid = t["owner"]; dst_name = loc_label(t["to"])
+    t["kind"] = "back"; t["to"] = t["origin"]; t["from"] = "mid"; t["dst_free"] = False
+    t["start"] = now.isoformat(); t["arrive"] = (now + timedelta(minutes=elapsed)).isoformat()
+    txt = f"{cname(cid)} نیروهای خود را که به {dst_name} می‌رفتند از میانهٔ راه بازگرداند"
+    push_war("turnback", txt + (f"؛ دلیل: {reason}." if reason else "."), [cid])
+    if reason: push_news("بازگشت از میانهٔ راه", txt + f"؛ دلیل: {reason}.")
+
+def resolve_arrival(t):
+    cid = t["owner"]; units = t["units"]; dst = t["to"]
+    _, p = get_player_by_country(cid)
+    if not p: return
+    ensure_player_fields(p)
+    if t["kind"] == "back":
+        if dst == "home" or site_owner(dst) != cid:
+            _add_units(p["units"], units)
+        else:
+            g = site_forces.get(dst)
+            if not g or g.get("owner") != cid: g = site_forces[dst] = {"owner": cid, "units": {}}
+            _add_units(g["units"], units)
+        return
+    if dst == "home":
+        _add_units(p["units"], units); return
+    meta = site_meta(dst); kind = meta["kind"]; owner = site_owner(dst)
+    if owner and owner != cid and have_treaty(cid, owner, "non_aggression"):
+        _add_units(p["units"], units)
+        push_war("turnback", f"{cname(cid)} نیروهایش را که به {meta['name']} می‌رفتند بازگرداند؛ دلیل: پیمان عدم تجاوز با {cname(owner)}.", [cid, owner]); return
+    if owner == cid:
+        g = site_forces.get(dst)
+        if not g or g.get("owner") != cid: g = site_forces[dst] = {"owner": cid, "units": {}}
+        _add_units(g["units"], units)
+    elif not owner:
+        divert_transits(dst, cid)
+        site_forces[dst] = {"owner": cid, "units": dict(units)}; set_site_owner(dst, cid)
+        push_war("occupy", f"{cname(cid)} {meta['name']} را گرفت.", [cid])
+        push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, None, "attacker", "بی‌صاحب بود")
+        push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را تصرف کرد.")
+    else:
+        _, dfd = get_player_by_country(owner)
+        gar = garrison(dst)
+        atk_p = units_power(units, p, "attack") * (1 + random.uniform(-0.08, 0.08))
+        def_p = units_power(gar, dfd, "defense") * 1.10 * (1 + random.uniform(-0.08, 0.08))
+        empty = units_count(gar) == 0
+        if empty or atk_p > def_p:
+            surv = dict(units) if empty else {k: max(1, int(n * 0.8)) for k, n in units.items()}
+            site_forces[dst] = {"owner": cid, "units": surv}; set_site_owner(dst, cid)
+            push_war("capture", f"{cname(cid)} {meta['name']} را از {cname(owner)} گرفت.", [cid, owner])
+            push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "attacker",
+                         f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}")
+            push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را از {cname(owner)} گرفت.")
+        else:
+            _add_units(p["units"], {k: int(n * 0.3) for k, n in units.items()})
+            for k in list(gar): gar[k] = int(gar[k] * 0.8)
+            push_war("repel", f"{cname(owner)} حملهٔ {cname(cid)} به {meta['name']} را دفع کرد.", [cid, owner])
+            push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "defender",
+                         f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}")
+
+def process_transits():
+    now = utcnow(); changed = False
+    due = []
+    for t in list(transits):
+        ar = parse_dt(t["arrive"])
+        if not ar or ar <= now: due.append(t)
+    due.sort(key=lambda t: t["arrive"])
+    for t in due:
+        if t not in transits: continue
+        ar = parse_dt(t["arrive"])
+        if ar and ar > now: continue     # در همین دور از میانهٔ راه برگردانده شد
+        transits.remove(t); changed = True
+        try: resolve_arrival(t)
+        except Exception as e: logging.error("resolve_arrival: %s", e)
+    if changed: save_state()
+
+async def transit_loop():
+    while True:
+        await asyncio.sleep(10)
+        try: process_transits()
+        except Exception as e: logging.error("transit tick: %s", e)
 
 async def dispatch_forces(request):
     uid = get_auth_user_id(request)
     if not uid: return _bad("unauthorized", 401)
+    process_transits()
     data = await read_json(request)
     src = data.get("from"); dst = data.get("to")
     p = _me(uid); cid = p.get("country")
@@ -1556,51 +1686,33 @@ async def dispatch_forces(request):
             return _bad("با خروج این یگان‌ها، نیروهای باقی‌مانده در این موضع بدون پشتیبان (ناو ترابری / ناو هواپیمابر / سوخت‌رسان) می‌مانند.")
 
     for k, n in units.items(): pool[k] -= n
-    def add_to(dest, sent):
-        for k, n in sent.items(): dest[k] = dest.get(k, 0) + n
-
-    outcome = "moved"
+    # مالکیت موضع حتی با خالی‌شدن از نیرو برای خودش می‌ماند؛ فقط اگر کسی حمله کند راحت می‌گیرد.
+    minutes = travel_minutes(cid, src, dst)
+    start_transit(cid, src, dst, units, minutes, "go", dst_free=(dst != "home" and not owner))
     if dst == "home":
-        add_to(p["units"], units); msg = "نیروها به خانه بازگشتند."
+        push_war("return", f"{cname(cid)} نیروهایش را از {loc_label(src)} به خانه بازگرداند.", [cid])
+    elif src == "home":
+        push_war("send", f"{cname(cid)} به {loc_label(dst)} نیرو فرستاد.", [cid])
     else:
-        meta = site_meta(dst); kind = meta["kind"]
-        if owner == cid:
-            g = site_forces.get(dst)
-            if not g or g.get("owner") != cid: g = site_forces[dst] = {"owner": cid, "units": {}}
-            add_to(g["units"], units); msg = f"نیروها در {meta['name']} مستقر شدند."
-        elif not owner:
-            site_forces[dst] = {"owner": cid, "units": dict(units)}; set_site_owner(dst, cid)
-            push_war("occupy", f"{cname(cid)} به {meta['name']} نیرو فرستاد و آن را گرفت.", [cid])
-            push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, None, "attacker", "بی‌صاحب بود")
-            push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را تصرف کرد.")
-            outcome = "occupied"; msg = f"{meta['name']} را گرفتید."
-        else:
-            _, dfd = get_player_by_country(owner)
-            gar = garrison(dst)
-            atk_p = units_power(units, p, "attack") * (1 + random.uniform(-0.08, 0.08))
-            def_p = units_power(gar, dfd, "defense") * 1.10 * (1 + random.uniform(-0.08, 0.08))
-            empty = units_count(gar) == 0
-            if empty or atk_p > def_p:
-                surv = dict(units) if empty else {k: max(1, int(n * 0.8)) for k, n in units.items()}
-                site_forces[dst] = {"owner": cid, "units": surv}; set_site_owner(dst, cid)
-                push_war("capture", f"{cname(cid)} {meta['name']} را از {cname(owner)} گرفت.", [cid, owner])
-                push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "attacker",
-                             f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}")
-                push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را از {cname(owner)} گرفت.")
-                outcome = "captured"; msg = f"پیروز شدید و {meta['name']} را گرفتید."
-            else:
-                add_to(p["units"], {k: int(n * 0.3) for k, n in units.items()})
-                for k in list(gar): gar[k] = int(gar[k] * 0.8)
-                push_war("repel", f"{cname(owner)} حملهٔ {cname(cid)} به {meta['name']} را دفع کرد.", [cid, owner])
-                push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "defender",
-                             f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}")
-                outcome = "repelled"; msg = "حمله دفع شد. بخش کوچکی از نیروها به خانه برگشتند."
-    if src != "home" and units_count(garrison(src)) == 0:
-        sm = site_meta(src)
-        site_forces.pop(src, None); set_site_owner(src, None)
-        push_war("release", f"{cname(cid)} {sm['name']} را رها کرد و بی‌صاحب ماند.", [cid])
+        push_war("send", f"{cname(cid)} از {loc_label(src)} نیروهایش را به {loc_label(dst)} فرستاد.", [cid])
     save_state()
-    return web.json_response({"success": True, "outcome": outcome, "message": msg, "player": serialize_player(p)})
+    mins = int(math.ceil(minutes))
+    eta = f"{mins} دقیقه" if mins < 60 else f"{mins // 60} ساعت و {mins % 60} دقیقه"
+    return web.json_response({"success": True, "outcome": "sent", "message": f"نیروها به راه افتادند؛ رسیدن: حدود {eta}.",
+                              "player": serialize_player(p)})
+
+async def recall_forces(request):
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    process_transits()
+    data = await read_json(request)
+    p = _me(uid); cid = p.get("country")
+    t = next((x for x in transits if x["id"] == data.get("id") and x["owner"] == cid), None)
+    if not t: return _bad("این نیرو دیگر در راه نیست.")
+    if t["kind"] != "go": return _bad("این نیرو در حال بازگشت است.")
+    _turn_back(t, utcnow())
+    save_state()
+    return web.json_response({"success": True, "message": "نیروها از میانهٔ راه برمی‌گردند.", "player": serialize_player(p)})
 
 async def get_war_log(request):
     uid = get_auth_user_id(request)
@@ -2553,7 +2665,7 @@ async def create_web_app():
         ("/api/upgrade-economy", upgrade_economy), ("/api/train-unit", train_unit),
         ("/api/propose-treaty", propose_treaty), ("/api/respond-treaty", respond_treaty),
         ("/api/war/declare", declare_war), ("/api/war/battle", perform_battle),
-        ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces),
+        ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/recall", recall_forces),
         ("/api/satellite/launch", sat_launch), ("/api/satellite/scan-site", sat_scan_site),
         ("/api/satellite/scan-country", sat_scan_country),
         ("/api/announcements/create", create_announcement),
@@ -2596,6 +2708,7 @@ async def main():
     load_state()
     asyncio.create_task(autosave_loop())
     asyncio.create_task(war_tick_loop())
+    asyncio.create_task(transit_loop())
     await start_web_server()
     await bot.delete_webhook(drop_pending_updates=True)
     try:
