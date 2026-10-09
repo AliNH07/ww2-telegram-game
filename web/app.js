@@ -2800,56 +2800,14 @@ function renderMapRoutes() {
     });
     updateMapRoutes();
 }
-// مسیر دریایی: مبدأ را از مرکز کشور به نزدیک‌ترین نقطهٔ آب منتقل می‌کند و
-// نقاط مسیر را در صورت برخورد با خشکی به نزدیک‌ترین آب قابل‌دسترسی منحرف می‌کند.
-function isLandPoint(ll) { return mapFeatures.some(m => d3.geoContains(m.f, ll)); }
-function nearestSeaPoint(ll, maxRadius = 24) {
-    if (!isLandPoint(ll)) return ll;
-    for (let r = 2; r <= maxRadius; r += 2) {
-        for (let a = 0; a < 360; a += 10) {
-            const rad = a * Math.PI / 180;
-            const q = [((ll[0] + r * Math.cos(rad) + 540) % 360) - 180,
-                       Math.max(-85, Math.min(85, ll[1] + r * Math.sin(rad)))];
-            if (!isLandPoint(q)) return q;
-        }
-    }
-    return ll;
-}
-function seaRouteCoordinates(d) {
-    const from = nearestSeaPoint(d.from_ll), to = nearestSeaPoint(d.to_ll);
-    const interp = d3.geoInterpolate(from, to), coords = [from];
-    // نمونه‌برداری متراکم؛ هیچ بخش قابل‌مشاهده‌ای از خط روی خشکی عبور نمی‌کند.
-    for (let i = 1; i < 80; i++) {
-        let q = interp(i / 80);
-        if (isLandPoint(q)) q = nearestSeaPoint(q, 18);
-        coords.push(q);
-    }
-    coords.push(to);
-    return coords;
-}
-function pointAlongRoute(coords, fraction) {
-    const lengths = [];
-    let total = 0;
-    for (let i = 1; i < coords.length; i++) { const len = d3.geoDistance(coords[i - 1], coords[i]); lengths.push(len); total += len; }
-    let target = total * fraction;
-    for (let i = 0; i < lengths.length; i++) {
-        if (target <= lengths[i] || i === lengths.length - 1) {
-            const part = lengths[i] > 0 ? Math.max(0, Math.min(1, target / lengths[i])) : 0;
-            return d3.geoInterpolate(coords[i], coords[i + 1])(part);
-        }
-        target -= lengths[i];
-    }
-    return coords[coords.length - 1];
-}
 function updateMapRoutes() {
     if (!mapRoutesSvg || !mapProjection || !mapRoutesVisible) return;
     const rot = mapProjection.rotate(), pathGen = d3.geoPath(mapProjection);
     const now = Date.now() + mapRouteSkew;
     mapRoutesSvg.selectAll(".map-route").each(function (d) {
         const f = Math.max(0, Math.min(1, (now - Date.parse(d.start)) / Math.max(1, Date.parse(d.arrive) - Date.parse(d.start))));
-        const coords = seaRouteCoordinates(d);
-        d3.select(this).select(".map-route-line").attr("d", pathGen({ type: "LineString", coordinates: coords }) || "");
-        const pos = pointAlongRoute(coords, f);
+        d3.select(this).select(".map-route-line").attr("d", pathGen({ type: "LineString", coordinates: [d.from_ll, d.to_ll] }) || "");
+        const pos = d3.geoInterpolate(d.from_ll, d.to_ll)(f);
         const p = viewCos(pos[0], pos[1], rot) > 0.02 ? mapProjection(pos) : null;
         const head = d3.select(this).select(".map-route-head");
         if (p) head.attr("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)})`).style("display", "");
