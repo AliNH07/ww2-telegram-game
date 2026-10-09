@@ -2005,3 +2005,13 @@ input, textarea, button { -webkit-touch-callout:none; }
 
 #infra-sheet.modal-overlay { z-index: 600; }
 .gs-overlay { background: rgba(4,6,10,.72); }
+
+/* نیروهای در راه */
+.wf-transit { background: rgba(255,255,255,.05); border: 1px solid rgba(var(--brand-rgb), .25); border-radius: 14px; padding: 10px 12px; margin-bottom: 8px; }
+.wf-tr-top { display: flex; flex-direction: column; gap: 2px; }
+.wf-tr-top b { font-size: 13.5px; }
+.wf-tr-top small { font-size: 11px; color: #8d97a7; }
+.wf-tr-bar { height: 6px; border-radius: 6px; background: rgba(255,255,255,.1); margin: 8px 0; overflow: hidden; }
+.wf-tr-bar i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .9s linear; }
+.wf-tr-bottom { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; }
+.wf-tr-cancel { padding: 6px 12px; border-radius: 10px; border: 1px solid rgba(255,120,120,.5); background: rgba(255,80,80,.12); color: #ff9a9a; font-weight: 700; font-size: 12px; }
