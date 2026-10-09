@@ -1885,6 +1885,8 @@ async def sat_scan_country(request):
 # API Announcements
 # =========================================================
 async def get_announcements(request):
+    uid = get_auth_user_id(request)
+    current_cid = players.get(uid, {}).get("country") if uid else None
     result = []
     for a in announcements[-50:]:
         reactions = a.get("reactions", {})
@@ -1892,34 +1894,69 @@ async def get_announcements(request):
         accuse = [c for c, r in reactions.items() if r == "accuse"]
         result.append({"id": a["id"], "from_country": a["from_country"], "text": a["text"],
                        "created_at": a["created_at"], "support": support, "accuse": accuse,
+                       "is_mine": bool(current_cid and current_cid == a.get("from_country")),
                        "comments": a.get("comments", []),
                        "comments_count": len(a.get("comments", []))})
     result.reverse()
     return web.json_response(result)
 
+async def get_announcement_status(request):
+    uid = get_auth_user_id(request)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    if uid not in players:
+        players[uid] = create_player(uid)
+    p = players[uid]
+    if not p.get("country"):
+        return web.json_response({"success": False, "error": "no_country",
+                                  "message": "ابتدا کشور خود را انتخاب کنید."}, status=400)
+    today = utcnow().strftime("%Y-%m-%d")
+    used = len(p.setdefault("announcements", {}).get(today, []))
+    next_number = used + 1 if used < 4 else None
+    return web.json_response({"success": True, "count": used, "limit": 4,
+                              "next_number": next_number,
+                              "next_cost": ANN_COSTS.get(next_number, 0) if next_number else None,
+                              "costs": {str(k): v for k, v in ANN_COSTS.items()}})
+
+async def _broadcast_announcement_notification(cid):
+    """ارسال اعلان تلگرامی انتشار بیانیه به همهٔ بازیکنان دارای کشور."""
+    if cid not in COUNTRIES:
+        return
+    text = (f"📢 بیانیهٔ جدید\nکشور «{COUNTRIES[cid]['name']}» بیانیه‌ای منتشر کرد.\n"
+            "برای خواندن و پاسخ دادن: بازی ← ارتباطات ← بیانیه‌ها")
+    semaphore = asyncio.Semaphore(8)
+    async def send_to(uid):
+        async with semaphore:
+            try:
+                await bot.send_message(int(uid), text)
+            except Exception as e:
+                logging.warning("announcement notification failed for %s: %s", uid, e)
+    recipients = list(players.keys())
+    await asyncio.gather(*(send_to(uid) for uid in recipients))
+
 async def create_announcement(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); text = (data.get("text") or "").strip()[:500]
-    if not text: return web.json_response({"success": False, "error": "empty"}, status=400)
+    data = await read_json(request); text = (data.get("text") or "").strip()[:20000]
+    if not text: return web.json_response({"success": False, "error": "empty", "message": "متن بیانیه را بنویسید."}, status=400)
     if uid not in players: players[uid] = create_player(uid)
     p = players[uid]; cid = p.get("country")
-    if not cid: return web.json_response({"success": False, "error": "no_country"}, status=400)
+    if not cid: return web.json_response({"success": False, "error": "no_country", "message": "ابتدا کشور خود را انتخاب کنید."}, status=400)
     today = utcnow().strftime("%Y-%m-%d")
     anns = p.setdefault("announcements", {}); today_list = anns.get(today, [])
     if len(today_list) >= 4:
         return web.json_response({"success": False, "error": "daily_limit",
-                                  "message": "سهمیه امروز تمام است."}, status=400)
+                                  "message": "سهمیهٔ امروز تمام است."}, status=400)
     if today_list:
         last = parse_dt(today_list[-1])
         if last and (utcnow() - last).total_seconds() < 3600:
-            mins = int((3600 - (utcnow() - last).total_seconds()) / 60)
+            mins = max(1, int((3600 - (utcnow() - last).total_seconds() + 59) / 60))
             return web.json_response({"success": False, "error": "cooldown",
-                                      "message": f"{mins} دقیقه دیگر."}, status=400)
+                                      "message": f"برای انتشار بیانیهٔ بعدی {mins} دقیقه دیگر صبر کنید."}, status=400)
     cost = ANN_COSTS.get(len(today_list) + 1, 400_000)
     if p.get("money", 0) < cost:
         return web.json_response({"success": False, "error": "not_enough_money",
-                                  "message": f"هزینه {cost} دلار."}, status=400)
+                                  "message": f"هزینهٔ این بیانیه {cost:,} دلار است."}, status=400)
     p["money"] -= cost
     today_list.append(utcnow().isoformat()); anns[today] = today_list
     ann = {"id": str(uuid.uuid4()), "from_country": cid, "text": text,
@@ -1927,7 +1964,12 @@ async def create_announcement(request):
     announcements.append(ann)
     push_news("بیانیه", f"{COUNTRIES[cid]['name']}: {text[:80]}")
     save_state()
-    return web.json_response({"success": True, "announcement": ann})
+    try:
+        asyncio.get_running_loop().create_task(_broadcast_announcement_notification(cid))
+    except RuntimeError:
+        logging.warning("announcement notification skipped: no active event loop")
+    return web.json_response({"success": True, "announcement": ann, "cost": cost,
+                              "remaining_today": max(0, 4 - len(today_list))})
 
 async def react_announcement(request):
     uid = get_auth_user_id(request)
@@ -1935,10 +1977,14 @@ async def react_announcement(request):
     data = await read_json(request); ann_id = data.get("announcement_id"); r = data.get("reaction")
     if r not in ("support", "accuse"):
         return web.json_response({"success": False, "error": "invalid"}, status=400)
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    if uid not in players or not players[uid].get("country"):
+        return web.json_response({"success": False, "error": "no_country", "message": "ابتدا کشور خود را انتخاب کنید."}, status=400)
     cid = players[uid].get("country")
     for a in announcements:
         if a["id"] == ann_id:
+            if cid == a.get("from_country"):
+                return web.json_response({"success": False, "error": "own_announcement",
+                                          "message": "نمی‌توانید به بیانیهٔ کشور خودتان واکنش بدهید."}, status=403)
             a.setdefault("reactions", {})[cid] = r
             save_state(); return web.json_response({"success": True})
     return web.json_response({"success": False, "error": "not_found"}, status=404)
@@ -1946,9 +1992,10 @@ async def react_announcement(request):
 async def comment_announcement(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); ann_id = data.get("announcement_id"); text = (data.get("text") or "").strip()[:300]
-    if not text: return web.json_response({"success": False, "error": "empty"}, status=400)
-    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    data = await read_json(request); ann_id = data.get("announcement_id"); text = (data.get("text") or "").strip()[:5000]
+    if not text: return web.json_response({"success": False, "error": "empty", "message": "متن پاسخ را بنویسید."}, status=400)
+    if uid not in players or not players[uid].get("country"):
+        return web.json_response({"success": False, "error": "no_country", "message": "ابتدا کشور خود را انتخاب کنید."}, status=400)
     cid = players[uid].get("country")
     for a in announcements:
         if a["id"] == ann_id:
@@ -2835,7 +2882,7 @@ async def create_web_app():
         ("/api/player", get_player), ("/api/countries", get_countries),
         ("/api/army-units", get_army_units), ("/api/diplomacy", get_diplomacy),
         ("/api/wars", get_wars), ("/api/map-sites", get_map_sites),
-        ("/api/announcements", get_announcements), ("/api/announcement", get_announcement_detail),
+        ("/api/announcements", get_announcements), ("/api/announcements/status", get_announcement_status), ("/api/announcement", get_announcement_detail),
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
         ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
