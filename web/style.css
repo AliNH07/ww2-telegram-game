@@ -2154,3 +2154,75 @@ input, textarea, button { -webkit-touch-callout:none; }
 .union-invite-form { display: flex; gap: 7px; align-items: center; }
 .union-invite-form .diplomacy-select { min-width: 0; flex: 1; }
 .union-empty-small { font-size: 10px; color: #7f8996; padding: 6px 2px; }
+
+/* ==================== بیانیه: فرم و پاسخ مدرن ==================== */
+.ann-launcher-row { display: flex; justify-content: flex-start; align-items: center; margin: 0 0 12px; }
+.ann-submit {
+    display: inline-flex; width: auto; align-self: flex-start; align-items: center; justify-content: center; gap: 8px;
+    padding: 9px 15px; border-radius: 12px; font-size: 12px; line-height: 1.4;
+    box-shadow: 0 5px 15px rgba(var(--brand-rgb), .12); transition: transform .18s ease, box-shadow .18s ease;
+}
+.ann-submit:active, .ann-reply-button:active, .ann-publish-button:active { transform: scale(.98); }
+.ann-card { padding: 12px 13px; border-radius: 15px; background: linear-gradient(145deg, rgba(18,24,36,.94), rgba(12,16,25,.9)); }
+.ann-header { gap: 9px; align-items: center; margin-bottom: 9px; padding-bottom: 9px; }
+.ann-author { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.ann-author time { font-size: 9px; color: #707b8c; }
+.ann-official-tag { flex: 0 0 auto; padding: 3px 7px; border-radius: 7px; color: #e9c77e; background: rgba(var(--brand-rgb), .09); border: 1px solid rgba(var(--brand-rgb), .17); font-size: 9px; }
+.ann-text { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-size: 12px; line-height: 1.95; margin-bottom: 12px; }
+.ann-reactions { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; flex-wrap: wrap; }
+.ann-react { flex: 1 1 120px; display: inline-flex; justify-content: center; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; font-size: 11px; }
+.ann-react b { font-size: 10px; opacity: .9; }
+.ann-own-note { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; background: rgba(255,255,255,.035); color: #929cab; border: 1px solid rgba(255,255,255,.065); border-radius: 9px; font-size: 10px; }
+.ann-flags { margin: 3px 0 8px; }
+.ann-flags-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.ann-comments { display: flex; flex-direction: column; gap: 7px; margin: 8px 0 10px; }
+.ann-comment-bubble { display: flex; align-items: flex-start; gap: 7px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px 10px 4px 10px; background: rgba(255,255,255,.035); border-color: rgba(255,255,255,.055); line-height: 1.7; overflow-wrap: anywhere; }
+.ann-comment-bubble strong { color: #d4bd85; font-size: 10px; white-space: nowrap; }
+.ann-comment-bubble span { flex: 1 1 100%; font-size: 11px; white-space: pre-wrap; }
+.ann-card-footer { display: flex; justify-content: flex-start; align-items: center; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.055); }
+.ann-reply-button { display: inline-flex; justify-content: center; align-items: center; gap: 7px; color: #e8c16b; background: rgba(var(--brand-rgb), .08); border: 1px solid rgba(var(--brand-rgb), .2); border-radius: 10px; padding: 7px 10px; font-size: 10.5px; transition: background .18s ease, transform .18s ease; }
+.ann-reply-button span { display: inline-flex; min-width: 18px; height: 18px; align-items: center; justify-content: center; padding: 0 4px; border-radius: 6px; background: rgba(var(--brand-rgb), .14); font-size: 9px; }
+.ann-modal-overlay { z-index: 650; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 16px; }
+.ann-composer-box, .ann-reply-box { width: min(680px, 100%); max-height: min(88vh, 900px); padding: 18px; gap: 13px; border-radius: 20px; background: linear-gradient(155deg, #151c29, #0d121c 80%); border-color: rgba(var(--brand-rgb), .23); box-shadow: 0 25px 80px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.035); }
+.ann-modal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.ann-modal-head > div { min-width: 0; }
+.ann-modal-kicker { display: block; color: #98835b; font-size: 10px; margin-bottom: 4px; }
+.ann-modal-head .modal-title { font-size: 17px; font-weight: 700; color: #f2f4f8; margin: 0; }
+.ann-modal-close { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 33px; height: 33px; border-radius: 10px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.07); color: #aeb6c2; font-size: 23px; line-height: 1; }
+.ann-composer-text { width: 100%; min-height: min(44vh, 410px); max-height: 52vh; resize: vertical; font-size: 13px; line-height: 1.95; padding: 13px 14px; border-radius: 13px; background: rgba(7,11,18,.78); border-color: rgba(var(--brand-rgb), .16); }
+.ann-reply-text { width: 100%; min-height: 180px; max-height: 45vh; resize: vertical; font-size: 12.5px; line-height: 1.9; padding: 12px 13px; border-radius: 13px; }
+.ann-composer-text:focus, .ann-reply-text:focus { border-color: rgba(var(--brand-rgb), .53); box-shadow: 0 0 0 3px rgba(var(--brand-rgb), .055); }
+.ann-composer-meta { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; color: #6e7b8d; font-size: 10px; }
+.ann-cost-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 7px; }
+.ann-cost-chip { display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; padding: 9px 5px; min-width: 0; border-radius: 10px; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.06); color: #8993a1; }
+.ann-cost-chip b { font-size: 10px; font-weight: 600; }
+.ann-cost-chip small { font-size: 10px; white-space: nowrap; }
+.ann-cost-chip.current { color: #f1d18a; border-color: rgba(var(--brand-rgb), .45); background: rgba(var(--brand-rgb), .085); box-shadow: inset 0 0 0 1px rgba(var(--brand-rgb), .035); }
+.ann-modal-actions { display: flex; align-items: stretch; gap: 9px; }
+.ann-modal-actions .modal-cancel, .ann-publish-button { min-height: 42px; border-radius: 11px; padding: 10px 13px; font-family: inherit; font-size: 11.5px; }
+.ann-modal-actions .modal-cancel { flex: 0 0 100px; }
+.ann-publish-button { flex: 1; background: linear-gradient(135deg, #ebc469, #b9892e); color: #11151b; font-weight: 800; box-shadow: 0 5px 18px rgba(var(--brand-rgb), .12); }
+.ann-publish-button:disabled { opacity: .65; cursor: wait; }
+
+/* ==================== فوتر کوچک و یکدست ==================== */
+:root { --nav-h: 54px; --nav-icon: 20px; --nav-home: 20px; --nav-home-lift: 0px; }
+.bottom-nav { height: calc(var(--nav-h) + env(safe-area-inset-bottom)); border-top-left-radius: 16px; border-top-right-radius: 16px; box-shadow: 0 -4px 18px rgba(0,0,0,.4); }
+.bottom-nav .nav-item { justify-content: center; gap: 3px; padding: 0; }
+.bottom-nav .nav-item .nav-icon { width: var(--nav-icon); height: var(--nav-icon); flex: 0 0 var(--nav-icon); margin: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.bottom-nav .nav-item .nav-icon svg { width: 100%; height: 100%; }
+.bottom-nav .nav-item small, .bottom-nav .nav-home small { font-size: 9px; line-height: 1.1; font-weight: 500; color: inherit; }
+.bottom-nav .nav-item.active small, .bottom-nav .nav-home.active small { font-weight: 600; color: var(--brand); }
+.bottom-nav .nav-home { justify-content: center; gap: 3px; }
+.bottom-nav .nav-home .nav-icon { width: var(--nav-icon); height: var(--nav-icon); flex: 0 0 var(--nav-icon); margin-top: 0; background: transparent; color: inherit; border: 0; border-radius: 0; box-shadow: none; }
+.bottom-nav .nav-home .nav-icon svg { width: 100%; height: 100%; }
+.bottom-nav .nav-home.active .nav-icon { background: transparent; color: var(--brand); border: 0; transform: scale(1.08); box-shadow: none; }
+
+@media (max-width: 480px) {
+    .ann-composer-box, .ann-reply-box { padding: 14px; gap: 11px; }
+    .ann-composer-text { min-height: 34vh; }
+    .ann-cost-row { gap: 5px; }
+    .ann-cost-chip { padding: 8px 3px; }
+    .ann-cost-chip small { font-size: 9px; }
+    .ann-modal-actions .modal-cancel { flex-basis: 82px; }
+    .ann-modal-actions .modal-cancel, .ann-publish-button { padding: 9px 8px; font-size: 10.5px; }
+}
