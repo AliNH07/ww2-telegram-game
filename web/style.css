@@ -2429,3 +2429,24 @@ input, textarea, button { -webkit-touch-callout:none; }
     .union-create-dialog { padding: 16px; }
     .notif-clear-all { padding: 7px 8px; }
 }
+
+
+/* بیانیه: شمارش‌گر کنار دکمه و راهنمای پنهان در علامت سؤال */
+.ann-launcher-row { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
+.ann-submit:disabled { opacity: .58; filter: saturate(.65); cursor: not-allowed; transform: none; }
+.ann-timer { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 7px 10px; border: 1px solid rgba(var(--brand-rgb), .2); border-radius: 11px; background: rgba(var(--brand-rgb), .06); color: #e5c77e; font-size: 10.5px; font-variant-numeric: tabular-nums; direction: rtl; }
+.ann-help-button { width: 31px; height: 31px; flex: 0 0 31px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #d9c18a; border: 1px solid rgba(var(--brand-rgb), .25); background: rgba(var(--brand-rgb), .075); font-family: inherit; font-size: 15px; font-weight: 800; transition: background .18s ease, transform .18s ease; }
+.ann-help-button:active { transform: scale(.94); background: rgba(var(--brand-rgb), .16); }
+.ann-help-overlay { z-index: 670; }
+.ann-help-box { width: min(510px, 100%); max-height: min(84vh, 760px); overflow-y: auto; }
+.ann-help-content { display: flex; flex-direction: column; gap: 10px; }
+.ann-help-rule { display: flex; align-items: flex-start; gap: 11px; padding: 12px; border: 1px solid rgba(255,255,255,.065); border-radius: 13px; background: rgba(255,255,255,.025); }
+.ann-help-rule-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px; background: rgba(var(--brand-rgb), .085); font-size: 16px; }
+.ann-help-rule strong { display: block; color: #f1d697; font-size: 12px; margin-bottom: 4px; }
+.ann-help-rule p { color: #a6afbd; font-size: 11px; line-height: 1.9; }
+.ann-text { font-size: 13px; }
+@media (max-width: 480px) {
+    .ann-launcher-row { gap: 6px; }
+    .ann-timer { min-height: 32px; padding: 6px 8px; font-size: 9.5px; }
+    .ann-help-button { width: 30px; height: 30px; flex-basis: 30px; }
+}
