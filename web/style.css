@@ -2486,3 +2486,105 @@ input, textarea, button { -webkit-touch-callout:none; }
 .iws-metrics .iws-penalty { color: #fca5a5; }
 .iws-details-button { width: 100%; margin-top: 11px; padding: 10px 12px; border-radius: 10px; background: rgba(var(--brand-rgb), .1); border: 1px solid rgba(var(--brand-rgb), .26); color: #f3d589; font: inherit; font-size: 11px; font-weight: 700; text-align: center; }
 .iws-details-button:active { background: rgba(var(--brand-rgb), .18); transform: scale(.99); }
+
+
+/* ===== درآمد کل، هزینه‌ها و درآمد خالص در آمار کشور ===== */
+.st-finance-card { overflow: hidden; }
+.st-finance-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px; margin:-18px -16px 12px; background:linear-gradient(120deg,rgba(74,222,128,.12),rgba(227,176,75,.06)); border-bottom:1px solid rgba(255,255,255,.08); }
+.st-finance-head small,.st-net-panel small { display:block; color:#aab2c0; font-size:12px; margin-bottom:6px; }
+.st-finance-head strong { display:block; color:#8ce8a6; font-size:25px; font-weight:900; direction:ltr; text-align:right; }
+.st-finance-icon { width:44px; height:44px; display:grid; place-items:center; border-radius:14px; background:rgba(74,222,128,.1); font-size:23px; }
+.st-finance-breakdown .st-line { font-size:13px; padding:9px 2px 0; margin-top:0; color:#cbd1dc; gap:12px; }
+.st-finance-breakdown .st-line span { min-width:0; }
+.st-finance-breakdown .st-line b { white-space:nowrap; direction:ltr; font-size:13px; color:#edf0f6; }
+.st-finance-breakdown .st-income-bonus b { color:#7ee3a1; }
+.st-total-divider { height:1px; background:rgba(255,255,255,.11); margin:14px 0 4px; }
+.st-gross-total { font-weight:800; }
+.st-gross-total b { color:#e6c16b; direction:ltr; white-space:nowrap; }
+.st-cost-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:18px; padding:12px 12px; border-radius:12px; background:rgba(248,113,113,.08); border:1px solid rgba(248,113,113,.18); color:#f1c1c1; font-size:13px; }
+.st-cost-heading strong { color:#ff9e9e; direction:ltr; white-space:nowrap; }
+.st-upkeep-list { padding:4px 2px 0; }
+.st-cost-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.055); }
+.st-cost-row:last-child { border-bottom:0; }
+.st-cost-row > span { display:flex; align-items:center; gap:9px; min-width:0; }
+.st-cost-row i { font-style:normal; width:32px; height:32px; display:grid; place-items:center; flex:none; border-radius:10px; background:rgba(255,255,255,.05); }
+.st-cost-row b,.st-cost-row small { display:block; }
+.st-cost-row b { font-size:12px; color:#e0e4ec; font-weight:700; }
+.st-cost-row small { font-size:10px; color:#8892a3; margin-top:2px; }
+.st-cost-row strong { color:#f59b9b; white-space:nowrap; direction:ltr; font-size:12px; }
+.st-no-costs { color:#8993a4; font-size:12px; padding:10px 2px; }
+.st-net-panel { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:14px; padding:16px 14px; border-radius:16px; background:linear-gradient(120deg,rgba(74,222,128,.11),rgba(74,222,128,.035)); border:1px solid rgba(74,222,128,.22); }
+.st-net-panel strong { display:block; font-size:24px; font-weight:900; direction:ltr; }
+.st-net-panel .is-positive { color:#6ee7a0; }
+.st-net-panel .is-negative { color:#ff8e8e; }
+.st-net-panel > span { color:#b8c1cc; font-size:11px; text-align:left; }
+.st-finance-note { font-size:11px; line-height:1.9; margin-top:12px; }
+
+/* ===== راهنمای رتبه‌بندی در پنجرهٔ علامت سؤال ===== */
+.rk-help { width:30px; height:30px; flex:none; border-radius:50%; border:1px solid rgba(var(--brand-rgb),.55); background:rgba(var(--brand-rgb),.09); color:var(--brand); font:800 15px Vazirmatn,Tahoma,sans-serif; }
+.rk-help:active { transform:scale(.94); }
+.rk-help-overlay { z-index:650; }
+.rk-help-sheet-box { width:min(560px,100%); max-height:86vh; display:flex; flex-direction:column; overflow:hidden; border-radius:24px; border:1px solid rgba(var(--brand-rgb),.3); background:linear-gradient(160deg,#191d2a,#0d111a); box-shadow:0 24px 80px rgba(0,0,0,.55); }
+.rk-help-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px; border-bottom:1px solid rgba(255,255,255,.08); }
+.rk-help-head small { color:var(--brand); font-size:11px; }
+.rk-help-head h3 { font-size:17px; line-height:1.7; }
+.rk-help-close { width:34px; height:34px; flex:none; border-radius:50%; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.04); color:#f3f4f6; font-size:22px; }
+.rk-help-content { overflow:auto; padding:16px; }
+.rk-help-lead { color:#bbc4d2; font-size:13px; margin-bottom:10px; }
+.rk-weight-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:18px; }
+.rk-weight-grid span { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 11px; border:1px solid rgba(var(--brand-rgb),.16); border-radius:12px; background:rgba(255,255,255,.025); color:#dce1ea; font-size:12px; }
+.rk-weight-grid b { color:var(--brand); white-space:nowrap; }
+.rk-help-section { padding:13px 0; border-top:1px solid rgba(255,255,255,.075); }
+.rk-help-section h4 { color:#f3d17f; font-size:13px; margin-bottom:5px; }
+.rk-help-section p { color:#aeb8c8; font-size:12px; line-height:2; }
+
+/* ===== کارت‌های مدرن برای «وام‌های من» و «دفتر دنیا» ===== */
+#loan .ln-head { padding:10px 16px 8px; }
+#loan .ln-head h2 { letter-spacing:.1px; }
+#loan .ln-tabs { padding-top:8px; }
+#loan .ln-tab { transition:background .18s,border-color .18s,transform .18s; }
+#loan .ln-tab:active { transform:scale(.98); }
+#loan .ln-panel { padding-left:12px; padding-right:12px; }
+#loan .ln-card { padding:14px; background:linear-gradient(160deg,rgba(23,28,42,.97),rgba(12,16,26,.96)); border-color:rgba(180,190,220,.14); box-shadow:0 10px 30px rgba(0,0,0,.16); }
+#loan .ln-card-title { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-bottom:13px; margin-bottom:13px; font-size:15px; border-bottom-color:rgba(255,255,255,.09); }
+#loan .ln-card-title small { padding:4px 8px; border-radius:8px; background:rgba(var(--brand-rgb),.1); color:#e6c46f; font-size:10px; white-space:nowrap; }
+.ln-book-intro { color:#929caf; font-size:11px; line-height:1.8; margin:-4px 0 12px; }
+.ln-list { display:flex; flex-direction:column; gap:12px; }
+.ln-item { display:block; padding:14px; border:1px solid rgba(183,193,215,.13); border-radius:18px; background:linear-gradient(155deg,rgba(255,255,255,.035),rgba(255,255,255,.012)); box-shadow:0 7px 20px rgba(0,0,0,.12); }
+.ln-item.active { border-color:rgba(var(--brand-rgb),.3); }
+.ln-item.overdue { border-color:rgba(248,113,113,.35); }
+.ln-item.settled { border-color:rgba(74,222,128,.22); }
+.ln-item-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:13px; }
+.ln-amount-block small { display:block; color:#8f99aa; font-size:10px; margin-bottom:4px; }
+.ln-amt { display:block; min-width:0; font-size:21px; font-weight:900; color:#f2d17e; letter-spacing:.1px; }
+.ln-st { display:inline-flex; align-items:center; justify-content:center; padding:5px 9px; border-radius:9px; background:rgba(255,255,255,.05); font-size:10px; white-space:nowrap; }
+.ln-st.pending { color:#edcf7d; background:rgba(227,176,75,.1); }
+.ln-st.active { color:#7ddfaa; background:rgba(74,222,128,.1); }
+.ln-st.overdue,.ln-st.declined { color:#ff9b9b; background:rgba(248,113,113,.1); }
+.ln-st.settled { color:#7de4ab; background:rgba(74,222,128,.09); }
+.ln-route-card { display:grid; grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr); align-items:center; gap:5px; padding:11px 9px; border-radius:13px; background:rgba(4,7,13,.35); border:1px solid rgba(255,255,255,.045); }
+.ln-party { min-width:0; }
+.ln-party small { display:block; font-size:9px; color:#7f899b; margin-bottom:5px; }
+.ln-party strong { display:flex; align-items:center; gap:5px; font-size:12px; color:#e5e9f1; overflow-wrap:anywhere; line-height:1.6; }
+.ln-flag { font-size:15px; flex:none; }
+.ln-route-arrow { text-align:center; font-size:18px; color:#ddbb63; }
+.ln-facts-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; margin-top:10px; }
+.ln-facts-grid > div { min-width:0; padding:9px 8px; border-radius:11px; border:1px solid rgba(255,255,255,.055); background:rgba(255,255,255,.025); }
+.ln-facts-grid small { display:block; font-size:9px; line-height:1.5; color:#8993a5; margin-bottom:5px; }
+.ln-facts-grid b { display:block; font-size:11px; color:#dce1ea; line-height:1.7; overflow-wrap:anywhere; }
+.ln-balance-row,.ln-due-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; padding:9px 2px 0; border-top:1px solid rgba(255,255,255,.05); font-size:11px; color:#9ea8b8; }
+.ln-balance-row b { color:#ffaeae; direction:ltr; white-space:nowrap; }
+.ln-due-row b { color:#e5d7b4; font-size:10px; direction:ltr; text-align:left; }
+.ln-item-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:5px 10px; margin-top:12px; font-size:9px; color:#7f8999; }
+.ln-early-note { margin-top:10px; color:#80dba4; font-size:10px; }
+.ln-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:13px; padding-top:12px; border-top:1px solid rgba(255,255,255,.06); }
+.ln-btn { flex:1 1 auto; padding:10px 12px; border-radius:11px; font-size:11px; }
+.ln-btn.ok { background:linear-gradient(135deg,#ecc86b,#c99c38); border-color:rgba(255,220,130,.35); }
+.ln-btn.no { background:rgba(248,113,113,.055); }
+.ln-debt { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 14px; border-radius:14px; padding:13px; font-size:12px; }
+.ln-debt b { font-size:15px; direction:ltr; white-space:nowrap; }
+.ln-empty { display:flex; flex-direction:column; align-items:center; gap:6px; padding:34px 12px; }
+.ln-empty > span { font-size:27px; margin-bottom:4px; }
+.ln-empty b { color:#e4e8ef; font-size:13px; }
+.ln-empty small { color:#808b9e; font-size:10px; text-align:center; line-height:1.8; }
+@media(max-width:370px) { .ln-facts-grid { gap:5px; } .ln-facts-grid > div { padding:8px 6px; } .ln-facts-grid b { font-size:10px; } .ln-amt { font-size:18px; } .ln-party strong { font-size:11px; } }
