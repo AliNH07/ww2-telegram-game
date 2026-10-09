@@ -2350,26 +2350,6 @@ input, textarea, button { -webkit-touch-callout:none; }
 /* دکمهٔ خانه فقط چند پیکسل برجسته‌تر از قبل باشد. */
 :root { --nav-home-lift: 16px; }
 
-/* هدر با اسکرول به پایین نرم محو می‌شود و در اسکرول رو به بالا برمی‌گردد. */
-#game .game-header {
-    border-bottom: 0 !important;
-    box-shadow: none !important;
-    overflow: hidden;
-    transition: height .2s ease, min-height .2s ease, margin .2s ease, padding .2s ease, opacity .16s ease;
-}
-#game.header-collapsed .game-header {
-    height: 0 !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    opacity: 0;
-    pointer-events: none;
-}
-#game.header-collapsed .game-page {
-    height: calc(100vh - var(--nav-h) - env(safe-area-inset-bottom));
-}
-
 /* اعلان‌ها: پاک کردن اعلان‌ها، مستقل از فهرست اخبار */
 .notif-head-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .notif-clear-all {
@@ -2450,3 +2430,59 @@ input, textarea, button { -webkit-touch-callout:none; }
     .ann-timer { min-height: 32px; padding: 6px 8px; font-size: 9.5px; }
     .ann-help-button { width: 30px; height: 30px; flex-basis: 30px; }
 }
+
+
+/* ==================== رفتار نهایی هدر: اسکرول طبیعی، بدون محو شدن ناگهانی ==================== */
+#game:not(.booting) { overflow: hidden; }
+#game:not(.booting) .game-header {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 20;
+    overflow: visible;
+    transform: translate3d(0, 0, 0);
+    transition: none !important;
+    will-change: transform;
+}
+#game:not(.booting) .game-page {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+    left: 0;
+    width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 94px 15px 110px;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+}
+#game.booting .game-header {
+    position: relative;
+    transform: none !important;
+    transition: none !important;
+}
+/* پیش‌نمایش آمار رفاه مستقیماً در تب رفاه زیرساخت */
+.infra-welfare-summary {
+    margin: 0 0 14px;
+    padding: 14px;
+    border-radius: 15px;
+    border: 1px solid rgba(var(--brand-rgb), .2);
+    background: linear-gradient(145deg, rgba(20, 30, 39, .96), rgba(11, 15, 23, .96));
+    box-shadow: 0 8px 20px rgba(0, 0, 0, .18);
+}
+.iws-loading { color: #a0a8b3; font-size: 11px; line-height: 1.8; text-align: center; padding: 6px 0; }
+.iws-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.iws-head strong:first-child { color: #f3d589; font-size: 12px; }
+.iws-head p { color: #9ca8b7; font-size: 10px; line-height: 1.7; margin-top: 4px; }
+.iws-total { flex: 0 0 auto; color: #6ee7a0; font-size: 18px; white-space: nowrap; }
+.iws-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 12px; }
+.iws-metrics > div { display: flex; flex-direction: column; gap: 5px; padding: 9px; min-width: 0; border-radius: 10px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.045); }
+.iws-metrics span { color: #9ca8b7; font-size: 10px; }
+.iws-metrics b { color: #dce6ee; font-size: 12px; overflow-wrap: anywhere; }
+.iws-metrics .iws-penalty { color: #fca5a5; }
+.iws-details-button { width: 100%; margin-top: 11px; padding: 10px 12px; border-radius: 10px; background: rgba(var(--brand-rgb), .1); border: 1px solid rgba(var(--brand-rgb), .26); color: #f3d589; font: inherit; font-size: 11px; font-weight: 700; text-align: center; }
+.iws-details-button:active { background: rgba(var(--brand-rgb), .18); transform: scale(.99); }
