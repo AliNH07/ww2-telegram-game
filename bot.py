@@ -635,8 +635,12 @@ def compute_rates(player):
     manpower_production = BASE_MANPOWER_PRODUCTION
     resource_production = {k: 0 for k in RESOURCE_NAMES}
     resource_consumption = {k: 0 for k in RESOURCE_NAMES}
-    income = BASE_DAILY_INCOME
+    base_income = BASE_DAILY_INCOME
+    income = base_income
     eco_income = 0
+    map_income = 0
+    strait_income = 0
+    occupation_income = 0
     upkeep = 0
 
     for item_id, item in INFRASTRUCTURE.items():
@@ -653,8 +657,9 @@ def compute_rates(player):
     for item_id, item in ECONOMY.items():
         lv = get_infra_level(player, item_id)
         if lv > 0: eco_income += item["levels"][lv - 1]["income"]
+    # درآمد ساختمان‌های اقتصادی ابتدا بدون پاداش رفاه جمع می‌شود.
+    income += eco_income
     wb = welfare_bonus(player)
-    income += eco_income * (1 + wb / 100.0)
 
     country = player.get("country")
 
@@ -664,7 +669,9 @@ def compute_rates(player):
         res = MAP_RESOURCES.get(key)
         if not res: continue
         if res["type"] == "oil":
-            income += res["production"] // 10
+            gain = res["production"] // 10
+            income += gain
+            map_income += gain
             resource_production["oil"] += res["production"] // 5
         elif res["type"] == "food":    resource_production["food"]    += res["production"] // 5
         elif res["type"] == "steel":   resource_production["steel"]   += res["production"] // 5
@@ -673,11 +680,19 @@ def compute_rates(player):
     for key, owner in strait_holdings.items():
         if owner != country: continue
         s = STRAITS_DATA.get(key)
-        if s: income += s["income"]
+        if s:
+            income += s["income"]
+            strait_income += s["income"]
 
     for target_country, occupier in occupied_countries.items():
         if occupier == country:
             income += 500_000
+            occupation_income += 500_000
+
+    # پاداش رفاه روی درآمد کل روزانه اعمال می‌شود تا در خزانه و آمار روزانه دیده شود.
+    income_before_welfare = income
+    welfare_extra_income = income_before_welfare * wb / 100.0
+    income += welfare_extra_income
 
     # ----- اثر فصل روی غذا/نفت -----
     season = get_game_time(player)["season"]
@@ -695,7 +710,12 @@ def compute_rates(player):
         if n > 0:
             for k, a in u.get("daily", {}).items(): resource_consumption[k] += a * n
 
-    return {"gross_income": income, "net_income": income - upkeep, "daily_upkeep": upkeep,
+    return {"gross_income": income, "income_before_welfare": income_before_welfare,
+            "base_income": base_income, "economy_income": eco_income,
+            "map_income": map_income, "strait_income": strait_income,
+            "occupation_income": occupation_income,
+            "welfare_extra_income": welfare_extra_income,
+            "net_income": income - upkeep, "daily_upkeep": upkeep,
             "power_capacity": power_capacity, "power_consumption": power_consumption,
             "manpower_production": manpower_production,
             "resource_production": resource_production,
@@ -2925,22 +2945,37 @@ async def get_stats(request):
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
     p = _me(uid); cid = p.get("country")
     if not cid: return web.json_response({"error": "no_country"}, status=400)
-    accrue_player(p)
+    rates = compute_rates(p)
     gross, pen = welfare_gross(p), welfare_penalty_now(p)
     bonus = max(0.0, gross - pen)
-    eco_base = 0
-    for item_id, item in ECONOMY.items():
-        lv = get_infra_level(p, item_id)
-        if lv > 0: eco_base += item["levels"][lv - 1]["income"]
+    eco_base = rates["economy_income"]
     blds = []
     for bid, item in INFRASTRUCTURE.items():
         if item.get("group") != "welfare": continue
         blds.append({"id": bid, "name": item["name"], "icon": item["icon"],
                      "level": min(get_infra_level(p, bid), len(item["levels"])), "max_level": len(item["levels"])})
+    upkeep_items = []
+    group_titles = {"power": "برق", "manpower": "نیروی انسانی", "resource": "منابع", "land": "نیروی زمینی",
+                    "naval": "نیروی دریایی", "air": "نیروی هوایی", "missile": "موشکی", "strategy": "استراتژیک", "welfare": "رفاه و امنیت"}
+    for bid, item in INFRASTRUCTURE.items():
+        lv = min(get_infra_level(p, bid), len(item["levels"]))
+        if lv <= 0: continue
+        cost = infra_upkeep(item, lv)
+        if cost <= 0: continue
+        upkeep_items.append({"id": bid, "name": item["name"], "icon": item.get("icon", "🏗️"),
+                             "group": group_titles.get(item.get("group"), "زیرساخت"), "amount": cost})
+    upkeep_items.sort(key=lambda x: x["amount"], reverse=True)
     return web.json_response({
         "now": utcnow().isoformat(), "bonus": round(bonus, 1), "gross": round(gross, 1),
         "penalty": round(min(pen, gross), 1), "max": WELFARE_MAX, "eco_base": eco_base,
-        "extra_income": int(eco_base * bonus / 100), "buildings": blds,
+        "extra_income": int(round(rates["welfare_extra_income"])), "buildings": blds,
+        "income_base": rates["base_income"], "income_economy": rates["economy_income"],
+        "income_map": rates["map_income"], "income_straits": rates["strait_income"],
+        "income_occupation": rates["occupation_income"],
+        "income_before_welfare": rates["income_before_welfare"],
+        "welfare_extra_income": rates["welfare_extra_income"],
+        "total_income": rates["gross_income"], "daily_upkeep": rates["daily_upkeep"],
+        "net_income": rates["net_income"], "upkeep_items": upkeep_items,
         "risks": [WELFARE_EVENTS[k]["name"] for k in COUNTRY_RISKS.get(cid, [])],
         "events": list(reversed(p.get("welfare_events", [])))[:20]})
 
