@@ -19,6 +19,12 @@ let worldData = null;
 let statsInterval = null;
 let currentPMTarget = null;
 let currentArmyTab = "land";
+let pmCountrySearch = "";
+let newsItemsCache = [];
+let currentNewsFilter = "all";
+let unionChatId = null;
+let unionChatSignature = "";
+let unionDataCache = null;
 
 const COUNTRY_IMAGE_EXT = { germany: "jpg", britain: "jfif", ussr: "jfif", usa: "jfif",
     france: "jfif", italy: "jfif", china: "jfif", japan: "jfif" };
@@ -2167,7 +2173,7 @@ document.querySelectorAll(".nav-item").forEach(item => {
         item.classList.add("active");
         if (page === "home") { updateHomeStats(); refreshNotificationBadge(); }
         else if (page === "map") setTimeout(() => initWorldMap(), 30);
-        else if (page === "communications") { loadAnnouncements(); loadUnion(); loadNews(); refreshNotificationBadge(); }
+        else if (page === "communications") { resetNewsFilter(); loadAnnouncements(); loadUnion(); loadNews(); refreshNotificationBadge(); }
         else if (page === "market") { loadMarketListings(); loadMyListings(); }
     });
 });
@@ -2185,7 +2191,7 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
         if (panel) panel.classList.remove("hidden");
         if (tid === "comm-announcements") loadAnnouncements();
         else if (tid === "comm-unions") loadUnion();
-        else if (tid === "comm-news") loadNews();
+        else if (tid === "comm-news") { resetNewsFilter(); loadNews(); }
         else if (tid === "comm-contacts") openPmHome();
     });
 });
@@ -2270,143 +2276,359 @@ function escapeHtml(s) {
 }
 
 /* =========================================================
-   Unions
+   Unions — فهرست عمومی و چت تمام‌صفحه
 ========================================================= */
+function unionErrorText(error) {
+    return ({
+        already_member: "شما عضو یک اتحادیه هستید.", in_other: "این کشور عضو اتحادیهٔ دیگری است.",
+        not_leader: "فقط مالک اتحادیه می‌تواند این کار را انجام دهد.", no_union: "اتحادیه پیدا نشد.",
+        no_request: "درخواست عضویت پیدا نشد.", no_invite: "دعوت پیدا نشد.",
+        cannot_kick_self: "مالک نمی‌تواند خودش را اخراج کند. برای انحلال از اتحادیه خارج شوید."
+    })[error] || "انجام عملیات ممکن نشد.";
+}
+
+function unionMemberNames(members) {
+    return (members || []).map(cid => `${flagInline(cid, true)} <span>${escapeHtml(COUNTRY_NAMES[cid] || cid)}</span>`).join("");
+}
+
 async function loadUnion() {
     const c = document.getElementById("union-content");
-    c.innerHTML = "";
+    if (!c) return;
+    c.innerHTML = `<div class="diplomacy-item-empty">در حال دریافت اتحادیه‌ها...</div>`;
     try {
         const d = await apiGet("/api/union");
-        if (!d.union) {
-            c.innerHTML = `
-                <div class="ann-form">
-                    <input id="union-name" class="diplomacy-input" placeholder="نام اتحادیه..." maxlength="40">
-                    <button id="union-create" class="diplomacy-submit">ساخت اتحادیه</button>
-                </div>`;
-            document.getElementById("union-create").onclick = async () => {
-                const name = document.getElementById("union-name").value.trim();
-                if (!name) return;
-                const r = await apiPost("/api/union/create", { name });
-                if (!r.success) { showToast("خطا"); return; }
-                showToast("اتحادیه ساخته شد."); loadUnion();
-            };
+        unionDataCache = d;
+        renderUnionBrowser(d);
+    } catch (e) {
+        console.error(e);
+        c.innerHTML = `<div class="diplomacy-item-empty">فهرست اتحادیه‌ها در دسترس نیست.</div>`;
+    }
+}
 
-            if (d.invites?.length) {
-                const invBox = document.createElement("div");
-                invBox.style.marginTop = "14px";
-                invBox.innerHTML = `<div class="diplomacy-list-title">دعوت‌ها</div>`;
-                d.invites.forEach(inv => {
-                    const row = document.createElement("div");
-                    row.className = "diplomacy-item";
-                    row.innerHTML = `<span>${inv.name} از ${flagInline(inv.leader, true)} ${COUNTRY_NAMES[inv.leader]}</span>
-                        <span>
-                            <button class="message-button" data-invite-accept="${inv.union_id}" style="background:rgba(74,222,128,.15);color:#4ade80;">قبول</button>
-                            <button class="message-button" data-invite-reject="${inv.union_id}">رد</button>
-                        </span>`;
-                    invBox.appendChild(row);
-                });
-                c.appendChild(invBox);
-                invBox.querySelectorAll("[data-invite-accept]").forEach(b => b.onclick = () => respondInvite(b.dataset.inviteAccept, true));
-                invBox.querySelectorAll("[data-invite-reject]").forEach(b => b.onclick = () => respondInvite(b.dataset.inviteReject, false));
-            }
+function renderUnionBrowser(d) {
+    const c = document.getElementById("union-content");
+    if (!c) return;
+    const mine = d.union || null;
+    const unions = d.unions || [];
+    const requested = new Set(d.requested_union_ids || []);
+    const invited = new Map((d.invites || []).map(x => [x.union_id, x]));
+    c.innerHTML = "";
+
+    if (!mine) {
+        const create = document.createElement("div");
+        create.className = "ann-form union-create-form";
+        create.innerHTML = `<div class="union-section-heading">ساخت اتحادیهٔ جدید</div>
+            <input id="union-name" class="diplomacy-input" placeholder="نام اتحادیه..." maxlength="40">
+            <button id="union-create" class="diplomacy-submit">ساخت اتحادیه</button>`;
+        c.appendChild(create);
+        document.getElementById("union-create").onclick = async () => {
+            const name = document.getElementById("union-name").value.trim();
+            if (!name) { showToast("نام اتحادیه را وارد کنید."); return; }
+            const r = await apiPost("/api/union/create", { name });
+            if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+            showToast("اتحادیه ساخته شد.", "success");
+            await loadUnion();
+            await openUnionChat(r.union_id);
+        };
+    } else {
+        const note = document.createElement("div");
+        note.className = "union-own-note";
+        note.textContent = `شما عضو «${mine.name}» هستید. برای ورود به گفت‌وگو، اتحادیهٔ خودتان را از فهرست انتخاب کنید.`;
+        c.appendChild(note);
+    }
+
+    if (d.invites?.length) {
+        const invites = document.createElement("div");
+        invites.className = "union-invites-block";
+        invites.innerHTML = `<div class="union-section-heading">دعوت‌های دریافتی</div>`;
+        d.invites.forEach(inv => {
+            const row = document.createElement("div");
+            row.className = "union-invite-row";
+            row.innerHTML = `<div><strong>${escapeHtml(inv.name)}</strong><small>دعوت از ${escapeHtml(COUNTRY_NAMES[inv.leader] || inv.leader)}</small></div>
+                <div class="union-inline-actions"><button class="union-action accept" data-invite-accept="${escapeHtml(inv.union_id)}">پذیرفتن</button>
+                <button class="union-action reject" data-invite-reject="${escapeHtml(inv.union_id)}">رد</button></div>`;
+            invites.appendChild(row);
+        });
+        c.appendChild(invites);
+    }
+
+    const listHead = document.createElement("div");
+    listHead.className = "union-list-heading";
+    listHead.innerHTML = `<div><h3>اتحادیه‌های جهان</h3><p>نام و اعضا عمومی است؛ پیام‌های داخل اتحادیه فقط برای اعضاست.</p></div><span>${formatNumber(unions.length)} اتحادیه</span>`;
+    c.appendChild(listHead);
+
+    const list = document.createElement("div");
+    list.className = "union-public-list";
+    if (!unions.length) list.innerHTML = `<div class="diplomacy-item-empty">هنوز اتحادیه‌ای ساخته نشده است.</div>`;
+    unions.forEach(u => {
+        const isMine = !!mine && mine.id === u.id;
+        const hasUnion = !!mine;
+        const requestPending = requested.has(u.id);
+        const hasInvite = invited.has(u.id);
+        const card = document.createElement("article");
+        card.className = "union-public-card" + (isMine ? " is-my-union" : "");
+        const members = u.members || [];
+        const actionHtml = isMine
+            ? `<button class="union-action primary" data-enter-union="${escapeHtml(u.id)}">ورود به اتحادیه <span>←</span></button>`
+            : hasUnion
+                ? `<button class="union-action" disabled>عضو اتحادیهٔ دیگری هستید</button>`
+                : hasInvite
+                    ? `<button class="union-action primary" data-invite-accept="${escapeHtml(u.id)}">پذیرفتن دعوت</button>`
+                    : requestPending
+                        ? `<button class="union-action" disabled>درخواست ارسال شده</button>`
+                        : `<button class="union-action primary" data-union-request="${escapeHtml(u.id)}">درخواست عضویت</button>`;
+        card.innerHTML = `<div class="union-public-head"><div class="union-public-title-wrap"><h4>${escapeHtml(u.name || "اتحادیه")}</h4>
+                <small>👑 مالک: ${escapeHtml(COUNTRY_NAMES[u.leader_country] || u.leader_country || "نامشخص")}</small></div>
+                <span class="union-member-count">👥 ${formatNumber(members.length)} عضو</span></div>
+            <div class="union-member-preview">${unionMemberNames(members) || '<span class="union-no-members">بدون عضو</span>'}</div>
+            <div class="union-public-footer">${actionHtml}</div>`;
+        list.appendChild(card);
+    });
+    c.appendChild(list);
+
+    c.querySelectorAll("[data-enter-union]").forEach(b => b.onclick = () => openUnionChat(b.dataset.enterUnion));
+    c.querySelectorAll("[data-union-request]").forEach(b => b.onclick = async () => {
+        b.disabled = true;
+        const r = await apiPost("/api/union/request", { union_id: b.dataset.unionRequest });
+        if (!r.success) showToast(unionErrorText(r.error), "error");
+        else showToast("درخواست عضویت برای مالک اتحادیه فرستاده شد.", "success");
+        await loadUnion();
+    });
+    c.querySelectorAll("[data-invite-accept]").forEach(b => b.onclick = async () => respondInvite(b.dataset.inviteAccept, true));
+    c.querySelectorAll("[data-invite-reject]").forEach(b => b.onclick = async () => respondInvite(b.dataset.inviteReject, false));
+}
+
+async function respondInvite(uId, accept) {
+    const r = await apiPost("/api/union/respond", { union_id: uId, accept });
+    if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+    showToast(accept ? "عضویت در اتحادیه انجام شد." : "دعوت رد شد.", "success");
+    await loadUnion();
+    if (accept) await openUnionChat(uId);
+}
+
+async function openUnionChat(unionId) {
+    const d = await apiGet("/api/union");
+    unionDataCache = d;
+    if (!d.union || (unionId && d.union.id !== unionId)) {
+        showToast("فقط اعضای اتحادیه می‌توانند وارد چت شوند.", "error");
+        await loadUnion();
+        return;
+    }
+    unionChatId = d.union.id;
+    unionChatSignature = "";
+    renderUnionChat(d.union, true);
+    document.getElementById("union-conversation").classList.remove("hidden");
+}
+
+function renderUnionChat(u, forceScroll = false) {
+    if (!u) return;
+    document.getElementById("union-chat-name").textContent = u.name || "اتحادیه";
+    document.getElementById("union-chat-count").textContent = `${formatNumber((u.members || []).length)} عضو`;
+    const messages = u.messages || [];
+    const sig = `${messages.length}|${messages.length ? messages[messages.length - 1].at + messages[messages.length - 1].text : ""}`;
+    const box = document.getElementById("union-chat-messages");
+    if (!forceScroll && sig === unionChatSignature) return;
+    const wasNearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 90;
+    unionChatSignature = sig;
+    box.innerHTML = "";
+    if (!messages.length) {
+        box.innerHTML = `<div class="union-chat-empty">هنوز پیامی در اتحادیه نیست. اولین پیام را بفرستید.</div>`;
+        return;
+    }
+    messages.forEach(m => {
+        const mine = m.from_country === selectedCountry;
+        const row = document.createElement("div");
+        row.className = `union-msg-row ${mine ? "mine" : "other"}`;
+        const meta = document.createElement("div");
+        meta.className = "union-msg-meta";
+        meta.innerHTML = `${flagInline(m.from_country, true)} <span>${escapeHtml(COUNTRY_NAMES[m.from_country] || m.from_country)}</span><time>${escapeHtml(formatNewsTime(m.at))}</time>`;
+        const bubble = document.createElement("div");
+        bubble.className = "union-msg-bubble";
+        bubble.textContent = m.text || "";
+        row.appendChild(meta); row.appendChild(bubble); box.appendChild(row);
+    });
+    if (forceScroll || wasNearBottom) box.scrollTop = box.scrollHeight;
+}
+
+async function refreshUnionChat() {
+    if (!unionChatId || document.getElementById("union-conversation").classList.contains("hidden")) return;
+    try {
+        const d = await apiGet("/api/union");
+        unionDataCache = d;
+        if (!d.union || d.union.id !== unionChatId) {
+            closeUnionChat();
+            showToast("عضویت شما در این اتحادیه دیگر فعال نیست.", "error");
+            await loadUnion();
             return;
         }
-
-        const u = d.union;
-        const isLeader = d.is_leader;
-        const header = document.createElement("div");
-        header.className = "infra-card";
-        header.innerHTML = `
-            <div class="infra-card-top">
-                <span class="infra-card-name">${u.name}</span>
-                <span class="infra-card-level">${u.members.length} عضو</span>
-            </div>
-            <div class="infra-card-detail">
-                اعضا: ${u.members.map(m => flagInline(m, true) + " " + COUNTRY_NAMES[m]).join(" • ")}
-            </div>`;
-        c.appendChild(header);
-
-        if (isLeader) {
-            const invForm = document.createElement("div");
-            invForm.className = "ann-form";
-            invForm.innerHTML = `
-                <label class="diplomacy-label">دعوت کشور</label>
-                <select id="invite-target" class="diplomacy-select">
-                    ${Object.keys(COUNTRY_NAMES).filter(cid => !u.members.includes(cid) && cid !== selectedCountry)
-                        .map(cid => `<option value="${cid}">${COUNTRY_NAMES[cid]}</option>`).join("")}
-                </select>
-                <button id="invite-submit" class="diplomacy-submit">ارسال دعوت</button>`;
-            c.appendChild(invForm);
-            document.getElementById("invite-submit").onclick = async () => {
-                const target = document.getElementById("invite-target").value;
-                const r = await apiPost("/api/union/invite", { union_id: u.id, target });
-                if (!r.success) { showToast("خطا"); return; }
-                showToast("دعوت ارسال شد.");
-            };
-        }
-
-        const msgTitle = document.createElement("div");
-        msgTitle.className = "diplomacy-list-title";
-        msgTitle.textContent = "پیام‌های اتحادیه";
-        c.appendChild(msgTitle);
-
-        const msgBox = document.createElement("div");
-        msgBox.className = "ann-list";
-        u.messages?.forEach(m => {
-            const d2 = document.createElement("div");
-            d2.className = "ann-card";
-            d2.innerHTML = `<div class="ann-header">
-                <span class="ann-flag">${flagInline(m.from_country, true)}</span>
-                <span class="ann-name">${COUNTRY_NAMES[m.from_country]}</span>
-            </div><div class="ann-text">${escapeHtml(m.text)}</div>`;
-            msgBox.appendChild(d2);
-        });
-        c.appendChild(msgBox);
-
-        const inp = document.createElement("div");
-        inp.className = "ann-form";
-        inp.innerHTML = `
-            <textarea id="union-msg" class="ann-input" maxlength="500" placeholder="پیام به اتحادیه..."></textarea>
-            <button id="union-msg-send" class="ann-submit">ارسال</button>
-            <button id="union-leave" class="diplomacy-submit" style="background:#6a2b2b;color:#fff;">خروج از اتحادیه</button>`;
-        c.appendChild(inp);
-        document.getElementById("union-msg-send").onclick = async () => {
-            const text = document.getElementById("union-msg").value.trim();
-            if (!text) return;
-            await apiPost("/api/union/message", { text });
-            loadUnion();
-        };
-        document.getElementById("union-leave").onclick = async () => {
-            if (!(await gameConfirm("از اتحادیه خارج می‌شوید؟", { title: "خروج از اتحادیه", ok: "خروج", danger: true }))) return;
-            await apiPost("/api/union/leave", {});
-            loadUnion();
-        };
+        renderUnionChat(d.union);
     } catch (e) { console.error(e); }
 }
 
-async function respondInvite(u_id, accept) {
-    await apiPost("/api/union/respond", { union_id: u_id, accept });
+function closeUnionChat() {
+    document.getElementById("union-conversation")?.classList.add("hidden");
+    document.querySelector(".union-members-overlay")?.remove();
+    unionChatId = null;
+    unionChatSignature = "";
     loadUnion();
+}
+document.getElementById("union-chat-back")?.addEventListener("click", closeUnionChat);
+document.getElementById("union-chat-title")?.addEventListener("click", openUnionMembers);
+document.getElementById("union-chat-members")?.addEventListener("click", openUnionMembers);
+
+async function sendUnionChatMessage() {
+    const input = document.getElementById("union-chat-input");
+    const text = input.value.trim();
+    if (!text || !unionChatId) return;
+    input.value = "";
+    const r = await apiPost("/api/union/message", { text });
+    if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+    await refreshUnionChat();
+}
+document.getElementById("union-chat-send")?.addEventListener("click", sendUnionChatMessage);
+document.getElementById("union-chat-input")?.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendUnionChatMessage(); }
+});
+
+async function openUnionMembers() {
+    if (!unionChatId) return;
+    const d = await apiGet("/api/union");
+    unionDataCache = d;
+    const u = d.union;
+    if (!u || u.id !== unionChatId) return;
+    const isLeader = !!d.is_leader;
+    document.querySelector(".union-members-overlay")?.remove();
+    const ov = document.createElement("div");
+    ov.className = "modal-overlay union-members-overlay";
+    ov.innerHTML = `<div class="modal-box union-manage-box">
+        <div class="union-modal-head"><div><div class="modal-title">${escapeHtml(u.name)}</div><small>${formatNumber((u.members || []).length)} عضو</small></div><button class="union-modal-close" aria-label="بستن">✕</button></div>
+        <div class="union-section-heading">اعضای اتحادیه</div><div class="union-manage-list" id="union-manage-members"></div>
+        ${isLeader ? `<div class="union-section-heading">درخواست‌های عضویت</div><div class="union-manage-list" id="union-manage-requests"></div>
+            <div class="union-section-heading">دعوت عضو جدید</div><div class="union-invite-form"><select id="union-invite-target" class="diplomacy-select"></select><button id="union-invite-submit" class="union-action primary">دعوت</button></div>` : ""}
+        <button id="union-leave" class="union-action danger">خروج از اتحادیه</button>
+    </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener("click", e => { if (e.target === ov) ov.remove(); });
+    ov.querySelector(".union-modal-close").onclick = () => ov.remove();
+
+    const membersBox = ov.querySelector("#union-manage-members");
+    membersBox.innerHTML = "";
+    (u.members || []).forEach(cid => {
+        const row = document.createElement("div");
+        row.className = "union-manage-row";
+        row.innerHTML = `<div class="union-manage-person">${flagInline(cid, true)}<span>${escapeHtml(COUNTRY_NAMES[cid] || cid)}</span>${cid === u.leader_country ? '<small class="union-owner-tag">مالک</small>' : ""}</div>
+            ${isLeader && cid !== u.leader_country ? `<button class="union-action reject" data-kick-member="${escapeHtml(cid)}">اخراج</button>` : ""}`;
+        membersBox.appendChild(row);
+    });
+
+    if (isLeader) {
+        const reqBox = ov.querySelector("#union-manage-requests");
+        const requests = u.join_requests || [];
+        if (!requests.length) reqBox.innerHTML = `<div class="union-empty-small">درخواست جدیدی وجود ندارد.</div>`;
+        requests.forEach(cid => {
+            const row = document.createElement("div"); row.className = "union-manage-row";
+            row.innerHTML = `<div class="union-manage-person">${flagInline(cid, true)}<span>${escapeHtml(COUNTRY_NAMES[cid] || cid)}</span></div>
+                <div class="union-inline-actions"><button class="union-action accept" data-join-response="${escapeHtml(cid)}" data-accept="true">قبول</button>
+                <button class="union-action reject" data-join-response="${escapeHtml(cid)}" data-accept="false">رد</button></div>`;
+            reqBox.appendChild(row);
+        });
+        const alreadyUsed = new Set((d.unions || []).filter(x => x.id !== u.id).flatMap(x => x.members || []));
+        const choices = Object.entries(COUNTRY_NAMES).filter(([cid]) => !(u.members || []).includes(cid) && !alreadyUsed.has(cid));
+        ov.querySelector("#union-invite-target").innerHTML = choices.length
+            ? choices.map(([cid, name]) => `<option value="${escapeHtml(cid)}">${escapeHtml(name)}</option>`).join("")
+            : `<option value="">کشوری برای دعوت باقی نمانده</option>`;
+        ov.querySelector("#union-invite-submit").disabled = !choices.length;
+        ov.querySelector("#union-invite-submit").onclick = async () => {
+            const target = ov.querySelector("#union-invite-target").value;
+            if (!target) return;
+            const r = await apiPost("/api/union/invite", { union_id: u.id, target });
+            if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+            showToast(`دعوت ${COUNTRY_NAMES[target]} ارسال شد.`, "success");
+            ov.remove(); await openUnionMembers();
+        };
+        ov.querySelectorAll("[data-kick-member]").forEach(b => b.onclick = async () => {
+            const target = b.dataset.kickMember;
+            if (!(await gameConfirm(`کشور ${COUNTRY_NAMES[target]} از اتحادیه اخراج شود؟`, { title: "اخراج عضو", ok: "اخراج", danger: true }))) return;
+            const r = await apiPost("/api/union/kick", { union_id: u.id, target });
+            if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+            showToast("عضو از اتحادیه اخراج شد.", "success"); ov.remove(); await refreshUnionChat(); await openUnionMembers();
+        });
+        ov.querySelectorAll("[data-join-response]").forEach(b => b.onclick = async () => {
+            const target = b.dataset.joinResponse, accept = b.dataset.accept === "true";
+            const r = await apiPost("/api/union/request/respond", { union_id: u.id, target, accept });
+            if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+            showToast(accept ? `${COUNTRY_NAMES[target]} به اتحادیه پیوست.` : "درخواست رد شد.", "success");
+            ov.remove(); await refreshUnionChat(); await openUnionMembers();
+        });
+    }
+    ov.querySelector("#union-leave").onclick = async () => {
+        const message = isLeader ? "با خروج مالک، اتحادیه منحل می‌شود. ادامه می‌دهید؟" : "از اتحادیه خارج می‌شوید؟";
+        if (!(await gameConfirm(message, { title: "خروج از اتحادیه", ok: "خروج", danger: true }))) return;
+        const r = await apiPost("/api/union/leave", {});
+        if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+        ov.remove(); document.getElementById("union-conversation").classList.add("hidden");
+        unionChatId = null; unionChatSignature = "";
+        showToast(isLeader ? "اتحادیه منحل شد." : "از اتحادیه خارج شدید.", "success");
+        await loadUnion();
+    };
 }
 
 /* =========================================================
-   News
+   News — filters and compact cards
 ========================================================= */
+function inferNewsCategory(item) {
+    if (item.category) return item.category;
+    const source = `${item.title || ""} ${item.text || ""}`;
+    if (source.includes("اتحادیه")) return "union";
+    if (["جنگ", "نبرد", "دفاع", "حمله", "اشغال", "تلفات", "نیرو", "ارتش", "پیروزی", "شکست"].some(x => source.includes(x))) return "military";
+    if (["پیمان", "عدم تجاوز", "اتحاد", "دیپلماسی", "بیانیه", "مذاکره"].some(x => source.includes(x))) return "diplomacy";
+    if (["معامله", "تجارت", "بازار", "مرز زمینی", "حمل‌ونقل", "حمل و نقل"].some(x => source.includes(x))) return "trade";
+    if (["تصرف", "تنگه", "قلمرو", "مرز", "منطقه"].some(x => source.includes(x))) return "territory";
+    if (["وام", "درآمد", "اقتصاد", "تسویه", "غذا", "نفت", "آهن", "اورانیوم", "منبع", "منابع"].some(x => source.includes(x))) return "economy";
+    return "general";
+}
+
+function renderNewsList() {
+    const c = document.getElementById("news-list");
+    if (!c) return;
+    const list = currentNewsFilter === "all" ? newsItemsCache : newsItemsCache.filter(item => inferNewsCategory(item) === currentNewsFilter);
+    c.innerHTML = "";
+    if (!list.length) {
+        c.innerHTML = `<div class="diplomacy-item-empty">در این دسته‌بندی خبری وجود ندارد.</div>`;
+        return;
+    }
+    list.forEach(item => {
+        const div = document.createElement("article");
+        div.className = `news-item news-category-${inferNewsCategory(item)}`;
+        const categoryNames = { military: "نظامی", diplomacy: "دیپلماسی", economy: "اقتصاد", trade: "تجارت", territory: "قلمرو", union: "اتحادیه", general: "عمومی" };
+        div.innerHTML = `<div class="news-item-top"><h3>${escapeHtml(item.title || "خبر")}</h3><span class="news-category-label">${categoryNames[inferNewsCategory(item)] || "عمومی"}</span></div>
+            <p>${escapeHtml(item.text || "")}</p>${item.at ? `<time>${escapeHtml(formatNewsTime(item.at))}</time>` : ""}`;
+        c.appendChild(div);
+    });
+}
+
+document.querySelectorAll("[data-news-filter]").forEach(button => button.addEventListener("click", () => {
+    currentNewsFilter = button.dataset.newsFilter || "all";
+    document.querySelectorAll("[data-news-filter]").forEach(item => item.classList.toggle("active", item === button));
+    renderNewsList();
+}));
+
+function resetNewsFilter() {
+    currentNewsFilter = "all";
+    document.querySelectorAll("[data-news-filter]").forEach(item => item.classList.toggle("active", item.dataset.newsFilter === "all"));
+    renderNewsList();
+}
+
 async function loadNews() {
     const c = document.getElementById("news-list");
     if (!c) return;
     try {
         const news = await apiGet("/api/news");
-        c.innerHTML = "";
-        news.forEach(item => {
-            const div = document.createElement("div");
-            div.className = "news-item";
-            div.innerHTML = `<h3>${escapeHtml(item.title || "")}</h3><p>${escapeHtml(item.text || "")}</p>`;
-            c.appendChild(div);
-        });
+        newsItemsCache = Array.isArray(news) ? news : [];
+        renderNewsList();
         refreshNotificationBadge();
     } catch (e) {
-        c.innerHTML = `<div class="news-item"><h3>اخبار</h3><p>خبری نیست.</p></div>`;
+        c.innerHTML = `<div class="news-item"><h3>اخبار</h3><p>دریافت خبرها ممکن نشد.</p></div>`;
     }
 }
 
@@ -2432,6 +2654,7 @@ function setPmSub(sub) {
     document.querySelectorAll(".pm-subtab").forEach(t => t.classList.toggle("active", t.dataset.pmSub === sub));
     document.getElementById("pm-inbox").classList.toggle("hidden", sub !== "inbox");
     document.getElementById("contact-list").classList.toggle("hidden", sub !== "chat");
+    document.getElementById("contact-search-wrap")?.classList.toggle("hidden", sub !== "chat");
     if (sub === "inbox") renderPmInbox(); else renderContactList();
 }
 document.querySelectorAll(".pm-subtab").forEach(t => t.addEventListener("click", () => setPmSub(t.dataset.pmSub)));
@@ -2474,20 +2697,27 @@ function renderContactList() {
     const c = document.getElementById("contact-list");
     if (!c) return;
     c.innerHTML = "";
-    Object.keys(COUNTRY_NAMES).forEach(cid => {
-        if (cid === selectedCountry) return;
+    const q = (pmCountrySearch || "").trim().toLocaleLowerCase("fa-IR");
+    const matches = Object.entries(COUNTRY_NAMES).filter(([cid, name]) => cid !== selectedCountry &&
+        (!q || name.toLocaleLowerCase("fa-IR").includes(q) || cid.toLowerCase().includes(q)));
+    if (!matches.length) {
+        c.innerHTML = `<div class="diplomacy-item-empty">کشوری با این نام پیدا نشد.</div>`;
+        return;
+    }
+    matches.forEach(([cid, name]) => {
         const div = document.createElement("div");
         div.className = "contact-item";
-        div.innerHTML = `
-            <div class="contact-info">
-                ${flagInline(cid, true)}
-                <span class="contact-name">${COUNTRY_NAMES[cid]}</span>
-            </div>
+        div.innerHTML = `<div class="contact-info">${flagInline(cid, true)}<span class="contact-name">${escapeHtml(name)}</span></div>
             <button class="message-button" data-open-pm="${cid}">چت</button>`;
         c.appendChild(div);
     });
     c.querySelectorAll("[data-open-pm]").forEach(b => b.onclick = () => openPM(b.dataset.openPm));
 }
+
+document.getElementById("pm-country-search")?.addEventListener("input", e => {
+    pmCountrySearch = e.target.value || "";
+    renderContactList();
+});
 
 function openPM(target) {
     currentPMTarget = target;
@@ -2549,7 +2779,10 @@ async function loadPM(target, forceScroll = false) {
         if (forceScroll || nearBottom) c.scrollTop = c.scrollHeight;
     } catch (e) { console.error(e); }
 }
-setInterval(() => { if (currentPMTarget) loadPM(currentPMTarget); }, 4000);
+setInterval(() => {
+    if (currentPMTarget) loadPM(currentPMTarget);
+    if (unionChatId) refreshUnionChat();
+}, 4000);
 
 /* =========================================================
    Market — global trade
