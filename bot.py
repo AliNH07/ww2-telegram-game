@@ -1527,45 +1527,14 @@ async def get_forces(request):
                               "transits": mine, "now": utcnow().isoformat()})
 
 # ---------------- زمان سفر نیروها ----------------
-TRAVEL_KM_PER_MIN = 150     # سرعت (کیلومتر در دقیقه) روی مسیر دریایی
-TRAVEL_MIN_MINUTES = 2      # کمترین زمان سفر: ۲ دقیقه
-TRAVEL_MAX_MINUTES = 135    # بیشترین زمان سفر: ۲ ساعت و ۱۵ دقیقه
-SEA_DETOUR = 1.2            # مسیر دریایی کمی از خط مستقیم بلندتر است
+TRAVEL_KM_PER_MIN = 40      # سرعت: ۴۰ کیلومتر در دقیقه (۱۰٬۰۰۰ کیلومتر ≈ ۴ ساعت)
+TRAVEL_MIN_MINUTES = 3
+TRAVEL_MAX_MINUTES = 480
 
-# بندرهای هر کشور (نقطه‌های روی آب کنار ساحل). نیروها از نزدیک‌ترین بندر به مقصد حرکت می‌کنند، نه از وسط کشور.
-COUNTRY_PORTS = {
-    "germany": [(7.3, 54.2), (10.5, 54.7)],
-    "britain": [(-1.3, 50.2), (-1.0, 57.3)],
-    "ussr": [(33.0, 70.3), (29.2, 59.95), (33.2, 44.0), (132.0, 42.5), (159.5, 52.7)],
-    "usa": [(-73.0, 38.5), (-89.5, 28.0), (-123.5, 37.5)],
-    "france": [(-5.5, 48.2), (5.3, 42.8)],
-    "italy": [(13.5, 39.9), (17.2, 39.7)],
-    "china": [(123.3, 31.0), (114.3, 21.8), (121.5, 35.6)],
-    "japan": [(140.5, 34.3), (128.8, 33.0), (136.0, 38.0)],
-}
-
-def loc_coords(cid, loc, toward=None):
-    """مختصات یک مکان. برای «خانه» نزدیک‌ترین بندر کشور به نقطهٔ toward است."""
-    if loc == "home":
-        ports = COUNTRY_PORTS.get(cid) or [TRADE_COUNTRY_COORDS.get(cid)]
-        ports = [p for p in ports if p]
-        if not ports: return None
-        if toward is None: return ports[0]
-        return min(ports, key=lambda p: gc_km(p, toward))
+def loc_coords(cid, loc):
+    if loc == "home": return TRADE_COUNTRY_COORDS.get(cid)
     i = MAP_RESOURCES.get(loc) or STRAITS_DATA.get(loc)
     return (i["lon"], i["lat"]) if i else None
-
-def gc_km(a, b):
-    lon1, lat1, lon2, lat2 = map(math.radians, (a[0], a[1], b[0], b[1]))
-    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
-    return 6371 * 2 * math.asin(min(1, math.sqrt(h)))
-
-def route_endpoints(cid, src, dst):
-    """دو سر مسیر؛ اگر سر مسیر «خانه» باشد، بندرِ مناسب انتخاب می‌شود."""
-    other_a = loc_coords(cid, dst) if dst != "home" else None
-    other_b = loc_coords(cid, src) if src != "home" else None
-    a = loc_coords(cid, src, other_a); b = loc_coords(cid, dst, other_b)
-    return a, b
 
 def geo_interp(a, b, f):
     """نقطهٔ f (۰ تا ۱) روی کمان بین دو مختصات (lon, lat)."""
@@ -1578,10 +1547,12 @@ def geo_interp(a, b, f):
     z = A * math.sin(lat1) + B * math.sin(lat2)
     return (math.degrees(math.atan2(y, x)), math.degrees(math.atan2(z, math.hypot(x, y))))
 
-def travel_minutes(cid, src, dst):
-    pa, pb = route_endpoints(cid, src, dst)
-    if not pa or not pb: return TRAVEL_MIN_MINUTES
-    km = gc_km(pa, pb) * SEA_DETOUR
+def travel_minutes(cid, a, b):
+    ca, cb = loc_coords(cid, a), loc_coords(cid, b)
+    if not ca or not cb: return TRAVEL_MIN_MINUTES
+    lon1, lat1, lon2, lat2 = map(math.radians, (ca[0], ca[1], cb[0], cb[1]))
+    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    km = 6371 * 2 * math.asin(min(1, math.sqrt(h)))
     return max(TRAVEL_MIN_MINUTES, min(TRAVEL_MAX_MINUTES, km / TRAVEL_KM_PER_MIN))
 
 def loc_label(loc):
@@ -1609,7 +1580,7 @@ def start_transit(cid, src, dst, units, minutes, kind="go", dst_free=False, orig
     now = utcnow()
     t = {"id": str(uuid.uuid4()), "owner": cid, "from": src, "to": dst, "units": dict(units), "kind": kind,
          "dst_free": dst_free, "origin": origin or src,
-         "ra": (route_endpoints(cid, src, dst)[0] or None), "rb": (route_endpoints(cid, src, dst)[1] or None), "f0": 0.0, "f1": 1.0,
+         "from_ll": loc_coords(cid, src), "to_ll": loc_coords(cid, dst),
          "start": now.isoformat(), "arrive": (now + timedelta(minutes=minutes)).isoformat()}
     transits.append(t); return t
 
@@ -1626,9 +1597,9 @@ def _turn_back(t, now, reason=None):
     elapsed = max(0.0, (now - st).total_seconds() / 60) if st else 0.0
     cid = t["owner"]; dst_name = loc_label(t["to"])
     total = (ar - st).total_seconds() / 60 if (st and ar) else 0
-    f0, f1 = t.get("f0", 0.0), t.get("f1", 1.0)
-    cur = f0 + (f1 - f0) * (min(1.0, elapsed / total) if total > 0 else 0.0)
-    t["f0"] = cur; t["f1"] = 0.0     # از همین نقطهٔ مسیر، همان راه را برمی‌گردد
+    fr = t.get("from_ll") or loc_coords(cid, t["from"]); to = t.get("to_ll") or loc_coords(cid, t["to"])
+    here = geo_interp(fr, to, min(1.0, elapsed / total)) if (fr and to and total > 0) else fr
+    t["from_ll"] = here; t["to_ll"] = loc_coords(cid, t["origin"])
     t["kind"] = "back"; t["to"] = t["origin"]; t["from"] = "mid"; t["dst_free"] = False
     t["start"] = now.isoformat(); t["arrive"] = (now + timedelta(minutes=elapsed)).isoformat()
     back_name = loc_label(t["to"])
@@ -1776,14 +1747,10 @@ async def get_map_transits(request):
     out = []
     for t in transits:
         cid = t["owner"]
-        ra, rb = t.get("ra"), t.get("rb")
-        if not ra or not rb:
-            ra, rb = route_endpoints(cid, t["origin"], t["to"] if t["kind"] == "go" else t["from"])
-        if not ra or not rb: continue
-        go_to = t["to"]
-        out.append({"id": t["id"], "country": cid, "ra": list(ra), "rb": list(rb),
-                    "f0": t.get("f0", 0.0), "f1": t.get("f1", 1.0), "kind": t["kind"],
-                    "from_name": "میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"]), "to_name": loc_label(go_to),
+        fr = t.get("from_ll") or loc_coords(cid, t["from"]); to = t.get("to_ll") or loc_coords(cid, t["to"])
+        if not fr or not to: continue
+        out.append({"id": t["id"], "country": cid, "from_ll": list(fr), "to_ll": list(to), "kind": t["kind"],
+                    "from_name": "میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"]), "to_name": loc_label(t["to"]),
                     "start": t["start"], "arrive": t["arrive"]})
     return web.json_response({"transits": out, "now": utcnow().isoformat()})
 
