@@ -2709,7 +2709,7 @@ async def create_web_app():
         ("/api/announcements", get_announcements), ("/api/announcement", get_announcement_detail),
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
         ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
-        ("/api/war/forces", get_forces), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
+        ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
         ("/api/debug-auth", debug_auth), ("/health", health)]:
         app.router.add_get(path, h)
 
@@ -2718,7 +2718,7 @@ async def create_web_app():
         ("/api/upgrade-economy", upgrade_economy), ("/api/train-unit", train_unit),
         ("/api/propose-treaty", propose_treaty), ("/api/respond-treaty", respond_treaty),
         ("/api/war/declare", declare_war), ("/api/war/battle", perform_battle),
-        ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/recall", recall_forces), ("/api/map/transits", get_map_transits),
+        ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/recall", recall_forces),
         ("/api/satellite/launch", sat_launch), ("/api/satellite/scan-site", sat_scan_site),
         ("/api/satellite/scan-country", sat_scan_country),
         ("/api/announcements/create", create_announcement),
