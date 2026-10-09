@@ -125,6 +125,7 @@ function showGamePage(id) {
     document.querySelectorAll(".game-page").forEach(p => p.classList.add("hidden"));
     const t = document.getElementById(id);
     if (t) { t.classList.remove("hidden"); t.scrollTop = 0; }
+    document.getElementById("game")?.classList.remove("header-collapsed");
 }
 
 function formatMoney(v) { return "$" + Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
@@ -410,6 +411,14 @@ function getSeenNews() {
 function saveSeenNews(set) {
     try { localStorage.setItem(seenNewsKey(), JSON.stringify([...set].slice(-300))); } catch (e) {}
 }
+const dismissedNotifsKey = () => `fl93_dismissed_notifications_${userId || "guest"}`;
+function getDismissedNotifications() {
+    try { return new Set(JSON.parse(localStorage.getItem(dismissedNotifsKey()) || "[]")); }
+    catch (e) { return new Set(); }
+}
+function saveDismissedNotifications(set) {
+    try { localStorage.setItem(dismissedNotifsKey(), JSON.stringify([...set].slice(-500))); } catch (e) {}
+}
 function setNotifBadge(count) {
     const badge = document.getElementById("notif-badge");
     if (!badge) return;
@@ -427,7 +436,8 @@ async function refreshNotificationBadge() {
         const news = await apiGet("/api/news");
         const list = Array.isArray(news) ? news : [];
         const seen = getSeenNews();
-        setNotifBadge(list.filter(n => n.id && !seen.has(n.id)).length);
+        const dismissed = getDismissedNotifications();
+        setNotifBadge(list.filter(n => n.id && !seen.has(n.id) && !dismissed.has(n.id)).length);
     } catch (e) {}
 }
 
@@ -451,7 +461,10 @@ async function openNotificationsSheet() {
                     <div class="is-name">🔔 اعلان‌ها</div>
                     <div class="is-sub" id="notif-sub">در حال دریافت...</div>
                 </div>
-                <button class="is-close" aria-label="بستن">✕</button>
+                <div class="notif-head-actions">
+                    <button class="notif-clear-all" id="notif-clear-all" type="button">پاک‌کردن همه</button>
+                    <button class="is-close" aria-label="بستن">✕</button>
+                </div>
             </div>
             <div class="notif-list" id="notif-list"></div>
         </div>`;
@@ -461,30 +474,47 @@ async function openNotificationsSheet() {
     ov.querySelector(".is-close").onclick = close;
 
     try {
-        const news = await apiGet("/api/news");
-        const list = Array.isArray(news) ? news : [];
-        const seen = getSeenNews();
+        const response = await apiGet("/api/news");
+        const list = Array.isArray(response) ? response : [];
         const box = ov.querySelector("#notif-list");
-        box.innerHTML = "";
-        let fresh = 0;
-        list.forEach(item => {
-            const isNew = !!item.id && !seen.has(item.id);
-            if (isNew) fresh++;
-            const div = document.createElement("div");
-            div.className = "notif-item" + (isNew ? " is-new" : "");
-            const t = formatNewsTime(item.at);
-            div.innerHTML = `
-                <div class="notif-title">${isNew ? '<span class="notif-dot"></span>' : ""}${escapeHtml(item.title || "")}</div>
-                <p>${escapeHtml(item.text || "")}</p>
-                ${t ? `<div class="notif-time">${t}</div>` : ""}`;
-            box.appendChild(div);
-        });
-        if (!list.length) box.innerHTML = `<div class="notif-empty">اعلانی وجود ندارد.</div>`;
-        ov.querySelector("#notif-sub").textContent = fresh ? `${fresh} اعلان جدید` : "همه را دیده‌اید";
-        // بعد از دیده شدن، عدد روی زنگ پاک می‌شود
-        list.forEach(n => { if (n.id) seen.add(n.id); });
+        const sub = ov.querySelector("#notif-sub");
+        const clearButton = ov.querySelector("#notif-clear-all");
+        const seen = getSeenNews();
+        const dismissed = getDismissedNotifications();
+        const render = () => {
+            const visible = list.filter(item => !item.id || !dismissed.has(item.id));
+            const fresh = visible.filter(item => item.id && !seen.has(item.id)).length;
+            box.innerHTML = "";
+            visible.forEach(item => {
+                const isNew = !!item.id && !seen.has(item.id);
+                const div = document.createElement("div");
+                div.className = "notif-item" + (isNew ? " is-new" : "");
+                const t = formatNewsTime(item.at);
+                div.innerHTML = `
+                    <div class="notif-title">${isNew ? '<span class="notif-dot"></span>' : ""}${escapeHtml(item.title || "")}</div>
+                    <p>${escapeHtml(item.text || "")}</p>
+                    ${t ? `<div class="notif-time">${t}</div>` : ""}`;
+                box.appendChild(div);
+            });
+            if (!visible.length) box.innerHTML = `<div class="notif-empty">اعلانی وجود ندارد.</div>`;
+            sub.textContent = fresh ? `${fresh} اعلان جدید` : (visible.length ? "همه را دیده‌اید" : "اعلان‌ها پاک شده‌اند");
+            clearButton.disabled = visible.length === 0;
+            clearButton.classList.toggle("is-empty", visible.length === 0);
+        };
+        render();
+        list.forEach(item => { if (item.id) seen.add(item.id); });
         saveSeenNews(seen);
         setNotifBadge(0);
+        clearButton.onclick = () => {
+            list.forEach(item => {
+                if (item.id) { dismissed.add(item.id); seen.add(item.id); }
+            });
+            saveDismissedNotifications(dismissed);
+            saveSeenNews(seen);
+            setNotifBadge(0);
+            render();
+            showToast("اعلان‌ها پاک شدند؛ خبرها در بخش اخبار باقی می‌مانند.", "success");
+        };
     } catch (e) {
         ov.querySelector("#notif-sub").textContent = "دریافت اعلان‌ها ممکن نشد.";
     }
@@ -2178,6 +2208,19 @@ document.querySelectorAll(".nav-item").forEach(item => {
     });
 });
 
+// هدر هنگام پایین رفتن محو می‌شود و با اسکرول رو به بالا برمی‌گردد.
+const gameShellForHeader = document.getElementById("game");
+const headerScrollPositions = new WeakMap();
+document.querySelectorAll("#game .game-page").forEach(page => {
+    page.addEventListener("scroll", () => {
+        const top = page.scrollTop || 0;
+        const prev = headerScrollPositions.get(page) || 0;
+        if (top <= 10 || top < prev - 3) gameShellForHeader?.classList.remove("header-collapsed");
+        else if (top > 28 && top > prev + 2) gameShellForHeader?.classList.add("header-collapsed");
+        headerScrollPositions.set(page, top);
+    }, { passive: true });
+});
+
 // راهنمای بازار جهانی فقط با زدن علامت سؤال نمایش داده می‌شود.
 const marketHelpButton = document.getElementById("market-help-btn");
 if (marketHelpButton) marketHelpButton.addEventListener("click", () => {
@@ -2302,11 +2345,9 @@ async function loadAnnouncements() {
             const accuseFlags = accuse.map(cid => flagInline(cid, true)).join(" ");
             const own = !!a.is_mine || (!!player?.country && player.country === a.from_country);
             let reactionHtml;
-            if (own) {
-                reactionHtml = `<span class="ann-own-note">بیانیهٔ کشور شما</span>`;
-            } else if (a.my_reaction) {
-                const isSupport = a.my_reaction === "support";
-                reactionHtml = `<button class="ann-react ${isSupport ? "support" : "accuse"} selected" disabled aria-label="واکنش قبلاً ثبت شده">${isSupport ? "✓ حمایت" : "❌ محکوم کردن"} <b>${isSupport ? support.length : accuse.length}</b><span class="ann-locked-mark">ثبت شد 🔒</span></button>`;
+            // برای بیانیهٔ خودتان و پس از ثبت واکنش، ردیف توضیح/قفل نمایش داده نمی‌شود.
+            if (own || a.my_reaction) {
+                reactionHtml = "";
             } else {
                 reactionHtml = `
                     <button class="ann-react support" data-react="support" data-id="${escapeHtml(a.id)}">✓ حمایت <b>${support.length}</b></button>
@@ -2323,7 +2364,7 @@ async function loadAnnouncements() {
                 </div>
                 <div class="ann-text ${canExpand ? "is-collapsed" : ""}" data-ann-text>${escapeHtml(statementText)}</div>
                 ${canExpand ? `<button type="button" class="ann-expand-button" aria-expanded="false">نمایش بیشتر <span>⌄</span></button>` : ""}
-                <div class="ann-reactions">${reactionHtml}</div>
+                ${reactionHtml ? `<div class="ann-reactions">${reactionHtml}</div>` : ""}
                 <div class="ann-balance ${totalReactions ? "" : "is-empty"}" aria-label="نسبت حمایت و محکومیت">
                     <div class="ann-balance-track"><span class="ann-balance-support" style="width:${supportPercent.toFixed(2)}%"></span><span class="ann-balance-accuse" style="width:${accusePercent.toFixed(2)}%"></span></div>
                     <div class="ann-balance-legend"><span class="support-legend">● حمایت ${support.length.toLocaleString("fa-IR")}</span><span class="accuse-legend">● محکومیت ${accuse.length.toLocaleString("fa-IR")}</span></div>
@@ -2498,6 +2539,46 @@ async function loadUnion() {
     }
 }
 
+function openUnionCreateModal() {
+    document.getElementById("union-create-modal")?.remove();
+    const ov = document.createElement("div");
+    ov.id = "union-create-modal";
+    ov.className = "modal-overlay union-create-overlay";
+    ov.innerHTML = `<section class="modal-box union-create-dialog" role="dialog" aria-modal="true" aria-labelledby="union-create-title">
+        <div class="ann-modal-head"><div><span class="ann-modal-kicker">اتحاد کشورها</span><h2 class="modal-title" id="union-create-title">ساخت اتحادیهٔ جدید</h2></div><button type="button" class="ann-modal-close" aria-label="بستن">×</button></div>
+        <div class="union-create-hero"><span>🌐</span><div><strong>اتحادیهٔ خودت را بساز</strong><p>بعد از ساخت، کشورهای دیگر می‌توانند درخواست عضویت بفرستند.</p></div></div>
+        <label for="union-modal-name" class="diplomacy-label">نام اتحادیه</label>
+        <input id="union-modal-name" class="diplomacy-input union-modal-name" placeholder="مثلاً پیمان همکاری جهانی" maxlength="40" autocomplete="off">
+        <div class="union-create-modal-actions"><button type="button" class="modal-cancel union-create-cancel">انصراف</button><button type="button" id="union-create-confirm" class="diplomacy-submit">ساخت اتحادیه</button></div>
+    </section>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector(".ann-modal-close").onclick = close;
+    ov.querySelector(".union-create-cancel").onclick = close;
+    ov.addEventListener("click", e => { if (e.target === ov) close(); });
+    const input = ov.querySelector("#union-modal-name");
+    const submit = ov.querySelector("#union-create-confirm");
+    const create = async () => {
+        const name = input.value.trim();
+        if (!name) { showToast("نام اتحادیه را وارد کنید.", "error"); input.focus(); return; }
+        submit.disabled = true; submit.textContent = "در حال ساخت…";
+        try {
+            const r = await apiPost("/api/union/create", { name });
+            if (!r.success) { showToast(unionErrorText(r.error), "error"); submit.disabled = false; submit.textContent = "ساخت اتحادیه"; return; }
+            close();
+            showToast("اتحادیه ساخته شد.", "success");
+            await loadUnion();
+            await openUnionChat(r.union_id);
+        } catch (e) {
+            showToast("ارتباط با سرور برقرار نشد.", "error");
+            submit.disabled = false; submit.textContent = "ساخت اتحادیه";
+        }
+    };
+    submit.onclick = create;
+    input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); create(); } });
+    setTimeout(() => input.focus(), 40);
+}
+
 function renderUnionBrowser(d) {
     const c = document.getElementById("union-content");
     if (!c) return;
@@ -2508,21 +2589,12 @@ function renderUnionBrowser(d) {
     c.innerHTML = "";
 
     if (!mine) {
-        const create = document.createElement("div");
-        create.className = "ann-form union-create-form";
-        create.innerHTML = `<div class="union-section-heading">ساخت اتحادیهٔ جدید</div>
-            <input id="union-name" class="diplomacy-input" placeholder="نام اتحادیه..." maxlength="40">
-            <button id="union-create" class="diplomacy-submit">ساخت اتحادیه</button>`;
+        const create = document.createElement("button");
+        create.type = "button";
+        create.className = "union-create-launch";
+        create.innerHTML = `<span class="union-create-launch-icon">＋</span><span class="union-create-launch-copy"><strong>ساخت اتحادیهٔ جدید</strong><small>نام و اتحادیهٔ خودت را ایجاد کن</small></span><span class="union-create-launch-arrow">←</span>`;
+        create.onclick = openUnionCreateModal;
         c.appendChild(create);
-        document.getElementById("union-create").onclick = async () => {
-            const name = document.getElementById("union-name").value.trim();
-            if (!name) { showToast("نام اتحادیه را وارد کنید."); return; }
-            const r = await apiPost("/api/union/create", { name });
-            if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
-            showToast("اتحادیه ساخته شد.", "success");
-            await loadUnion();
-            await openUnionChat(r.union_id);
-        };
     } else {
         const note = document.createElement("div");
         note.className = "union-own-note";
@@ -2862,8 +2934,16 @@ async function renderPmInbox() {
         const list = d.conversations || [];
         setPmBadges(d.unread_total || 0);
         c.innerHTML = "";
+        const un = document.createElement("div");
+        un.className = "contact-item pm-conv-item un-pm-item";
+        un.innerHTML = `<div class="contact-info"><span class="un-pm-icon">🌐</span><div class="pm-conv-text"><span class="contact-name">سازمان ملل</span><span class="pm-conv-last">گفت‌وگوی رسمی · فعلاً فقط نمایشی</span></div></div><span class="un-pm-tag">رسمی</span>`;
+        un.onclick = openUnitedNationsPM;
+        c.appendChild(un);
         if (!list.length) {
-            c.innerHTML = `<div class="diplomacy-item-empty">هنوز پیامی نیست. از تب «چت» یک کشور را انتخاب کنید.</div>`;
+            const empty = document.createElement("div");
+            empty.className = "diplomacy-item-empty pm-inbox-empty";
+            empty.textContent = "گفت‌وگوی کشورها پس از آغاز مکالمه در اینجا نمایش داده می‌شود.";
+            c.appendChild(empty);
             return;
         }
         list.forEach(cv => {
@@ -2912,12 +2992,44 @@ document.getElementById("pm-country-search")?.addEventListener("input", e => {
     renderContactList();
 });
 
+const UN_PM_TARGET = "__un__";
+let unPmLocalMessages = [];
+function renderUnitedNationsPMMessages() {
+    const box = document.getElementById("pm-messages");
+    box.innerHTML = `<div class="un-pm-placeholder"><span>🌐</span><strong>گفت‌وگوی سازمان ملل</strong><p>پیام‌ها فعلاً فقط در همین صفحه نمایش داده می‌شوند و برای سازمان ملل یا هیچ بازیکنی ارسال نمی‌شوند.</p></div>`;
+    unPmLocalMessages.forEach(text => {
+        const bubble = document.createElement("div");
+        bubble.className = "pm-msg pm-mine un-pm-local-msg";
+        bubble.textContent = text;
+        box.appendChild(bubble);
+    });
+    box.scrollTop = box.scrollHeight;
+}
+function openUnitedNationsPM() {
+    currentPMTarget = UN_PM_TARGET;
+    pmLastSig = "";
+    document.getElementById("pm-target-name").textContent = "سازمان ملل";
+    document.getElementById("pm-target-flag").innerHTML = `<span class="un-pm-icon un-pm-icon-large">🌐</span>`;
+    renderUnitedNationsPMMessages();
+    const input = document.getElementById("pm-input");
+    const send = document.getElementById("pm-send");
+    input.value = ""; input.disabled = false; input.placeholder = "پیام نمایشی به سازمان ملل...";
+    send.disabled = false;
+    document.getElementById("pm-conversation").classList.add("un-pm-local");
+    document.getElementById("pm-conversation").classList.remove("un-pm-readonly", "hidden");
+}
+
 function openPM(target) {
     currentPMTarget = target;
     pmLastSig = "";
     document.getElementById("pm-target-name").textContent = COUNTRY_NAMES[target];
     document.getElementById("pm-target-flag").innerHTML = flagInline(target, true);
     document.getElementById("pm-messages").innerHTML = "";
+    const input = document.getElementById("pm-input");
+    const send = document.getElementById("pm-send");
+    input.disabled = false; input.placeholder = "پیام...";
+    send.disabled = false;
+    document.getElementById("pm-conversation").classList.remove("un-pm-readonly", "un-pm-local");
     document.getElementById("pm-conversation").classList.remove("hidden");
     loadPM(target, true);
 }
@@ -2938,6 +3050,13 @@ async function sendPM() {
     const text = ta.value.trim();
     if (!text || !currentPMTarget) return;
     ta.value = ""; ta.style.height = "";
+    if (currentPMTarget === UN_PM_TARGET) {
+        // این چت هنوز به سرور وصل نیست؛ پیام صرفاً در رابط همین نشست نشان داده می‌شود.
+        unPmLocalMessages.push(text);
+        renderUnitedNationsPMMessages();
+        showToast("پیام فقط در همین صفحه نمایش داده شد و برای کسی ارسال نشد.", "success");
+        return;
+    }
     await apiPost("/api/pm/send", { target: currentPMTarget, text });
     loadPM(currentPMTarget, true);
 }
@@ -2973,7 +3092,7 @@ async function loadPM(target, forceScroll = false) {
     } catch (e) { console.error(e); }
 }
 setInterval(() => {
-    if (currentPMTarget) loadPM(currentPMTarget);
+    if (currentPMTarget && currentPMTarget !== UN_PM_TARGET) loadPM(currentPMTarget);
     if (unionChatId) refreshUnionChat();
 }, 4000);
 
