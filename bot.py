@@ -310,45 +310,63 @@ def infra_upkeep(item, lv):
 ECONOMY = {
     "eco_agriculture": {
         "name": "کشاورزی و دامداری", "group": "eco", "icon": "🌾",
-        "desc": "پایهٔ اقتصاد. غذای اضافی می‌فروشد و درآمد می‌دهد.",
-        "power_required": 5,
-        "levels": [L(cost=90_000, income=30_000), L(cost=220_000, income=80_000), L(cost=500_000, income=190_000), L(cost=1_050_000, income=420_000), L(cost=2_100_000, income=850_000)],
+        "desc": "سرمایه‌گذاری کم‌ریسک در تولید و صادرات محصولات غذایی.", "power_required": 2,
+        "levels": [L(cost=900_000, income=250_000), L(cost=1_500_000, income=400_000), L(cost=2_300_000, income=600_000), L(cost=3_300_000, income=850_000), L(cost=4_500_000, income=1_150_000)],
     },
     "eco_textile": {
         "name": "کارخانه نساجی", "group": "eco", "icon": "🧵",
-        "desc": "پوشاک و منسوجات تولید می‌کند.",
-        "power_required": 8,
-        "levels": [L(cost=160_000, income=45_000), L(cost=400_000, income=115_000), L(cost=920_000, income=270_000), L(cost=1_950_000, income=600_000), L(cost=3_900_000, income=1_200_000)],
+        "desc": "تولید پوشاک و منسوجات برای بازار داخلی و صادرات.", "power_required": 3,
+        "levels": [L(cost=1_140_000, income=300_000), L(cost=1_820_000, income=480_000), L(cost=2_740_000, income=720_000), L(cost=3_800_000, income=1_000_000), L(cost=5_300_000, income=1_400_000)],
+    },
+    "eco_fishing": {
+        "name": "شیلات و فرآوری غذا", "group": "eco", "icon": "🐟",
+        "desc": "صادرات محصولات دریایی با سرمایه‌گذاری آغازین مناسب.", "power_required": 2,
+        "levels": [L(cost=1_050_000, income=275_000), L(cost=1_700_000, income=450_000), L(cost=2_600_000, income=680_000), L(cost=3_700_000, income=950_000), L(cost=5_000_000, income=1_300_000)],
+    },
+    "eco_construction": {
+        "name": "شرکت عمرانی", "group": "eco", "icon": "🏗️",
+        "desc": "پروژه‌های ساخت‌وساز داخلی و قراردادهای عمرانی.", "power_required": 3,
+        "levels": [L(cost=1_520_000, income=400_000), L(cost=2_280_000, income=600_000), L(cost=3_420_000, income=900_000), L(cost=4_750_000, income=1_250_000), L(cost=6_460_000, income=1_700_000)],
     },
     "eco_mining": {
         "name": "معدن‌کاری", "group": "eco", "icon": "⛏️",
-        "desc": "مواد معدنی استخراج و صادر می‌کند.",
-        "power_required": 12,
-        "levels": [L(cost=280_000, income=70_000), L(cost=700_000, income=180_000), L(cost=1_600_000, income=420_000), L(cost=3_400_000, income=920_000), L(cost=6_800_000, income=1_850_000)],
+        "desc": "استخراج و فروش مواد معدنی؛ درآمد مناسب با مصرف برق بیشتر.", "power_required": 4,
+        "levels": [L(cost=1_520_000, income=400_000), L(cost=2_360_000, income=620_000), L(cost=3_420_000, income=900_000), L(cost=4_750_000, income=1_250_000), L(cost=6_460_000, income=1_700_000)],
     },
     "eco_steel": {
-        "name": "کارخانه آهن", "group": "eco", "icon": "⚙️",
-        "desc": "آهن را به محصولات صنعتی تبدیل می‌کند.",
-        "power_required": 18,
-        "levels": [L(cost=420_000, income=100_000), L(cost=1_050_000, income=260_000), L(cost=2_400_000, income=600_000), L(cost=5_100_000, income=1_300_000), L(cost=10_200_000, income=2_600_000)],
+        "name": "کارخانه فولاد", "group": "eco", "icon": "⚙️",
+        "desc": "تولید محصولات فلزی و صنعتی با هزینهٔ آغازین بالاتر.", "power_required": 5,
+        "levels": [L(cost=1_900_000, income=500_000), L(cost=2_890_000, income=760_000), L(cost=4_100_000, income=1_080_000), L(cost=5_620_000, income=1_480_000), L(cost=7_600_000, income=2_000_000)],
+    },
+    "eco_tourism": {
+        "name": "گردشگری و هتل‌داری", "group": "eco", "icon": "🏨",
+        "desc": "درآمد از گردشگری، هتل‌ها و خدمات شهری.", "power_required": 4,
+        "levels": [L(cost=2_090_000, income=550_000), L(cost=3_040_000, income=800_000), L(cost=4_370_000, income=1_150_000), L(cost=6_080_000, income=1_600_000), L(cost=8_170_000, income=2_150_000)],
     },
     "eco_trade": {
         "name": "تجارت بین‌الملل", "group": "eco", "icon": "🚢",
-        "desc": "شبکهٔ تجاری کشور را گسترش می‌دهد.",
-        "power_required": 20,
-        "levels": [L(cost=700_000, income=130_000), L(cost=1_750_000, income=330_000), L(cost=4_000_000, income=760_000), L(cost=8_400_000, income=1_600_000), L(cost=16_800_000, income=3_200_000)],
+        "desc": "گسترش شبکهٔ واردات و صادرات کشور.", "power_required": 6,
+        "levels": [L(cost=2_470_000, income=650_000), L(cost=3_610_000, income=950_000), L(cost=5_130_000, income=1_350_000), L(cost=7_030_000, income=1_850_000), L(cost=9_500_000, income=2_500_000)],
+    },
+    "eco_electronics": {
+        "name": "کارخانهٔ تجهیزات الکترونیکی", "group": "eco", "icon": "🔌",
+        "desc": "مونتاژ و فروش تجهیزات برقی و الکترونیکی.", "power_required": 7,
+        "levels": [L(cost=2_660_000, income=700_000), L(cost=3_990_000, income=1_050_000), L(cost=5_700_000, income=1_500_000), L(cost=7_790_000, income=2_050_000), L(cost=10_260_000, income=2_700_000)],
     },
     "eco_oil": {
         "name": "پالایشگاه نفت", "group": "eco", "icon": "🛢️",
-        "desc": "نفت خام را پالایش و صادر می‌کند.",
-        "power_required": 25,
-        "levels": [L(cost=800_000, income=140_000), L(cost=2_000_000, income=360_000), L(cost=4_500_000, income=820_000), L(cost=9_500_000, income=1_750_000), L(cost=19_000_000, income=3_500_000)],
+        "desc": "تبدیل نفت خام به فرآورده‌های قابل صادرات.", "power_required": 8,
+        "levels": [L(cost=3_230_000, income=850_000), L(cost=4_560_000, income=1_200_000), L(cost=6_460_000, income=1_700_000), L(cost=8_740_000, income=2_300_000), L(cost=11_780_000, income=3_100_000)],
+    },
+    "eco_chemicals": {
+        "name": "مجتمع پتروشیمی", "group": "eco", "icon": "🧪",
+        "desc": "تولید مواد شیمیایی و فرآورده‌های صنعتی برای صادرات.", "power_required": 9,
+        "levels": [L(cost=3_420_000, income=900_000), L(cost=5_130_000, income=1_350_000), L(cost=7_220_000, income=1_900_000), L(cost=9_690_000, income=2_550_000), L(cost=12_540_000, income=3_300_000)],
     },
     "eco_bank": {
         "name": "بانک مرکزی", "group": "eco", "icon": "🏦",
-        "desc": "سیستم مالی کشور را مدیریت می‌کند.",
-        "power_required": 30,
-        "levels": [L(cost=1_600_000, income=180_000), L(cost=4_000_000, income=460_000), L(cost=9_200_000, income=1_050_000), L(cost=19_500_000, income=2_200_000), L(cost=39_000_000, income=4_400_000)],
+        "desc": "زیرساخت مالی کشور؛ درآمد بالا با سرمایه‌گذاری بیشتر.", "power_required": 10,
+        "levels": [L(cost=3_800_000, income=1_000_000), L(cost=5_700_000, income=1_500_000), L(cost=8_360_000, income=2_200_000), L(cost=11_400_000, income=3_000_000), L(cost=15_200_000, income=4_000_000)],
     },
 }
 
@@ -570,11 +588,23 @@ def get_group_units(player, group):
     return total
 
 def recompute_army(player):
+    """قدرت کل همهٔ یگان‌های زندهٔ کشور؛ خانه، مواضع تصرف‌شده و مسیر حرکت."""
     total = 0
-    dep = deployed_units(player.get("country"))
+    cid = player.get("country")
+    dep = deployed_units(cid)
+    in_transit = {}
+    # اعزام نیرو آن‌ها را از واحدهای داخل کشور خارج می‌کند؛ تا رسیدن/بازگشت،
+    # نباید قدرتشان از جمع قدرت نظامی ناپدید شود.
+    for transit in transits:
+        if transit.get("owner") != cid:
+            continue
+        for uid_, count in (transit.get("units") or {}).items():
+            in_transit[uid_] = in_transit.get(uid_, 0) + max(0, int(count or 0))
     for unit_id, unit in ARMY_UNITS.items():
         dm = group_defense_mult(player, unit["group"])
-        total += (player.get("units", {}).get(unit_id, 0) + dep.get(unit_id, 0)) * (unit["attack"] + unit["defense"] * dm)
+        count = (player.get("units", {}).get(unit_id, 0)
+                 + dep.get(unit_id, 0) + in_transit.get(unit_id, 0))
+        total += max(0, count) * (unit["attack"] + unit["defense"] * dm)
     player["army"] = int(round(total))
 
 def ensure_player_fields(player):
