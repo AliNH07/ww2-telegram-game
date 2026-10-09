@@ -772,9 +772,27 @@ def get_player_by_country(country_id):
         if p.get("country") == country_id: return uid_, p
     return None, None
 
+def classify_news(title, text="", kind="info"):
+    """دسته‌بندی اخبار برای فیلترهای بخش ارتباطات."""
+    source = f"{title or ''} {text or ''}".lower()
+    if "اتحادیه" in source:
+        return "union"
+    if any(word in source for word in ("جنگ", "نبرد", "دفاع", "حمله", "اشغال", "تلفات", "نیرو", "ارتش", "پیروزی", "شکست")):
+        return "military"
+    if any(word in source for word in ("پیمان", "عدم تجاوز", "اتحاد", "دیپلماسی", "بیانیه", "مذاکره")):
+        return "diplomacy"
+    if any(word in source for word in ("معامله", "تجارت", "بازار", "مرز زمینی", "حمل‌ونقل", "حمل و نقل")):
+        return "trade"
+    if any(word in source for word in ("تصرف", "تنگه", "قلمرو", "مرز", "منطقه")):
+        return "territory"
+    if any(word in source for word in ("وام", "درآمد", "اقتصاد", "تسویه", "غذا", "نفت", "آهن", "اورانیوم", "منبع", "منابع")):
+        return "economy"
+    return "general"
+
 def push_news(title, text, kind="info"):
     news_feed.append({"id": str(uuid.uuid4()), "title": title, "text": text,
-                      "kind": kind, "at": utcnow().isoformat()})
+                      "kind": kind, "category": classify_news(title, text, kind),
+                      "at": utcnow().isoformat()})
     if len(news_feed) > 200: del news_feed[:50]
 
 def save_state():
@@ -1947,19 +1965,36 @@ async def get_announcement_detail(request):
 # =========================================================
 # API Unions
 # =========================================================
+def _public_union(u):
+    """اطلاعات عمومی اتحادیه؛ پیام‌ها و درخواست‌های عضویت خصوصی می‌مانند."""
+    members = list(u.get("members", []))
+    return {"id": u["id"], "name": u.get("name", "اتحادیه"),
+            "leader_country": u.get("leader_country"), "members": members,
+            "member_count": len(members), "created_at": u.get("created_at")}
+
 async def get_union(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
-    if uid not in players: return web.json_response({"union": None})
-    cid = players[uid].get("country")
-    for u in unions.values():
-        if cid in u.get("members", []):
-            return web.json_response({"union": u, "is_leader": u["leader_country"] == cid})
+    cid = players.get(uid, {}).get("country")
+    public_unions = [_public_union(u) for u in sorted(unions.values(), key=lambda x: x.get("created_at", ""), reverse=True)]
+    current = next((u for u in unions.values() if cid and cid in u.get("members", [])), None)
+    if current:
+        payload = {**_public_union(current), "messages": current.get("messages", [])}
+        is_leader = current.get("leader_country") == cid
+        if is_leader:
+            payload["join_requests"] = list(current.get("requests", []))
+        return web.json_response({"union": payload, "is_leader": is_leader,
+                                  "unions": public_unions, "invites": [], "requested_union_ids": []})
+
     invites = []
+    requested = []
     for u in unions.values():
-        if cid in u.get("invites", []):
+        if cid and cid in u.get("invites", []):
             invites.append({"union_id": u["id"], "name": u["name"], "leader": u["leader_country"]})
-    return web.json_response({"union": None, "invites": invites})
+        if cid and cid in u.get("requests", []):
+            requested.append(u["id"])
+    return web.json_response({"union": None, "invites": invites, "unions": public_unions,
+                              "requested_union_ids": requested})
 
 async def create_union(request):
     uid = get_auth_user_id(request)
@@ -1974,7 +2009,7 @@ async def create_union(request):
             return web.json_response({"success": False, "error": "already_member"}, status=400)
     u_id = str(uuid.uuid4())
     unions[u_id] = {"id": u_id, "name": name, "leader_country": cid, "members": [cid],
-                    "messages": [], "invites": [], "created_at": utcnow().isoformat()}
+                    "messages": [], "invites": [], "requests": [], "created_at": utcnow().isoformat()}
     push_news("اتحادیه", f"{COUNTRIES[cid]['name']} اتحادیه «{name}» را ساخت.")
     save_state()
     return web.json_response({"success": True, "union_id": u_id})
@@ -1989,7 +2024,10 @@ async def invite_union(request):
     u = unions.get(u_id)
     if not u: return web.json_response({"success": False, "error": "no_union"}, status=404)
     if u["leader_country"] != cid: return web.json_response({"success": False, "error": "not_leader"}, status=403)
-    if target in u["members"]: return web.json_response({"success": False, "error": "already_member"}, status=400)
+    if target in u.get("members", []): return web.json_response({"success": False, "error": "already_member"}, status=400)
+    if any(target in other.get("members", []) for other in unions.values() if other["id"] != u_id):
+        return web.json_response({"success": False, "error": "in_other"}, status=400)
+    u.setdefault("invites", [])
     if target not in u["invites"]: u["invites"].append(target)
     save_state()
     return web.json_response({"success": True})
@@ -2003,11 +2041,78 @@ async def respond_union_invite(request):
     u = unions.get(u_id)
     if not u or cid not in u.get("invites", []):
         return web.json_response({"success": False, "error": "no_invite"}, status=400)
+    if accept and any(cid in other.get("members", []) for other in unions.values() if other["id"] != u_id):
+        return web.json_response({"success": False, "error": "in_other"}, status=400)
     u["invites"].remove(cid)
+    if accept and cid not in u.setdefault("members", []):
+        u["members"].append(cid)
+        for other in unions.values():
+            if other["id"] == u_id: continue
+            if cid in other.get("requests", []): other["requests"].remove(cid)
+            if cid in other.get("invites", []): other["invites"].remove(cid)
+    save_state()
+    return web.json_response({"success": True})
+
+async def request_union_membership(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    cid = players[uid].get("country")
+    if not cid: return web.json_response({"success": False, "error": "no_country"}, status=400)
+    data = await read_json(request); u_id = data.get("union_id")
+    u = unions.get(u_id)
+    if not u: return web.json_response({"success": False, "error": "no_union"}, status=404)
+    if any(cid in other.get("members", []) for other in unions.values()):
+        return web.json_response({"success": False, "error": "already_member"}, status=400)
+    if cid in u.get("members", []): return web.json_response({"success": False, "error": "already_member"}, status=400)
+    # هر کشور فقط یک درخواست عضویت فعال داشته باشد تا درخواست‌های قدیمی معلق نمانند.
     for other in unions.values():
-        if other["id"] != u_id and cid in other.get("members", []):
-            return web.json_response({"success": False, "error": "in_other"}, status=400)
-    if accept: u["members"].append(cid)
+        if other["id"] != u_id and cid in other.get("requests", []):
+            other["requests"].remove(cid)
+    requests = u.setdefault("requests", [])
+    if cid not in requests: requests.append(cid)
+    save_state()
+    return web.json_response({"success": True, "pending": True})
+
+async def respond_union_request(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    cid = players[uid].get("country")
+    data = await read_json(request); u_id = data.get("union_id"); target = data.get("target")
+    accept = bool(data.get("accept"))
+    u = unions.get(u_id)
+    if not u: return web.json_response({"success": False, "error": "no_union"}, status=404)
+    if u.get("leader_country") != cid:
+        return web.json_response({"success": False, "error": "not_leader"}, status=403)
+    if target not in u.setdefault("requests", []):
+        return web.json_response({"success": False, "error": "no_request"}, status=400)
+    if accept and any(target in other.get("members", []) for other in unions.values() if other["id"] != u_id):
+        return web.json_response({"success": False, "error": "in_other"}, status=400)
+    u["requests"].remove(target)
+    if accept and target not in u.setdefault("members", []):
+        u["members"].append(target)
+        if target in u.setdefault("invites", []): u["invites"].remove(target)
+        for other in unions.values():
+            if other["id"] == u_id: continue
+            if target in other.get("requests", []): other["requests"].remove(target)
+            if target in other.get("invites", []): other["invites"].remove(target)
+    save_state()
+    return web.json_response({"success": True})
+
+async def kick_union_member(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    if uid not in players: return web.json_response({"success": False, "error": "no_player"}, status=400)
+    cid = players[uid].get("country")
+    data = await read_json(request); u_id = data.get("union_id"); target = data.get("target")
+    u = unions.get(u_id)
+    if not u: return web.json_response({"success": False, "error": "no_union"}, status=404)
+    if u.get("leader_country") != cid:
+        return web.json_response({"success": False, "error": "not_leader"}, status=403)
+    if target == cid: return web.json_response({"success": False, "error": "cannot_kick_self"}, status=400)
+    if target not in u.get("members", []): return web.json_response({"success": False, "error": "not_member"}, status=400)
+    u["members"].remove(target)
     save_state()
     return web.json_response({"success": True})
 
@@ -2018,8 +2123,12 @@ async def leave_union(request):
     cid = players[uid].get("country")
     for u in list(unions.values()):
         if cid in u.get("members", []):
-            u["members"].remove(cid)
-            if not u["members"]: del unions[u["id"]]
+            # اگر مالک خارج شود، اتحادیه حذف می‌شود تا بدون مالک نماند.
+            if u.get("leader_country") == cid:
+                del unions[u["id"]]
+                push_news("اتحادیه", f"اتحادیه «{u.get('name', 'اتحادیه')}» با خروج مالک منحل شد.")
+            else:
+                u["members"].remove(cid)
             save_state(); return web.json_response({"success": True})
     return web.json_response({"success": False, "error": "not_member"}, status=400)
 
@@ -2745,8 +2854,10 @@ async def create_web_app():
         ("/api/announcements/react", react_announcement),
         ("/api/announcements/comment", comment_announcement),
         ("/api/union/create", create_union), ("/api/union/invite", invite_union),
-        ("/api/union/respond", respond_union_invite), ("/api/union/leave", leave_union),
-        ("/api/union/message", send_union_message), ("/api/pm/send", send_pm),
+        ("/api/union/respond", respond_union_invite), ("/api/union/request", request_union_membership),
+        ("/api/union/request/respond", respond_union_request), ("/api/union/kick", kick_union_member),
+        ("/api/union/leave", leave_union), ("/api/union/message", send_union_message),
+        ("/api/pm/send", send_pm),
         ("/api/market/create", create_listing), ("/api/market/cancel", cancel_listing),
         ("/api/market/accept", accept_listing), ("/api/strait/settings", set_strait_settings),
         ("/api/loans/propose", propose_loan), ("/api/loans/respond", respond_loan),
