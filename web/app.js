@@ -4093,7 +4093,11 @@ function showSiteInfo(site) {
 
     if (site.kind === "strait") {
         flagEl.textContent = "⚓";
-        descEl.textContent = `درآمد روزانه: ${formatMoney(site.income)} · عوارض عبور: ${formatMoney(site.toll || 0)} · ${site.closed ? "بسته" : "باز"}`;
+        const personalRule = site.country_rules?.[selectedCountry];
+        const effectiveToll = site.owner === selectedCountry ? 0 : Number(personalRule?.toll ?? site.toll ?? 0);
+        const effectiveClosed = site.owner === selectedCountry ? false : Boolean(personalRule?.closed ?? site.closed ?? false);
+        const policyLabel = personalRule && site.owner !== selectedCountry ? "قانون ویژهٔ کشور شما" : "قانون عمومی";
+        descEl.textContent = `درآمد روزانه: ${formatMoney(site.income)} · عوارض برای شما: ${effectiveToll === 0 ? "رایگان" : formatMoney(effectiveToll)} · ${effectiveClosed ? "عبور بسته" : "عبور باز"} (${policyLabel})`;
     } else {
         flagEl.textContent = RESOURCE_ICONS[site.type] || "📍";
         const zoneTxt = site.zone === "sea" ? "🌊 در دریا" : (site.zone === "land" ? "⛰️ در خشکی" : "");
@@ -4112,9 +4116,78 @@ function showSiteInfo(site) {
     actionBtn.onclick = () => openDispatchTo(site.id);
     if (site.kind === "strait" && site.owner === selectedCountry && controls) {
         controls.classList.remove("hidden");
-        controls.innerHTML = `<div class="strait-control-title">تنظیم تنگه</div><div class="strait-control-row"><input id="strait-toll-input" type="number" min="0" value="${Number(site.toll||0)}" placeholder="عوارض $"><button id="strait-open-toggle">${site.closed?"باز کردن":"بستن"}</button><button id="strait-save-btn">ذخیره</button></div><small>هر تغییر عوارض یا وضعیت، برای همه بازیکنان اعلان می‌شود.</small>`;
-        controls.querySelector("#strait-save-btn").onclick=async()=>{const toll=Math.max(0,Number(controls.querySelector("#strait-toll-input").value||0));const closed=site.closed;const d=await apiPost("/api/strait/settings",{site_id:site.id,toll,closed});if(!d.success){showToast(d.message||"خطا");return;}showToast("تنظیمات تنگه ذخیره شد و اعلان عمومی ارسال شد.");await loadMapSites();const ns=mapSites.find(x=>x.id===site.id);if(ns)showSiteInfo(ns);};
-        controls.querySelector("#strait-open-toggle").onclick=async()=>{const toll=Math.max(0,Number(controls.querySelector("#strait-toll-input").value||0));const closed=!site.closed;const d=await apiPost("/api/strait/settings",{site_id:site.id,toll,closed});if(!d.success){showToast(d.message||"خطا");return;}await loadMapSites();const ns=mapSites.find(x=>x.id===site.id);if(ns)showSiteInfo(ns);};
+        const countryOptions = Object.entries(COUNTRY_NAMES).map(([id, name]) =>
+            `<option value="${id}">${COUNTRY_FLAGS[id] || "🏳️"} ${name}</option>`).join("");
+        controls.innerHTML = `
+            <div class="strait-control-title">⚓ مدیریت عبور از تنگه</div>
+            <section class="strait-policy-block">
+                <div class="strait-policy-heading"><b>قانون عمومی</b><span>برای همه کشورها</span></div>
+                <label class="strait-policy-label" for="strait-toll-input">عوارض عمومی هر عبور ($)</label>
+                <div class="strait-policy-row">
+                    <input id="strait-toll-input" type="number" min="0" step="1" value="${Math.max(0, Number(site.toll || 0))}" placeholder="مثلاً 50000">
+                    <button id="strait-save-btn" type="button">ذخیره عمومی</button>
+                </div>
+                <label class="strait-check-row"><input id="strait-closed-input" type="checkbox" ${site.closed ? "checked" : ""}><span>بستن تنگه برای همه کشورها</span></label>
+            </section>
+            <section class="strait-policy-block country-policy-block">
+                <div class="strait-policy-heading"><b>قانون ویژه</b><span>تنظیم برای یک کشور</span></div>
+                <label class="strait-policy-label" for="strait-country-select">انتخاب کشور</label>
+                <select id="strait-country-select"><option value="">انتخاب کشور...</option>${countryOptions}</select>
+                <label class="strait-policy-label" for="strait-country-toll">عوارض این کشور ($)</label>
+                <input id="strait-country-toll" type="number" min="0" step="1" value="${Math.max(0, Number(site.toll || 0))}" placeholder="۰ = رایگان">
+                <label class="strait-check-row"><input id="strait-country-closed" type="checkbox" ${site.closed ? "checked" : ""}><span>بستن تنگه فقط برای این کشور</span></label>
+                <div class="strait-policy-actions">
+                    <button id="strait-country-save" type="button">ذخیره قانون ویژه</button>
+                    <button id="strait-country-free" type="button">رایگان کردن</button>
+                    <button id="strait-country-clear" type="button">حذف استثنا</button>
+                </div>
+            </section>
+            <small>عوارض صفر یعنی عبور رایگان. قانون ویژه فقط روی کشور انتخاب‌شده اثر می‌گذارد. هر تغییر در اخبار و اعلان‌های همهٔ بازیکنان ثبت می‌شود.</small>`;
+
+        const reloadSite = async (message) => {
+            if (message) showToast(message, "success");
+            await loadMapSites();
+            const updated = mapSites.find(x => x.id === site.id);
+            if (updated) showSiteInfo(updated);
+        };
+        const saveRule = async (payload) => {
+            const d = await apiPost("/api/strait/settings", { site_id: site.id, ...payload });
+            if (!d?.success) { showToast(d?.message || "ذخیره تنظیمات انجام نشد.", "error"); return false; }
+            return true;
+        };
+        controls.querySelector("#strait-save-btn").onclick = async () => {
+            const toll = Math.max(0, Math.floor(Number(controls.querySelector("#strait-toll-input").value || 0)));
+            const closed = controls.querySelector("#strait-closed-input").checked;
+            if (await saveRule({ toll, closed })) await reloadSite("قانون عمومی تنگه ذخیره شد؛ خبر و اعلان ثبت شد.");
+        };
+        const selectedRuleData = () => {
+            const countryId = controls.querySelector("#strait-country-select").value;
+            const rule = countryId ? site.country_rules?.[countryId] : null;
+            controls.querySelector("#strait-country-toll").value = Math.max(0, Number(rule?.toll ?? site.toll ?? 0));
+            controls.querySelector("#strait-country-closed").checked = Boolean(rule?.closed ?? site.closed ?? false);
+            controls.querySelector("#strait-country-clear").disabled = !countryId || !rule;
+            controls.querySelector("#strait-country-save").disabled = !countryId;
+            controls.querySelector("#strait-country-free").disabled = !countryId;
+        };
+        controls.querySelector("#strait-country-select").addEventListener("change", selectedRuleData);
+        controls.querySelector("#strait-country-save").onclick = async () => {
+            const country_id = controls.querySelector("#strait-country-select").value;
+            if (!country_id) { showToast("ابتدا کشور را انتخاب کنید.", "error"); return; }
+            const toll = Math.max(0, Math.floor(Number(controls.querySelector("#strait-country-toll").value || 0)));
+            const closed = controls.querySelector("#strait-country-closed").checked;
+            if (await saveRule({ country_id, toll, closed })) await reloadSite("قانون ویژهٔ کشور ذخیره شد و اعلان عمومی ثبت شد.");
+        };
+        controls.querySelector("#strait-country-free").onclick = async () => {
+            const country_id = controls.querySelector("#strait-country-select").value;
+            if (!country_id) { showToast("ابتدا کشور را انتخاب کنید.", "error"); return; }
+            if (await saveRule({ country_id, toll: 0, closed: false })) await reloadSite("عبور برای کشور انتخاب‌شده رایگان شد؛ اعلان عمومی ثبت شد.");
+        };
+        controls.querySelector("#strait-country-clear").onclick = async () => {
+            const country_id = controls.querySelector("#strait-country-select").value;
+            if (!country_id) { showToast("ابتدا کشور را انتخاب کنید.", "error"); return; }
+            if (await saveRule({ country_id, clear_country_rule: true })) await reloadSite("قانون ویژه حذف شد و قانون عمومی اعمال می‌شود.");
+        };
+        selectedRuleData();
     }
     renderSiteScan(site);
     panel.classList.remove("hidden");
