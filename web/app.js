@@ -22,6 +22,7 @@ let currentArmyTab = "land";
 let pmCountrySearch = "";
 let newsItemsCache = [];
 let currentNewsFilter = "all";
+let currentEconomyFilter = "all";
 let unionChatId = null;
 let unionChatSignature = "";
 let unionDataCache = null;
@@ -188,36 +189,50 @@ async function loadArmyCatalog() {
     catch (e) { console.error("Army catalog:", e); }
 }
 
+function resourceEtaLabel(amount, dailyDeficit) {
+    if (amount <= 0) return "موجودی تمام شده است";
+    if (!(dailyDeficit > 0)) return "";
+    let minutes = Math.max(0, Math.floor((amount / dailyDeficit) * 24 * 60));
+    const days = Math.floor(minutes / 1440); minutes -= days * 1440;
+    const hours = Math.floor(minutes / 60); minutes -= hours * 60;
+    const parts = [];
+    if (days) parts.push(`${formatNumber(days)} روز`);
+    if (hours) parts.push(`${formatNumber(hours)} ساعت`);
+    if (minutes || !parts.length) parts.push(`${formatNumber(minutes)} دقیقه`);
+    return `موجودی با این روند تا ${parts.join(" و ")} تمام می‌شود`;
+}
+
 function renderResourceBars() {
     if (!player?.resources) return;
     document.querySelectorAll(".resource-bar").forEach(bar => {
         bar.innerHTML = "";
         Object.keys(RESOURCE_NAMES).forEach(key => {
-            const amt = player.resources[key] ?? 0;
-            const rate = player.resource_production?.[key] ?? 0;
-            const use = player.resource_consumption?.[key] ?? 0;
+            const amt = Math.max(0, Number(player.resources[key] ?? 0));
+            const rate = Math.max(0, Number(player.resource_production?.[key] ?? 0));
+            const use = Math.max(0, Number(player.resource_consumption?.[key] ?? 0));
+            const net = rate - use;
             const chip = document.createElement("div");
             chip.className = "resource-chip";
-            let rateLine = "";
-            if (rate > 0 && use > 0) {
-                rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>
-                            <div class="resource-chip-rate down">▼ ${formatNumber(use)} کسر فصلی</div>`;
-            } else if (rate > 0) {
-                rateLine = `<div class="resource-chip-rate up">▲ ${formatNumber(rate)} /روز</div>`;
-            } else if (use > 0) {
-                rateLine = `<div class="resource-chip-rate down">▼ ${formatNumber(use)} /روز</div>`;
+            const productionLine = `<div class="resource-chip-rate up"><span>تولید روزانه</span><b>▲ ${formatNumber(rate)}</b></div>`;
+            const consumptionLine = `<div class="resource-chip-rate down"><span>مصرف روزانه</span><b>▼ ${formatNumber(use)}</b></div>`;
+            let balanceLine = "";
+            if (net > 0) {
+                balanceLine = `<div class="resource-balance positive"><span>افزایش خالص</span><b>+${formatNumber(net)} / روز</b></div>`;
+            } else if (net < 0) {
+                const eta = resourceEtaLabel(amt, Math.abs(net));
+                balanceLine = `<div class="resource-balance negative"><strong>🔺 کمبود روزانه ${formatNumber(Math.abs(net))}</strong><small>${eta}</small></div>`;
             } else {
-                rateLine = `<div class="resource-chip-rate zero">بدون تولید</div>`;
+                balanceLine = `<div class="resource-balance neutral"><span>تولید و مصرف برابر است</span></div>`;
             }
             chip.innerHTML = `
-                <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span></div>
+                <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span><span class="resource-chip-status ${net < 0 ? "is-shortage" : net > 0 ? "is-surplus" : "is-balanced"}">${net < 0 ? "کمبود" : net > 0 ? "مازاد" : "متعادل"}</span></div>
                 <div class="resource-chip-value">${formatNumber(amt)}</div>
-                ${rateLine}`;
+                <div class="resource-rates-stack">${productionLine}${consumptionLine}</div>
+                ${balanceLine}`;
             bar.appendChild(chip);
         });
     });
 }
-
 async function loadWorldAtlas() {
     if (worldData) return worldData;
     const r = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
@@ -1171,12 +1186,42 @@ async function openEconomyPage() {
     showGamePage("economy"); await refreshPlayer(); renderEconomyList();
 }
 
+function economyCategoryFor(iid) {
+    if (["eco_agriculture", "eco_fishing"].includes(iid)) return "food";
+    if (["eco_textile", "eco_construction", "eco_mining", "eco_steel", "eco_electronics", "eco_oil", "eco_chemicals"].includes(iid)) return "industry";
+    if (["eco_trade"].includes(iid)) return "trade";
+    return "finance"; // گردشگری، خدمات و بانک
+}
+
+function bindEconomyFilters() {
+    const filters = document.getElementById("economy-filters");
+    if (!filters || filters.dataset.bound === "1") return;
+    filters.dataset.bound = "1";
+    filters.addEventListener("click", e => {
+        const btn = e.target.closest("[data-economy-filter]");
+        if (!btn) return;
+        currentEconomyFilter = btn.dataset.economyFilter || "all";
+        filters.querySelectorAll("[data-economy-filter]").forEach(item => {
+            const active = item === btn;
+            item.classList.toggle("active", active);
+            item.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        renderEconomyList();
+    });
+}
+
 function renderEconomyList() {
     const c = document.getElementById("economy-list");
     if (!c || !player?.economy) return;
+    bindEconomyFilters();
     c.innerHTML = "";
     c.classList.add("economy-list-grid");
-    Object.entries(player.economy).forEach(([iid, item]) => {
+    const entries = Object.entries(player.economy).filter(([iid]) => currentEconomyFilter === "all" || economyCategoryFor(iid) === currentEconomyFilter);
+    if (!entries.length) {
+        c.innerHTML = `<div class="economy-empty-state">در این دسته هنوز گزینه‌ای وجود ندارد.</div>`;
+        return;
+    }
+    entries.forEach(([iid, item]) => {
         const card = document.createElement("article");
         card.className = "eco-investment-card";
         const built = item.level > 0;
@@ -1192,7 +1237,7 @@ function renderEconomyList() {
             <p class="eco-card-desc">${escapeHtml(item.desc || "")}</p>
             <div class="eco-level-pips">${maxPips}</div>
             <div class="eco-income-panel"><small>درآمد روزانهٔ ${built ? "فعلی" : "سطح ۱"}</small><strong>${formatMoney(built ? currentIncome : Number(next?.income || 0))}</strong>${built && next ? `<span>پس از ارتقا: ${formatMoney(nextIncome)} <i>(${incomeGain >= 0 ? "+" : "−"}${formatMoney(Math.abs(incomeGain))})</i></span>` : !built ? `<span>قابل ارتقا تا ${item.max_level} سطح</span>` : `<span>بالاترین سطح</span>`}</div>
-            <div class="eco-card-facts"><span>⚡ برق لازم <b>${formatNumber(item.power_required || 0)}</b></span><span>🪙 هزینهٔ سرمایه‌گذاری <b>${next ? formatMoney(next.cost) : "—"}</b></span></div>
+            <div class="eco-card-facts"><span>⚡ برق لازم <b>${formatNumber(item.power_required || 0)}</b></span><span>🪙 هزینه <b>${next ? formatMoney(next.cost) : "—"}</b></span></div>
             <button class="eco-invest-button" ${!next ? "disabled" : ""}>${buttonText}</button>`;
         const btn = card.querySelector(".eco-invest-button");
         if (next) btn.addEventListener("click", () => upgradeEconomy(iid));
@@ -4126,9 +4171,9 @@ function showSiteInfo(site) {
         const countryOptions = Object.entries(COUNTRY_NAMES).map(([id, name]) =>
             `<option value="${id}">${COUNTRY_FLAGS[id] || "🏳️"} ${name}</option>`).join("");
         controls.innerHTML = `
-            <div class="strait-control-title">⚓ مدیریت عبور از تنگه</div>
-            <section class="strait-policy-block">
-                <div class="strait-policy-heading"><b>قانون عمومی</b><span>برای همه کشورها</span></div>
+            <div class="strait-control-hero"><span class="strait-control-mark">⚓</span><div><div class="strait-control-title">مدیریت تنگه</div><p>عوارض، دسترسی و استثناهای کشورها را تنظیم کن.</p></div></div>
+            <section class="strait-policy-block strait-global-policy">
+                <div class="strait-policy-heading"><b>قانون عمومی</b><span class="strait-policy-tag">برای همه کشورها</span></div>
                 <label class="strait-policy-label" for="strait-toll-input">عوارض عمومی هر عبور ($)</label>
                 <div class="strait-policy-row">
                     <input id="strait-toll-input" type="number" min="0" step="1" value="${Math.max(0, Number(site.toll || 0))}" placeholder="مثلاً 50000">
@@ -4137,7 +4182,7 @@ function showSiteInfo(site) {
                 <label class="strait-check-row"><input id="strait-closed-input" type="checkbox" ${site.closed ? "checked" : ""}><span>بستن تنگه برای همه کشورها</span></label>
             </section>
             <section class="strait-policy-block country-policy-block">
-                <div class="strait-policy-heading"><b>قانون ویژه</b><span>تنظیم برای یک کشور</span></div>
+                <div class="strait-policy-heading"><b>قانون ویژه</b><span class="strait-policy-tag">فقط کشور انتخابی</span></div>
                 <label class="strait-policy-label" for="strait-country-select">انتخاب کشور</label>
                 <select id="strait-country-select"><option value="">انتخاب کشور...</option>${countryOptions}</select>
                 <label class="strait-policy-label" for="strait-country-toll">عوارض این کشور ($)</label>
@@ -4149,7 +4194,7 @@ function showSiteInfo(site) {
                     <button id="strait-country-clear" type="button">حذف استثنا</button>
                 </div>
             </section>
-            <small>عوارض صفر یعنی عبور رایگان. قانون ویژه فقط روی کشور انتخاب‌شده اثر می‌گذارد. هر تغییر در اخبار و اعلان‌های همهٔ بازیکنان ثبت می‌شود.</small>`;
+            <div class="strait-control-footnote"><span>ⓘ</span><p>عوارض صفر یعنی عبور رایگان. قانون ویژه فقط روی کشور انتخاب‌شده اعمال می‌شود؛ در غیر این صورت قانون عمومی فعال است. تغییرات در خبرها و اعلان‌های بازیکنان ثبت می‌شود.</p></div>`;
 
         const reloadSite = async (message) => {
             if (message) showToast(message, "success");
