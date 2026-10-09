@@ -1536,6 +1536,17 @@ def loc_coords(cid, loc):
     i = MAP_RESOURCES.get(loc) or STRAITS_DATA.get(loc)
     return (i["lon"], i["lat"]) if i else None
 
+def geo_interp(a, b, f):
+    """نقطهٔ f (۰ تا ۱) روی کمان بین دو مختصات (lon, lat)."""
+    lon1, lat1, lon2, lat2 = map(math.radians, (a[0], a[1], b[0], b[1]))
+    d = 2 * math.asin(min(1, math.sqrt(math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2)))
+    if d < 1e-9: return (a[0], a[1])
+    A = math.sin((1 - f) * d) / math.sin(d); B = math.sin(f * d) / math.sin(d)
+    x = A * math.cos(lat1) * math.cos(lon1) + B * math.cos(lat2) * math.cos(lon2)
+    y = A * math.cos(lat1) * math.sin(lon1) + B * math.cos(lat2) * math.sin(lon2)
+    z = A * math.sin(lat1) + B * math.sin(lat2)
+    return (math.degrees(math.atan2(y, x)), math.degrees(math.atan2(z, math.hypot(x, y))))
+
 def travel_minutes(cid, a, b):
     ca, cb = loc_coords(cid, a), loc_coords(cid, b)
     if not ca or not cb: return TRAVEL_MIN_MINUTES
@@ -1569,6 +1580,7 @@ def start_transit(cid, src, dst, units, minutes, kind="go", dst_free=False, orig
     now = utcnow()
     t = {"id": str(uuid.uuid4()), "owner": cid, "from": src, "to": dst, "units": dict(units), "kind": kind,
          "dst_free": dst_free, "origin": origin or src,
+         "from_ll": loc_coords(cid, src), "to_ll": loc_coords(cid, dst),
          "start": now.isoformat(), "arrive": (now + timedelta(minutes=minutes)).isoformat()}
     transits.append(t); return t
 
@@ -1584,6 +1596,10 @@ def _turn_back(t, now, reason=None):
     st, ar = parse_dt(t["start"]), parse_dt(t["arrive"])
     elapsed = max(0.0, (now - st).total_seconds() / 60) if st else 0.0
     cid = t["owner"]; dst_name = loc_label(t["to"])
+    total = (ar - st).total_seconds() / 60 if (st and ar) else 0
+    fr = t.get("from_ll") or loc_coords(cid, t["from"]); to = t.get("to_ll") or loc_coords(cid, t["to"])
+    here = geo_interp(fr, to, min(1.0, elapsed / total)) if (fr and to and total > 0) else fr
+    t["from_ll"] = here; t["to_ll"] = loc_coords(cid, t["origin"])
     t["kind"] = "back"; t["to"] = t["origin"]; t["from"] = "mid"; t["dst_free"] = False
     t["start"] = now.isoformat(); t["arrive"] = (now + timedelta(minutes=elapsed)).isoformat()
     back_name = loc_label(t["to"])
@@ -1722,6 +1738,21 @@ async def dispatch_forces(request):
     eta = f"{mins} دقیقه" if mins < 60 else f"{mins // 60} ساعت و {mins % 60} دقیقه"
     return web.json_response({"success": True, "outcome": "sent", "message": f"نیروها به راه افتادند؛ رسیدن: حدود {eta}.",
                               "player": serialize_player(p)})
+
+async def get_map_transits(request):
+    """مسیر نیروهای در حال حرکت برای همهٔ بازیکنان (بدون تعداد نیرو)."""
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    process_transits()
+    out = []
+    for t in transits:
+        cid = t["owner"]
+        fr = t.get("from_ll") or loc_coords(cid, t["from"]); to = t.get("to_ll") or loc_coords(cid, t["to"])
+        if not fr or not to: continue
+        out.append({"id": t["id"], "country": cid, "from_ll": list(fr), "to_ll": list(to), "kind": t["kind"],
+                    "from_name": "میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"]), "to_name": loc_label(t["to"]),
+                    "start": t["start"], "arrive": t["arrive"]})
+    return web.json_response({"transits": out, "now": utcnow().isoformat()})
 
 async def recall_forces(request):
     uid = get_auth_user_id(request)
@@ -2687,7 +2718,7 @@ async def create_web_app():
         ("/api/upgrade-economy", upgrade_economy), ("/api/train-unit", train_unit),
         ("/api/propose-treaty", propose_treaty), ("/api/respond-treaty", respond_treaty),
         ("/api/war/declare", declare_war), ("/api/war/battle", perform_battle),
-        ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/recall", recall_forces),
+        ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/recall", recall_forces), ("/api/map/transits", get_map_transits),
         ("/api/satellite/launch", sat_launch), ("/api/satellite/scan-site", sat_scan_site),
         ("/api/satellite/scan-country", sat_scan_country),
         ("/api/announcements/create", create_announcement),
