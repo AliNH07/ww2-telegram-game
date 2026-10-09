@@ -29,9 +29,9 @@ COUNTRIES = {
 }
 
 STARTING_MONEY = 10_000_000
-STARTING_MANPOWER = 50_000
+STARTING_MANPOWER = 5_000
 BASE_DAILY_INCOME = 500_000
-BASE_MANPOWER_PRODUCTION = 10_000
+BASE_MANPOWER_PRODUCTION = 1_000
 DAYS_PER_SEASON = 3
 GAME_TOTAL_DAYS = 12
 
@@ -59,7 +59,7 @@ SEASON_HINTS = {
     "زمستان": "❄️ مصرف سوخت و غذا خیلی زیاد می‌شود",
 }
 
-STARTING_RESOURCES = {"food": 5_000, "steel": 0, "uranium": 0, "oil": 5_000}
+STARTING_RESOURCES = {"food": 5_000, "steel": 5_000, "uranium": 0, "oil": 5_000}
 RESOURCE_NAMES = {"food": "غذا", "steel": "آهن", "uranium": "اورانیوم", "oil": "نفت"}
 GROUP_NAMES = {"land": "زمینی", "naval": "دریایی", "air": "هوایی",
                "power": "برق", "manpower": "نیروی انسانی", "resource": "منابع", "missile": "موشکی"}
@@ -372,36 +372,36 @@ ECONOMY = {
 
 ARMY_UNITS = {
     "infantry": {"name": "پیاده‌نظام", "group": "land", "requires": ["land_barracks", "land_hq"],
-        "cost": 50_000, "manpower": 300, "resources": {"food": 100},
+        "cost": 50_000, "manpower": 300, "resources": {"food": 100}, "daily": {"food": 2},
         "attack": 20, "defense": 10},
     "tank": {"name": "تانک", "group": "land", "requires": ["land_barracks", "land_hq", "land_tank_factory"],
-        "cost": 150_000, "manpower": 250, "resources": {"steel": 300, "food": 150},
+        "cost": 150_000, "manpower": 250, "resources": {"steel": 300, "food": 150}, "daily": {"food": 3, "oil": 4, "steel": 1},
         "attack": 50, "defense": 25},
     "ship": {"name": "ناو دریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 250_000, "manpower": 200, "resources": {"oil": 250, "food": 150},
+        "cost": 250_000, "manpower": 200, "resources": {"oil": 250, "food": 150}, "daily": {"food": 4, "oil": 10, "steel": 1},
         "attack": 50, "defense": 60},
     "submarine": {"name": "زیردریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 200_000, "manpower": 120, "resources": {"oil": 200, "steel": 150},
+        "cost": 200_000, "manpower": 120, "resources": {"oil": 200, "steel": 150}, "daily": {"food": 2, "oil": 8, "steel": 1},
         "attack": 45, "defense": 25},
     "transport_ship": {"name": "ناو ترابری", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 180_000, "manpower": 150, "resources": {"oil": 150, "steel": 200},
+        "cost": 180_000, "manpower": 150, "resources": {"oil": 150, "steel": 200}, "daily": {"food": 2, "oil": 5, "steel": 1},
         "attack": 5, "defense": 40, "transport_capacity": 500},
     "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 800_000, "manpower": 500, "resources": {"oil": 800, "steel": 1200},
+        "cost": 800_000, "manpower": 500, "resources": {"oil": 800, "steel": 1200}, "daily": {"food": 8, "oil": 30, "steel": 2},
         "attack": 25, "defense": 90, "aircraft_capacity": 40},
     "fighter": {"name": "جنگنده", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 200_000, "manpower": 150, "resources": {"oil": 200, "steel": 100},
+        "cost": 200_000, "manpower": 150, "resources": {"oil": 200, "steel": 100}, "daily": {"food": 1, "oil": 5},
         "attack": 45, "defense": 40},
     "bomber": {"name": "بمب‌افکن", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 250_000, "manpower": 180, "resources": {"oil": 300, "steel": 150},
+        "cost": 250_000, "manpower": 180, "resources": {"oil": 300, "steel": 150}, "daily": {"food": 2, "oil": 8},
         "attack": 60, "defense": 15},
     "helicopter": {"name": "بالگرد", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 120_000, "manpower": 100, "resources": {"oil": 120, "steel": 60},
+        "cost": 120_000, "manpower": 100, "resources": {"oil": 120, "steel": 60}, "daily": {"food": 1, "oil": 3},
         "attack": 30, "defense": 35},
     "air_tanker": {"name": "هواپیمای سوخت‌رسان", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 220_000, "manpower": 120, "resources": {"oil": 250, "steel": 120},
+        "cost": 220_000, "manpower": 120, "resources": {"oil": 250, "steel": 120}, "daily": {"food": 1, "oil": 8},
         "attack": 2, "defense": 20, "refuel_capacity": 20},
-    # موشک‌ها: علاوه بر هزینهٔ یک‌باره، هر موشکِ موجود هر روز غذا، نفت و آهن مصرف می‌کند
+    # یگان‌ها و موشک‌ها: علاوه بر هزینهٔ ساخت، منابع روزانهٔ نگهداری دارند
     "cruise_missile": {"name": "موشک کروز", "group": "missile", "requires": ["missile_depot", "missile_factory"],
         "min_level": {"missile_factory": 1},
         "cost": 400_000, "manpower": 100, "resources": {"steel": 300, "oil": 200, "food": 50},
@@ -736,11 +736,26 @@ def compute_rates(player):
             resource_consumption[key] = raw - reduced
             resource_production[key] = reduced
 
-    # مصرف روزانهٔ موشک‌ها
+    # مصرف روزانهٔ نگهداریِ همهٔ یگان‌های کشور؛ هم در خانه، هم در مواضع و هم در مسیر.
+    # یگان‌های اعزام‌شده از player["units"] خارج می‌شوند، بنابراین باید از موقعیت فعلی‌شان جمع شوند.
+    unit_totals = {uid_: max(0, int(n or 0)) for uid_, n in player.get("units", {}).items()}
+    country_id = player.get("country")
+    for garrison in globals().get("site_forces", {}).values():
+        if garrison.get("owner") != country_id:
+            continue
+        for uid_, n in (garrison.get("units") or {}).items():
+            unit_totals[uid_] = unit_totals.get(uid_, 0) + max(0, int(n or 0))
+    for transit in globals().get("transits", []):
+        if transit.get("owner") != country_id:
+            continue
+        for uid_, n in (transit.get("units") or {}).items():
+            unit_totals[uid_] = unit_totals.get(uid_, 0) + max(0, int(n or 0))
     for uid_, u in ARMY_UNITS.items():
-        n = player.get("units", {}).get(uid_, 0)
+        n = unit_totals.get(uid_, 0)
         if n > 0:
-            for k, a in u.get("daily", {}).items(): resource_consumption[k] += a * n
+            for k, a in u.get("daily", {}).items():
+                if k in resource_consumption:
+                    resource_consumption[k] += a * n
 
     return {"gross_income": income, "income_before_welfare": income_before_welfare,
             "base_income": base_income, "economy_income": eco_income,
