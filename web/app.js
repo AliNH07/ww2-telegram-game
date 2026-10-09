@@ -1218,13 +1218,22 @@ async function openArmyPage() {
     renderArmyUnitsNew();
 }
 
+function selectArmyTabAndReveal(group, scroll = true) {
+    currentArmyTab = group;
+    document.querySelectorAll(".army-tab").forEach(t => t.classList.toggle("active", t.dataset.armyTab === group));
+    renderArmyUnitsNew();
+    if (scroll) {
+        requestAnimationFrame(() => document.getElementById("army-units-new")?.scrollIntoView({behavior: "smooth", block: "start"}));
+    }
+}
+
 document.querySelectorAll(".army-tab").forEach(tab => {
-    tab.addEventListener("click", () => {
-        document.querySelectorAll(".army-tab").forEach(t => t.classList.remove("active"));
-        tab.classList.add("active");
-        currentArmyTab = tab.dataset.armyTab;
-        renderArmyUnitsNew();
-    });
+    tab.addEventListener("click", () => selectArmyTabAndReveal(tab.dataset.armyTab, false));
+});
+document.querySelectorAll("[data-army-jump]").forEach(card => {
+    const activate = () => selectArmyTabAndReveal(card.dataset.armyJump, true);
+    card.addEventListener("click", activate);
+    card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); } });
 });
 
 function getGroupCapacity(group) {
@@ -3335,19 +3344,158 @@ async function openTradeModal(lid) {
 }
 
 function updateMarketCreateLabels() {
-    const buy=marketCreateSide==="buy";
-    document.getElementById("mk-resource-label").textContent=buy?"کالایی که می‌خرم":"کالایی که می‌فروشم";
-    document.getElementById("mk-price-label").textContent=buy?"در ازای کالای شما / پول":"در ازای";
-    document.getElementById("mk-submit").textContent=buy?"ثبت آگهی خرید":"ثبت آگهی فروش";
+    const buy = marketCreateSide === "buy";
+    document.getElementById("mk-resource-label").textContent = buy ? "کالایی که می‌خواهم بخرم" : "کالایی که می‌فروشم";
+    document.getElementById("mk-price-label").textContent = buy ? "مبلغ/کالای پیشنهادی من" : "در ازای چه چیزی؟";
+    document.getElementById("mk-amount-label").textContent = buy ? "مقدار کالای موردنیاز" : "مقدار کالای فروش";
+    document.getElementById("mk-submit").textContent = buy ? "ثبت آگهی خرید" : "ثبت آگهی فروش";
+    validateMarketForm();
 }
 
-document.querySelectorAll(".market-tab").forEach(tab=>tab.addEventListener("click",()=>{document.querySelectorAll(".market-tab").forEach(t=>t.classList.remove("active"));tab.classList.add("active");document.querySelectorAll(".market-panel").forEach(p=>p.classList.add("hidden"));document.getElementById(tab.dataset.marketTab)?.classList.remove("hidden");if(tab.dataset.marketTab==="market-list-panel")loadMarketListings();else if(tab.dataset.marketTab==="market-mine-panel")loadMyListings();}));
-document.querySelectorAll(".mk-filter").forEach(b=>b.onclick=()=>{document.querySelectorAll(".mk-filter").forEach(x=>x.classList.remove("active"));b.classList.add("active");marketFilter=b.dataset.side;renderMarketListings();});
-document.querySelectorAll(".mk-side").forEach(b=>b.onclick=()=>{document.querySelectorAll(".mk-side").forEach(x=>x.classList.remove("active"));b.classList.add("active");marketCreateSide=b.dataset.createSide;updateMarketCreateLabels();});
+let marketFormTouched = false;
+function marketSetError(id, message) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = message || "";
+}
+function marketAvailable(resource) {
+    if (resource === "money") return Number(player?.money || 0);
+    return Number(player?.resources?.[resource] || 0);
+}
+function validateMarketForm() {
+    const resource = document.getElementById("mk-sell-res")?.value || "";
+    const amountRaw = document.getElementById("mk-sell-amt")?.value ?? "";
+    const payResource = document.getElementById("mk-want-res")?.value || "";
+    const payRaw = document.getElementById("mk-want-amt")?.value ?? "";
+    const amount = amountRaw === "" ? null : Number(amountRaw);
+    const payAmount = payRaw === "" ? null : Number(payRaw);
 
-document.getElementById("mk-submit")?.addEventListener("click",async()=>{const body={side:marketCreateSide,resource:document.getElementById("mk-sell-res").value,amount:Number(document.getElementById("mk-sell-amt").value),price_resource:document.getElementById("mk-want-res").value,price_amount:Number(document.getElementById("mk-want-amt").value)};try{const d=await apiPost("/api/market/create",body);if(!d.success){showToast(d.message||"خطا");return;}showToast("آگهی ثبت شد.");document.querySelector('[data-market-tab="market-list-panel"]')?.click();loadMarketListings();}catch(e){showToast("خطا.");}});
+    marketSetError("mk-sell-res-error", (!resource && marketFormTouched) ? "کالا را انتخاب کنید." : "");
+    marketSetError("mk-want-res-error", (!payResource && marketFormTouched) ? "پول یا کالای موردنظر را انتخاب کنید." : "");
+    marketSetError("mk-sell-amt-error", "");
+    marketSetError("mk-want-amt-error", "");
 
-async function loadMyListings(){const c=document.getElementById("market-mine");if(!c)return;c.innerHTML="";try{const d=await apiGet("/api/market",{country:selectedCountry||""});const mine=(d.listings||[]).filter(l=>l.country===selectedCountry);if(!mine.length){c.innerHTML=`<div class="diplomacy-item-empty">آگهی‌ای ندارید.</div>`;return;}c.innerHTML=mine.map(l=>`<div class="market-card"><div class="market-card-head"><span>${l.side==="sell"?"فروش":"خرید"} ${RESOURCE_NAMES[l.resource]}</span><b>${formatNumber(l.amount)}</b></div><div class="market-card-detail">در ازای ${l.price_resource==="money"?formatMoney(l.price_amount):marketResourceText(l.price_resource,l.price_amount)}</div><button class="market-action cancel" data-cancel="${l.id}">لغو آگهی</button></div>`).join("");c.querySelectorAll("[data-cancel]").forEach(b=>b.onclick=async()=>{const d=await apiPost("/api/market/cancel",{listing_id:b.dataset.cancel});if(!d.success){showToast(d.message||"خطا");return;}loadMyListings();loadMarketListings();});}catch(e){}}
+    if (amountRaw !== "" && (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount))) {
+        marketSetError("mk-sell-amt-error", "مقدار باید یک عدد صحیح بزرگ‌تر از صفر باشد.");
+    } else if (amount !== null && marketCreateSide === "sell" && resource) {
+        const available = marketAvailable(resource);
+        if (amount > available) marketSetError("mk-sell-amt-error", `موجودی شما ${formatNumber(available)} ${RESOURCE_NAMES[resource] || resource} است؛ نمی‌توانید ${formatNumber(amount)} واحد ثبت کنید.`);
+    }
+
+    if (payRaw !== "" && (!Number.isFinite(payAmount) || payAmount <= 0 || !Number.isInteger(payAmount))) {
+        marketSetError("mk-want-amt-error", "مقدار باید یک عدد صحیح بزرگ‌تر از صفر باشد.");
+    } else if (payAmount !== null && marketCreateSide === "buy" && payResource) {
+        const available = marketAvailable(payResource);
+        if (payAmount > available) {
+            const label = payResource === "money" ? "دلارِ خزانه" : (RESOURCE_NAMES[payResource] || payResource);
+            marketSetError("mk-want-amt-error", `موجودی شما ${formatNumber(available)} ${label} است؛ این مقدار پیشنهاد بیشتر از موجودی شماست.`);
+        }
+    }
+
+    const amountError = !!document.getElementById("mk-sell-amt-error")?.textContent;
+    const payError = !!document.getElementById("mk-want-amt-error")?.textContent;
+    const resourceError = !resource || !payResource;
+    const amountValid = amount !== null && Number.isInteger(amount) && amount > 0;
+    const payValid = payAmount !== null && Number.isInteger(payAmount) && payAmount > 0;
+    const submit = document.getElementById("mk-submit");
+    if (submit) submit.disabled = resourceError || !amountValid || !payValid || amountError || payError;
+    return !(resourceError || !amountValid || !payValid || amountError || payError);
+}
+
+function clearMarketForm() {
+    marketFormTouched = false;
+    ["mk-sell-res", "mk-want-res"].forEach(id => { const e = document.getElementById(id); if (e) e.value = ""; });
+    ["mk-sell-amt", "mk-want-amt"].forEach(id => { const e = document.getElementById(id); if (e) e.value = ""; });
+    validateMarketForm();
+}
+
+document.querySelectorAll(".market-tab").forEach(tab => tab.addEventListener("click", () => {
+    document.querySelectorAll(".market-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    document.querySelectorAll(".market-panel").forEach(p => p.classList.add("hidden"));
+    document.getElementById(tab.dataset.marketTab)?.classList.remove("hidden");
+    if (tab.dataset.marketTab === "market-list-panel") loadMarketListings();
+    else if (tab.dataset.marketTab === "market-mine-panel") loadMyListings();
+    else if (tab.dataset.marketTab === "market-create-panel") { refreshPlayer().finally(validateMarketForm); }
+}));
+
+document.querySelectorAll(".mk-filter").forEach(b => b.onclick = () => {
+    document.querySelectorAll(".mk-filter").forEach(x => x.classList.remove("active"));
+    b.classList.add("active"); marketFilter = b.dataset.side; renderMarketListings();
+});
+document.querySelectorAll(".mk-side").forEach(b => b.onclick = () => {
+    document.querySelectorAll(".mk-side").forEach(x => x.classList.remove("active"));
+    b.classList.add("active"); marketCreateSide = b.dataset.createSide;
+    clearMarketForm(); updateMarketCreateLabels();
+});
+["mk-sell-res", "mk-sell-amt", "mk-want-res", "mk-want-amt"].forEach(id => {
+    const e = document.getElementById(id);
+    e?.addEventListener("input", () => { marketFormTouched = true; validateMarketForm(); });
+    e?.addEventListener("change", () => { marketFormTouched = true; validateMarketForm(); });
+});
+
+// فرم از ابتدا خالی است: هیچ کالایی یا عددی به‌صورت خودکار انتخاب نمی‌شود.
+updateMarketCreateLabels();
+
+ document.getElementById("mk-submit")?.addEventListener("click", async () => {
+    if (!validateMarketForm()) return;
+    const body = {
+        side: marketCreateSide,
+        resource: document.getElementById("mk-sell-res").value,
+        amount: Number(document.getElementById("mk-sell-amt").value),
+        price_resource: document.getElementById("mk-want-res").value,
+        price_amount: Number(document.getElementById("mk-want-amt").value)
+    };
+    try {
+        const d = await apiPost("/api/market/create", body);
+        if (!d.success) {
+            if (d.field === "amount") marketSetError("mk-sell-amt-error", d.message || "موجودی کافی نیست.");
+            else if (d.field === "price_amount") marketSetError("mk-want-amt-error", d.message || "موجودی کافی نیست.");
+            else showToast(d.message || "ثبت آگهی ناموفق بود.", "error");
+            await refreshPlayer(); validateMarketForm();
+            return;
+        }
+        await refreshPlayer();
+        clearMarketForm();
+        showToast("آگهی ثبت شد؛ کالای/مبلغ پیشنهادشده تا زمان معامله رزرو شد.", "success");
+        document.querySelector('[data-market-tab="market-mine-panel"]')?.click();
+        loadMarketListings();
+    } catch (e) { showToast("خطا در ثبت آگهی.", "error"); }
+});
+
+async function loadMyListings() {
+    const c = document.getElementById("market-mine"); if (!c) return;
+    c.innerHTML = `<div class="market-loading">در حال دریافت معاملات شما…</div>`;
+    try {
+        const d = await apiGet("/api/market", {country: selectedCountry || ""});
+        const mine = (d.listings || []).filter(l => l.country === selectedCountry);
+        if (!mine.length) {
+            c.innerHTML = `<div class="diplomacy-item-empty">هنوز آگهی بازی ندارید.<br><small>پس از ثبت خرید یا فروش، آن را اینجا مدیریت کنید.</small></div>`;
+            return;
+        }
+        c.innerHTML = mine.map(l => {
+            const isSell = l.side === "sell";
+            const pay = l.price_resource === "money" ? formatMoney(l.price_amount) : marketResourceText(l.price_resource, l.price_amount);
+            return `<article class="market-card market-mine-card side-${l.side}">
+                <div class="market-card-head"><span class="mk-country">${flagInline(l.country, true)} ${COUNTRY_NAMES[l.country] || l.country}</span><b class="mk-badge">${isSell ? "آگهی فروش" : "آگهی خرید"}</b></div>
+                <div class="market-card-main"><div class="market-product"><span class="mk-ico">${RESOURCE_ICONS[l.resource] || "📦"}</span><div class="mk-prod-text"><strong>${isSell ? "کالای قابل فروش" : "کالای موردنیاز"}</strong><b>${RESOURCE_NAMES[l.resource] || l.resource}</b><small>${formatNumber(l.amount)} واحد</small></div></div>
+                <div class="market-price"><small>${isSell ? "درخواست" : "پیشنهاد"}</small><b>${pay}</b></div></div>
+                <div class="market-card-detail">${isSell ? "موجودی کالا هنگام ثبت رزرو شده است." : "مبلغ یا کالای پیشنهادی هنگام ثبت رزرو شده است."}</div>
+                <button class="market-action cancel" data-cancel="${l.id}">لغو آگهی و بازگشت موجودی</button>
+            </article>`;
+        }).join("");
+        c.querySelectorAll("[data-cancel]").forEach(b => b.onclick = async () => {
+            b.disabled = true; b.textContent = "در حال لغو…";
+            try {
+                const d = await apiPost("/api/market/cancel", {listing_id: b.dataset.cancel});
+                if (!d.success) { showToast(d.message || "لغو آگهی ناموفق بود.", "error"); b.disabled = false; b.textContent = "لغو آگهی و بازگشت موجودی"; return; }
+                await refreshPlayer(); await loadMyListings(); await loadMarketListings();
+                showToast("آگهی لغو شد و موجودی رزروشده برگشت.", "success");
+            } catch (e) { b.disabled = false; showToast("خطا در لغو آگهی.", "error"); }
+        });
+    } catch (e) {
+        c.innerHTML = `<div class="diplomacy-item-empty">دریافت آگهی‌ها ناموفق بود. دوباره وارد این بخش شوید.</div>`;
+    }
+}
 
 /* =========================================================
    Map — World globe
