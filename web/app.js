@@ -1634,6 +1634,7 @@ function renderForcesTab() {
     const chips = [["all", "همه"], ["home", "خانه"], ["resource", "سکوها و معادن"], ["strait", "تنگه‌ها"]];
     root.innerHTML = `
         <div class="wf-stats">${wfStat(homeN, "در خانه")}${wfStat(siteN, `در ${formatNumber(warForces.sites.length)} موضع`)}${wfStat(homeN + siteN, "کل نیروها")}</div>
+        ${transitsHtml()}
         <button class="wf-send-btn" id="wf-send-toggle">🧭 اعزام نیرو</button>
         <div class="wf-section"><span>مواضع</span><small>${formatNumber(locs.length)} مکان</small></div>
         <div class="wf-chips">${chips.map(([k, l]) => `<button class="wf-fchip ${forcesFilter === k ? "active" : ""}" data-f="${k}">${l}</button>`).join("")}</div>
@@ -1647,7 +1648,64 @@ function renderForcesTab() {
     root.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
         openLocSheet(b.dataset.toggle);
     });
+    root.querySelectorAll("[data-recall]").forEach(b => b.onclick = async () => {
+        if (!(await gameConfirm("نیروها از میانهٔ راه برگردند؟", { title: "بازگشت نیرو", ok: "بازگرداندن" }))) return;
+        b.disabled = true;
+        try {
+            const d = await apiPost("/api/war/recall", { id: b.dataset.recall });
+            showToast(d.message || (d.success ? "انجام شد" : "خطا"));
+            if (d.player) { player = d.player; updateHomeStats(); }
+        } catch (e) { showToast("خطا."); }
+        loadForces();
+    });
     renderDispatchSheet();
+    startTransitTicker();
+}
+
+/* ---------- نیروهای در راه ---------- */
+let transitTimer = null, transitSkew = 0;
+function fmtEta(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+    const pad = n => String(n).padStart(2, "0");
+    return h ? `${h}:${pad(m)}:${pad(r)}` : `${m}:${pad(r)}`;
+}
+function transitsHtml() {
+    const list = warForces.transits || [];
+    if (!list.length) return "";
+    return `<div class="wf-section"><span>در راه</span><small>${formatNumber(list.length)} گروه</small></div>` + list.map(t => {
+        const total = sumVals(t.units);
+        return `<div class="wf-transit">
+            <div class="wf-tr-top"><b>${t.from_name} ← ${t.to_name}</b><small>${t.kind === "back" ? "در حال بازگشت" : "در حال حرکت"} · ${formatNumber(total)} یگان</small></div>
+            <div class="wf-tr-bar"><i data-tr-bar="${t.id}"></i></div>
+            <div class="wf-tr-bottom"><span>⏱ <b data-tr-eta="${t.id}" dir="ltr">—</b></span>
+                ${t.kind === "go" ? `<button class="wf-tr-cancel" data-recall="${t.id}">بازگرداندن</button>` : ""}</div>
+        </div>`;
+    }).join("");
+}
+function tickTransits() {
+    const list = warForces.transits || [];
+    const now = Date.now() + transitSkew;
+    let done = false;
+    list.forEach(t => {
+        const st = Date.parse(t.start), ar = Date.parse(t.arrive);
+        const left = ar - now, pct = Math.max(0, Math.min(100, ((now - st) / Math.max(1, ar - st)) * 100));
+        const e = document.querySelector(`[data-tr-eta="${t.id}"]`), bar = document.querySelector(`[data-tr-bar="${t.id}"]`);
+        if (e) e.textContent = left > 0 ? fmtEta(left) : "رسید";
+        if (bar) bar.style.width = pct + "%";
+        if (left <= -1500) done = true;
+    });
+    if (done) { clearInterval(transitTimer); transitTimer = null; setTimeout(loadForces, 600); }
+}
+function startTransitTicker() {
+    clearInterval(transitTimer); transitTimer = null;
+    if (warForces.now) transitSkew = Date.parse(warForces.now) - Date.now();
+    if (!(warForces.transits || []).length) return;
+    tickTransits();
+    transitTimer = setInterval(() => {
+        if (document.getElementById("war")?.classList.contains("hidden")) return;
+        tickTransits();
+    }, 1000);
 }
 
 function closeDispatchSheet() { document.getElementById("dp-sheet")?.remove(); }
@@ -2723,9 +2781,9 @@ function renderMapSites() {
         if (d.kind === "strait") s.append("circle").attr("class", "site-shape").attr("r", 4.8);
         else {
             const big = d.type === "oil";
-            s.append("circle").attr("class", "site-shape").attr("r", big ? 8 : 6);
+            s.append("circle").attr("class", "site-shape").attr("r", big ? 10 : 7.5);
             s.append("text").attr("class", "site-emoji").attr("text-anchor", "middle")
-                .attr("dominant-baseline", "central").attr("font-size", big ? 11 : 8)
+                .attr("dominant-baseline", "central").attr("font-size", big ? 8.5 : 5.8)
                 .text(RESOURCE_ICONS[d.type] || "📍");
         }
     });
