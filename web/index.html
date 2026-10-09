@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261009g">
+<link rel="stylesheet" href="/style.css?v=20261009h">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -509,7 +509,7 @@
             <button class="comm-tab active" data-tab="comm-announcements">بیانیه‌ها</button>
             <button class="comm-tab" data-tab="comm-unions">اتحادیه</button>
             <button class="comm-tab" data-tab="comm-news">اخبار</button>
-            <button class="comm-tab" data-tab="comm-contacts">پیام خصوصی</button>
+            <button class="comm-tab" data-tab="comm-contacts">پیام خصوصی<span id="pm-tab-badge" class="pm-badge hidden">0</span></button>
         </div>
 
         <div id="comm-announcements" class="comm-panel">
@@ -530,21 +530,28 @@
         </div>
 
         <div id="comm-contacts" class="comm-panel hidden">
-            <div id="contact-list" class="contact-list"></div>
-
-            <div id="pm-conversation" class="pm-conversation hidden">
-                <div class="pm-header">
-                    <button id="pm-back" class="pm-back">→ بازگشت</button>
-                    <span id="pm-target-name"></span>
-                </div>
-                <div id="pm-messages" class="pm-messages"></div>
-                <div class="pm-input-row">
-                    <textarea id="pm-input" class="pm-input" maxlength="500" placeholder="پیام..."></textarea>
-                    <button id="pm-send" class="pm-send">ارسال</button>
-                </div>
+            <div class="pm-subtabs">
+                <button class="pm-subtab active" data-pm-sub="inbox">پیام<span id="pm-sub-badge" class="pm-badge hidden">0</span></button>
+                <button class="pm-subtab" data-pm-sub="chat">چت</button>
             </div>
+            <div id="pm-inbox" class="contact-list"></div>
+            <div id="contact-list" class="contact-list hidden"></div>
         </div>
     </main>
+
+    <!-- صفحهٔ تمام‌صفحهٔ چت خصوصی -->
+    <div id="pm-conversation" class="pm-conversation hidden">
+        <div class="pm-header">
+            <button id="pm-back" class="pm-back" aria-label="بازگشت"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+            <span id="pm-target-flag" class="pm-target-flag"></span>
+            <span id="pm-target-name"></span>
+        </div>
+        <div id="pm-messages" class="pm-messages"></div>
+        <div class="pm-input-row">
+            <textarea id="pm-input" class="pm-input" rows="1" maxlength="500" placeholder="پیام..."></textarea>
+            <button id="pm-send" class="pm-send" aria-label="ارسال"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+        </div>
+    </div>
 
     <!-- ==================== بازار جهانی ==================== -->
     <main id="market" class="game-page hidden">
