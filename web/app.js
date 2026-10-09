@@ -2632,7 +2632,9 @@ function setMapSpin(on) {
 let mapInitialized = false, mapInitializing = false;
 let mapAbort = null;
 let mapSites = [];
-let mapSitesSvg = null;
+let mapSitesSvg = null, mapRoutesSvg = null;
+let mapTransits = [], mapRouteSkew = 0, mapRoutesVisible = true;
+try { mapRoutesVisible = localStorage.getItem("mapRoutes") !== "off"; } catch (e) {}
 let mapCanvas = null, mapCtx = null, mapDpr = 1, mapW = 320, mapH = 300;
 let mapFeatures = [], mapGroups = [], mapWaterItems = [], mapGraticule = null, mapRaf = 0;
 let mapBorders = null, mapCoast = null;
@@ -2642,7 +2644,7 @@ async function initWorldMap() {
     const svgEl = document.getElementById("map-globe");
     if (!box || !svgEl) return;
 
-    if (mapInitialized) { updateMapColors(); redrawMap(); refreshMapSites(); return; }
+    if (mapInitialized) { updateMapColors(); redrawMap(); refreshMapSites(); loadMapRoutes(); return; }
     if (mapInitializing) return;
     mapInitializing = true;
 
@@ -2742,6 +2744,7 @@ async function initWorldMap() {
         m.label = node;
     });
 
+    mapRoutesSvg = mapSvg.append("g").attr("class", "map-routes-layer");
     mapSitesSvg = mapSvg.append("g").attr("class", "map-sites-layer");
 
     updateMapColors(); redrawMap();
@@ -2750,6 +2753,16 @@ async function initWorldMap() {
     document.getElementById("map-zoom-in").onclick = () => zoomMap(1.35);
     document.getElementById("map-zoom-out").onclick = () => zoomMap(1 / 1.35);
     document.getElementById("map-reset").onclick = () => setMapSpin(!mapSpinning);
+    const rb = document.getElementById("map-routes-btn");
+    if (rb) {
+        rb.classList.toggle("active", mapRoutesVisible);
+        rb.onclick = () => {
+            mapRoutesVisible = !mapRoutesVisible;
+            try { localStorage.setItem("mapRoutes", mapRoutesVisible ? "on" : "off"); } catch (e) {}
+            rb.classList.toggle("active", mapRoutesVisible);
+            renderMapRoutes(); showToast(mapRoutesVisible ? "مسیر نیروها نمایش داده می‌شود" : "مسیر نیروها پنهان شد");
+        };
+    }
     document.getElementById("map-info-close").onclick = () => {
         document.getElementById("map-info-panel").classList.add("hidden");
     };
@@ -2758,14 +2771,62 @@ async function initWorldMap() {
     // سکوها بعد از نمایش کره لود می‌شوند تا نقشه زودتر دیده شود
     await loadMapSites();
     renderMapSites();
+    loadMapRoutes();
     redrawMap();
 }
+
+/* ---------- مسیر نیروهای در حال حرکت (برای همه) ---------- */
+async function loadMapRoutes() {
+    if (!mapRoutesSvg) return;
+    try {
+        const d = await apiGet("/api/map/transits");
+        mapTransits = Array.isArray(d?.transits) ? d.transits : [];
+        if (d?.now) mapRouteSkew = Date.parse(d.now) - Date.now();
+    } catch (e) { mapTransits = []; }
+    renderMapRoutes();
+}
+function renderMapRoutes() {
+    if (!mapRoutesSvg) return;
+    mapRoutesSvg.selectAll("*").remove();
+    if (!mapRoutesVisible) return;
+    const g = mapRoutesSvg.selectAll(".map-route").data(mapTransits, d => d.id).enter().append("g").attr("class", "map-route");
+    g.append("path").attr("class", d => "map-route-line" + (d.country === selectedCountry ? " mine" : ""));
+    g.each(function (d) {
+        const s = d3.select(this).append("g").attr("class", "map-route-head")
+            .on("click", e => { e.stopPropagation(); showToast(`${COUNTRY_NAMES[d.country] || d.country}: ${d.from_name} ← ${d.to_name}`.replace("←", "➜")); });
+        s.append("circle").attr("class", "map-route-pulse").attr("r", 3);
+        s.append("circle").attr("class", "map-route-dot").attr("r", 3.2);
+        s.append("text").attr("class", "map-route-flag").attr("x", 6).attr("y", -5).text(COUNTRY_FLAGS[d.country] || "");
+    });
+    updateMapRoutes();
+}
+function updateMapRoutes() {
+    if (!mapRoutesSvg || !mapProjection || !mapRoutesVisible) return;
+    const rot = mapProjection.rotate(), pathGen = d3.geoPath(mapProjection);
+    const now = Date.now() + mapRouteSkew;
+    mapRoutesSvg.selectAll(".map-route").each(function (d) {
+        const f = Math.max(0, Math.min(1, (now - Date.parse(d.start)) / Math.max(1, Date.parse(d.arrive) - Date.parse(d.start))));
+        d3.select(this).select(".map-route-line").attr("d", pathGen({ type: "LineString", coordinates: [d.from_ll, d.to_ll] }) || "");
+        const pos = d3.geoInterpolate(d.from_ll, d.to_ll)(f);
+        const p = viewCos(pos[0], pos[1], rot) > 0.02 ? mapProjection(pos) : null;
+        const head = d3.select(this).select(".map-route-head");
+        if (p) head.attr("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)})`).style("display", "");
+        else head.style("display", "none");
+    });
+}
+setInterval(() => {
+    if (mapInitialized && !document.getElementById("map")?.classList.contains("hidden")) { loadMapRoutes(); }
+}, 10000);
+setInterval(() => {
+    if (mapInitialized && mapTransits.length && !document.getElementById("map")?.classList.contains("hidden")) updateMapRoutes();
+}, 1000);
 
 async function refreshMapSites() {
     if (!mapSitesSvg) return;
     await loadMapSites();
     renderMapSites();
     updateMapSitePositions();
+    loadMapRoutes();
 }
 setInterval(() => {
     if (mapInitialized && !document.getElementById("map")?.classList.contains("hidden")) refreshMapSites();
@@ -2801,6 +2862,7 @@ function renderMapSites() {
 }
 
 function updateMapSitePositions() {
+    updateMapRoutes();
     if (!mapSitesSvg || !mapProjection) return;
     const rot = mapProjection.rotate();
     const zoom = mapProjection.scale() / mapSize;
