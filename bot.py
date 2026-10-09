@@ -1552,6 +1552,16 @@ def announce(kind, title, text, countries=()):
     """اعلان همزمان در اخبار جنگ و اعلان‌ها/اخبار عمومی (بدون ذکر تعداد نیرو)."""
     push_war(kind, text, list(countries)); push_news(title, text)
 
+def notify_country(cid, text):
+    """پیام خصوصی تلگرام به بازیکنِ آن کشور (علاوه بر اعلان‌های درون بازی)."""
+    uid_, _ = get_player_by_country(cid)
+    if not uid_: return
+    async def _send():
+        try: await bot.send_message(uid_, text)
+        except Exception as e: logging.warning("notify failed: %s", e)
+    try: asyncio.get_running_loop().create_task(_send())
+    except RuntimeError: pass
+
 def _add_units(dest, sent):
     for k, n in sent.items(): dest[k] = dest.get(k, 0) + n
 
@@ -1610,6 +1620,7 @@ def resolve_arrival(t):
         push_war("occupy", f"{cname(cid)} {meta['name']} را گرفت.", [cid])
         push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, None, "attacker", "بی‌صاحب بود")
         push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را تصرف کرد.")
+        notify_country(cid, f"✅ نیروهای شما به {meta['name']} رسیدند و آن را با موفقیت گرفتند.")
     else:
         _, dfd = get_player_by_country(owner)
         gar = garrison(dst)
@@ -1623,12 +1634,16 @@ def resolve_arrival(t):
             push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "attacker",
                          f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}")
             push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را از {cname(owner)} گرفت.")
+            notify_country(cid, f"✅ حمله موفق بود! {meta['name']} را از {cname(owner)} گرفتید.")
+            notify_country(owner, f"⚠️ {cname(cid)} {meta['name']} را از شما گرفت.")
         else:
             _add_units(p["units"], {k: int(n * 0.3) for k, n in units.items()})
             for k in list(gar): gar[k] = int(gar[k] * 0.8)
             push_war("repel", f"{cname(owner)} حملهٔ {cname(cid)} به {meta['name']} را دفع کرد.", [cid, owner])
             push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "defender",
                          f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}")
+            notify_country(cid, f"❌ حمله شما به {meta['name']} دفع شد؛ بخشی از نیروها به خانه برگشتند.")
+            notify_country(owner, f"🛡️ حملهٔ {cname(cid)} به {meta['name']} را دفع کردید.")
 
 def process_transits():
     now = utcnow(); changed = False
