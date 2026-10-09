@@ -751,6 +751,7 @@ war_reports = []
 announcements = []
 unions = {}
 private_messages = {}
+pm_read = {}   # cid -> {other_cid: تعداد پیام‌های دیده‌شده}
 market_listings = {}
 news_feed = []
 site_forces = {}   # site_id -> {"owner": country, "units": {unit_id: n}}
@@ -785,7 +786,7 @@ def save_state():
                  "occupied_countries": occupied_countries, "war_declarations": war_declarations,
                  "active_wars": active_wars, "war_reports": war_reports[-50:],
                  "announcements": announcements[-100:], "unions": unions,
-                 "private_messages": private_messages, "market_listings": market_listings,
+                 "private_messages": private_messages, "pm_read": pm_read, "market_listings": market_listings,
                  "news_feed": news_feed[-200:],
                  "straits_data": STRAITS_DATA,
                  "transits": transits, "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:],
@@ -800,7 +801,7 @@ def save_state():
 def load_state():
     global diplomacy_proposals, active_treaties, map_holdings, strait_holdings
     global occupied_countries, war_declarations, active_wars, war_reports
-    global announcements, unions, private_messages, market_listings, news_feed
+    global announcements, unions, private_messages, pm_read, market_listings, news_feed
     global site_forces, war_events, war_history, loans, transits
     if not os.path.exists(STATE_FILE):
         logging.info("No state, fresh start."); return
@@ -818,6 +819,7 @@ def load_state():
         announcements = state.get("announcements", [])
         unions = state.get("unions", {})
         private_messages = state.get("private_messages", {})
+        pm_read = state.get("pm_read", {})
         market_listings = state.get("market_listings", {})
         news_feed = state.get("news_feed", [])
         for _sid, _sv in state.get("straits_data", {}).items():
@@ -2051,19 +2053,37 @@ async def send_pm(request):
     msg = {"from": cid, "to": target, "text": text, "at": utcnow().isoformat()}
     private_messages.setdefault(cid, {}).setdefault(target, []).append(msg)
     private_messages.setdefault(target, {}).setdefault(cid, []).append(msg)
+    # فرستنده پیام خودش را دیده است
+    pm_read.setdefault(cid, {})[target] = len(private_messages[cid][target])
     save_state()
+    try: notify_country(target, f"📩 از کشور {_lname(cid)} یک پیغام خصوصی آمد.\nبرای خواندن: ارتباطات ← پیام خصوصی")
+    except Exception as e: logging.warning("pm notify failed: %s", e)
     return web.json_response({"success": True})
+
+def _pm_unread(cid, other):
+    msgs = private_messages.get(cid, {}).get(other, [])
+    seen = pm_read.get(cid, {}).get(other, 0)
+    return sum(1 for m in msgs[seen:] if m.get("from") == other)
 
 async def get_pm(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
     target = request.query.get("target")
-    if uid not in players: return web.json_response({"messages": []})
+    if uid not in players: return web.json_response({"messages": [], "conversations": [], "unread_total": 0})
     cid = players[uid].get("country")
-    if not cid: return web.json_response({"messages": []})
+    if not cid: return web.json_response({"messages": [], "conversations": [], "unread_total": 0})
     if target:
-        return web.json_response({"messages": private_messages.get(cid, {}).get(target, []), "with": target})
-    return web.json_response({"conversations": list(private_messages.get(cid, {}).keys())})
+        msgs = private_messages.get(cid, {}).get(target, [])
+        pm_read.setdefault(cid, {})[target] = len(msgs)
+        return web.json_response({"messages": msgs, "with": target})
+    convs = []
+    for other, msgs in private_messages.get(cid, {}).items():
+        if not msgs: continue
+        last = msgs[-1]
+        convs.append({"with": other, "last": last.get("text", ""), "last_from": last.get("from"),
+                      "at": last.get("at"), "unread": _pm_unread(cid, other)})
+    convs.sort(key=lambda c: c.get("at") or "", reverse=True)
+    return web.json_response({"conversations": convs, "unread_total": sum(c["unread"] for c in convs)})
 
 # =========================================================
 # API Market — international trade
