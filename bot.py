@@ -1794,7 +1794,8 @@ async def get_map_transits(request):
         cid = t["owner"]
         fr = t.get("from_ll") or loc_coords(cid, t["from"]); to = t.get("to_ll") or loc_coords(cid, t["to"])
         if not fr or not to: continue
-        out.append({"id": t["id"], "country": cid, "from_ll": list(fr), "to_ll": list(to), "kind": t["kind"],
+        out.append({"id": t["id"], "country": cid, "from": t["from"], "to": t["to"],
+                    "from_ll": list(fr), "to_ll": list(to), "kind": t["kind"],
                     "from_name": "میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"]), "to_name": loc_label(t["to"]),
                     "start": t["start"], "arrive": t["arrive"]})
     return web.json_response({"transits": out, "now": utcnow().isoformat()})
