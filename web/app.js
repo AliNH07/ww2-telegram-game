@@ -2351,7 +2351,7 @@ function openAnnouncementHelp() {
         <section class="modal-box ann-help-box" role="dialog" aria-modal="true" aria-labelledby="ann-help-title">
             <div class="ann-modal-head"><div><span class="ann-modal-kicker">راهنمای کوتاه</span><h2 class="modal-title" id="ann-help-title">قوانین انتشار بیانیه</h2></div><button class="ann-modal-close" type="button" aria-label="بستن">×</button></div>
             <div class="ann-help-content">
-                <div class="ann-help-rule"><span class="ann-help-rule-icon">📅</span><div><strong>۴ بیانیه در روز</strong><p>سهمیه هر روز ساعت ۰۰:۰۰ به وقت باکو دوباره فعال می‌شود.</p></div></div>
+                <div class="ann-help-rule"><span class="ann-help-rule-icon">📅</span><div><strong>۴ بیانیه در روز</strong><p>سهمیه هر روز ساعت ۰۰:۰۰ دوباره فعال می‌شود.</p></div></div>
                 <div class="ann-help-rule"><span class="ann-help-rule-icon">⏱️</span><div><strong>فاصلهٔ یک‌ساعته</strong><p>بین انتشار هر بیانیه باید یک ساعت کامل فاصله باشد. زمان باقی‌مانده کنار دکمه نشان داده می‌شود.</p></div></div>
                 <div class="ann-help-rule"><span class="ann-help-rule-icon">💰</span><div><strong>هزینهٔ روزانه</strong><p>بیانیهٔ اول و دوم رایگان است؛ بیانیهٔ سوم ۱۰٬۰۰۰ دلار و بیانیهٔ چهارم ۴۰۰٬۰۰۰ دلار هزینه دارد.</p></div></div>
                 <div class="ann-help-rule"><span class="ann-help-rule-icon">✍️</span><div><strong>متن بیانیه</strong><p>هر بیانیه می‌تواند حداکثر ۲۰٬۰۰۰ حرف داشته باشد.</p></div></div>
@@ -3374,6 +3374,11 @@ let mapCanvas = null, mapCtx = null, mapDpr = 1, mapW = 320, mapH = 300;
 let mapFeatures = [], mapGroups = [], mapWaterItems = [], mapGraticule = null, mapRaf = 0;
 let mapBorders = null, mapCoast = null;
 
+// Sea-only route graph: transit lines follow connected water cells instead of drawing a great-circle through continents.
+const MAP_SEA_STEP = 2;
+let mapSeaGrid = null, mapSeaGridPromise = null;
+const mapSeaLandCache = new Map(), mapSeaEdgeCache = new Map(), mapSeaCoastCache = new Map(), mapTransitRouteCache = new Map();
+
 async function initWorldMap() {
     const box = document.querySelector(".map-box");
     const svgEl = document.getElementById("map-globe");
@@ -3520,11 +3525,212 @@ async function loadMapRoutes() {
     } catch (e) { mapTransits = []; }
     renderMapRoutes();
 }
+function mapRouteNormalizeLon(lon) {
+    return ((Number(lon) + 180) % 360 + 360) % 360 - 180;
+}
+function mapRouteLandAt(ll) {
+    if (!ll || !Number.isFinite(Number(ll[0])) || !Number.isFinite(Number(ll[1]))) return false;
+    const lon = mapRouteNormalizeLon(ll[0]), lat = Math.max(-89.9, Math.min(89.9, Number(ll[1])));
+    const key = `${lon.toFixed(2)},${lat.toFixed(2)}`;
+    if (mapSeaLandCache.has(key)) return mapSeaLandCache.get(key);
+    const land = mapFeatures.some(m => m.f && d3.geoContains(m.f, [lon, lat]));
+    mapSeaLandCache.set(key, land);
+    return land;
+}
+function mapRouteSegmentIsWater(a, b) {
+    if (!a || !b) return false;
+    const interp = d3.geoInterpolate(a, b);
+    // Multiple samples catch narrow land crossings between adjacent grid nodes.
+    for (const f of [0.25, 0.5, 0.75]) if (mapRouteLandAt(interp(f))) return false;
+    return true;
+}
+function ensureMapSeaGrid() {
+    if (mapSeaGrid) return mapSeaGrid;
+    if (mapSeaGridPromise) return null;
+    mapSeaGridPromise = true;
+    const cols = 360 / MAP_SEA_STEP, rows = (176 / MAP_SEA_STEP) + 1;
+    const nodes = new Array(cols * rows);
+    for (let r = 0; r < rows; r++) {
+        const lat = -88 + r * MAP_SEA_STEP;
+        for (let c = 0; c < cols; c++) {
+            const lon = -180 + c * MAP_SEA_STEP, id = r * cols + c;
+            const ll = [lon, lat];
+            nodes[id] = { id, r, c, ll, land: mapRouteLandAt(ll), neighbors: null };
+        }
+    }
+    mapSeaGrid = { cols, rows, nodes };
+    mapSeaGridPromise = null;
+    return mapSeaGrid;
+}
+function mapSeaEdgeOpen(a, b) {
+    const lo = Math.min(a.id, b.id), hi = Math.max(a.id, b.id), key = `${lo}:${hi}`;
+    if (mapSeaEdgeCache.has(key)) return mapSeaEdgeCache.get(key);
+    const open = !a.land && !b.land && mapRouteSegmentIsWater(a.ll, b.ll);
+    mapSeaEdgeCache.set(key, open);
+    return open;
+}
+function mapSeaNeighbors(id) {
+    const grid = ensureMapSeaGrid();
+    if (!grid) return [];
+    const node = grid.nodes[id];
+    if (!node || node.land) return [];
+    if (node.neighbors) return node.neighbors;
+    const found = [], dirs = [-1, 0, 1];
+    for (const dr of dirs) for (const dc of dirs) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = node.r + dr;
+        if (nr < 0 || nr >= grid.rows) continue;
+        const nc = (node.c + dc + grid.cols) % grid.cols;
+        const next = grid.nodes[nr * grid.cols + nc];
+        if (next && !next.land && mapSeaEdgeOpen(node, next)) found.push(next.id);
+    }
+    node.neighbors = found;
+    return found;
+}
+function mapSeaCoastNodes(country) {
+    const grid = ensureMapSeaGrid();
+    if (!grid) return [];
+    if (mapSeaCoastCache.has(country)) return mapSeaCoastCache.get(country);
+    const feature = mapFeatures.find(m => m.key === country && m.f);
+    if (!feature) { mapSeaCoastCache.set(country, []); return []; }
+    const goals = [], dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    for (const n of grid.nodes) {
+        if (n.land) continue;
+        let coastal = false;
+        for (const [dr, dc] of dirs) {
+            const nr = n.r + dr;
+            if (nr < 0 || nr >= grid.rows) continue;
+            const nc = (n.c + dc + grid.cols) % grid.cols;
+            const adj = grid.nodes[nr * grid.cols + nc];
+            if (adj?.land && d3.geoContains(feature.f, adj.ll)) { coastal = true; break; }
+        }
+        if (coastal) goals.push(n.id);
+    }
+    mapSeaCoastCache.set(country, goals);
+    return goals;
+}
+function mapNearestSeaNode(ll) {
+    const grid = ensureMapSeaGrid();
+    if (!grid || !ll) return null;
+    const candidates = [];
+    for (const n of grid.nodes) {
+        if (n.land) continue;
+        candidates.push({ n, dist: d3.geoDistance(ll, n.ll) });
+    }
+    candidates.sort((a, b) => a.dist - b.dist);
+    for (const { n } of candidates.slice(0, 80)) {
+        if (mapRouteSegmentIsWater(ll, n.ll)) return n.id;
+    }
+    return null;
+}
+class MapRouteMinHeap {
+    constructor() { this.items = []; }
+    push(item) {
+        const a = this.items; a.push(item); let i = a.length - 1;
+        while (i > 0) { const p = (i - 1) >> 1; if (a[p].score <= item.score) break; a[i] = a[p]; i = p; }
+        a[i] = item;
+    }
+    pop() {
+        const a = this.items; if (!a.length) return null;
+        const root = a[0], last = a.pop();
+        if (a.length) { let i = 0; while (true) { let c = i * 2 + 1; if (c >= a.length) break; if (c + 1 < a.length && a[c + 1].score < a[c].score) c++; if (a[c].score >= last.score) break; a[i] = a[c]; i = c; } a[i] = last; }
+        return root;
+    }
+    get length() { return this.items.length; }
+}
+function findSeaGridPath(startId, targetId, goalIds = null) {
+    const grid = ensureMapSeaGrid();
+    if (!grid || startId == null) return null;
+    const goals = goalIds ? new Set(goalIds) : new Set([targetId]);
+    if (!goals.size) return null;
+    if (goals.has(startId)) return [startId];
+    const total = grid.nodes.length, best = new Float64Array(total); best.fill(Infinity);
+    const parent = new Int32Array(total); parent.fill(-1);
+    const closed = new Uint8Array(total), heap = new MapRouteMinHeap();
+    const targetLL = !goalIds && grid.nodes[targetId]?.ll;
+    const heuristic = node => {
+        // For one destination use great-circle distance as an admissible heuristic.
+        // For a set of coast goals use Dijkstra so we don't scan hundreds of coast points per node.
+        return targetLL ? d3.geoDistance(node.ll, targetLL) * 6371 : 0;
+    };
+    best[startId] = 0; heap.push({ id: startId, score: heuristic(grid.nodes[startId]) });
+    let found = -1, expanded = 0;
+    while (heap.length && expanded < total) {
+        const cur = heap.pop(); if (!cur || closed[cur.id]) continue;
+        closed[cur.id] = 1; expanded++;
+        if (goals.has(cur.id)) { found = cur.id; break; }
+        const a = grid.nodes[cur.id];
+        for (const nid of mapSeaNeighbors(cur.id)) {
+            if (closed[nid]) continue;
+            const b = grid.nodes[nid];
+            const cost = d3.geoDistance(a.ll, b.ll) * 6371;
+            const alt = best[cur.id] + cost;
+            if (alt < best[nid]) {
+                best[nid] = alt; parent[nid] = cur.id;
+                heap.push({ id: nid, score: alt + heuristic(b) });
+            }
+        }
+    }
+    if (found < 0) return null;
+    const path = []; let cur = found;
+    while (cur >= 0) { path.push(cur); if (cur === startId) break; cur = parent[cur]; }
+    if (path[path.length - 1] !== startId) return null;
+    path.reverse(); return path;
+}
+function makeMapRouteInfo(coords) {
+    if (!Array.isArray(coords) || coords.length < 2) return null;
+    const lengths = [], cumulative = [0]; let total = 0;
+    for (let i = 1; i < coords.length; i++) {
+        const length = d3.geoDistance(coords[i - 1], coords[i]);
+        lengths.push(length); total += length; cumulative.push(total);
+    }
+    if (!total) return null;
+    return { coords, lengths, cumulative, total };
+}
+function mapTransitRouteInfo(d) {
+    const signature = `${d.from}|${d.to}|${(d.from_ll||[]).join(',')}|${(d.to_ll||[]).join(',')}|${d.start}|${d.arrive}`;
+    const saved = mapTransitRouteCache.get(d.id);
+    if (saved?.signature === signature) return saved.route;
+    const grid = ensureMapSeaGrid(); if (!grid) return null;
+    const fromHome = d.from === "home", toHome = d.to === "home";
+    let coords = null;
+    if (fromHome || toHome) {
+        const coast = mapSeaCoastNodes(d.country);
+        if (!coast.length) return null;
+        if (fromHome) {
+            const targetId = mapNearestSeaNode(d.to_ll);
+            const path = targetId == null ? null : findSeaGridPath(targetId, null, coast);
+            if (path?.length) coords = path.slice().reverse().map(id => grid.nodes[id].ll).concat([d.to_ll]);
+        } else {
+            const sourceId = mapNearestSeaNode(d.from_ll);
+            const path = sourceId == null ? null : findSeaGridPath(sourceId, null, coast);
+            if (path?.length) coords = [d.from_ll, ...path.map(id => grid.nodes[id].ll)];
+        }
+    } else {
+        const sourceId = mapNearestSeaNode(d.from_ll), targetId = mapNearestSeaNode(d.to_ll);
+        const path = sourceId == null || targetId == null ? null : findSeaGridPath(sourceId, targetId);
+        if (path?.length) coords = [d.from_ll, ...path.map(id => grid.nodes[id].ll), d.to_ll];
+    }
+    // Do not draw a fake straight line through land when no connected sea route exists.
+    const route = coords ? makeMapRouteInfo(coords) : null;
+    mapTransitRouteCache.set(d.id, { signature, route });
+    return route;
+}
+function mapRoutePointAt(route, f) {
+    if (!route) return null;
+    const goal = Math.max(0, Math.min(1, f)) * route.total;
+    let i = 0;
+    while (i < route.lengths.length - 1 && route.cumulative[i + 1] < goal) i++;
+    const seg = Math.max(1e-9, route.lengths[i]);
+    const t = Math.max(0, Math.min(1, (goal - route.cumulative[i]) / seg));
+    return d3.geoInterpolate(route.coords[i], route.coords[i + 1])(t);
+}
 function renderMapRoutes() {
     if (!mapRoutesSvg) return;
     mapRoutesSvg.selectAll("*").remove();
     if (!mapRoutesVisible) return;
-    const g = mapRoutesSvg.selectAll(".map-route").data(mapTransits, d => d.id).enter().append("g").attr("class", "map-route");
+    const routes = mapTransits.map(d => ({ ...d, routeInfo: mapTransitRouteInfo(d) })).filter(d => d.routeInfo);
+    const g = mapRoutesSvg.selectAll(".map-route").data(routes, d => d.id).enter().append("g").attr("class", "map-route");
     g.append("path").attr("class", d => "map-route-line" + (d.country === selectedCountry ? " mine" : ""));
     g.each(function (d) {
         const s = d3.select(this).append("g").attr("class", "map-route-head")
@@ -3541,9 +3747,9 @@ function updateMapRoutes() {
     const now = Date.now() + mapRouteSkew;
     mapRoutesSvg.selectAll(".map-route").each(function (d) {
         const f = Math.max(0, Math.min(1, (now - Date.parse(d.start)) / Math.max(1, Date.parse(d.arrive) - Date.parse(d.start))));
-        d3.select(this).select(".map-route-line").attr("d", pathGen({ type: "LineString", coordinates: [d.from_ll, d.to_ll] }) || "");
-        const pos = d3.geoInterpolate(d.from_ll, d.to_ll)(f);
-        const p = viewCos(pos[0], pos[1], rot) > 0.02 ? mapProjection(pos) : null;
+        d3.select(this).select(".map-route-line").attr("d", pathGen({ type: "LineString", coordinates: d.routeInfo.coords }) || "");
+        const pos = mapRoutePointAt(d.routeInfo, f);
+        const p = pos && viewCos(pos[0], pos[1], rot) > 0.02 ? mapProjection(pos) : null;
         const head = d3.select(this).select(".map-route-head");
         if (p) head.attr("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)})`).style("display", "");
         else head.style("display", "none");
