@@ -1548,6 +1548,10 @@ def loc_label(loc):
     if loc == "home": return "خانه"
     m = site_meta(loc); return m["name"] if m else "—"
 
+def announce(kind, title, text, countries=()):
+    """اعلان همزمان در اخبار جنگ و اعلان‌ها/اخبار عمومی (بدون ذکر تعداد نیرو)."""
+    push_war(kind, text, list(countries)); push_news(title, text)
+
 def _add_units(dest, sent):
     for k, n in sent.items(): dest[k] = dest.get(k, 0) + n
 
@@ -1572,9 +1576,10 @@ def _turn_back(t, now, reason=None):
     cid = t["owner"]; dst_name = loc_label(t["to"])
     t["kind"] = "back"; t["to"] = t["origin"]; t["from"] = "mid"; t["dst_free"] = False
     t["start"] = now.isoformat(); t["arrive"] = (now + timedelta(minutes=elapsed)).isoformat()
-    txt = f"{cname(cid)} نیروهای خود را که به {dst_name} می‌رفتند از میانهٔ راه بازگرداند"
-    push_war("turnback", txt + (f"؛ دلیل: {reason}." if reason else "."), [cid])
-    if reason: push_news("بازگشت از میانهٔ راه", txt + f"؛ دلیل: {reason}.")
+    back_name = loc_label(t["to"])
+    announce("turnback", "بازگشت نیرو از میانهٔ راه",
+             f"{cname(cid)} نیروهای خود را که به {dst_name} می‌رفتند از میانهٔ راه به {back_name} بازگرداند"
+             + (f"؛ دلیل: {reason}." if reason else "."), [cid])
 
 def resolve_arrival(t):
     cid = t["owner"]; units = t["units"]; dst = t["to"]
@@ -1594,7 +1599,7 @@ def resolve_arrival(t):
     meta = site_meta(dst); kind = meta["kind"]; owner = site_owner(dst)
     if owner and owner != cid and have_treaty(cid, owner, "non_aggression"):
         _add_units(p["units"], units)
-        push_war("turnback", f"{cname(cid)} نیروهایش را که به {meta['name']} می‌رفتند بازگرداند؛ دلیل: پیمان عدم تجاوز با {cname(owner)}.", [cid, owner]); return
+        announce("turnback", "بازگشت نیرو", f"{cname(cid)} نیروهایش را که به {meta['name']} رسیده بودند بازگرداند؛ دلیل: پیمان عدم تجاوز با {cname(owner)}.", [cid, owner]); return
     if owner == cid:
         g = site_forces.get(dst)
         if not g or g.get("owner") != cid: g = site_forces[dst] = {"owner": cid, "units": {}}
@@ -1690,11 +1695,13 @@ async def dispatch_forces(request):
     minutes = travel_minutes(cid, src, dst)
     start_transit(cid, src, dst, units, minutes, "go", dst_free=(dst != "home" and not owner))
     if dst == "home":
-        push_war("return", f"{cname(cid)} نیروهایش را از {loc_label(src)} به خانه بازگرداند.", [cid])
-    elif src == "home":
-        push_war("send", f"{cname(cid)} به {loc_label(dst)} نیرو فرستاد.", [cid])
+        announce("return", "بازگشت نیرو", f"{cname(cid)} از {loc_label(src)} نیروهایش را به خانه فرستاد.", [cid])
     else:
-        push_war("send", f"{cname(cid)} از {loc_label(src)} نیروهایش را به {loc_label(dst)} فرستاد.", [cid])
+        target = f"به {loc_label(dst)}" if owner == cid else f"برای {loc_label(dst)}"
+        if src == "home":
+            announce("send", "اعزام نیرو", f"{cname(cid)} {target} نیرو فرستاد.", [cid] + ([owner] if owner and owner != cid else []))
+        else:
+            announce("send", "اعزام نیرو", f"{cname(cid)} از {loc_label(src)} نیروهایش را {target} فرستاد.", [cid] + ([owner] if owner and owner != cid else []))
     save_state()
     mins = int(math.ceil(minutes))
     eta = f"{mins} دقیقه" if mins < 60 else f"{mins // 60} ساعت و {mins % 60} دقیقه"
