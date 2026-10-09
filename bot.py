@@ -64,6 +64,31 @@ GROUP_NAMES = {"land": "زمینی", "naval": "دریایی", "air": "هوایی
                "power": "برق", "manpower": "نیروی انسانی", "resource": "منابع", "missile": "موشکی"}
 TREATY_TYPE_NAMES = {"alliance": "پیمان اتحاد", "non_aggression": "پیمان عدم تجاوز"}
 ANN_COSTS = {1: 0, 2: 0, 3: 10_000, 4: 400_000}
+ANNOUNCEMENT_TZ = timezone(timedelta(hours=4))  # ریست سهمیه در نیمه‌شب باکو
+ANNOUNCEMENT_INTERVAL_SECONDS = 3600
+
+
+def _announcement_day(now=None):
+    now = now or utcnow()
+    return now.astimezone(ANNOUNCEMENT_TZ).strftime("%Y-%m-%d")
+
+
+def _announcement_reset_seconds(now=None):
+    now = now or utcnow()
+    local_now = now.astimezone(ANNOUNCEMENT_TZ)
+    next_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    return max(0, int((next_midnight - local_now).total_seconds()))
+
+
+def _announcement_cooldown_seconds(today_list, now=None):
+    now = now or utcnow()
+    if not today_list:
+        return 0
+    last = parse_dt(today_list[-1])
+    if not last:
+        return 0
+    elapsed = max(0, (now - last).total_seconds())
+    return max(0, int(ANNOUNCEMENT_INTERVAL_SECONDS - elapsed + 0.999))
 WAR_PENALTY_ALLIANCE = 2_000_000
 NEGOTIATION_HOURS = 24
 DEFAULT_COST = 150_000
@@ -1920,13 +1945,24 @@ async def get_announcement_status(request):
     if not p.get("country"):
         return web.json_response({"success": False, "error": "no_country",
                                   "message": "ابتدا کشور خود را انتخاب کنید."}, status=400)
-    today = utcnow().strftime("%Y-%m-%d")
-    used = len(p.setdefault("announcements", {}).get(today, []))
+    now = utcnow()
+    today = _announcement_day(now)
+    anns = p.setdefault("announcements", {})
+    used_list = anns.get(today, [])
+    # Clean malformed legacy values defensively while preserving the stored timestamps.
+    if not isinstance(used_list, list):
+        used_list = []
+        anns[today] = used_list
+    used = len(used_list)
     next_number = used + 1 if used < 4 else None
+    cooldown = _announcement_cooldown_seconds(used_list, now) if used < 4 else 0
     return web.json_response({"success": True, "count": used, "limit": 4,
                               "next_number": next_number,
                               "next_cost": ANN_COSTS.get(next_number, 0) if next_number else None,
-                              "costs": {str(k): v for k, v in ANN_COSTS.items()}})
+                              "costs": {str(k): v for k, v in ANN_COSTS.items()},
+                              "cooldown_seconds": cooldown,
+                              "reset_seconds": _announcement_reset_seconds(now),
+                              "can_publish": used < 4 and cooldown <= 0})
 
 async def _broadcast_announcement_notification(cid, author_uid=None):
     """ارسال اعلان کوتاه بیانیه به دیگر بازیکنان؛ نویسنده اعلان خودش را نمی‌گیرد."""
@@ -1955,25 +1991,31 @@ async def create_announcement(request):
     if uid not in players: players[uid] = create_player(uid)
     p = players[uid]; cid = p.get("country")
     if not cid: return web.json_response({"success": False, "error": "no_country", "message": "ابتدا کشور خود را انتخاب کنید."}, status=400)
-    today = utcnow().strftime("%Y-%m-%d")
-    anns = p.setdefault("announcements", {}); today_list = anns.get(today, [])
+    now = utcnow()
+    today = _announcement_day(now)
+    anns = p.setdefault("announcements", {})
+    today_list = anns.get(today, [])
+    if not isinstance(today_list, list):
+        today_list = []
     if len(today_list) >= 4:
         return web.json_response({"success": False, "error": "daily_limit",
-                                  "message": "سهمیهٔ امروز تمام است."}, status=400)
-    if today_list:
-        last = parse_dt(today_list[-1])
-        if last and (utcnow() - last).total_seconds() < 3600:
-            mins = max(1, int((3600 - (utcnow() - last).total_seconds() + 59) / 60))
-            return web.json_response({"success": False, "error": "cooldown",
-                                      "message": f"برای انتشار بیانیهٔ بعدی {mins} دقیقه دیگر صبر کنید."}, status=400)
+                                  "reset_seconds": _announcement_reset_seconds(now),
+                                  "message": "سهمیهٔ امروز تمام شده است؛ پس از نیمه‌شب دوباره فعال می‌شود."}, status=400)
+    cooldown = _announcement_cooldown_seconds(today_list, now)
+    if cooldown > 0:
+        mins = max(1, (cooldown + 59) // 60)
+        return web.json_response({"success": False, "error": "cooldown",
+                                  "retry_after_seconds": cooldown,
+                                  "message": f"برای انتشار بیانیهٔ بعدی {mins} دقیقه دیگر صبر کنید."}, status=400)
     cost = ANN_COSTS.get(len(today_list) + 1, 400_000)
     if p.get("money", 0) < cost:
         return web.json_response({"success": False, "error": "not_enough_money",
                                   "message": f"هزینهٔ این بیانیه {cost:,} دلار است."}, status=400)
     p["money"] -= cost
-    today_list.append(utcnow().isoformat()); anns[today] = today_list
+    published_at = utcnow().isoformat()
+    today_list.append(published_at); anns[today] = today_list
     ann = {"id": str(uuid.uuid4()), "from_country": cid, "text": text,
-           "created_at": utcnow().isoformat(), "reactions": {}, "comments": []}
+           "created_at": published_at, "reactions": {}, "comments": []}
     announcements.append(ann)
     # متن کامل بیانیه هرگز وارد خبرهای عمومی/اعلان‌ها نمی‌شود.
     push_news("بیانیه", f"کشور «{COUNTRIES[cid]['name']}» بیانیه‌ای منتشر کرد؛ متن فقط در بخش بیانیه‌هاست.")
