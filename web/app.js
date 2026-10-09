@@ -125,7 +125,8 @@ function showGamePage(id) {
     document.querySelectorAll(".game-page").forEach(p => p.classList.add("hidden"));
     const t = document.getElementById(id);
     if (t) { t.classList.remove("hidden"); t.scrollTop = 0; }
-    document.getElementById("game")?.classList.remove("header-collapsed");
+    const header = document.querySelector("#game .game-header");
+    if (header) header.style.transform = "translate3d(0, 0, 0)";
 }
 
 function formatMoney(v) { return "$" + Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
@@ -657,7 +658,7 @@ const LOAN_HELP = `
 <p><b>سود:</b> برای هر ۱۲ ساعت کامل، ۱۰٪ مبلغ؛ زیر ۱۲ ساعت بدون سود. حداکثر مهلت ۷۲ ساعت (۶۰٪).</p>
 <p><b>کارمزد:</b> ۵٪ از هر دریافت — وام‌گیرنده هنگام گرفتن، وام‌دهنده هنگام بازگشت. وام زیر ۱۲ ساعت و دریافت‌کننده VIP کارمزد ندارد.</p>
 <p><b>سقف:</b> هر وام حداکثر ۵۰٪ درآمد روزانه وام‌دهنده، و وام‌گیرنده باید بتواند با خزانه و درآمدش در همان مهلت بازپرداخت کند.</p>
-<p>هر کشور هم‌زمان فقط یک وام می‌گیرد و تا تسویه وام نمی‌دهد. وام‌دهی در هفته اول فصل بسته است و همه وام‌ها تا ۱ دقیقه پیش از جنگ جهانی سررسید می‌شوند.</p>
+<p>هر کشور هم‌زمان فقط یک وام می‌گیرد و تا تسویه وام نمی‌دهد. وام‌دهی تا نزدیک پایان بازی فعال است و همه وام‌ها تا ۱ دقیقه پیش از جنگ جهانی سررسید می‌شوند.</p>
 <p>در سررسید کل بدهی برداشته می‌شود. اگر خزانه کافی نباشد، هرچه هست برداشته می‌شود و تا تسویه، تمام درآمد وام‌گیرنده به وام‌دهنده می‌رسد.</p>
 <p>همه کشورهای دنیا دفتر وام‌ها را می‌بینند.</p>`;
 
@@ -862,9 +863,10 @@ function renderInfraTab(tab) {
         renderInfraList("infra-food-list", INFRA_TAB_FILTERS.food);
     else if (tab === "resource")
         renderInfraList("infra-resource-list", INFRA_TAB_FILTERS.resource);
-    else if (tab === "welfare")
+    else if (tab === "welfare") {
         renderInfraList("infra-welfare-list", INFRA_TAB_FILTERS.welfare);
-    else if (tab === "strategy")
+        renderInfraWelfareSummary();
+    } else if (tab === "strategy")
         renderInfraList("infra-strategy-list", INFRA_TAB_FILTERS.strategy);
     else if (tab === "military") {
         renderInfraList("infra-land-list", i => i.group === "land");
@@ -877,6 +879,43 @@ function renderInfraTab(tab) {
 document.querySelectorAll(".infra-tab").forEach(tab => {
     tab.addEventListener("click", () => renderInfraTab(tab.dataset.infraTab));
 });
+
+async function renderInfraWelfareSummary() {
+    const box = document.getElementById("infra-welfare-summary");
+    if (!box) return;
+    box.innerHTML = `<p class="iws-loading">در حال دریافت آمار زندهٔ رفاه و امنیت…</p>`;
+    try {
+        const d = await apiGet("/api/stats");
+        if (!d || d.error || !Array.isArray(d.buildings)) throw new Error("stats_unavailable");
+        statsData = d;
+        const bonus = Number(d.bonus || 0);
+        const gross = Number(d.gross || 0);
+        const penalty = Number(d.penalty || 0);
+        box.innerHTML = `
+            <div class="iws-head">
+                <div><strong>📊 رفاه و امنیت کشور</strong><p>وضعیت زندهٔ ساختمان‌های همین بخش و اثر آن‌ها بر اقتصاد</p></div>
+                <strong class="iws-total">+${fmt1(bonus)}٪</strong>
+            </div>
+            <div class="iws-metrics">
+                <div><span>پاداش ساختمان‌ها</span><b>+${fmt1(gross)}٪</b></div>
+                ${penalty > 0 ? `<div><span>افت موقت رویدادها</span><b class="iws-penalty">−${fmt1(penalty)}٪</b></div>` : ""}
+                <div><span>اثر نهایی بر درآمد</span><b>+${fmt1(bonus)}٪</b></div>
+                <div><span>درآمد اضافهٔ روزانه</span><b>+${formatMoney(d.extra_income || 0)}</b></div>
+            </div>
+            <button type="button" class="iws-details-button" id="infra-welfare-open-stats">مشاهدهٔ جزئیات کامل آمار کشور ←</button>`;
+        box.querySelector("#infra-welfare-open-stats")?.addEventListener("click", () => {
+            showGamePage("stats");
+            loadStats();
+        });
+    } catch (e) {
+        console.error("Infrastructure welfare stats:", e);
+        box.innerHTML = `<p class="iws-loading">آمار رفاه فعلاً دریافت نشد.</p><button type="button" class="iws-details-button" id="infra-welfare-open-stats">رفتن به آمار کشور ←</button>`;
+        box.querySelector("#infra-welfare-open-stats")?.addEventListener("click", () => {
+            showGamePage("stats");
+            loadStats();
+        });
+    }
+}
 
 function statBox(icon, value, label) {
     return `<div class="stat-box">
@@ -2208,16 +2247,14 @@ document.querySelectorAll(".nav-item").forEach(item => {
     });
 });
 
-// هدر هنگام پایین رفتن محو می‌شود و با اسکرول رو به بالا برمی‌گردد.
+// هدر همراه اسکرول صفحه به‌آرامی از قاب خارج می‌شود؛ بدون تأخیر و جمع‌شدن ناگهانی.
 const gameShellForHeader = document.getElementById("game");
-const headerScrollPositions = new WeakMap();
+const gameHeaderForScroll = document.querySelector("#game .game-header");
 document.querySelectorAll("#game .game-page").forEach(page => {
     page.addEventListener("scroll", () => {
-        const top = page.scrollTop || 0;
-        const prev = headerScrollPositions.get(page) || 0;
-        if (top <= 10 || top < prev - 3) gameShellForHeader?.classList.remove("header-collapsed");
-        else if (top > 28 && top > prev + 2) gameShellForHeader?.classList.add("header-collapsed");
-        headerScrollPositions.set(page, top);
+        if (!gameHeaderForScroll || gameShellForHeader?.classList.contains("booting")) return;
+        const travel = Math.min(Math.max(0, page.scrollTop || 0), gameHeaderForScroll.offsetHeight || 78);
+        gameHeaderForScroll.style.transform = `translate3d(0, ${-travel}px, 0)`;
     }, { passive: true });
 });
 
@@ -3374,11 +3411,6 @@ let mapCanvas = null, mapCtx = null, mapDpr = 1, mapW = 320, mapH = 300;
 let mapFeatures = [], mapGroups = [], mapWaterItems = [], mapGraticule = null, mapRaf = 0;
 let mapBorders = null, mapCoast = null;
 
-// Sea-only route graph: transit lines follow connected water cells instead of drawing a great-circle through continents.
-const MAP_SEA_STEP = 2;
-let mapSeaGrid = null, mapSeaGridPromise = null;
-const mapSeaLandCache = new Map(), mapSeaEdgeCache = new Map(), mapSeaCoastCache = new Map(), mapTransitRouteCache = new Map();
-
 async function initWorldMap() {
     const box = document.querySelector(".map-box");
     const svgEl = document.getElementById("map-globe");
@@ -3525,212 +3557,11 @@ async function loadMapRoutes() {
     } catch (e) { mapTransits = []; }
     renderMapRoutes();
 }
-function mapRouteNormalizeLon(lon) {
-    return ((Number(lon) + 180) % 360 + 360) % 360 - 180;
-}
-function mapRouteLandAt(ll) {
-    if (!ll || !Number.isFinite(Number(ll[0])) || !Number.isFinite(Number(ll[1]))) return false;
-    const lon = mapRouteNormalizeLon(ll[0]), lat = Math.max(-89.9, Math.min(89.9, Number(ll[1])));
-    const key = `${lon.toFixed(2)},${lat.toFixed(2)}`;
-    if (mapSeaLandCache.has(key)) return mapSeaLandCache.get(key);
-    const land = mapFeatures.some(m => m.f && d3.geoContains(m.f, [lon, lat]));
-    mapSeaLandCache.set(key, land);
-    return land;
-}
-function mapRouteSegmentIsWater(a, b) {
-    if (!a || !b) return false;
-    const interp = d3.geoInterpolate(a, b);
-    // Multiple samples catch narrow land crossings between adjacent grid nodes.
-    for (const f of [0.25, 0.5, 0.75]) if (mapRouteLandAt(interp(f))) return false;
-    return true;
-}
-function ensureMapSeaGrid() {
-    if (mapSeaGrid) return mapSeaGrid;
-    if (mapSeaGridPromise) return null;
-    mapSeaGridPromise = true;
-    const cols = 360 / MAP_SEA_STEP, rows = (176 / MAP_SEA_STEP) + 1;
-    const nodes = new Array(cols * rows);
-    for (let r = 0; r < rows; r++) {
-        const lat = -88 + r * MAP_SEA_STEP;
-        for (let c = 0; c < cols; c++) {
-            const lon = -180 + c * MAP_SEA_STEP, id = r * cols + c;
-            const ll = [lon, lat];
-            nodes[id] = { id, r, c, ll, land: mapRouteLandAt(ll), neighbors: null };
-        }
-    }
-    mapSeaGrid = { cols, rows, nodes };
-    mapSeaGridPromise = null;
-    return mapSeaGrid;
-}
-function mapSeaEdgeOpen(a, b) {
-    const lo = Math.min(a.id, b.id), hi = Math.max(a.id, b.id), key = `${lo}:${hi}`;
-    if (mapSeaEdgeCache.has(key)) return mapSeaEdgeCache.get(key);
-    const open = !a.land && !b.land && mapRouteSegmentIsWater(a.ll, b.ll);
-    mapSeaEdgeCache.set(key, open);
-    return open;
-}
-function mapSeaNeighbors(id) {
-    const grid = ensureMapSeaGrid();
-    if (!grid) return [];
-    const node = grid.nodes[id];
-    if (!node || node.land) return [];
-    if (node.neighbors) return node.neighbors;
-    const found = [], dirs = [-1, 0, 1];
-    for (const dr of dirs) for (const dc of dirs) {
-        if (dr === 0 && dc === 0) continue;
-        const nr = node.r + dr;
-        if (nr < 0 || nr >= grid.rows) continue;
-        const nc = (node.c + dc + grid.cols) % grid.cols;
-        const next = grid.nodes[nr * grid.cols + nc];
-        if (next && !next.land && mapSeaEdgeOpen(node, next)) found.push(next.id);
-    }
-    node.neighbors = found;
-    return found;
-}
-function mapSeaCoastNodes(country) {
-    const grid = ensureMapSeaGrid();
-    if (!grid) return [];
-    if (mapSeaCoastCache.has(country)) return mapSeaCoastCache.get(country);
-    const feature = mapFeatures.find(m => m.key === country && m.f);
-    if (!feature) { mapSeaCoastCache.set(country, []); return []; }
-    const goals = [], dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-    for (const n of grid.nodes) {
-        if (n.land) continue;
-        let coastal = false;
-        for (const [dr, dc] of dirs) {
-            const nr = n.r + dr;
-            if (nr < 0 || nr >= grid.rows) continue;
-            const nc = (n.c + dc + grid.cols) % grid.cols;
-            const adj = grid.nodes[nr * grid.cols + nc];
-            if (adj?.land && d3.geoContains(feature.f, adj.ll)) { coastal = true; break; }
-        }
-        if (coastal) goals.push(n.id);
-    }
-    mapSeaCoastCache.set(country, goals);
-    return goals;
-}
-function mapNearestSeaNode(ll) {
-    const grid = ensureMapSeaGrid();
-    if (!grid || !ll) return null;
-    const candidates = [];
-    for (const n of grid.nodes) {
-        if (n.land) continue;
-        candidates.push({ n, dist: d3.geoDistance(ll, n.ll) });
-    }
-    candidates.sort((a, b) => a.dist - b.dist);
-    for (const { n } of candidates.slice(0, 80)) {
-        if (mapRouteSegmentIsWater(ll, n.ll)) return n.id;
-    }
-    return null;
-}
-class MapRouteMinHeap {
-    constructor() { this.items = []; }
-    push(item) {
-        const a = this.items; a.push(item); let i = a.length - 1;
-        while (i > 0) { const p = (i - 1) >> 1; if (a[p].score <= item.score) break; a[i] = a[p]; i = p; }
-        a[i] = item;
-    }
-    pop() {
-        const a = this.items; if (!a.length) return null;
-        const root = a[0], last = a.pop();
-        if (a.length) { let i = 0; while (true) { let c = i * 2 + 1; if (c >= a.length) break; if (c + 1 < a.length && a[c + 1].score < a[c].score) c++; if (a[c].score >= last.score) break; a[i] = a[c]; i = c; } a[i] = last; }
-        return root;
-    }
-    get length() { return this.items.length; }
-}
-function findSeaGridPath(startId, targetId, goalIds = null) {
-    const grid = ensureMapSeaGrid();
-    if (!grid || startId == null) return null;
-    const goals = goalIds ? new Set(goalIds) : new Set([targetId]);
-    if (!goals.size) return null;
-    if (goals.has(startId)) return [startId];
-    const total = grid.nodes.length, best = new Float64Array(total); best.fill(Infinity);
-    const parent = new Int32Array(total); parent.fill(-1);
-    const closed = new Uint8Array(total), heap = new MapRouteMinHeap();
-    const targetLL = !goalIds && grid.nodes[targetId]?.ll;
-    const heuristic = node => {
-        // For one destination use great-circle distance as an admissible heuristic.
-        // For a set of coast goals use Dijkstra so we don't scan hundreds of coast points per node.
-        return targetLL ? d3.geoDistance(node.ll, targetLL) * 6371 : 0;
-    };
-    best[startId] = 0; heap.push({ id: startId, score: heuristic(grid.nodes[startId]) });
-    let found = -1, expanded = 0;
-    while (heap.length && expanded < total) {
-        const cur = heap.pop(); if (!cur || closed[cur.id]) continue;
-        closed[cur.id] = 1; expanded++;
-        if (goals.has(cur.id)) { found = cur.id; break; }
-        const a = grid.nodes[cur.id];
-        for (const nid of mapSeaNeighbors(cur.id)) {
-            if (closed[nid]) continue;
-            const b = grid.nodes[nid];
-            const cost = d3.geoDistance(a.ll, b.ll) * 6371;
-            const alt = best[cur.id] + cost;
-            if (alt < best[nid]) {
-                best[nid] = alt; parent[nid] = cur.id;
-                heap.push({ id: nid, score: alt + heuristic(b) });
-            }
-        }
-    }
-    if (found < 0) return null;
-    const path = []; let cur = found;
-    while (cur >= 0) { path.push(cur); if (cur === startId) break; cur = parent[cur]; }
-    if (path[path.length - 1] !== startId) return null;
-    path.reverse(); return path;
-}
-function makeMapRouteInfo(coords) {
-    if (!Array.isArray(coords) || coords.length < 2) return null;
-    const lengths = [], cumulative = [0]; let total = 0;
-    for (let i = 1; i < coords.length; i++) {
-        const length = d3.geoDistance(coords[i - 1], coords[i]);
-        lengths.push(length); total += length; cumulative.push(total);
-    }
-    if (!total) return null;
-    return { coords, lengths, cumulative, total };
-}
-function mapTransitRouteInfo(d) {
-    const signature = `${d.from}|${d.to}|${(d.from_ll||[]).join(',')}|${(d.to_ll||[]).join(',')}|${d.start}|${d.arrive}`;
-    const saved = mapTransitRouteCache.get(d.id);
-    if (saved?.signature === signature) return saved.route;
-    const grid = ensureMapSeaGrid(); if (!grid) return null;
-    const fromHome = d.from === "home", toHome = d.to === "home";
-    let coords = null;
-    if (fromHome || toHome) {
-        const coast = mapSeaCoastNodes(d.country);
-        if (!coast.length) return null;
-        if (fromHome) {
-            const targetId = mapNearestSeaNode(d.to_ll);
-            const path = targetId == null ? null : findSeaGridPath(targetId, null, coast);
-            if (path?.length) coords = path.slice().reverse().map(id => grid.nodes[id].ll).concat([d.to_ll]);
-        } else {
-            const sourceId = mapNearestSeaNode(d.from_ll);
-            const path = sourceId == null ? null : findSeaGridPath(sourceId, null, coast);
-            if (path?.length) coords = [d.from_ll, ...path.map(id => grid.nodes[id].ll)];
-        }
-    } else {
-        const sourceId = mapNearestSeaNode(d.from_ll), targetId = mapNearestSeaNode(d.to_ll);
-        const path = sourceId == null || targetId == null ? null : findSeaGridPath(sourceId, targetId);
-        if (path?.length) coords = [d.from_ll, ...path.map(id => grid.nodes[id].ll), d.to_ll];
-    }
-    // Do not draw a fake straight line through land when no connected sea route exists.
-    const route = coords ? makeMapRouteInfo(coords) : null;
-    mapTransitRouteCache.set(d.id, { signature, route });
-    return route;
-}
-function mapRoutePointAt(route, f) {
-    if (!route) return null;
-    const goal = Math.max(0, Math.min(1, f)) * route.total;
-    let i = 0;
-    while (i < route.lengths.length - 1 && route.cumulative[i + 1] < goal) i++;
-    const seg = Math.max(1e-9, route.lengths[i]);
-    const t = Math.max(0, Math.min(1, (goal - route.cumulative[i]) / seg));
-    return d3.geoInterpolate(route.coords[i], route.coords[i + 1])(t);
-}
 function renderMapRoutes() {
     if (!mapRoutesSvg) return;
     mapRoutesSvg.selectAll("*").remove();
     if (!mapRoutesVisible) return;
-    const routes = mapTransits.map(d => ({ ...d, routeInfo: mapTransitRouteInfo(d) })).filter(d => d.routeInfo);
-    const g = mapRoutesSvg.selectAll(".map-route").data(routes, d => d.id).enter().append("g").attr("class", "map-route");
+    const g = mapRoutesSvg.selectAll(".map-route").data(mapTransits, d => d.id).enter().append("g").attr("class", "map-route");
     g.append("path").attr("class", d => "map-route-line" + (d.country === selectedCountry ? " mine" : ""));
     g.each(function (d) {
         const s = d3.select(this).append("g").attr("class", "map-route-head")
@@ -3747,9 +3578,9 @@ function updateMapRoutes() {
     const now = Date.now() + mapRouteSkew;
     mapRoutesSvg.selectAll(".map-route").each(function (d) {
         const f = Math.max(0, Math.min(1, (now - Date.parse(d.start)) / Math.max(1, Date.parse(d.arrive) - Date.parse(d.start))));
-        d3.select(this).select(".map-route-line").attr("d", pathGen({ type: "LineString", coordinates: d.routeInfo.coords }) || "");
-        const pos = mapRoutePointAt(d.routeInfo, f);
-        const p = pos && viewCos(pos[0], pos[1], rot) > 0.02 ? mapProjection(pos) : null;
+        d3.select(this).select(".map-route-line").attr("d", pathGen({ type: "LineString", coordinates: [d.from_ll, d.to_ll] }) || "");
+        const pos = d3.geoInterpolate(d.from_ll, d.to_ll)(f);
+        const p = viewCos(pos[0], pos[1], rot) > 0.02 ? mapProjection(pos) : null;
         const head = d3.select(this).select(".map-route-head");
         if (p) head.attr("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)})`).style("display", "");
         else head.style("display", "none");
@@ -4325,32 +4156,37 @@ async function loadStats() {
 }
 function renderStats() {
     const d = statsData, body = document.getElementById("st-body");
-    const pct = Math.min(100, d.bonus / d.max * 100);
-    const blds = d.buildings.map(b => `<div class="st-line"><span>${b.icon} ${escapeHtml(b.name)}</span><span>سطح ${b.level} از ${b.max_level}</span></div>`).join("");
-    const events = d.events.length
-        ? d.events.map(e => `<li><span class="st-ev-text">${escapeHtml(e.text)}</span><span class="st-ev-time">${timeAgo(e.at, d.now)}</span></li>`).join("")
+    if (!body || !d) return;
+    const bonus = Number(d.bonus || 0), max = Math.max(1, Number(d.max || 50));
+    const buildings = Array.isArray(d.buildings) ? d.buildings : [];
+    const risks = Array.isArray(d.risks) ? d.risks : [];
+    const recentEvents = Array.isArray(d.events) ? d.events : [];
+    const pct = Math.min(100, bonus / max * 100);
+    const blds = buildings.map(b => `<div class="st-line"><span>${b.icon} ${escapeHtml(b.name)}</span><span>سطح ${b.level} از ${b.max_level}</span></div>`).join("");
+    const events = recentEvents.length
+        ? recentEvents.map(e => `<li><span class="st-ev-text">${escapeHtml(e.text)}</span><span class="st-ev-time">${timeAgo(e.at, d.now)}</span></li>`).join("")
         : `<li><span class="st-ev-text">هنوز رویدادی رخ نداده است.</span></li>`;
     body.innerHTML = `
         <div class="st-card">
             <div class="st-box st-box-row">
                 <div class="st-box-title"><span class="st-shield">🛡️</span><b>پاداش رفاه</b><small>روی درآمد سرمایه‌گذاری‌ها</small></div>
-                <strong class="st-good">+${fmt1(d.bonus)}٪</strong>
+                <strong class="st-good">+${fmt1(bonus)}٪</strong>
             </div>
             <div class="st-bar"><div class="st-bar-fill" style="width:${pct}%"></div></div>
-            <p class="st-text">بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه — ارتقای هرکدام این پاداش را بالا می‌برد، تا سقفِ ${d.max}٪.</p>
+            <p class="st-text">بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه — ارتقای هرکدام این پاداش را بالا می‌برد، تا سقفِ ${max}٪.</p>
             ${blds}
         </div>
         <div class="st-card">
             <div class="st-box st-box-split">
                 <span class="st-box-label">اثرِ کل روی درآمدِ سرمایه‌گذاری‌ها</span>
-                <strong class="st-good st-big">${fmt1(d.bonus)}٪<br>افزایش</strong>
+                <strong class="st-good st-big">${fmt1(bonus)}٪<br>افزایش</strong>
             </div>
-            <div class="st-line"><span>پاداش رفاه</span><span class="st-good-soft">${fmt1(d.gross)}٪ افزایش</span></div>
-            ${d.penalty > 0 ? `<div class="st-line"><span>افت موقتِ رویدادها</span><span class="st-bad-soft">${fmt1(d.penalty)}٪ کاهش</span></div>` : ""}
+            <div class="st-line"><span>پاداش رفاه</span><span class="st-good-soft">${fmt1(Number(d.gross || 0))}٪ افزایش</span></div>
+            ${Number(d.penalty || 0) > 0 ? `<div class="st-line"><span>افت موقتِ رویدادها</span><span class="st-bad-soft">${fmt1(d.penalty)}٪ کاهش</span></div>` : ""}
             <div class="st-line"><span>درآمدِ اضافه</span><span class="st-good-soft">+${formatMoney(d.extra_income)} در روز</span></div>
         </div>
         <div class="st-card st-card-plain">
-            <p class="st-muted">بلایای محتمل در کشورِ خودی: ${d.risks.length ? escapeHtml(d.risks.join("، ")) : "—"}</p>
+            <p class="st-muted">بلایای محتمل در کشورِ خودی: ${risks.length ? escapeHtml(risks.join("، ")) : "—"}</p>
             <p class="st-text">هر سطح ساختمان هم احتمالش را کم می‌کند هم افتِ موقتِ رفاه را.</p>
         </div>
         <div class="st-card st-card-plain">
@@ -4371,13 +4207,14 @@ document.getElementById("st-help-btn")?.addEventListener("click", () => {
     ov.innerHTML = `
         <div class="st-sheet">
             <div class="st-sheet-head">
-                <h3>رفاه و درآمد</h3>
+                <h3>رفاه و امنیت کشور</h3>
                 <button class="st-sheet-close" aria-label="بستن">✕</button>
             </div>
             <div class="st-sheet-body">
-                <p>بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه با هم امتیازِ <b>رفاه</b> را می‌سازند. هرچه بیشتر و بالاتر ساخته شوند، <b>درآمدِ سرمایه‌گذاری‌ها</b> تا +50٪ پاداش می‌گیرد.</p>
-                <p>این پاداش فقط اضافه می‌کند؛ نساختنِ این ساختمان‌ها چیزی از درآمد کم نمی‌کند.</p>
-                <p>زلزله، موجِ جرم، همه‌گیری، قحطی و خشکسالی پاداشِ رفاه را موقتاً کم می‌کنند (نه زیرِ صفر)؛ هر دوره (۶ ساعت) 3 واحد جبران می‌شود. زیرساختِ بیشتر هم احتمالِ این رویدادها را کم می‌کند و هم افتِ آن‌ها را.</p>
+                <p><b>رفاه:</b> بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه با هم پاداش رفاه را می‌سازند. هر سطح این ساختمان‌ها ۲٪ اضافه می‌کند و مجموع پاداش حداکثر ۵۰٪ است.</p>
+                <p><b>اثر اقتصادی:</b> این درصد به درآمد ساختمان‌های اقتصادی اضافه می‌شود؛ نساختن ساختمان‌های رفاهی، درآمد پایه را کم نمی‌کند. مقدار نهایی و درآمد اضافه در آمار کشور نمایش داده می‌شود.</p>
+                <p><b>امنیت و رویدادها:</b> زلزله، موج سرقت، همه‌گیری، قحطی و خشکسالی ممکن است پاداش رفاه را موقتاً کاهش دهند. ساختمان مربوط به هر رویداد، احتمال و شدت خسارت آن را کمتر می‌کند.</p>
+                <p><b>بازیابی:</b> افت رفاه به‌مرور جبران می‌شود؛ هر ۶ ساعت ۳ واحد از جریمه کم می‌شود و پاداش نهایی هیچ‌وقت از صفر کمتر نمی‌شود. آمار زنده، سطح ساختمان‌ها، خسارت فعلی و رویدادهای اخیر را نشان می‌دهد.</p>
             </div>
         </div>`;
     document.body.appendChild(ov);
