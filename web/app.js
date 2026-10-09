@@ -238,25 +238,37 @@ async function loadPlayer() {
 
 let refreshController = null;
 async function refreshPlayer() {
-    if (!userId) return;
-    if (refreshController) refreshController.abort();
-    refreshController = new AbortController();
+    if (!userId || playerRefreshInFlight) return;
+    playerRefreshInFlight = true;
     try {
-        player = await apiGet("/api/player");
-        updateHomeStats();
+        const fresh = await apiGet("/api/player");
+        if (fresh && !fresh.error) {
+            player = fresh;
+            if (player?.country) selectedCountry = player.country;
+            updateHomeStats();
+            // اگر کاربر در همین لحظه در صفحات مالی/رفاه باشد، اعداد سربرگ هم زنده بمانند.
+            document.querySelectorAll(".sb-money").forEach(e => { e.textContent = formatMoney(player.money); });
+        }
     } catch (e) { if (e.name !== "AbortError") console.error(e); }
+    finally { playerRefreshInFlight = false; }
 }
 
+let fastPlayerInterval = null;
+let playerRefreshInFlight = false;
 function startStatsPolling() {
     stopStatsPolling();
+    refreshPlayer();
+    // خزانه، نیروی انسانی و منابع در فاصلهٔ کوتاه‌تری تازه می‌شوند؛
+    // اعلان‌ها و رتبه‌بندی همچنان با فاصلهٔ بیشتر دریافت می‌شوند.
+    fastPlayerInterval = setInterval(() => refreshPlayer(), 2500);
     statsInterval = setInterval(() => {
-        refreshPlayer();
         refreshNotificationBadge();
         refreshHeaderRank();
     }, 30000);
 }
 function stopStatsPolling() {
     if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
+    if (fastPlayerInterval) { clearInterval(fastPlayerInterval); fastPlayerInterval = null; }
 }
 
 async function loadCountries() {
@@ -656,6 +668,7 @@ document.querySelectorAll(".action-card").forEach(card => {
         else if (s === "market") { showGamePage("market"); loadMarketListings(); }
         else if (s === "ranking") { showGamePage("ranking"); loadRankings(); }
         else if (s === "stats") { showGamePage("stats"); loadStats(); }
+        else if (s === "welfare") { showGamePage("welfare"); loadWelfare(); }
         else if (s === "transfer") { showGamePage("loan"); renderLoanPage(); }
     });
 });
@@ -927,17 +940,17 @@ async function renderInfraWelfareSummary() {
                 <div><span>اثر نهایی بر درآمد</span><b>+${fmt1(bonus)}٪</b></div>
                 <div><span>درآمد اضافهٔ روزانه</span><b>+${formatMoney(d.extra_income || 0)}</b></div>
             </div>
-            <button type="button" class="iws-details-button" id="infra-welfare-open-stats">مشاهدهٔ جزئیات کامل آمار کشور ←</button>`;
+            <button type="button" class="iws-details-button" id="infra-welfare-open-stats">مشاهدهٔ جزئیات رفاه و امنیت ←</button>`;
         box.querySelector("#infra-welfare-open-stats")?.addEventListener("click", () => {
-            showGamePage("stats");
-            loadStats();
+            showGamePage("welfare");
+            loadWelfare();
         });
     } catch (e) {
         console.error("Infrastructure welfare stats:", e);
-        box.innerHTML = `<p class="iws-loading">آمار رفاه فعلاً دریافت نشد.</p><button type="button" class="iws-details-button" id="infra-welfare-open-stats">رفتن به آمار کشور ←</button>`;
+        box.innerHTML = `<p class="iws-loading">آمار رفاه فعلاً دریافت نشد.</p><button type="button" class="iws-details-button" id="infra-welfare-open-stats">رفتن به رفاه و امنیت ←</button>`;
         box.querySelector("#infra-welfare-open-stats")?.addEventListener("click", () => {
-            showGamePage("stats");
-            loadStats();
+            showGamePage("welfare");
+            loadWelfare();
         });
     }
 }
@@ -1162,39 +1175,30 @@ function renderEconomyList() {
     const c = document.getElementById("economy-list");
     if (!c || !player?.economy) return;
     c.innerHTML = "";
+    c.classList.add("economy-list-grid");
     Object.entries(player.economy).forEach(([iid, item]) => {
-        const card = document.createElement("div");
-        card.className = "infra-card-new";
-
-        const isBuilt = item.level > 0;
-        const statusText = isBuilt ? `سطح ${item.level}` : "ساخته نشده";
-        const shownLevel = item.next || item.current;
-        const statsHtml = buildStatsHtml(item, shownLevel);
-
-        const btnText = !item.next
-            ? "حداکثر سطح"
-            : (isBuilt ? `⬆️ ارتقا به سطح ${item.level + 1} — ${formatMoney(item.next.cost)}`
-                       : `⬆️ ساخت — ${formatMoney(item.next.cost)}`);
-        const btnDisabled = !item.next ? "disabled" : "";
-
+        const card = document.createElement("article");
+        card.className = "eco-investment-card";
+        const built = item.level > 0;
+        const next = item.next;
+        const currentIncome = Number(item.current?.income || 0);
+        const nextIncome = Number(next?.income || 0);
+        const incomeGain = nextIncome - currentIncome;
+        const maxPips = Array.from({length:item.max_level || 0}, (_,i) => `<i class="${i < item.level ? "on" : ""}"></i>`).join("");
+        const statusText = !built ? "آمادهٔ سرمایه‌گذاری" : `سطح ${item.level} از ${item.max_level}`;
+        const buttonText = !next ? "حداکثر سطح" : (built ? `ارتقای سرمایه‌گذاری · ${formatMoney(next.cost)}` : `سرمایه‌گذاری · ${formatMoney(next.cost)}`);
         card.innerHTML = `
-            <div class="infra-card-head">
-                <div class="infra-card-icon">${item.icon || "💰"}</div>
-                <div class="infra-card-titles">
-                    <div class="infra-card-name">${item.name}</div>
-                    <div class="infra-card-status">${statusText}</div>
-                </div>
-            </div>
-            <div class="infra-card-desc">${item.desc || ""}</div>
-            ${statsHtml}
-            <button class="infra-card-button" ${btnDisabled}>${btnText}</button>`;
-
-        const btn = card.querySelector(".infra-card-button");
-        if (item.next) btn.addEventListener("click", () => upgradeEconomy(iid));
+            <div class="eco-card-top"><span class="eco-card-icon">${item.icon || "💼"}</span><div class="eco-card-title"><h3>${escapeHtml(item.name || "سرمایه‌گذاری")}</h3><small>${statusText}</small></div><span class="eco-card-level">${built ? `${item.level}/${item.max_level}` : "جدید"}</span></div>
+            <p class="eco-card-desc">${escapeHtml(item.desc || "")}</p>
+            <div class="eco-level-pips">${maxPips}</div>
+            <div class="eco-income-panel"><small>درآمد روزانهٔ ${built ? "فعلی" : "سطح ۱"}</small><strong>${formatMoney(built ? currentIncome : Number(next?.income || 0))}</strong>${built && next ? `<span>پس از ارتقا: ${formatMoney(nextIncome)} <i>(${incomeGain >= 0 ? "+" : "−"}${formatMoney(Math.abs(incomeGain))})</i></span>` : !built ? `<span>قابل ارتقا تا ${item.max_level} سطح</span>` : `<span>بالاترین سطح</span>`}</div>
+            <div class="eco-card-facts"><span>⚡ برق لازم <b>${formatNumber(item.power_required || 0)}</b></span><span>🪙 هزینهٔ سرمایه‌گذاری <b>${next ? formatMoney(next.cost) : "—"}</b></span></div>
+            <button class="eco-invest-button" ${!next ? "disabled" : ""}>${buttonText}</button>`;
+        const btn = card.querySelector(".eco-invest-button");
+        if (next) btn.addEventListener("click", () => upgradeEconomy(iid));
         c.appendChild(card);
     });
 }
-
 async function upgradeEconomy(iid) {
     if (!userId) return;
     try {
@@ -4303,8 +4307,8 @@ async function createPreviewGlobe(containerId, svgId, selected) {
 })();
 
 
-/* ---------- آمار کشور: دادهٔ زنده ---------- */
-let statsData = null, statsTimer = null;
+/* ---------- آمار کشور و صفحهٔ مستقل رفاه و امنیت ---------- */
+let statsData = null, statsTimer = null, welfareTimer = null, upkeepExpanded = false;
 function timeAgo(iso, now) {
     const sec = Math.max(0, (new Date(now || Date.now()) - new Date(iso)) / 1000);
     if (sec < 90) return "لحظاتی پیش";
@@ -4313,73 +4317,114 @@ function timeAgo(iso, now) {
     return `${Math.round(sec / 86400)} روز پیش`;
 }
 const fmt1 = v => (Math.round(v * 10) / 10).toString();
+async function fetchStatsData() {
+    const d = await apiGet("/api/stats");
+    if (!d || d.error) throw new Error("stats_unavailable");
+    statsData = d;
+    return d;
+}
 async function loadStats() {
     const body = document.getElementById("st-body");
-    try {
-        const d = await apiGet("/api/stats");
-        if (d && !d.error) statsData = d;
-    } catch (e) { console.error(e); }
-    if (!statsData) { body.innerHTML = `<div class="st-card st-card-plain"><p class="st-muted">خطا در دریافت آمار.</p></div>`; return; }
+    try { await fetchStatsData(); }
+    catch (e) {
+        console.error(e);
+        if (body && !statsData) body.innerHTML = `<div class="st-card st-card-plain"><p class="st-muted">خطا در دریافت آمار مالی.</p></div>`;
+        return;
+    }
     renderStats();
     clearInterval(statsTimer);
-    statsTimer = setInterval(() => {
-        if (document.getElementById("stats")?.classList.contains("hidden")) { clearInterval(statsTimer); return; }
-        loadStats();
-    }, 30000);
+    statsTimer = setInterval(async () => {
+        if (document.getElementById("stats")?.classList.contains("hidden")) { clearInterval(statsTimer); statsTimer = null; return; }
+        try { await fetchStatsData(); renderStats(); } catch (e) { console.error(e); }
+    }, 5000);
+}
+async function loadWelfare() {
+    try { await fetchStatsData(); }
+    catch (e) {
+        console.error(e);
+        const body = document.getElementById("welfare-body");
+        if (body && !statsData) body.innerHTML = `<div class="st-card st-card-plain"><p class="st-muted">خطا در دریافت اطلاعات رفاه و امنیت.</p></div>`;
+        return;
+    }
+    renderWelfarePage();
+    clearInterval(welfareTimer);
+    welfareTimer = setInterval(async () => {
+        if (document.getElementById("welfare")?.classList.contains("hidden")) { clearInterval(welfareTimer); welfareTimer = null; return; }
+        try { await fetchStatsData(); renderWelfarePage(); } catch (e) { console.error(e); }
+    }, 5000);
+}
+function formatStatsAmount(v) {
+    const n = Math.round(Number(v || 0));
+    return n < 0 ? `−$${Math.abs(n).toLocaleString("en-US")}` : `$${n.toLocaleString("en-US")}`;
 }
 function renderStats() {
     const d = statsData, body = document.getElementById("st-body");
     if (!body || !d) return;
-    const bonus = Number(d.bonus || 0), max = Math.max(1, Number(d.max || 50));
-    const risks = Array.isArray(d.risks) ? d.risks : [];
-    const recentEvents = Array.isArray(d.events) ? d.events : [];
     const upkeepItems = Array.isArray(d.upkeep_items) ? d.upkeep_items : [];
-    const pct = Math.min(100, bonus / max * 100);
-    const formatAmount = v => { const n = Math.round(Number(v || 0)); return n < 0 ? `−$${Math.abs(n).toLocaleString("en-US")}` : `$${n.toLocaleString("en-US")}`; };
     const upkeepRows = upkeepItems.length
-        ? upkeepItems.map(x => `<div class="st-cost-row"><span><i>${escapeHtml(x.icon || "🏗️")}</i><span><b>${escapeHtml(x.name || "ساختمان")}</b><small>${escapeHtml(x.group || "زیرساخت")}</small></span></span><strong>−${formatAmount(x.amount)}</strong></div>`).join("")
+        ? upkeepItems.map((x, i) => `<div class="st-cost-row st-upkeep-row ${i >= 2 ? `st-upkeep-extra ${upkeepExpanded ? "" : "hidden"}` : ""}"><span><i>${escapeHtml(x.icon || "🏗️")}</i><span><b>${escapeHtml(x.name || "ساختمان")}</b><small>${escapeHtml(x.group || "زیرساخت")}</small></span></span><strong>−${formatStatsAmount(x.amount)}</strong></div>`).join("")
         : `<p class="st-no-costs">هزینهٔ نگهداری روزانه‌ای برای ساختمان‌ها ثبت نشده است.</p>`;
-    const events = recentEvents.length
-        ? recentEvents.map(e => `<li><span class="st-ev-text">${escapeHtml(e.text)}</span><span class="st-ev-time">${timeAgo(e.at, d.now)}</span></li>`).join("")
-        : `<li><span class="st-ev-text">هنوز رویدادی رخ نداده است.</span></li>`;
     const net = Number(d.net_income ?? d.total_income ?? 0);
     body.innerHTML = `
         <div class="st-card st-finance-card">
-            <div class="st-finance-head"><div><small>درآمد ناخالص روزانه</small><strong>${formatAmount(d.total_income)}</strong></div><span class="st-finance-icon">💰</span></div>
+            <div class="st-finance-head"><div><small>درآمد کل روزانه پیش از هزینه‌ها</small><strong>${formatStatsAmount(d.total_income)}</strong></div><span class="st-finance-icon">💰</span></div>
             <div class="st-finance-breakdown">
-                <div class="st-line"><span>درآمد پایهٔ کشور</span><b>${formatAmount(d.income_base)}</b></div>
-                ${Number(d.income_economy || 0) ? `<div class="st-line"><span>ساختمان‌های اقتصادی</span><b>${formatAmount(d.income_economy)}</b></div>` : ""}
-                ${Number(d.income_map || 0) ? `<div class="st-line"><span>منابع و سکوهای نقشه</span><b>${formatAmount(d.income_map)}</b></div>` : ""}
-                ${Number(d.income_straits || 0) ? `<div class="st-line"><span>تنگه‌ها و کانال‌ها</span><b>${formatAmount(d.income_straits)}</b></div>` : ""}
-                ${Number(d.income_occupation || 0) ? `<div class="st-line"><span>کشورهای اشغال‌شده</span><b>${formatAmount(d.income_occupation)}</b></div>` : ""}
-                ${Number(d.welfare_extra_income || 0) ? `<div class="st-line st-income-bonus"><span>افزایش ناشی از رفاه (${fmt1(bonus)}٪)</span><b>+${formatAmount(d.welfare_extra_income)}</b></div>` : `<div class="st-line st-income-bonus"><span>افزایش ناشی از رفاه (${fmt1(bonus)}٪)</span><b>+${formatAmount(0)}</b></div>`}
+                <div class="st-line"><span>درآمد پایهٔ کشور</span><b>${formatStatsAmount(d.income_base)}</b></div>
+                ${Number(d.income_economy || 0) ? `<div class="st-line"><span>سرمایه‌گذاری‌های اقتصادی</span><b>${formatStatsAmount(d.income_economy)}</b></div>` : ""}
+                ${Number(d.income_map || 0) ? `<div class="st-line"><span>منابع نفتی و سکوهای نقشه</span><b>${formatStatsAmount(d.income_map)}</b></div>` : ""}
+                ${Number(d.income_straits || 0) ? `<div class="st-line"><span>تنگه‌ها و کانال‌ها</span><b>${formatStatsAmount(d.income_straits)}</b></div>` : ""}
+                ${Number(d.income_occupation || 0) ? `<div class="st-line"><span>کشورهای اشغال‌شده</span><b>${formatStatsAmount(d.income_occupation)}</b></div>` : ""}
+                <div class="st-line st-income-bonus"><span>درآمد اضافهٔ رفاه (${fmt1(Number(d.bonus || 0))}٪)</span><b>+${formatStatsAmount(d.welfare_extra_income)}</b></div>
             </div>
             <div class="st-total-divider"></div>
-            <div class="st-line st-gross-total"><span>مجموع درآمد روزانه</span><b>${formatAmount(d.total_income)}</b></div>
-            <div class="st-cost-heading"><span>کسرهای روزانه</span><strong>−${formatAmount(d.daily_upkeep)}</strong></div>
+            <div class="st-line st-gross-total"><span>درآمد کل روزانه</span><b>${formatStatsAmount(d.total_income)}</b></div>
+            <div class="st-cost-heading"><span>کسرهای روزانهٔ نگهداری</span><strong>−${formatStatsAmount(d.daily_upkeep)}</strong></div>
             <div class="st-upkeep-list">${upkeepRows}</div>
-            <div class="st-net-panel"><div><small>درآمد خالص روزانه پس از هزینه‌ها</small><strong class="${net >= 0 ? "is-positive" : "is-negative"}">${formatAmount(net)}</strong></div><span>${net >= 0 ? "✓ مبلغ باقی‌مانده" : "⚠ هزینه‌ها بیشتر از درآمدند"}</span></div>
-            <p class="st-text st-finance-note">درآمد خالص، مبلغی است که پس از کسر هزینهٔ نگهداری روزانهٔ ساختمان‌ها باقی می‌ماند. در صورت بدهیِ وامِ معوق، بخشی از دریافتی واقعی خزانه نیز ممکن است صرف بازپرداخت شود.</p>
-        </div>
-        <div class="st-card">
-            <div class="st-box st-box-row">
-                <div class="st-box-title"><span class="st-shield">🛡️</span><b>پاداش رفاه</b><small>افزایش درآمد کل روزانه</small></div>
-                <strong class="st-good">+${fmt1(bonus)}٪</strong>
-            </div>
-            <div class="st-bar"><div class="st-bar-fill" style="width:${pct}%"></div></div>
-            <p class="st-text">رفاه به درآمد روزانه اضافه می‌شود. ساخت و ارتقای ساختمان‌های رفاهی پاداش را بالا می‌برد و رویدادهای منفی می‌توانند آن را موقتاً کاهش دهند؛ سقف پاداش ${max}٪ است.</p>
-            <div class="st-line"><span>پاداشِ اولیهٔ ساختمان‌ها</span><span class="st-good-soft">${fmt1(Number(d.gross || 0))}٪</span></div>
-            ${Number(d.penalty || 0) > 0 ? `<div class="st-line"><span>کاهش موقت رویدادها</span><span class="st-bad-soft">−${fmt1(d.penalty)}٪</span></div>` : ""}
-            <div class="st-line"><span>اثر نهایی رفاه بر درآمد</span><span class="st-good-soft">+${formatAmount(d.welfare_extra_income)} در روز</span></div>
-        </div>
-        <div class="st-card st-card-plain">
-            <p class="st-muted">رویدادهای محتمل در کشور شما: ${risks.length ? escapeHtml(risks.join("، ")) : "—"}</p>
-            <p class="st-text">ساختمان‌های مرتبط، احتمال وقوع و شدت خسارت رویدادها را کاهش می‌دهند.</p>
-        </div>
-        <div class="st-card st-card-plain">
-            <p class="st-muted">رویدادهای اخیر:</p>
-            <ul class="st-events">${events}</ul>
+            ${upkeepItems.length > 2 ? `<button class="st-upkeep-toggle" id="st-upkeep-toggle" type="button">${upkeepExpanded ? "نمایش کمتر" : `مشاهدهٔ بیشتر (${upkeepItems.length - 2})`} <span>${upkeepExpanded ? "⌃" : "⌄"}</span></button>` : ""}
+            <div class="st-net-panel"><div><small>درآمد خالص روزانه پس از هزینه‌ها</small><strong class="${net >= 0 ? "is-positive" : "is-negative"}">${formatStatsAmount(net)}</strong></div><span>${net >= 0 ? "✓ مبلغ باقی‌مانده" : "⚠ هزینه‌ها بیشتر از درآمدند"}</span></div>
+            <p class="st-text st-finance-note">درآمد خالص از جمع درآمد پایه، اقتصاد، نقشه، تنگه‌ها و رفاه پس از کسر هزینهٔ نگهداری به‌دست می‌آید. خزانه طبق همین نرخ و در طول زمان به‌روزرسانی می‌شود.</p>
         </div>`;
+    const toggle = body.querySelector("#st-upkeep-toggle");
+    if (toggle) toggle.addEventListener("click", () => {
+        upkeepExpanded = !upkeepExpanded;
+        renderStats();
+    });
+}
+function renderWelfarePage() {
+    const d = statsData, body = document.getElementById("welfare-body");
+    if (!body || !d) return;
+    const bonus = Number(d.bonus || 0), max = Math.max(1, Number(d.max || 50));
+    const gross = Number(d.gross || 0), penalty = Number(d.penalty || 0);
+    const risks = Array.isArray(d.risks) ? d.risks : [];
+    const events = Array.isArray(d.events) ? d.events : [];
+    const buildings = Array.isArray(d.buildings) ? d.buildings : [];
+    const pct = Math.min(100, bonus / max * 100);
+    body.innerHTML = `
+        <div class="st-card welfare-hero-card">
+            <div class="st-box st-box-row"><div class="st-box-title"><span class="st-shield">🛡️</span><b>پاداش رفاه فعلی</b><small>اثر روی درآمد کل کشور</small></div><strong class="st-good">+${fmt1(bonus)}٪</strong></div>
+            <div class="st-bar"><div class="st-bar-fill" style="width:${pct}%"></div></div>
+            <div class="st-line"><span>پاداش ساخته‌شده از ساختمان‌ها</span><b class="st-good-soft">+${fmt1(gross)}٪</b></div>
+            ${penalty > 0 ? `<div class="st-line"><span>کاهش موقت رویدادها</span><b class="st-bad-soft">−${fmt1(penalty)}٪</b></div>` : ""}
+            <div class="st-line"><span>سقف پاداش</span><b>${fmt1(max)}٪</b></div>
+            <div class="st-line"><span>افزایش درآمد روزانه</span><b class="st-good-soft">+${formatStatsAmount(d.welfare_extra_income)}</b></div>
+        </div>
+        <div class="st-card welfare-buildings-card">
+            <div class="welfare-card-heading"><span>🏥</span><div><b>ساختمان‌های مرتبط</b><small>برای دیدن ساخت و ارتقا وارد زیرساخت شوید</small></div></div>
+            <div class="welfare-building-chips">${buildings.length ? buildings.map(b => `<span>${escapeHtml(b.icon || "🏗️")} ${escapeHtml(b.name || "ساختمان رفاهی")}</span>`).join("") : `<span>ساختمان رفاهی تعریف نشده است</span>`}</div>
+            <button type="button" class="iws-details-button" id="welfare-open-infra">رفتن به زیرساخت‌های رفاه و امنیت ←</button>
+        </div>
+        <div class="st-card st-card-plain welfare-events-card">
+            <h3>رویدادها و امنیت</h3>
+            <p class="st-muted">رویدادهای محتمل در کشور شما: ${risks.length ? escapeHtml(risks.join("، ")) : "—"}</p>
+            <p class="st-text">بیمارستان، پلیس، شهرک مسکونی، دانشگاه و مترو می‌توانند احتمال یا شدت برخی رویدادها را کاهش دهند. افت رفاه به‌مرور جبران می‌شود.</p>
+            <div class="welfare-events-heading">رویدادهای اخیر</div>
+            <ul class="st-events">${events.length ? events.map(e => `<li><span class="st-ev-text">${escapeHtml(e.text || "")}</span><span class="st-ev-time">${timeAgo(e.at, d.now)}</span></li>`).join("") : `<li><span class="st-ev-text">هنوز رویدادی رخ نداده است.</span></li>`}</ul>
+        </div>`;
+    body.querySelector("#welfare-open-infra")?.addEventListener("click", async () => {
+        showGamePage("infrastructure");
+        await refreshPlayer();
+        renderInfraTab("welfare");
+    });
 }
 
 /* =========================================================
