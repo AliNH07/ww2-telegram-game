@@ -39,7 +39,6 @@ LOAN_INTEREST_PER_STEP = 0.10      # ۱۰٪ مبلغ
 LOAN_MAX_HOURS = 72                # حداکثر مهلت (=۶۰٪)
 LOAN_FEE = 0.05                    # کارمزد ۵٪ از هر دریافت
 LOAN_CAP_FRACTION = 0.50           # سقف هر وام: ۵۰٪ درآمد روزانهٔ وام‌دهنده
-LOAN_CLOSED_HOURS_AT_START = 24    # «هفتهٔ اول فصل» (متناسب با طول بازی) وام‌دهی بسته است
 LOAN_END_MARGIN_SECONDS = 60       # سررسید همه وام‌ها ۱ دقیقه پیش از جنگ جهانی (پایان بازی)
 LOAN_PENDING_TTL_HOURS = 24        # پیشنهادهای بی‌پاسخ منقضی می‌شوند
 SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
@@ -1794,8 +1793,7 @@ async def get_map_transits(request):
         cid = t["owner"]
         fr = t.get("from_ll") or loc_coords(cid, t["from"]); to = t.get("to_ll") or loc_coords(cid, t["to"])
         if not fr or not to: continue
-        out.append({"id": t["id"], "country": cid, "from": t["from"], "to": t["to"],
-                    "from_ll": list(fr), "to_ll": list(to), "kind": t["kind"],
+        out.append({"id": t["id"], "country": cid, "from_ll": list(fr), "to_ll": list(to), "kind": t["kind"],
                     "from_name": "میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"]), "to_name": loc_label(t["to"]),
                     "start": t["start"], "arrive": t["arrive"]})
     return web.json_response({"transits": out, "now": utcnow().isoformat()})
@@ -2667,8 +2665,6 @@ def loan_lending_open():
     start, end = _game_window()
     if not start: return False, "بازی هنوز شروع نشده است."
     now = utcnow()
-    if now < start + timedelta(hours=LOAN_CLOSED_HOURS_AT_START):
-        return False, "وام‌دهی در هفته اول فصل بسته است."
     if now >= end - timedelta(seconds=LOAN_END_MARGIN_SECONDS):
         return False, "وام‌دهی بسته شده است؛ جنگ جهانی نزدیک است."
     return True, ""
