@@ -2738,3 +2738,24 @@ input, textarea, button { -webkit-touch-callout:none; }
     .infra-tab-label { font-size:9px; }
     .infra-tab-count { font-size:8px; }
 }
+
+/* بازطراحی پنل مدیریت عوارض تنگه */
+.map-info-strait-controls .strait-control-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:900;margin-bottom:12px;color:#f4d78a}
+.map-info-strait-controls .strait-policy-block{padding:11px;border-radius:12px;background:rgba(9,13,23,.58);border:1px solid rgba(232,187,78,.14);margin-top:9px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.map-info-strait-controls .strait-policy-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
+.map-info-strait-controls .strait-policy-heading b{font-size:12px;color:#f2d38a}
+.map-info-strait-controls .strait-policy-heading span{font-size:10px;color:#9ba4b7}
+.map-info-strait-controls .strait-policy-label{font-size:11px;color:#b7c0d0;margin-top:2px}
+.map-info-strait-controls .strait-policy-block input[type=number],.map-info-strait-controls .strait-policy-block select{width:100%;min-width:0;border-radius:9px;border:1px solid rgba(180,190,210,.22);background:#111722;color:#f5f7fb;padding:9px 10px;font:inherit;font-size:12px;outline:none}
+.map-info-strait-controls .strait-policy-block input:focus,.map-info-strait-controls .strait-policy-block select:focus{border-color:rgba(232,187,78,.7);box-shadow:0 0 0 2px rgba(232,187,78,.08)}
+.map-info-strait-controls .strait-policy-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px}
+.map-info-strait-controls .strait-policy-block button{border:1px solid rgba(232,187,78,.22);border-radius:9px;background:rgba(232,187,78,.12);color:#f5dda0;padding:9px 11px;font-size:11px;font-weight:800;white-space:nowrap}
+.map-info-strait-controls .strait-policy-block button:active{transform:scale(.98)}
+.map-info-strait-controls .strait-policy-block button:disabled{opacity:.35;cursor:not-allowed}
+.map-info-strait-controls .strait-check-row{display:flex;align-items:center;gap:8px;font-size:11px;color:#d6dbea;line-height:1.5;cursor:pointer}
+.map-info-strait-controls .strait-check-row input{accent-color:#e3b04b;width:15px;height:15px;flex:0 0 auto}
+.map-info-strait-controls .strait-policy-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.map-info-strait-controls .strait-policy-actions #strait-country-free{background:rgba(63,185,119,.13);border-color:rgba(63,185,119,.3);color:#9ef0bc}
+.map-info-strait-controls .strait-policy-actions #strait-country-clear{grid-column:1/-1;background:rgba(255,255,255,.035);border-color:rgba(180,190,210,.15);color:#b6bfce}
+.map-info-strait-controls small{display:block;color:#9ca6b7;margin-top:10px;line-height:1.8;font-size:10px}
+@media(max-width:420px){.map-info-strait-controls .strait-policy-row{grid-template-columns:1fr}.map-info-strait-controls .strait-policy-actions{grid-template-columns:1fr 1fr}.map-info-strait-controls .strait-policy-actions #strait-country-clear{grid-column:1/-1}}
