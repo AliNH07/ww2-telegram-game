@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261009h">
+<link rel="stylesheet" href="/style.css?v=20261009i">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -526,6 +526,16 @@
         </div>
 
         <div id="comm-news" class="comm-panel hidden">
+            <div id="news-filter-tabs" class="news-filter-tabs" role="tablist" aria-label="دسته‌بندی اخبار">
+                <button class="news-filter active" data-news-filter="all">همه</button>
+                <button class="news-filter" data-news-filter="military">نظامی</button>
+                <button class="news-filter" data-news-filter="diplomacy">دیپلماسی</button>
+                <button class="news-filter" data-news-filter="economy">اقتصاد</button>
+                <button class="news-filter" data-news-filter="trade">تجارت</button>
+                <button class="news-filter" data-news-filter="territory">قلمرو</button>
+                <button class="news-filter" data-news-filter="union">اتحادیه</button>
+                <button class="news-filter" data-news-filter="general">عمومی</button>
+            </div>
             <div id="news-list" class="news-list"></div>
         </div>
 
@@ -535,6 +545,9 @@
                 <button class="pm-subtab" data-pm-sub="chat">چت</button>
             </div>
             <div id="pm-inbox" class="contact-list"></div>
+            <div id="contact-search-wrap" class="pm-country-search-wrap hidden">
+                <input id="pm-country-search" class="pm-country-search" type="search" placeholder="جست‌وجوی کشور برای چت..." autocomplete="off">
+            </div>
             <div id="contact-list" class="contact-list hidden"></div>
         </div>
     </main>
@@ -550,6 +563,23 @@
         <div class="pm-input-row">
             <textarea id="pm-input" class="pm-input" rows="1" maxlength="500" placeholder="پیام..."></textarea>
             <button id="pm-send" class="pm-send" aria-label="ارسال"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+        </div>
+    </div>
+
+    <!-- چت تمام‌صفحهٔ اتحادیه، شبیه گروه‌های تلگرامی -->
+    <div id="union-conversation" class="union-conversation hidden">
+        <div class="pm-header union-chat-header">
+            <button id="union-chat-back" class="pm-back" aria-label="بازگشت"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+            <button id="union-chat-title" class="union-chat-title" aria-label="نمایش اعضای اتحادیه">
+                <span id="union-chat-name">اتحادیه</span>
+                <small id="union-chat-count">۰ عضو</small>
+            </button>
+            <button id="union-chat-members" class="union-chat-members" aria-label="اعضا و مدیریت">👥</button>
+        </div>
+        <div id="union-chat-messages" class="pm-messages union-chat-messages"></div>
+        <div class="pm-input-row">
+            <textarea id="union-chat-input" class="pm-input" rows="1" maxlength="500" placeholder="پیام به اتحادیه..."></textarea>
+            <button id="union-chat-send" class="pm-send" aria-label="ارسال پیام"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
         </div>
     </div>
 
@@ -642,6 +672,6 @@
 
 </section>
 
-<script src="/app.js?v=20261009g"></script>
+<script src="/app.js?v=20261009i"></script>
 </body>
 </html>
