@@ -2248,7 +2248,7 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
         document.querySelectorAll(".comm-panel").forEach(p => p.classList.add("hidden"));
         const panel = document.getElementById(tid);
         if (panel) panel.classList.remove("hidden");
-        if (tid === "comm-announcements") loadAnnouncements();
+        if (tid === "comm-announcements") { loadAnnouncements(); loadAnnouncementStatus(true); }
         else if (tid === "comm-unions") loadUnion();
         else if (tid === "comm-news") { resetNewsFilter(); loadNews(); }
         else if (tid === "comm-contacts") openPmHome();
@@ -2259,19 +2259,128 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
    Announcements
 ========================================================= */
 document.getElementById("ann-submit").addEventListener("click", openAnnouncementComposer);
+document.getElementById("ann-help")?.addEventListener("click", openAnnouncementHelp);
 
 const announcementCache = new Map();
 const ANNOUNCEMENT_COSTS = [0, 0, 10000, 400000];
 const ANNOUNCEMENT_LIMIT = 20000;
 const ANNOUNCEMENT_SLOT_NAMES = ["اول", "دوم", "سوم", "چهارم"];
 const announcementCurrency = amount => amount ? `${formatNumber(amount)}$` : "رایگان";
+let announcementStatusState = null;
+let announcementCooldownUntil = 0;
+let announcementResetAt = 0;
+let announcementCountdownInterval = null;
+let announcementStatusRefreshing = false;
+let announcementNeedsCooldownRefresh = false;
+let announcementNeedsResetRefresh = false;
+
+function announcementFormatCountdown(seconds) {
+    const sec = Math.max(0, Math.floor(seconds));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return [h, m, s].map(v => String(v).padStart(2, "0")).join(":").replace(/[0-9]/g, d => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
+}
+
+function renderAnnouncementStatus() {
+    const button = document.getElementById("ann-submit");
+    const timer = document.getElementById("ann-timer");
+    if (!button || !timer || !announcementStatusState) return;
+    const now = Date.now();
+    const count = Number(announcementStatusState.count || 0);
+    if (count >= 4) {
+        button.disabled = true;
+        const remaining = Math.ceil((announcementResetAt - now) / 1000);
+        timer.classList.remove("hidden");
+        if (remaining <= 0) {
+            timer.textContent = "در حال تازه‌سازی سهمیه…";
+            if (announcementNeedsResetRefresh && !announcementStatusRefreshing) {
+                announcementNeedsResetRefresh = false;
+                loadAnnouncementStatus(true);
+            }
+        } else {
+            timer.textContent = `سهمیهٔ بعدی تا ${announcementFormatCountdown(remaining)}`;
+        }
+        return;
+    }
+    const cooldown = Math.ceil((announcementCooldownUntil - now) / 1000);
+    if (cooldown > 0) {
+        button.disabled = true;
+        timer.classList.remove("hidden");
+        timer.textContent = `بیانیهٔ بعدی تا ${announcementFormatCountdown(cooldown)}`;
+    } else {
+        button.disabled = false;
+        timer.classList.add("hidden");
+        timer.textContent = "";
+        if (announcementNeedsCooldownRefresh && !announcementStatusRefreshing) {
+            announcementNeedsCooldownRefresh = false;
+            loadAnnouncementStatus(true);
+        }
+    }
+}
+
+async function loadAnnouncementStatus(silent = false) {
+    if (announcementStatusRefreshing) return;
+    announcementStatusRefreshing = true;
+    try {
+        const status = await apiGet("/api/announcements/status");
+        if (!status?.success) {
+            if (!silent) showToast(status?.message || "وضعیت انتشار بیانیه دریافت نشد.", "error");
+            return;
+        }
+        announcementStatusState = status;
+        announcementCooldownUntil = Date.now() + Math.max(0, Number(status.cooldown_seconds || 0)) * 1000;
+        announcementResetAt = Date.now() + Math.max(0, Number(status.reset_seconds || 0)) * 1000;
+        announcementNeedsCooldownRefresh = Number(status.cooldown_seconds || 0) > 0;
+        announcementNeedsResetRefresh = Number(status.count || 0) >= 4;
+        renderAnnouncementStatus();
+        if (!announcementCountdownInterval) {
+            announcementCountdownInterval = setInterval(renderAnnouncementStatus, 1000);
+        }
+    } catch (e) {
+        if (!silent) showToast("وضعیت انتشار بیانیه دریافت نشد.", "error");
+    } finally {
+        announcementStatusRefreshing = false;
+    }
+}
+
+function openAnnouncementHelp() {
+    const ov = document.createElement("div");
+    ov.className = "modal-overlay ann-modal-overlay ann-help-overlay";
+    ov.innerHTML = `
+        <section class="modal-box ann-help-box" role="dialog" aria-modal="true" aria-labelledby="ann-help-title">
+            <div class="ann-modal-head"><div><span class="ann-modal-kicker">راهنمای کوتاه</span><h2 class="modal-title" id="ann-help-title">قوانین انتشار بیانیه</h2></div><button class="ann-modal-close" type="button" aria-label="بستن">×</button></div>
+            <div class="ann-help-content">
+                <div class="ann-help-rule"><span class="ann-help-rule-icon">📅</span><div><strong>۴ بیانیه در روز</strong><p>سهمیه هر روز ساعت ۰۰:۰۰ به وقت باکو دوباره فعال می‌شود.</p></div></div>
+                <div class="ann-help-rule"><span class="ann-help-rule-icon">⏱️</span><div><strong>فاصلهٔ یک‌ساعته</strong><p>بین انتشار هر بیانیه باید یک ساعت کامل فاصله باشد. زمان باقی‌مانده کنار دکمه نشان داده می‌شود.</p></div></div>
+                <div class="ann-help-rule"><span class="ann-help-rule-icon">💰</span><div><strong>هزینهٔ روزانه</strong><p>بیانیهٔ اول و دوم رایگان است؛ بیانیهٔ سوم ۱۰٬۰۰۰ دلار و بیانیهٔ چهارم ۴۰۰٬۰۰۰ دلار هزینه دارد.</p></div></div>
+                <div class="ann-help-rule"><span class="ann-help-rule-icon">✍️</span><div><strong>متن بیانیه</strong><p>هر بیانیه می‌تواند حداکثر ۲۰٬۰۰۰ حرف داشته باشد.</p></div></div>
+            </div>
+            <div class="ann-modal-actions"><button type="button" class="ann-publish-button ann-help-close">متوجه شدم</button></div>
+        </section>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector(".ann-modal-close").onclick = close;
+    ov.querySelector(".ann-help-close").onclick = close;
+    ov.addEventListener("click", e => { if (e.target === ov) close(); });
+}
 
 async function openAnnouncementComposer() {
-    let status;
-    try { status = await apiGet("/api/announcements/status"); }
+    if (!announcementStatusState) await loadAnnouncementStatus(true);
+    let status = announcementStatusState;
+    try { status = await apiGet("/api/announcements/status"); announcementStatusState = status; }
     catch (e) { showToast("وضعیت انتشار بیانیه دریافت نشد.", "error"); return; }
     if (!status?.success) { showToast(status?.message || "برای انتشار، ابتدا کشور انتخاب کنید.", "error"); return; }
-    if (status.count >= 4) { showToast("سهمیهٔ روزانهٔ انتشار بیانیه تمام شده است.", "error"); return; }
+    announcementCooldownUntil = Date.now() + Math.max(0, Number(status.cooldown_seconds || 0)) * 1000;
+    announcementResetAt = Date.now() + Math.max(0, Number(status.reset_seconds || 0)) * 1000;
+    announcementNeedsCooldownRefresh = Number(status.cooldown_seconds || 0) > 0;
+    announcementNeedsResetRefresh = Number(status.count || 0) >= 4;
+    renderAnnouncementStatus();
+    if (status.count >= 4) { showToast("سهمیهٔ روزانه تمام شده است؛ پس از نیمه‌شب دوباره فعال می‌شود.", "error"); return; }
+    if (Number(status.cooldown_seconds || 0) > 0) {
+        showToast(`برای بیانیهٔ بعدی ${Math.ceil(status.cooldown_seconds / 60)} دقیقه دیگر صبر کنید.`, "error");
+        return;
+    }
 
     const currentSlot = Math.min(4, (status.count || 0) + 1);
     const currentCost = status.next_cost ?? ANNOUNCEMENT_COSTS[currentSlot - 1] ?? 0;
@@ -2282,9 +2391,6 @@ async function openAnnouncementComposer() {
             <div class="ann-modal-head"><div><span class="ann-modal-kicker">بیانیهٔ رسمی کشور</span><h2 class="modal-title" id="ann-composer-title">بیانیهٔ جدید</h2></div><button class="ann-modal-close" type="button" aria-label="بستن">×</button></div>
             <textarea id="ann-composer-text" class="ann-input ann-composer-text" maxlength="${ANNOUNCEMENT_LIMIT}" placeholder="متن بیانیه را بنویسید…" aria-label="متن بیانیه"></textarea>
             <div class="ann-composer-meta"><span id="ann-char-count">۰ / ۲۰٬۰۰۰</span><span>نوبت ${ANNOUNCEMENT_SLOT_NAMES[currentSlot - 1]} انتشار</span></div>
-            <div class="ann-cost-row" aria-label="قیمت انتشار بیانیه">
-                ${ANNOUNCEMENT_COSTS.map((cost, i) => `<span class="ann-cost-chip ${i + 1 === currentSlot ? "current" : ""}"><b>نوبت ${ANNOUNCEMENT_SLOT_NAMES[i]}</b><small>${announcementCurrency(cost)}</small></span>`).join("")}
-            </div>
             <div class="ann-modal-actions"><button type="button" class="modal-cancel ann-modal-cancel">انصراف</button><button type="button" class="ann-publish-button" id="ann-publish-confirm">انتشار بیانیه · ${announcementCurrency(currentCost)}</button></div>
         </section>`;
     document.body.appendChild(ov);
@@ -2307,10 +2413,12 @@ async function openAnnouncementComposer() {
                 showToast(d.message || "انتشار بیانیه انجام نشد.", "error");
                 publish.disabled = false;
                 publish.textContent = `انتشار بیانیه · ${announcementCurrency(currentCost)}`;
+                await loadAnnouncementStatus(true);
                 return;
             }
             close();
             showToast("بیانیه منتشر شد.", "success");
+            await loadAnnouncementStatus(true);
             loadAnnouncements();
         } catch (e) {
             showToast("ارتباط با سرور برقرار نشد.", "error");
