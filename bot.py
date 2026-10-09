@@ -1928,20 +1928,23 @@ async def get_announcement_status(request):
                               "next_cost": ANN_COSTS.get(next_number, 0) if next_number else None,
                               "costs": {str(k): v for k, v in ANN_COSTS.items()}})
 
-async def _broadcast_announcement_notification(cid):
-    """ارسال اعلان تلگرامی انتشار بیانیه به همهٔ بازیکنان دارای کشور."""
+async def _broadcast_announcement_notification(cid, author_uid=None):
+    """ارسال اعلان کوتاه بیانیه به دیگر بازیکنان؛ نویسنده اعلان خودش را نمی‌گیرد."""
     if cid not in COUNTRIES:
         return
-    text = (f"📢 بیانیهٔ جدید\nکشور «{COUNTRIES[cid]['name']}» بیانیه‌ای منتشر کرد.\n"
-            "برای خواندن و پاسخ دادن: بازی ← ارتباطات ← بیانیه‌ها")
+    country_name = COUNTRIES[cid]["name"]
+    text = (f"📢 بیانیهٔ جدید\nکشور «{country_name}» بیانیه‌ای منتشر کرد.\n"
+            "متن بیانیه فقط در بخش «ارتباطات ← بیانیه‌ها» قابل مشاهده است.")
     semaphore = asyncio.Semaphore(8)
     async def send_to(uid):
+        if author_uid is not None and str(uid) == str(author_uid):
+            return
         async with semaphore:
             try:
                 await bot.send_message(int(uid), text)
             except Exception as e:
                 logging.warning("announcement notification failed for %s: %s", uid, e)
-    recipients = list(players.keys())
+    recipients = [uid for uid in players.keys() if author_uid is None or str(uid) != str(author_uid)]
     await asyncio.gather(*(send_to(uid) for uid in recipients))
 
 async def create_announcement(request):
@@ -1972,10 +1975,11 @@ async def create_announcement(request):
     ann = {"id": str(uuid.uuid4()), "from_country": cid, "text": text,
            "created_at": utcnow().isoformat(), "reactions": {}, "comments": []}
     announcements.append(ann)
-    push_news("بیانیه", f"{COUNTRIES[cid]['name']}: {text[:80]}")
+    # متن کامل بیانیه هرگز وارد خبرهای عمومی/اعلان‌ها نمی‌شود.
+    push_news("بیانیه", f"کشور «{COUNTRIES[cid]['name']}» بیانیه‌ای منتشر کرد؛ متن فقط در بخش بیانیه‌هاست.")
     save_state()
     try:
-        asyncio.get_running_loop().create_task(_broadcast_announcement_notification(cid))
+        asyncio.get_running_loop().create_task(_broadcast_announcement_notification(cid, uid))
     except RuntimeError:
         logging.warning("announcement notification skipped: no active event loop")
     return web.json_response({"success": True, "announcement": ann, "cost": cost,
@@ -2545,7 +2549,21 @@ async def set_border_settings(request):
 # API News / Rankings
 # =========================================================
 async def get_news(request):
-    return web.json_response(list(reversed(news_feed[-30:])) or [
+    # برای ردیف‌های قدیمی بیانیه نیز متن قبلی را از خبر/اعلان پنهان می‌کنیم.
+    rows = []
+    for item in reversed(news_feed[-30:]):
+        row = dict(item)
+        title = str(row.get("title", ""))
+        if "بیانیه" in title:
+            old_text = str(row.get("text", ""))
+            prefix = old_text.split(":", 1)[0].strip() if ":" in old_text else ""
+            if prefix and len(prefix) <= 80 and not prefix.startswith("کشور"):
+                row["text"] = f"کشور «{prefix}» بیانیه‌ای منتشر کرد؛ متن فقط در بخش بیانیه‌ها قابل مشاهده است."
+            else:
+                row["text"] = "بیانیه‌ای منتشر شد؛ متن فقط در بخش بیانیه‌ها قابل مشاهده است."
+            row["title"] = "بیانیه"
+        rows.append(row)
+    return web.json_response(rows or [
         {"title": "سال ۱۹۹۳", "text": "جهان در آستانه یک بحران بزرگ قرار دارد."}])
 
 def compute_rankings():
