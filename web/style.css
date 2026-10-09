@@ -2588,3 +2588,99 @@ input, textarea, button { -webkit-touch-callout:none; }
 .ln-empty b { color:#e4e8ef; font-size:13px; }
 .ln-empty small { color:#808b9e; font-size:10px; text-align:center; line-height:1.8; }
 @media(max-width:370px) { .ln-facts-grid { gap:5px; } .ln-facts-grid > div { padding:8px 6px; } .ln-facts-grid b { font-size:10px; } .ln-amt { font-size:18px; } .ln-party strong { font-size:11px; } }
+
+
+/* ==================== Final refinements: resources, infrastructure and army ==================== */
+.resource-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin: 0 0 16px;
+}
+.resource-chip {
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    padding: 12px 13px 11px;
+    gap: 5px;
+    border-radius: 16px;
+    background: linear-gradient(145deg, rgba(26, 32, 45, .92), rgba(12, 16, 25, .94));
+    border: 1px solid rgba(255,255,255,.085);
+    box-shadow: 0 7px 19px rgba(0,0,0,.18);
+}
+.resource-chip::before {
+    content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 3px;
+    background: linear-gradient(180deg, rgba(var(--brand-rgb), .9), rgba(var(--brand-rgb), .08));
+}
+.resource-chip-top { font-size: 12px; font-weight: 700; color: #bdc5d2; }
+.resource-chip-value { font-size: clamp(15px, 4vw, 19px); font-weight: 800; line-height: 1.35; color: #f8fafc; overflow-wrap: anywhere; }
+.resource-chip-rate { font-size: 10px; line-height: 1.7; }
+
+/* All infrastructure categories visible without horizontal scrolling; text-only tabs. */
+.infra-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    overflow: visible;
+    padding: 0;
+    margin: 0 0 16px;
+}
+.infra-tab {
+    min-width: 0;
+    width: 100%;
+    padding: 10px 7px;
+    min-height: 49px;
+    white-space: normal;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    border-radius: 13px;
+    background: linear-gradient(145deg, rgba(26,31,43,.92), rgba(12,16,25,.92));
+    border: 1px solid rgba(255,255,255,.08);
+    box-shadow: 0 4px 12px rgba(0,0,0,.13);
+}
+.infra-tab-label { font-size: 11.5px; font-weight: 750; line-height: 1.4; }
+.infra-tab-count { font-size: 10px; color: #98a4b4; line-height: 1.25; }
+.infra-tab.active { background: linear-gradient(145deg, rgba(var(--brand-rgb), .2), rgba(23,26,35,.95)); border-color: rgba(var(--brand-rgb), .55); }
+.infra-tab.active .infra-tab-count { color: var(--brand); }
+
+/* Army: compact capacity tiles leave room for unit production cards. */
+#army > .page-title { display: none !important; }
+#army .army-summary-card { padding: 11px 14px; margin-bottom: 10px; border-radius: 15px; }
+#army .army-summary-label { font-size: 12px; }
+#army .army-summary-power { font-size: 30px; }
+#army .base-cards-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-bottom: 11px; }
+#army .base-card {
+    min-width: 0; min-height: 94px; padding: 8px 7px 9px; gap: 4px;
+    border-radius: 12px; cursor: pointer; transition: border-color .18s ease, background .18s ease, transform .18s ease;
+    background: linear-gradient(145deg, rgba(26,32,44,.94), rgba(12,16,25,.95));
+}
+#army .base-card:hover, #army .base-card:focus-visible { border-color: rgba(var(--brand-rgb), .55); background: rgba(var(--brand-rgb), .09); outline: none; }
+#army .base-card:active { transform: scale(.97); }
+#army .base-card-head { align-items: center; gap: 3px; }
+#army .base-card-name { font-size: 10.5px; font-weight: 700; }
+#army .base-card-icon { width: 23px; height: 23px; font-size: 12px; border-radius: 7px; }
+#army .base-card-value { font-size: 16px; margin-top: 2px; }
+#army .base-card-max { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#army .base-card-progress { height: 4px; }
+#army .army-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; overflow: visible; margin: 0 0 11px; padding: 0; }
+#army .army-tab { justify-content: center; min-width: 0; padding: 9px 4px; gap: 4px; border-radius: 11px; font-size: 10.5px; white-space: normal; }
+#army .army-tab-count { padding: 1px 5px; font-size: 9px; }
+#army #army-units-new { scroll-margin-top: 88px; }
+
+/* Market field-level validation sits under the exact input, not in a toast. */
+#market .market-field-error { min-height: 0; color: #ff777d; font-size: 11.5px; line-height: 1.75; padding: 0 3px; }
+#market .market-field-error:empty { display: none; }
+#market .market-form .diplomacy-input:invalid { box-shadow: none; }
+#market .market-form .diplomacy-submit:disabled { opacity: .42; cursor: not-allowed; box-shadow: none; }
+#market .market-form .diplomacy-select:invalid { color: #8d97a7; }
+#market .market-mine-card .market-card-detail { border-top: 1px solid rgba(255,255,255,.06); margin-top: 4px; padding-top: 11px; }
+#market .market-mine-card .mk-prod-text small { display: block; margin-top: 4px; color: #aab1be; font-size: 11px; }
+#market .market-mine-card .market-action.cancel { font-size: 13px; background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.28); }
+@media (max-width: 360px) {
+    .infra-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #army .base-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #army .base-card { min-height: 90px; padding: 9px; }
+    #army .army-tab { font-size: 10px; }
+}
