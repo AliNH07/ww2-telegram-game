@@ -1528,8 +1528,8 @@ async def get_forces(request):
 
 # ---------------- زمان سفر نیروها ----------------
 TRAVEL_KM_PER_MIN = 40      # سرعت: ۴۰ کیلومتر در دقیقه (۱۰٬۰۰۰ کیلومتر ≈ ۴ ساعت)
-TRAVEL_MIN_MINUTES = 3
-TRAVEL_MAX_MINUTES = 480
+TRAVEL_MIN_MINUTES = 1
+TRAVEL_MAX_MINUTES = 135
 
 def loc_coords(cid, loc):
     if loc == "home": return TRADE_COUNTRY_COORDS.get(cid)
