@@ -6,6 +6,8 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp
+from aiogram.client.session.middlewares.base import BaseRequestMiddleware
+from aiogram.methods import SendMessage
 from aiogram.client.default import DefaultBotProperties
 from dotenv import load_dotenv
 
@@ -953,6 +955,32 @@ async def cors_middleware(request, handler):
 # =========================================================
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=None))
 dp = Dispatcher()
+
+class GameEntryButtonMiddleware(BaseRequestMiddleware):
+    """Append a persistent WebApp entry button to every message sent by the bot."""
+    async def __call__(self, make_request, bot, method):
+        if isinstance(method, SendMessage):
+            entry_button = InlineKeyboardButton(
+                text="🎮 ورود به بازی",
+                web_app=WebAppInfo(url=WEB_APP_URL)
+            )
+            markup = getattr(method, "reply_markup", None)
+            if isinstance(markup, InlineKeyboardMarkup):
+                rows = [list(row) for row in markup.inline_keyboard]
+                already_present = any(
+                    button.web_app is not None and button.web_app.url == WEB_APP_URL
+                    for row in rows for button in row
+                )
+                if not already_present:
+                    rows.append([entry_button])
+                method.reply_markup = InlineKeyboardMarkup(inline_keyboard=rows)
+            else:
+                # SendMessage permits only one reply markup type; inline markup is
+                # used here so the game entry button is always available below text.
+                method.reply_markup = InlineKeyboardMarkup(inline_keyboard=[[entry_button]])
+        return await make_request(bot, method)
+
+bot.session.middleware(GameEntryButtonMiddleware())
 
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
@@ -2471,18 +2499,17 @@ def _listing_view(l):
 
 async def get_market(request):
     rows = []
+    viewer_cid = request.query.get("country")
     for l in market_listings.values():
         if l.get("status") != "open": continue
         v = _listing_view(l)
-        seller = v["country"]
-        # برای هر آگهی، مسیر و هزینهٔ حمل فعلی را هم نشان بده.
-        other = None
-        if v["side"] == "sell":
-            other = request.query.get("country")
-        else:
-            other = request.query.get("country")
-        if other and other in COUNTRIES and other != seller:
-            qs, err = _route_options(seller, other, v["amount"])
+        owner_cid = v["country"]
+        if viewer_cid and viewer_cid in COUNTRIES and viewer_cid != owner_cid:
+            if v["side"] == "sell":
+                origin_cid, dest_cid = owner_cid, viewer_cid
+            else:
+                origin_cid, dest_cid = viewer_cid, owner_cid
+            qs, err = _route_options(origin_cid, dest_cid, v["amount"])
             v["routes"] = qs; v["route_error"] = err
         else:
             v["routes"] = []
@@ -2495,43 +2522,69 @@ async def create_listing(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
     data = await read_json(request); side = data.get("side", "sell")
-    try: amount = int(data.get("amount", 0)); price_amount = int(data.get("price_amount", 0))
-    except: return web.json_response({"success":False,"error":"invalid_amount"}, status=400)
-    resource = data.get("resource"); price_resource = data.get("price_resource", "money")
+    try:
+        amount = int(data.get("amount", 0)); price_amount = int(data.get("price_amount", 0))
+    except (TypeError, ValueError):
+        return web.json_response({"success":False,"error":"invalid_amount","message":"مقدارها باید عدد صحیح باشند."}, status=400)
+    resource = data.get("resource"); price_resource = data.get("price_resource")
     if resource not in RESOURCE_NAMES or (price_resource != "money" and price_resource not in RESOURCE_NAMES):
-        return web.json_response({"success":False,"error":"invalid_res"}, status=400)
-    if side not in ("sell","buy") or amount <= 0 or price_amount <= 0:
-        return web.json_response({"success":False,"error":"invalid_amount"}, status=400)
+        return web.json_response({"success":False,"error":"invalid_res","message":"کالا و چیزی که در ازای آن می‌خواهید را انتخاب کنید."}, status=400)
+    if side not in ("sell", "buy") or amount <= 0 or price_amount <= 0:
+        return web.json_response({"success":False,"error":"invalid_amount","message":"هر دو مقدار باید عدد صحیح بزرگ‌تر از صفر باشند."}, status=400)
     if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]; cid = p.get("country")
-    if not cid: return web.json_response({"success":False,"error":"no_country"}, status=400)
-    if side == "sell" and p["resources"].get(resource,0) < amount:
-        return web.json_response({"success":False,"error":"not_enough_res"}, status=400)
-    if side == "buy":
-        if price_resource == "money" and p.get("money",0) < price_amount:
-            return web.json_response({"success":False,"error":"not_enough_money"}, status=400)
-        if price_resource != "money" and p["resources"].get(price_resource,0) < price_amount:
-            return web.json_response({"success":False,"error":"not_enough_res"}, status=400)
-    lid = str(uuid.uuid4())
+    p = players[uid]
+    if not p.get("country"):
+        return web.json_response({"success":False,"error":"no_country","message":"ابتدا کشور خود را انتخاب کنید."}, status=400)
+    ensure_player_fields(p); accrue_player(p)
+    cid = p.get("country")
     if side == "sell":
-        l = {"id":lid,"side":"sell","seller":cid,"sell_resource":resource,"sell_amount":amount,
-             "want_resource":price_resource,"want_amount":price_amount,"status":"open","created_at":utcnow().isoformat()}
+        available = int(p["resources"].get(resource, 0))
+        if available < amount:
+            return web.json_response({"success":False,"error":"not_enough_res","field":"amount","available":available,
+                "message":f"موجودی شما {available:,} واحد {RESOURCE_NAMES[resource]} است."}, status=400)
+        # Reserve the listed goods. Cancelling the order returns this escrow.
+        p["resources"][resource] = p["resources"].get(resource, 0) - amount
+        l = {"id":str(uuid.uuid4()),"side":"sell","seller":cid,"sell_resource":resource,"sell_amount":amount,
+             "want_resource":price_resource,"want_amount":price_amount,"status":"open","escrowed":True,
+             "created_at":utcnow().isoformat()}
     else:
-        l = {"id":lid,"side":"buy","buyer":cid,"buy_resource":resource,"buy_amount":amount,
-             "offer_resource":price_resource,"offer_amount":price_amount,"status":"open","created_at":utcnow().isoformat()}
-    market_listings[lid] = l; save_state()
-    return web.json_response({"success":True,"listing_id":lid})
+        # Buy offers escrow the offered money/resource so the order cannot be posted twice with the same balance.
+        available = int(p.get("money", 0)) if price_resource == "money" else int(p["resources"].get(price_resource, 0))
+        if available < price_amount:
+            label = "دلارِ خزانه" if price_resource == "money" else RESOURCE_NAMES[price_resource]
+            return web.json_response({"success":False,"error":"not_enough_res" if price_resource != "money" else "not_enough_money",
+                "field":"price_amount","available":available,
+                "message":f"موجودی شما {available:,} {label} است."}, status=400)
+        if price_resource == "money": p["money"] = p.get("money", 0) - price_amount
+        else: p["resources"][price_resource] = p["resources"].get(price_resource, 0) - price_amount
+        l = {"id":str(uuid.uuid4()),"side":"buy","buyer":cid,"buy_resource":resource,"buy_amount":amount,
+             "offer_resource":price_resource,"offer_amount":price_amount,"status":"open","escrowed":True,
+             "created_at":utcnow().isoformat()}
+    market_listings[l["id"]] = l; save_state()
+    return web.json_response({"success":True,"listing_id":l["id"]})
 
 
 async def cancel_listing(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"success":False,"error":"unauthorized"}, status=401)
     data = await read_json(request); lid = data.get("listing_id")
-    cid = players.get(uid,{}).get("country"); l = market_listings.get(lid)
-    owner = l.get("seller") if l and l.get("side","sell")=="sell" else (l.get("buyer") if l else None)
-    if not l: return web.json_response({"success":False,"error":"not_found"}, status=404)
-    if owner != cid: return web.json_response({"success":False,"error":"not_owner"}, status=403)
-    del market_listings[lid]; save_state(); return web.json_response({"success":True})
+    p = players.get(uid); cid = p.get("country") if p else None
+    l = market_listings.get(lid)
+    owner = l.get("seller") if l and l.get("side", "sell") == "sell" else (l.get("buyer") if l else None)
+    if not l: return web.json_response({"success":False,"error":"not_found","message":"آگهی پیدا نشد."}, status=404)
+    if owner != cid: return web.json_response({"success":False,"error":"not_owner","message":"این آگهی متعلق به شما نیست."}, status=403)
+    # Only newly escrowed listings need a refund; legacy listings were not deducted at creation.
+    if l.get("escrowed") and p:
+        ensure_player_fields(p)
+        if l.get("side", "sell") == "sell":
+            key = l["sell_resource"]
+            p["resources"][key] = p["resources"].get(key, 0) + int(l.get("sell_amount", 0))
+        else:
+            key = l.get("offer_resource", "money"); value = int(l.get("offer_amount", 0))
+            if key == "money": p["money"] = p.get("money", 0) + value
+            else: p["resources"][key] = p["resources"].get(key, 0) + value
+    del market_listings[lid]; save_state()
+    return web.json_response({"success":True})
 
 
 async def accept_listing(request):
@@ -2540,42 +2593,61 @@ async def accept_listing(request):
     data = await read_json(request); lid = data.get("listing_id")
     if uid not in players: players[uid] = create_player(uid)
     actor = players[uid]; actor_cid = actor.get("country"); l = market_listings.get(lid)
-    if not l or l.get("status") != "open": return web.json_response({"success":False,"error":"closed"}, status=400)
-    side = l.get("side","sell")
+    if not l or l.get("status") != "open": return web.json_response({"success":False,"error":"closed","message":"این آگهی دیگر فعال نیست."}, status=400)
+    side = l.get("side", "sell")
     owner_cid = l.get("seller") if side == "sell" else l.get("buyer")
-    if owner_cid == actor_cid: return web.json_response({"success":False,"error":"self_buy"}, status=400)
-    seller_cid = owner_cid if side == "buy" else actor_cid
+    if owner_cid == actor_cid: return web.json_response({"success":False,"error":"self_buy","message":"نمی‌توانید آگهی کشور خودتان را قبول کنید."}, status=400)
+
+    # Direction is important: for a sell order the owner sells to the visitor;
+    # for a buy order the visitor sells to the owner.
+    seller_cid = owner_cid if side == "sell" else actor_cid
     buyer_cid = actor_cid if side == "sell" else owner_cid
     _, seller = get_player_by_country(seller_cid); _, buyer = get_player_by_country(buyer_cid)
-    if not seller or not buyer: return web.json_response({"success":False,"error":"player_gone"}, status=400)
+    if not seller or not buyer: return web.json_response({"success":False,"error":"player_gone","message":"یکی از کشورها دیگر بازیکن فعال ندارد."}, status=400)
+    ensure_player_fields(seller); ensure_player_fields(buyer)
+    accrue_player(seller); accrue_player(buyer)
+
     resource = l["sell_resource"] if side == "sell" else l["buy_resource"]
-    amount = l["sell_amount"] if side == "sell" else l["buy_amount"]
+    amount = int(l["sell_amount"] if side == "sell" else l["buy_amount"])
     pay_res = l["want_resource"] if side == "sell" else l["offer_resource"]
-    pay_amount = l["want_amount"] if side == "sell" else l["offer_amount"]
+    pay_amount = int(l["want_amount"] if side == "sell" else l["offer_amount"])
+    escrowed = bool(l.get("escrowed"))
+    payment_escrowed = side == "buy" and escrowed
+    goods_escrowed = side == "sell" and escrowed
+
     route, route_err = _route_quote(seller_cid, buyer_cid, amount, data.get("mode"))
     if route_err: return web.json_response({"success":False,"error":"no_route","message":route_err}, status=400)
-    if seller["resources"].get(resource,0) < amount:
-        return web.json_response({"success":False,"error":"seller_no_res"}, status=400)
+    if not goods_escrowed and seller["resources"].get(resource, 0) < amount:
+        return web.json_response({"success":False,"error":"seller_no_res","message":f"فروشنده فقط {seller['resources'].get(resource,0):,} واحد {RESOURCE_NAMES[resource]} دارد."}, status=400)
+
     if pay_res == "money":
-        if buyer.get("money",0) < pay_amount + route["transport_cost"]:
-            return web.json_response({"success":False,"error":"not_enough_money","message":f"پول کافی نیست؛ هزینه حمل {route['transport_cost']:,}$ است."}, status=400)
-        buyer["money"] -= pay_amount; seller["money"] = seller.get("money",0) + pay_amount
-        buyer["money"] -= route["transport_cost"]
+        required_now = route["transport_cost"] + (0 if payment_escrowed else pay_amount)
+        if buyer.get("money", 0) < required_now:
+            return web.json_response({"success":False,"error":"not_enough_money",
+                "message":f"خزانه برای معامله و حمل کافی نیست؛ موجودی {buyer.get('money',0):,}$، مبلغ معامله {0 if payment_escrowed else pay_amount:,}$ و حمل {route['transport_cost']:,}$ است."}, status=400)
     else:
-        if buyer["resources"].get(pay_res,0) < pay_amount:
-            return web.json_response({"success":False,"error":"not_enough_res"}, status=400)
-        if buyer.get("money",0) < route["transport_cost"]:
-            return web.json_response({"success":False,"error":"not_enough_money","message":f"پول کافی برای حمل نیست؛ هزینه حمل {route['transport_cost']:,}$ است."}, status=400)
-        buyer["resources"][pay_res] -= pay_amount; seller["resources"][pay_res] = seller["resources"].get(pay_res,0) + pay_amount
-        buyer["money"] -= route["transport_cost"]
-    seller["resources"][resource] -= amount; buyer["resources"][resource] = buyer["resources"].get(resource,0) + amount
-    l["status"]="filled"; l["actor"] = actor_cid; l["route"] = route
-    for s in route.get("strait_costs",[]):
+        if not payment_escrowed and buyer["resources"].get(pay_res, 0) < pay_amount:
+            return web.json_response({"success":False,"error":"not_enough_res","message":f"موجودی {RESOURCE_NAMES[pay_res]} برای پرداخت کافی نیست."}, status=400)
+        if buyer.get("money", 0) < route["transport_cost"]:
+            return web.json_response({"success":False,"error":"not_enough_money","message":f"هزینه حمل {route['transport_cost']:,}$ است و خزانه کافی نیست."}, status=400)
+
+    if pay_res == "money":
+        if not payment_escrowed: buyer["money"] -= pay_amount
+        seller["money"] = seller.get("money", 0) + pay_amount
+    else:
+        if not payment_escrowed: buyer["resources"][pay_res] -= pay_amount
+        seller["resources"][pay_res] = seller["resources"].get(pay_res, 0) + pay_amount
+    buyer["money"] -= route["transport_cost"]
+
+    if not goods_escrowed:
+        seller["resources"][resource] = seller["resources"].get(resource, 0) - amount
+    buyer["resources"][resource] = buyer["resources"].get(resource, 0) + amount
+    l["status"] = "filled"; l["actor"] = actor_cid; l["route"] = route; l["filled_at"] = utcnow().isoformat()
+    for s in route.get("strait_costs", []):
         owner = s.get("owner")
-        if owner and owner in players.values(): pass
         if owner:
             _, sp = get_player_by_country(owner)
-            if sp: sp["money"] = sp.get("money",0) + s["cost"]
+            if sp: sp["money"] = sp.get("money", 0) + s["cost"]
     push_news("معامله بازار جهانی", f"{COUNTRIES[buyer_cid]['name']} {amount:,} {RESOURCE_NAMES[resource]} را از {COUNTRIES[seller_cid]['name']} خرید؛ مسیر {route['mode']} و هزینه حمل {route['transport_cost']:,}$.")
     save_state()
     return web.json_response({"success":True,"route":route,"transport_cost":route["transport_cost"]})
