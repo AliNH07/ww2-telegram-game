@@ -1483,7 +1483,7 @@ function openDispatchTo(siteId) { openWarPage({ dispatchTo: siteId }); }
 async function loadForces() {
     try {
         const [f, s] = await Promise.all([apiGet("/api/war/forces"), apiGet("/api/map-sites")]);
-        if (f && f.home) warForces = f;
+        if (f && f.home) { warForces = f; if (f.now) transitSkew = Date.parse(f.now) - Date.now(); }
         warSites = Array.isArray(s) ? s : [];
         if (player?.satellite_built) await loadScanState();
     } catch (e) { console.error(e); }
@@ -1699,7 +1699,6 @@ function tickTransits() {
 }
 function startTransitTicker() {
     clearInterval(transitTimer); transitTimer = null;
-    if (warForces.now) transitSkew = Date.parse(warForces.now) - Date.now();
     if (!(warForces.transits || []).length) return;
     tickTransits();
     transitTimer = setInterval(() => {
