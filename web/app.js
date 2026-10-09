@@ -4088,8 +4088,15 @@ function showSiteInfo(site) {
     const statusEl = document.getElementById("map-info-status");
     const descEl = document.getElementById("map-info-desc");
     const actionBtn = document.getElementById("map-info-action");
-    const controls = document.getElementById("map-info-strait-controls");
-    if(controls){controls.classList.add("hidden");controls.innerHTML="";}
+    let controls = document.getElementById("map-info-strait-controls");
+    // Compatibility fallback: ensure the strait settings host exists even if an older HTML was deployed.
+    if (!controls) {
+        controls = document.createElement("div");
+        controls.id = "map-info-strait-controls";
+        controls.className = "map-info-strait-controls hidden";
+        document.getElementById("map-info-desc")?.insertAdjacentElement("afterend", controls);
+    }
+    if (controls) { controls.classList.add("hidden"); controls.innerHTML = ""; }
 
     if (site.kind === "strait") {
         flagEl.textContent = "⚓";
