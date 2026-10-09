@@ -2199,76 +2199,146 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
 /* =========================================================
    Announcements
 ========================================================= */
-document.getElementById("ann-submit").addEventListener("click", async () => {
-    const ta = document.getElementById("ann-text");
-    const text = ta.value.trim();
-    if (!text) return;
-    try {
-        const d = await apiPost("/api/announcements/create", { text });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
-        ta.value = "";
-        showToast("بیانیه ثبت شد.");
-        loadAnnouncements();
-    } catch (e) { showToast("خطا."); }
-});
+document.getElementById("ann-submit").addEventListener("click", openAnnouncementComposer);
+
+const ANNOUNCEMENT_COSTS = [0, 0, 10000, 400000];
+const ANNOUNCEMENT_LIMIT = 20000;
+const ANNOUNCEMENT_SLOT_NAMES = ["اول", "دوم", "سوم", "چهارم"];
+const announcementCurrency = amount => amount ? `${formatNumber(amount)}$` : "رایگان";
+
+async function openAnnouncementComposer() {
+    let status;
+    try { status = await apiGet("/api/announcements/status"); }
+    catch (e) { showToast("وضعیت انتشار بیانیه دریافت نشد.", "error"); return; }
+    if (!status?.success) { showToast(status?.message || "برای انتشار، ابتدا کشور انتخاب کنید.", "error"); return; }
+    if (status.count >= 4) { showToast("سهمیهٔ روزانهٔ انتشار بیانیه تمام شده است.", "error"); return; }
+
+    const currentSlot = Math.min(4, (status.count || 0) + 1);
+    const currentCost = status.next_cost ?? ANNOUNCEMENT_COSTS[currentSlot - 1] ?? 0;
+    const ov = document.createElement("div");
+    ov.className = "modal-overlay ann-modal-overlay";
+    ov.innerHTML = `
+        <section class="modal-box ann-composer-box" role="dialog" aria-modal="true" aria-labelledby="ann-composer-title">
+            <div class="ann-modal-head"><div><span class="ann-modal-kicker">بیانیهٔ رسمی کشور</span><h2 class="modal-title" id="ann-composer-title">بیانیهٔ جدید</h2></div><button class="ann-modal-close" type="button" aria-label="بستن">×</button></div>
+            <textarea id="ann-composer-text" class="ann-input ann-composer-text" maxlength="${ANNOUNCEMENT_LIMIT}" placeholder="متن بیانیه را بنویسید…" aria-label="متن بیانیه"></textarea>
+            <div class="ann-composer-meta"><span id="ann-char-count">۰ / ۲۰٬۰۰۰</span><span>نوبت ${ANNOUNCEMENT_SLOT_NAMES[currentSlot - 1]} انتشار</span></div>
+            <div class="ann-cost-row" aria-label="قیمت انتشار بیانیه">
+                ${ANNOUNCEMENT_COSTS.map((cost, i) => `<span class="ann-cost-chip ${i + 1 === currentSlot ? "current" : ""}"><b>نوبت ${ANNOUNCEMENT_SLOT_NAMES[i]}</b><small>${announcementCurrency(cost)}</small></span>`).join("")}
+            </div>
+            <div class="ann-modal-actions"><button type="button" class="modal-cancel ann-modal-cancel">انصراف</button><button type="button" class="ann-publish-button" id="ann-publish-confirm">انتشار بیانیه · ${announcementCurrency(currentCost)}</button></div>
+        </section>`;
+    document.body.appendChild(ov);
+    const input = ov.querySelector("#ann-composer-text");
+    const counter = ov.querySelector("#ann-char-count");
+    const publish = ov.querySelector("#ann-publish-confirm");
+    const close = () => ov.remove();
+    ov.querySelector(".ann-modal-close").onclick = close;
+    ov.querySelector(".ann-modal-cancel").onclick = close;
+    ov.addEventListener("click", e => { if (e.target === ov) close(); });
+    input.addEventListener("input", () => { counter.textContent = `${input.value.length.toLocaleString("fa-IR")} / ${ANNOUNCEMENT_LIMIT.toLocaleString("fa-IR")}`; });
+    publish.onclick = async () => {
+        const text = input.value.trim();
+        if (!text) { showToast("متن بیانیه را بنویسید.", "error"); input.focus(); return; }
+        publish.disabled = true;
+        publish.textContent = "در حال انتشار…";
+        try {
+            const d = await apiPost("/api/announcements/create", { text });
+            if (!d.success) {
+                showToast(d.message || "انتشار بیانیه انجام نشد.", "error");
+                publish.disabled = false;
+                publish.textContent = `انتشار بیانیه · ${announcementCurrency(currentCost)}`;
+                return;
+            }
+            close();
+            showToast("بیانیه منتشر شد.", "success");
+            loadAnnouncements();
+        } catch (e) {
+            showToast("ارتباط با سرور برقرار نشد.", "error");
+            publish.disabled = false;
+            publish.textContent = `انتشار بیانیه · ${announcementCurrency(currentCost)}`;
+        }
+    };
+    input.focus();
+}
 
 async function loadAnnouncements() {
     try {
         const list = await apiGet("/api/announcements");
         const c = document.getElementById("ann-list");
         c.innerHTML = "";
-        if (!list.length) { c.innerHTML = `<div class="diplomacy-item-empty">بیانیه‌ای نیست.</div>`; return; }
+        if (!Array.isArray(list) || !list.length) { c.innerHTML = `<div class="diplomacy-item-empty">بیانیه‌ای منتشر نشده است.</div>`; return; }
         list.forEach(a => {
-            const div = document.createElement("div");
+            const div = document.createElement("article");
             div.className = "ann-card";
-            const supportFlags = a.support.map(cid => flagInline(cid, true)).join(" ");
-            const accuseFlags = a.accuse.map(cid => flagInline(cid, true)).join(" ");
+            const support = Array.isArray(a.support) ? a.support : [];
+            const accuse = Array.isArray(a.accuse) ? a.accuse : [];
+            const supportFlags = support.map(cid => flagInline(cid, true)).join(" ");
+            const accuseFlags = accuse.map(cid => flagInline(cid, true)).join(" ");
             const commentsHtml = (a.comments || []).map(cm =>
-                `<div class="ann-comment-bubble">${flagInline(cm.from_country, true)} <span>${escapeHtml(cm.text)}</span></div>`
+                `<div class="ann-comment-bubble">${flagInline(cm.from_country, true)}<strong>${escapeHtml(COUNTRY_NAMES[cm.from_country] || cm.from_country || "کشور")}</strong><span>${escapeHtml(cm.text || "")}</span></div>`
             ).join("");
+            const own = !!a.is_mine || (!!player?.country && player.country === a.from_country);
+            const reactionHtml = own ? `<span class="ann-own-note">بیانیهٔ کشور شما</span>` : `
+                <button class="ann-react support" data-react="support" data-id="${escapeHtml(a.id)}">✓ حمایت <b>${support.length}</b></button>
+                <button class="ann-react accuse" data-react="accuse" data-id="${escapeHtml(a.id)}">❌ محکوم کردن <b>${accuse.length}</b></button>`;
+            const created = a.created_at ? new Date(a.created_at).toLocaleString("fa-IR", { dateStyle: "medium", timeStyle: "short" }) : "";
             div.innerHTML = `
                 <div class="ann-header">
                     <span class="ann-flag">${flagInline(a.from_country, true)}</span>
-                    <span class="ann-name">${COUNTRY_NAMES[a.from_country] || a.from_country}</span>
+                    <div class="ann-author"><span class="ann-name">${escapeHtml(COUNTRY_NAMES[a.from_country] || a.from_country || "کشور ناشناس")}</span><time>${escapeHtml(created)}</time></div>
+                    <span class="ann-official-tag">بیانیهٔ رسمی</span>
                 </div>
-                <div class="ann-text">${escapeHtml(a.text)}</div>
-                <div class="ann-reactions">
-                    <button class="ann-react support" data-react="support" data-id="${a.id}">✅ حمایت</button>
-                    <button class="ann-react accuse" data-react="accuse" data-id="${a.id}">❌ اتهام</button>
-                </div>
-                <div class="ann-flags">
-                    ${supportFlags ? `<div class="ann-flags-row"><span>✅</span> ${supportFlags}</div>` : ""}
-                    ${accuseFlags ? `<div class="ann-flags-row"><span>❌</span> ${accuseFlags}</div>` : ""}
-                </div>
-                <div class="ann-comments" id="ann-comments-${a.id}">${commentsHtml}</div>
-                <div class="ann-comment-row">
-                    <input class="ann-comment-input" data-ann="${a.id}" placeholder="کامنت...">
-                    <button class="ann-comment-send" data-ann="${a.id}">ارسال</button>
-                </div>`;
+                <div class="ann-text">${escapeHtml(a.text || "")}</div>
+                <div class="ann-reactions">${reactionHtml}</div>
+                ${(supportFlags || accuseFlags) ? `<div class="ann-flags">${supportFlags ? `<div class="ann-flags-row"><span>✅ حمایت</span> ${supportFlags}</div>` : ""}${accuseFlags ? `<div class="ann-flags-row"><span>⚑ محکومیت</span> ${accuseFlags}</div>` : ""}</div>` : ""}
+                <div class="ann-comments" id="ann-comments-${escapeHtml(a.id)}">${commentsHtml}</div>
+                <div class="ann-card-footer"><button type="button" class="ann-reply-button" data-reply-ann="${escapeHtml(a.id)}">↩ پاسخ به بیانیه <span>${(a.comments || []).length}</span></button></div>`;
             c.appendChild(div);
         });
         c.querySelectorAll(".ann-react").forEach(b => b.onclick = () => reactAnn(b.dataset.id, b.dataset.react));
-        c.querySelectorAll(".ann-comment-send").forEach(b => b.onclick = () => commentAnn(b.dataset.ann));
-    } catch (e) { console.error(e); }
+        c.querySelectorAll(".ann-reply-button").forEach(b => b.onclick = () => openAnnouncementReply(b.dataset.replyAnn));
+    } catch (e) { console.error("Announcements:", e); }
 }
 
 async function reactAnn(id, reaction) {
     try {
         const d = await apiPost("/api/announcements/react", { announcement_id: id, reaction });
-        if (!d.success) { showToast("خطا"); return; }
-        loadAnnouncements();
-    } catch (e) {}
+        if (!d.success) { showToast(d.message || "امکان ثبت واکنش وجود ندارد.", "error"); return; }
+        await loadAnnouncements();
+    } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
 }
 
-async function commentAnn(id) {
-    const inp = document.querySelector(`.ann-comment-input[data-ann="${id}"]`);
-    if (!inp || !inp.value.trim()) return;
-    try {
-        const d = await apiPost("/api/announcements/comment", { announcement_id: id, text: inp.value.trim() });
-        if (!d.success) { showToast("خطا"); return; }
-        inp.value = "";
-        loadAnnouncements();
-    } catch (e) {}
+function openAnnouncementReply(id) {
+    const card = document.querySelector(`.ann-card [data-reply-ann="${CSS.escape(id)}"]`)?.closest(".ann-card");
+    const title = card?.querySelector(".ann-name")?.textContent || "بیانیه";
+    const ov = document.createElement("div");
+    ov.className = "modal-overlay ann-modal-overlay";
+    ov.innerHTML = `
+        <section class="modal-box ann-reply-box" role="dialog" aria-modal="true" aria-labelledby="ann-reply-title">
+            <div class="ann-modal-head"><div><span class="ann-modal-kicker">گفت‌وگوی دیپلماتیک</span><h2 class="modal-title" id="ann-reply-title">پاسخ به بیانیهٔ ${escapeHtml(title)}</h2></div><button class="ann-modal-close" type="button" aria-label="بستن">×</button></div>
+            <textarea class="ann-input ann-reply-text" maxlength="5000" placeholder="پاسخ خود را بنویسید…" aria-label="متن پاسخ"></textarea>
+            <div class="ann-composer-meta"><span class="ann-reply-counter">۰ / ۵٬۰۰۰</span><span>پاسخ شما زیر بیانیه نمایش داده می‌شود</span></div>
+            <div class="ann-modal-actions"><button type="button" class="modal-cancel ann-modal-cancel">انصراف</button><button type="button" class="ann-publish-button ann-reply-send">ارسال پاسخ</button></div>
+        </section>`;
+    document.body.appendChild(ov);
+    const input = ov.querySelector(".ann-reply-text");
+    const counter = ov.querySelector(".ann-reply-counter");
+    const close = () => ov.remove();
+    ov.querySelector(".ann-modal-close").onclick = close;
+    ov.querySelector(".ann-modal-cancel").onclick = close;
+    ov.addEventListener("click", e => { if (e.target === ov) close(); });
+    input.addEventListener("input", () => { counter.textContent = `${input.value.length.toLocaleString("fa-IR")} / ۵٬۰۰۰`; });
+    ov.querySelector(".ann-reply-send").onclick = async () => {
+        const text = input.value.trim();
+        if (!text) { showToast("متن پاسخ را بنویسید.", "error"); input.focus(); return; }
+        const btn = ov.querySelector(".ann-reply-send"); btn.disabled = true; btn.textContent = "در حال ارسال…";
+        try {
+            const d = await apiPost("/api/announcements/comment", { announcement_id: id, text });
+            if (!d.success) { showToast(d.message || "ارسال پاسخ انجام نشد.", "error"); btn.disabled = false; btn.textContent = "ارسال پاسخ"; return; }
+            close(); await loadAnnouncements(); showToast("پاسخ شما ثبت شد.", "success");
+        } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); btn.disabled = false; btn.textContent = "ارسال پاسخ"; }
+    };
+    input.focus();
 }
 
 function escapeHtml(s) {
@@ -2333,7 +2403,7 @@ function renderUnionBrowser(d) {
     } else {
         const note = document.createElement("div");
         note.className = "union-own-note";
-        note.textContent = `شما عضو «${mine.name}» هستید. برای ورود به گفت‌وگو، اتحادیهٔ خودتان را از فهرست انتخاب کنید.`;
+        note.textContent = `شما عضو «${mine.name}» هستید.`;
         c.appendChild(note);
     }
 
