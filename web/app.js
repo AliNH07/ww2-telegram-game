@@ -575,7 +575,7 @@ function updateHomeStats() {
 }
 
 const RK_TABS = [
-    { id: "overall", key: "overall", label: "کلی", info: "<b>کلی</b> بر چه اساسیه: ترکیبِ پنج دسته‌ی دیگر، با وزنِ نابرابر: اقتصاد ۳۰، نظامی ۲۵، قلمرو ۲۰، توسعه ۱۵، دیپلماسی ۱۰. امتیازِ هر دسته نسبت به بهترین کشورِ همان دسته محاسبه می‌شود، پس یک عددِ غول‌آسا بقیه را خفه نمی‌کند." },
+    { id: "overall", key: "overall", label: "کلی", info: "<b>کلی</b> ترکیبِ پنج دستهٔ دیگر است. امتیازِ هر دسته نسبت به بهترین کشورِ همان دسته محاسبه می‌شود؛ بنابراین یک عددِ بسیار بزرگ در یک دسته، امتیازِ دسته‌های دیگر را محو نمی‌کند." },
     { id: "economy", key: "economy", label: "اقتصادی", info: "<b>اقتصادی</b> بر چه اساسیه: درآمدِ خالصِ روزانه‌ی کشور، بعد از کسرِ هزینه‌ی نگهداری — هر $1,000 یک امتیاز." },
     { id: "military", key: "military", label: "قدرت نظامی", info: "<b>قدرت نظامی</b> بر چه اساسیه: مجموعِ قدرتِ همه‌ی یگان‌ها — هر یگان به اندازه‌ی حمله + دفاعش امتیاز دارد. یگان‌های مستقر در سکوها و تنگه‌ها هم حساب می‌شوند." },
     { id: "territory", key: "territory", label: "قلمرو", info: "<b>قلمرو</b> بر چه اساسیه: منابعِ نقشه و تنگه‌هایی که زیرِ کنترلِ کشورند، هر کدام ۱ امتیاز، به‌اضافه‌ی هر کشورِ اشغال‌شده ۵ امتیاز." },
@@ -605,10 +605,6 @@ function renderRankings() {
         tabs.appendChild(b);
     });
     const cur = RK_TABS.find(t => t.id === rkTab);
-    document.getElementById("rk-info").innerHTML = cur.info;
-    const end = player?.season_end ? jalaliStamp(player.season_end) : "";
-    document.getElementById("rk-live-text").textContent =
-        `هنوز نهایی نشده — تا پایانِ فصل این جدول تغییر می‌کند.${end ? " پایان: " + end : ""}`;
     box.innerHTML = "";
     if (!rkRows.length) { box.innerHTML = `<div class="diplomacy-item-empty">هنوز رتبه‌ای نیست.</div>`; return; }
     [...rkRows].sort((x, y) => (y[cur.key] ?? 0) - (x[cur.key] ?? 0)).forEach((r, i) => {
@@ -627,6 +623,24 @@ async function loadRankings() {
         renderRankings();
     } catch (e) { console.error(e); }
 }
+
+
+document.getElementById("rk-help-btn")?.addEventListener("click", () => {
+    document.getElementById("rk-help-sheet")?.remove();
+    const ov = document.createElement("div");
+    ov.id = "rk-help-sheet";
+    ov.className = "modal-overlay rk-help-overlay";
+    const sections = RK_TABS.map(t => `<section class="rk-help-section"><h4>${escapeHtml(t.label)}</h4><p>${t.info}</p></section>`).join("");
+    ov.innerHTML = `<div class="rk-help-sheet-box" role="dialog" aria-modal="true" aria-labelledby="rk-help-title">
+        <div class="rk-help-head"><div><small>راهنمای امتیازدهی</small><h3 id="rk-help-title">رتبه‌بندی چگونه محاسبه می‌شود؟</h3></div><button class="rk-help-close" type="button" aria-label="بستن">×</button></div>
+        <div class="rk-help-content"><p class="rk-help-lead">وزن هر دسته در رتبهٔ کلی:</p>
+            <div class="rk-weight-grid"><span>اقتصاد <b>۳۰٪</b></span><span>قدرت نظامی <b>۲۵٪</b></span><span>قلمرو <b>۲۰٪</b></span><span>توسعه <b>۱۵٪</b></span><span>دیپلماسی <b>۱۰٪</b></span></div>
+            ${sections}
+        </div></div>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.addEventListener("click", e => { if (e.target === ov || e.target.closest(".rk-help-close")) close(); });
+});
 
 /* =========================================================
    Actions
@@ -680,23 +694,34 @@ function loanRate(h) { return Math.min(Math.floor(h / 12) * 10, 60); }
 function loanItemHtml(r, mine) {
     let actions = "";
     if (mine) {
-        if (r.can_accept) actions += `<button class="ln-btn ok" data-act="accept" data-id="${r.id}">پذیرش</button><button class="ln-btn no" data-act="decline" data-id="${r.id}">رد</button>`;
+        if (r.can_accept) actions += `<button class="ln-btn ok" data-act="accept" data-id="${r.id}">پذیرش پیشنهاد</button><button class="ln-btn no" data-act="decline" data-id="${r.id}">رد پیشنهاد</button>`;
         if (r.can_cancel) actions += `<button class="ln-btn no" data-act="cancel" data-id="${r.id}">لغو پیشنهاد</button>`;
         if (r.can_repay) actions += `<button class="ln-btn ok" data-act="repay" data-id="${r.id}">بازپرداخت ${formatMoney(r.remaining)}</button>`;
     }
-    const role = r.role === "lender" ? "وام‌دهنده: شما" : r.role === "borrower" ? "وام‌گیرنده: شما" : "";
     const live = r.status === "active" || r.status === "overdue";
-    const rem = live ? ` · مانده ${formatMoney(r.remaining)}` : "";
-    const due = live && r.due_at ? ` · سررسید ${loanDate(r.due_at)}` : "";
-    return `<div class="ln-item ${r.status}">
-        <div class="ln-amt">${formatMoney(r.amount)}</div>
-        <div class="ln-info">
-            <div class="ln-route"><span>${r.lender_flag} ${escapeHtml(r.lender_name)}</span> ← <span>${r.borrower_flag} ${escapeHtml(r.borrower_name)}</span></div>
-            <div class="ln-meta">${r.hours} ساعت · سود ${r.rate}٪ · بازپرداخت ${formatMoney(r.repay)}${r.early ? " · بازپرداخت زودتر مجاز" : ""}</div>
-            <div class="ln-meta"><span class="ln-st ${r.status}">${LOAN_STATUS[r.status] || r.status}</span> · ${loanDate(r.at)}${rem}${due}${role ? " · " + role : ""}</div>
-            ${actions ? `<div class="ln-actions">${actions}</div>` : ""}
+    const due = live && r.due_at ? loanDate(r.due_at) : "—";
+    const role = r.role === "lender" ? "نقش شما: وام‌دهنده" : r.role === "borrower" ? "نقش شما: وام‌گیرنده" : "ثبت‌شده در دفتر دنیا";
+    const state = LOAN_STATUS[r.status] || r.status || "نامشخص";
+    return `<article class="ln-item ${r.status || ""}">
+        <div class="ln-item-head">
+            <div class="ln-amount-block"><small>مبلغ وام</small><strong class="ln-amt">${formatMoney(r.amount)}</strong></div>
+            <span class="ln-st ${r.status || ""}">${state}</span>
         </div>
-    </div>`;
+        <div class="ln-route-card">
+            <div class="ln-party"><small>وام‌دهنده</small><strong><span class="ln-flag">${r.lender_flag || "🏳️"}</span>${escapeHtml(r.lender_name || "—")}</strong></div>
+            <span class="ln-route-arrow" aria-hidden="true">←</span>
+            <div class="ln-party"><small>وام‌گیرنده</small><strong><span class="ln-flag">${r.borrower_flag || "🏳️"}</span>${escapeHtml(r.borrower_name || "—")}</strong></div>
+        </div>
+        <div class="ln-facts-grid">
+            <div><small>مدت</small><b>${formatNumber(r.hours || 0)} ساعت</b></div>
+            <div><small>سود</small><b>${formatNumber(r.rate || 0)}٪</b></div>
+            <div><small>مبلغ بازپرداخت</small><b>${formatMoney(r.repay)}</b></div>
+        </div>
+        ${live ? `<div class="ln-balance-row"><span>ماندهٔ بدهی</span><b>${formatMoney(r.remaining)}</b></div><div class="ln-due-row"><span>سررسید</span><b>${due}</b></div>` : ""}
+        <div class="ln-item-foot"><span>🕒 ${loanDate(r.at)}</span><span>${role}</span></div>
+        ${r.early ? `<div class="ln-early-note">✓ بازپرداخت زودتر از موعد مجاز است</div>` : ""}
+        ${actions ? `<div class="ln-actions">${actions}</div>` : ""}
+    </article>`;
 }
 
 async function loadLoans() {
@@ -717,8 +742,8 @@ async function renderLoanPage(reload = true) {
 
     if (loanTab === "mine") {
         const debt = d.owes > 0 ? `<div class="ln-debt">بدهی فعلی شما: <b>${formatMoney(d.owes)}</b></div>` : "";
-        p.innerHTML = `<div class="ln-card"><div class="ln-card-title">💰 وام‌های من</div>${debt}` +
-            (d.mine.length ? d.mine.map(r => loanItemHtml(r, true)).join("") : `<div class="ln-empty">هنوز وامی ندارید.</div>`) + `</div>`;
+        p.innerHTML = `<div class="ln-card"><div class="ln-card-title"><span>💰 وام‌های من</span><small>${d.mine.length} مورد</small></div>${debt}` +
+            (d.mine.length ? `<div class="ln-list">${d.mine.map(r => loanItemHtml(r, true)).join("")}</div>` : `<div class="ln-empty"><span>💸</span><b>هنوز وامی ندارید</b><small>پیشنهادهای وام و وضعیت بازپرداخت اینجا نمایش داده می‌شوند.</small></div>`) + `</div>`;
     } else if (loanTab === "offer") {
         const closed = !d.lending_open;
         const opts = d.countries.map(c => `<option value="${c.id}" ${loanDraft.to === c.id ? "selected" : ""} ${c.busy ? "disabled" : ""}>${c.flag} ${escapeHtml(c.name)}${c.busy ? " (بدهکار)" : ""}</option>`).join("");
@@ -763,8 +788,8 @@ async function renderLoanPage(reload = true) {
             btn.disabled = false;
         });
     } else {
-        p.innerHTML = `<div class="ln-card"><div class="ln-card-title">🧾 دفتر وام‌های دنیا</div>` +
-            (d.book.length ? d.book.map(r => loanItemHtml(r, false)).join("") : `<div class="ln-empty">هنوز وامی ثبت نشده است.</div>`) + `</div>`;
+        p.innerHTML = `<div class="ln-card"><div class="ln-card-title"><span>🌐 دفتر وام‌های دنیا</span><small>${d.book.length} مورد</small></div><p class="ln-book-intro">سوابق پیشنهادها و وام‌های ثبت‌شده میان کشورهای بازی</p>` +
+            (d.book.length ? `<div class="ln-list">${d.book.map(r => loanItemHtml(r, false)).join("")}</div>` : `<div class="ln-empty"><span>📘</span><b>هنوز وامی ثبت نشده است</b><small>با ثبت اولین پیشنهاد، سابقهٔ آن در این دفتر می‌آید.</small></div>`) + `</div>`;
     }
 }
 
@@ -4158,36 +4183,50 @@ function renderStats() {
     const d = statsData, body = document.getElementById("st-body");
     if (!body || !d) return;
     const bonus = Number(d.bonus || 0), max = Math.max(1, Number(d.max || 50));
-    const buildings = Array.isArray(d.buildings) ? d.buildings : [];
     const risks = Array.isArray(d.risks) ? d.risks : [];
     const recentEvents = Array.isArray(d.events) ? d.events : [];
+    const upkeepItems = Array.isArray(d.upkeep_items) ? d.upkeep_items : [];
     const pct = Math.min(100, bonus / max * 100);
-    const blds = buildings.map(b => `<div class="st-line"><span>${b.icon} ${escapeHtml(b.name)}</span><span>سطح ${b.level} از ${b.max_level}</span></div>`).join("");
+    const formatAmount = v => { const n = Math.round(Number(v || 0)); return n < 0 ? `−$${Math.abs(n).toLocaleString("en-US")}` : `$${n.toLocaleString("en-US")}`; };
+    const upkeepRows = upkeepItems.length
+        ? upkeepItems.map(x => `<div class="st-cost-row"><span><i>${escapeHtml(x.icon || "🏗️")}</i><span><b>${escapeHtml(x.name || "ساختمان")}</b><small>${escapeHtml(x.group || "زیرساخت")}</small></span></span><strong>−${formatAmount(x.amount)}</strong></div>`).join("")
+        : `<p class="st-no-costs">هزینهٔ نگهداری روزانه‌ای برای ساختمان‌ها ثبت نشده است.</p>`;
     const events = recentEvents.length
         ? recentEvents.map(e => `<li><span class="st-ev-text">${escapeHtml(e.text)}</span><span class="st-ev-time">${timeAgo(e.at, d.now)}</span></li>`).join("")
         : `<li><span class="st-ev-text">هنوز رویدادی رخ نداده است.</span></li>`;
+    const net = Number(d.net_income ?? d.total_income ?? 0);
     body.innerHTML = `
+        <div class="st-card st-finance-card">
+            <div class="st-finance-head"><div><small>درآمد ناخالص روزانه</small><strong>${formatAmount(d.total_income)}</strong></div><span class="st-finance-icon">💰</span></div>
+            <div class="st-finance-breakdown">
+                <div class="st-line"><span>درآمد پایهٔ کشور</span><b>${formatAmount(d.income_base)}</b></div>
+                ${Number(d.income_economy || 0) ? `<div class="st-line"><span>ساختمان‌های اقتصادی</span><b>${formatAmount(d.income_economy)}</b></div>` : ""}
+                ${Number(d.income_map || 0) ? `<div class="st-line"><span>منابع و سکوهای نقشه</span><b>${formatAmount(d.income_map)}</b></div>` : ""}
+                ${Number(d.income_straits || 0) ? `<div class="st-line"><span>تنگه‌ها و کانال‌ها</span><b>${formatAmount(d.income_straits)}</b></div>` : ""}
+                ${Number(d.income_occupation || 0) ? `<div class="st-line"><span>کشورهای اشغال‌شده</span><b>${formatAmount(d.income_occupation)}</b></div>` : ""}
+                ${Number(d.welfare_extra_income || 0) ? `<div class="st-line st-income-bonus"><span>افزایش ناشی از رفاه (${fmt1(bonus)}٪)</span><b>+${formatAmount(d.welfare_extra_income)}</b></div>` : `<div class="st-line st-income-bonus"><span>افزایش ناشی از رفاه (${fmt1(bonus)}٪)</span><b>+${formatAmount(0)}</b></div>`}
+            </div>
+            <div class="st-total-divider"></div>
+            <div class="st-line st-gross-total"><span>مجموع درآمد روزانه</span><b>${formatAmount(d.total_income)}</b></div>
+            <div class="st-cost-heading"><span>کسرهای روزانه</span><strong>−${formatAmount(d.daily_upkeep)}</strong></div>
+            <div class="st-upkeep-list">${upkeepRows}</div>
+            <div class="st-net-panel"><div><small>درآمد خالص روزانه پس از هزینه‌ها</small><strong class="${net >= 0 ? "is-positive" : "is-negative"}">${formatAmount(net)}</strong></div><span>${net >= 0 ? "✓ مبلغ باقی‌مانده" : "⚠ هزینه‌ها بیشتر از درآمدند"}</span></div>
+            <p class="st-text st-finance-note">درآمد خالص، مبلغی است که پس از کسر هزینهٔ نگهداری روزانهٔ ساختمان‌ها باقی می‌ماند. در صورت بدهیِ وامِ معوق، بخشی از دریافتی واقعی خزانه نیز ممکن است صرف بازپرداخت شود.</p>
+        </div>
         <div class="st-card">
             <div class="st-box st-box-row">
-                <div class="st-box-title"><span class="st-shield">🛡️</span><b>پاداش رفاه</b><small>روی درآمد سرمایه‌گذاری‌ها</small></div>
+                <div class="st-box-title"><span class="st-shield">🛡️</span><b>پاداش رفاه</b><small>افزایش درآمد کل روزانه</small></div>
                 <strong class="st-good">+${fmt1(bonus)}٪</strong>
             </div>
             <div class="st-bar"><div class="st-bar-fill" style="width:${pct}%"></div></div>
-            <p class="st-text">بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه — ارتقای هرکدام این پاداش را بالا می‌برد، تا سقفِ ${max}٪.</p>
-            ${blds}
-        </div>
-        <div class="st-card">
-            <div class="st-box st-box-split">
-                <span class="st-box-label">اثرِ کل روی درآمدِ سرمایه‌گذاری‌ها</span>
-                <strong class="st-good st-big">${fmt1(bonus)}٪<br>افزایش</strong>
-            </div>
-            <div class="st-line"><span>پاداش رفاه</span><span class="st-good-soft">${fmt1(Number(d.gross || 0))}٪ افزایش</span></div>
-            ${Number(d.penalty || 0) > 0 ? `<div class="st-line"><span>افت موقتِ رویدادها</span><span class="st-bad-soft">${fmt1(d.penalty)}٪ کاهش</span></div>` : ""}
-            <div class="st-line"><span>درآمدِ اضافه</span><span class="st-good-soft">+${formatMoney(d.extra_income)} در روز</span></div>
+            <p class="st-text">رفاه به درآمد روزانه اضافه می‌شود. ساخت و ارتقای ساختمان‌های رفاهی پاداش را بالا می‌برد و رویدادهای منفی می‌توانند آن را موقتاً کاهش دهند؛ سقف پاداش ${max}٪ است.</p>
+            <div class="st-line"><span>پاداشِ اولیهٔ ساختمان‌ها</span><span class="st-good-soft">${fmt1(Number(d.gross || 0))}٪</span></div>
+            ${Number(d.penalty || 0) > 0 ? `<div class="st-line"><span>کاهش موقت رویدادها</span><span class="st-bad-soft">−${fmt1(d.penalty)}٪</span></div>` : ""}
+            <div class="st-line"><span>اثر نهایی رفاه بر درآمد</span><span class="st-good-soft">+${formatAmount(d.welfare_extra_income)} در روز</span></div>
         </div>
         <div class="st-card st-card-plain">
-            <p class="st-muted">بلایای محتمل در کشورِ خودی: ${risks.length ? escapeHtml(risks.join("، ")) : "—"}</p>
-            <p class="st-text">هر سطح ساختمان هم احتمالش را کم می‌کند هم افتِ موقتِ رفاه را.</p>
+            <p class="st-muted">رویدادهای محتمل در کشور شما: ${risks.length ? escapeHtml(risks.join("، ")) : "—"}</p>
+            <p class="st-text">ساختمان‌های مرتبط، احتمال وقوع و شدت خسارت رویدادها را کاهش می‌دهند.</p>
         </div>
         <div class="st-card st-card-plain">
             <p class="st-muted">رویدادهای اخیر:</p>
@@ -4212,9 +4251,9 @@ document.getElementById("st-help-btn")?.addEventListener("click", () => {
             </div>
             <div class="st-sheet-body">
                 <p><b>رفاه:</b> بیمارستان، ایستگاه پلیس، شهرک مسکونی، مترو و دانشگاه با هم پاداش رفاه را می‌سازند. هر سطح این ساختمان‌ها ۲٪ اضافه می‌کند و مجموع پاداش حداکثر ۵۰٪ است.</p>
-                <p><b>اثر اقتصادی:</b> این درصد به درآمد ساختمان‌های اقتصادی اضافه می‌شود؛ نساختن ساختمان‌های رفاهی، درآمد پایه را کم نمی‌کند. مقدار نهایی و درآمد اضافه در آمار کشور نمایش داده می‌شود.</p>
+                <p><b>اثر اقتصادی:</b> این درصد روی درآمد کل روزانه اعمال می‌شود؛ مقدار افزایش رفاه، درآمد کل، هزینهٔ نگهداری و درآمد خالص در آمار کشور جداگانه نمایش داده می‌شوند.</p>
                 <p><b>امنیت و رویدادها:</b> زلزله، موج سرقت، همه‌گیری، قحطی و خشکسالی ممکن است پاداش رفاه را موقتاً کاهش دهند. ساختمان مربوط به هر رویداد، احتمال و شدت خسارت آن را کمتر می‌کند.</p>
-                <p><b>بازیابی:</b> افت رفاه به‌مرور جبران می‌شود؛ هر ۶ ساعت ۳ واحد از جریمه کم می‌شود و پاداش نهایی هیچ‌وقت از صفر کمتر نمی‌شود. آمار زنده، سطح ساختمان‌ها، خسارت فعلی و رویدادهای اخیر را نشان می‌دهد.</p>
+                <p><b>بازیابی:</b> افت رفاه به‌مرور جبران می‌شود؛ هر ۶ ساعت ۳ واحد از جریمه کم می‌شود و پاداش نهایی هیچ‌وقت از صفر کمتر نمی‌شود. آمار زنده، مقدار پاداش، خسارت فعلی و رویدادهای اخیر را نشان می‌دهد.</p>
             </div>
         </div>`;
     document.body.appendChild(ov);
