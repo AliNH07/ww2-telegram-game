@@ -1888,15 +1888,25 @@ async def get_announcements(request):
     uid = get_auth_user_id(request)
     current_cid = players.get(uid, {}).get("country") if uid else None
     result = []
+    comments_migrated = False
     for a in announcements[-50:]:
         reactions = a.get("reactions", {})
         support = [c for c, r in reactions.items() if r == "support"]
         accuse = [c for c, r in reactions.items() if r == "accuse"]
+        # Give older replies stable identifiers so they can be replied to recursively.
+        for cm in a.setdefault("comments", []):
+            if not cm.get("id"):
+                cm["id"] = str(uuid.uuid4()); comments_migrated = True
+            if "parent_id" not in cm:
+                cm["parent_id"] = None; comments_migrated = True
         result.append({"id": a["id"], "from_country": a["from_country"], "text": a["text"],
                        "created_at": a["created_at"], "support": support, "accuse": accuse,
+                       "my_reaction": reactions.get(current_cid) if current_cid else None,
                        "is_mine": bool(current_cid and current_cid == a.get("from_country")),
                        "comments": a.get("comments", []),
                        "comments_count": len(a.get("comments", []))})
+    if comments_migrated:
+        save_state()
     result.reverse()
     return web.json_response(result)
 
@@ -1982,25 +1992,52 @@ async def react_announcement(request):
     cid = players[uid].get("country")
     for a in announcements:
         if a["id"] == ann_id:
-            if cid == a.get("from_country"):
-                return web.json_response({"success": False, "error": "own_announcement",
-                                          "message": "نمی‌توانید به بیانیهٔ کشور خودتان واکنش بدهید."}, status=403)
-            a.setdefault("reactions", {})[cid] = r
-            save_state(); return web.json_response({"success": True})
+            reactions = a.setdefault("reactions", {})
+            if cid in reactions:
+                return web.json_response({"success": False, "error": "already_reacted",
+                                          "message": "واکنش شما قبلاً برای همیشه ثبت شده و قابل تغییر یا حذف نیست."}, status=409)
+            reactions[cid] = r
+            save_state()
+            owner_uid, _ = get_player_by_country(a.get("from_country"))
+            if owner_uid and owner_uid != uid:
+                country_name = COUNTRIES.get(cid, {}).get("name", cid)
+                if r == "support":
+                    note = f"✅ کشور «{country_name}» از بیانیهٔ شما حمایت کرد."
+                else:
+                    note = f"❌ کشور «{country_name}» بیانیهٔ شما را محکوم کرد."
+                await notify_user(owner_uid, note)
+            return web.json_response({"success": True, "reaction": r, "immutable": True})
     return web.json_response({"success": False, "error": "not_found"}, status=404)
 
 async def comment_announcement(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); ann_id = data.get("announcement_id"); text = (data.get("text") or "").strip()[:5000]
+    data = await read_json(request)
+    ann_id = data.get("announcement_id")
+    text = (data.get("text") or "").strip()[:5000]
+    parent_id = data.get("parent_comment_id") or None
     if not text: return web.json_response({"success": False, "error": "empty", "message": "متن پاسخ را بنویسید."}, status=400)
+    if not parent_id is None:
+        parent_id = str(parent_id)
     if uid not in players or not players[uid].get("country"):
         return web.json_response({"success": False, "error": "no_country", "message": "ابتدا کشور خود را انتخاب کنید."}, status=400)
     cid = players[uid].get("country")
     for a in announcements:
         if a["id"] == ann_id:
-            a.setdefault("comments", []).append({"from_country": cid, "text": text, "at": utcnow().isoformat()})
-            save_state(); return web.json_response({"success": True})
+            comments = a.setdefault("comments", [])
+            for cm in comments:
+                if not cm.get("id"):
+                    cm["id"] = str(uuid.uuid4())
+                if "parent_id" not in cm:
+                    cm["parent_id"] = None
+            if parent_id and not any(str(cm.get("id")) == parent_id for cm in comments):
+                return web.json_response({"success": False, "error": "parent_not_found",
+                                          "message": "پاسخی که می‌خواهید به آن جواب دهید پیدا نشد؛ گفتگو را تازه کنید."}, status=400)
+            comment = {"id": str(uuid.uuid4()), "parent_id": parent_id, "from_country": cid,
+                       "text": text, "at": utcnow().isoformat()}
+            comments.append(comment)
+            save_state()
+            return web.json_response({"success": True, "comment": comment})
     return web.json_response({"success": False, "error": "not_found"}, status=404)
 
 async def get_announcement_detail(request):
