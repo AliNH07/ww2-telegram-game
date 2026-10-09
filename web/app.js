@@ -2178,6 +2178,22 @@ document.querySelectorAll(".nav-item").forEach(item => {
     });
 });
 
+// راهنمای بازار جهانی فقط با زدن علامت سؤال نمایش داده می‌شود.
+const marketHelpButton = document.getElementById("market-help-btn");
+if (marketHelpButton) marketHelpButton.addEventListener("click", () => {
+    const ov = document.createElement("div");
+    ov.className = "modal-overlay market-help-overlay";
+    ov.innerHTML = `<section class="modal-box market-help-dialog" role="dialog" aria-modal="true" aria-labelledby="market-help-title">
+        <div class="ann-modal-head"><div><span class="ann-modal-kicker">راهنمای کوتاه</span><h2 class="modal-title" id="market-help-title">🌐 بازار جهانی چطور کار می‌کند؟</h2></div><button type="button" class="ann-modal-close" aria-label="بستن">×</button></div>
+        <div class="market-help-content"><p>در بازار جهانی می‌توانی از کشورهای دیگر منابع بخری یا آگهی فروش ثبت کنی.</p><div><b>🛒 کالاها</b><span>آگهی‌های خرید و فروش بازیکنان را ببین و پیشنهاد مناسب را انتخاب کن.</span></div><div><b>🔁 مبادله</b><span>منبع، مقدار و چیزی را که در ازایش می‌خواهی مشخص کن و آگهی ثبت کن.</span></div><div><b>🚚 هزینهٔ حمل</b><span>هزینهٔ حمل‌ونقل را کشوری می‌پردازد که کالا به آن می‌رسد.</span></div><div><b>📦 معاملات من</b><span>آگهی‌ها و معامله‌های خودت را پیگیری کن.</span></div></div>
+        <button type="button" class="ann-publish-button market-help-close">متوجه شدم</button></section>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.querySelector(".ann-modal-close").onclick = close;
+    ov.querySelector(".market-help-close").onclick = close;
+    ov.addEventListener("click", e => { if (e.target === ov) close(); });
+});
+
 /* =========================================================
    Communications — Tabs
 ========================================================= */
@@ -2201,6 +2217,7 @@ document.querySelectorAll(".comm-tab").forEach(tab => {
 ========================================================= */
 document.getElementById("ann-submit").addEventListener("click", openAnnouncementComposer);
 
+const announcementCache = new Map();
 const ANNOUNCEMENT_COSTS = [0, 0, 10000, 400000];
 const ANNOUNCEMENT_LIMIT = 20000;
 const ANNOUNCEMENT_SLOT_NAMES = ["اول", "دوم", "سوم", "چهارم"];
@@ -2265,38 +2282,65 @@ async function loadAnnouncements() {
     try {
         const list = await apiGet("/api/announcements");
         const c = document.getElementById("ann-list");
+        if (!c) return;
         c.innerHTML = "";
-        if (!Array.isArray(list) || !list.length) { c.innerHTML = `<div class="diplomacy-item-empty">بیانیه‌ای منتشر نشده است.</div>`; return; }
+        announcementCache.clear();
+        if (!Array.isArray(list) || !list.length) {
+            c.innerHTML = `<div class="diplomacy-item-empty">بیانیه‌ای منتشر نشده است.</div>`;
+            return;
+        }
+        list.forEach(a => announcementCache.set(String(a.id), a));
         list.forEach(a => {
             const div = document.createElement("article");
             div.className = "ann-card";
             const support = Array.isArray(a.support) ? a.support : [];
             const accuse = Array.isArray(a.accuse) ? a.accuse : [];
+            const totalReactions = support.length + accuse.length;
+            const supportPercent = totalReactions ? (support.length / totalReactions) * 100 : 0;
+            const accusePercent = totalReactions ? (accuse.length / totalReactions) * 100 : 0;
             const supportFlags = support.map(cid => flagInline(cid, true)).join(" ");
             const accuseFlags = accuse.map(cid => flagInline(cid, true)).join(" ");
-            const commentsHtml = (a.comments || []).map(cm =>
-                `<div class="ann-comment-bubble">${flagInline(cm.from_country, true)}<strong>${escapeHtml(COUNTRY_NAMES[cm.from_country] || cm.from_country || "کشور")}</strong><span>${escapeHtml(cm.text || "")}</span></div>`
-            ).join("");
             const own = !!a.is_mine || (!!player?.country && player.country === a.from_country);
-            const reactionHtml = own ? `<span class="ann-own-note">بیانیهٔ کشور شما</span>` : `
-                <button class="ann-react support" data-react="support" data-id="${escapeHtml(a.id)}">✓ حمایت <b>${support.length}</b></button>
-                <button class="ann-react accuse" data-react="accuse" data-id="${escapeHtml(a.id)}">❌ محکوم کردن <b>${accuse.length}</b></button>`;
+            let reactionHtml;
+            if (own) {
+                reactionHtml = `<span class="ann-own-note">بیانیهٔ کشور شما</span>`;
+            } else if (a.my_reaction) {
+                const isSupport = a.my_reaction === "support";
+                reactionHtml = `<button class="ann-react ${isSupport ? "support" : "accuse"} selected" disabled aria-label="واکنش قبلاً ثبت شده">${isSupport ? "✓ حمایت" : "❌ محکوم کردن"} <b>${isSupport ? support.length : accuse.length}</b><span class="ann-locked-mark">ثبت شد 🔒</span></button>`;
+            } else {
+                reactionHtml = `
+                    <button class="ann-react support" data-react="support" data-id="${escapeHtml(a.id)}">✓ حمایت <b>${support.length}</b></button>
+                    <button class="ann-react accuse" data-react="accuse" data-id="${escapeHtml(a.id)}">❌ محکوم کردن <b>${accuse.length}</b></button>`;
+            }
             const created = a.created_at ? new Date(a.created_at).toLocaleString("fa-IR", { dateStyle: "medium", timeStyle: "short" }) : "";
+            const statementText = String(a.text || "");
+            const canExpand = statementText.length > 200;
             div.innerHTML = `
                 <div class="ann-header">
                     <span class="ann-flag">${flagInline(a.from_country, true)}</span>
                     <div class="ann-author"><span class="ann-name">${escapeHtml(COUNTRY_NAMES[a.from_country] || a.from_country || "کشور ناشناس")}</span><time>${escapeHtml(created)}</time></div>
                     <span class="ann-official-tag">بیانیهٔ رسمی</span>
                 </div>
-                <div class="ann-text">${escapeHtml(a.text || "")}</div>
+                <div class="ann-text ${canExpand ? "is-collapsed" : ""}" data-ann-text>${escapeHtml(statementText)}</div>
+                ${canExpand ? `<button type="button" class="ann-expand-button" aria-expanded="false">نمایش بیشتر <span>⌄</span></button>` : ""}
                 <div class="ann-reactions">${reactionHtml}</div>
+                <div class="ann-balance ${totalReactions ? "" : "is-empty"}" aria-label="نسبت حمایت و محکومیت">
+                    <div class="ann-balance-track"><span class="ann-balance-support" style="width:${supportPercent.toFixed(2)}%"></span><span class="ann-balance-accuse" style="width:${accusePercent.toFixed(2)}%"></span></div>
+                    <div class="ann-balance-legend"><span class="support-legend">● حمایت ${support.length.toLocaleString("fa-IR")}</span><span class="accuse-legend">● محکومیت ${accuse.length.toLocaleString("fa-IR")}</span></div>
+                </div>
                 ${(supportFlags || accuseFlags) ? `<div class="ann-flags">${supportFlags ? `<div class="ann-flags-row"><span>✅ حمایت</span> ${supportFlags}</div>` : ""}${accuseFlags ? `<div class="ann-flags-row"><span>⚑ محکومیت</span> ${accuseFlags}</div>` : ""}</div>` : ""}
-                <div class="ann-comments" id="ann-comments-${escapeHtml(a.id)}">${commentsHtml}</div>
-                <div class="ann-card-footer"><button type="button" class="ann-reply-button" data-reply-ann="${escapeHtml(a.id)}">↩ پاسخ به بیانیه <span>${(a.comments || []).length}</span></button></div>`;
+                <div class="ann-card-footer"><button type="button" class="ann-reply-button" data-reply-ann="${escapeHtml(a.id)}">↩ پاسخ‌ها <span>${(a.comments || []).length}</span></button></div>`;
             c.appendChild(div);
         });
-        c.querySelectorAll(".ann-react").forEach(b => b.onclick = () => reactAnn(b.dataset.id, b.dataset.react));
+        c.querySelectorAll(".ann-react[data-react]").forEach(b => b.onclick = () => reactAnn(b.dataset.id, b.dataset.react));
         c.querySelectorAll(".ann-reply-button").forEach(b => b.onclick = () => openAnnouncementReply(b.dataset.replyAnn));
+        c.querySelectorAll(".ann-expand-button").forEach(b => b.onclick = () => {
+            const text = b.previousElementSibling;
+            const expanded = text.classList.toggle("is-expanded");
+            text.classList.toggle("is-collapsed", !expanded);
+            b.setAttribute("aria-expanded", expanded ? "true" : "false");
+            b.innerHTML = expanded ? `نمایش کمتر <span>⌃</span>` : `نمایش بیشتر <span>⌄</span>`;
+        });
     } catch (e) { console.error("Announcements:", e); }
 }
 
@@ -2304,41 +2348,120 @@ async function reactAnn(id, reaction) {
     try {
         const d = await apiPost("/api/announcements/react", { announcement_id: id, reaction });
         if (!d.success) { showToast(d.message || "امکان ثبت واکنش وجود ندارد.", "error"); return; }
+        showToast("واکنش شما برای همیشه ثبت شد.", "success");
         await loadAnnouncements();
     } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
 }
 
+function renderAnnouncementThread(comments, parentId = null) {
+    const childrenByParent = new Map();
+    (Array.isArray(comments) ? comments : []).forEach(cm => {
+        const key = cm.parent_id || "";
+        if (!childrenByParent.has(key)) childrenByParent.set(key, []);
+        childrenByParent.get(key).push(cm);
+    });
+    const renderChildren = (pid, depth, path = new Set()) => {
+        const rows = childrenByParent.get(pid || "") || [];
+        return rows.map(cm => {
+            const id = String(cm.id || "");
+            if (!id || path.has(id)) return "";
+            const nextPath = new Set(path); nextPath.add(id);
+            const cid = cm.from_country;
+            const name = COUNTRY_NAMES[cid] || cid || "کشور";
+            const time = cm.at ? new Date(cm.at).toLocaleString("fa-IR", { dateStyle: "short", timeStyle: "short" }) : "";
+            return `<article class="ann-thread-comment" style="--thread-depth:${Math.min(depth, 5)}" data-comment-id="${escapeHtml(id)}">
+                <div class="ann-thread-comment-head">${flagInline(cid, true)}<strong>${escapeHtml(name)}</strong><time>${escapeHtml(time)}</time></div>
+                <div class="ann-thread-comment-text">${escapeHtml(cm.text || "")}</div>
+                <div class="ann-thread-comment-actions"><button type="button" data-reply-to-comment="${escapeHtml(id)}" data-reply-to-name="${escapeHtml(name)}">↩ پاسخ</button></div>
+                ${renderChildren(id, depth + 1, nextPath)}
+            </article>`;
+        }).join("");
+    };
+    return renderChildren(parentId, 0);
+}
+
 function openAnnouncementReply(id) {
-    const card = document.querySelector(`.ann-card [data-reply-ann="${CSS.escape(id)}"]`)?.closest(".ann-card");
-    const title = card?.querySelector(".ann-name")?.textContent || "بیانیه";
+    const announcement = announcementCache.get(String(id));
+    const card = document.querySelector(`.ann-card [data-reply-ann="${CSS.escape(String(id))}"]`)?.closest(".ann-card");
+    const title = announcement ? (COUNTRY_NAMES[announcement.from_country] || announcement.from_country) : (card?.querySelector(".ann-name")?.textContent || "بیانیه");
+    if (!announcement) { showToast("بیانیه پیدا نشد؛ فهرست را تازه کنید.", "error"); return; }
+
     const ov = document.createElement("div");
-    ov.className = "modal-overlay ann-modal-overlay";
+    ov.className = "modal-overlay ann-modal-overlay ann-thread-overlay";
     ov.innerHTML = `
-        <section class="modal-box ann-reply-box" role="dialog" aria-modal="true" aria-labelledby="ann-reply-title">
-            <div class="ann-modal-head"><div><span class="ann-modal-kicker">گفت‌وگوی دیپلماتیک</span><h2 class="modal-title" id="ann-reply-title">پاسخ به بیانیهٔ ${escapeHtml(title)}</h2></div><button class="ann-modal-close" type="button" aria-label="بستن">×</button></div>
-            <textarea class="ann-input ann-reply-text" maxlength="5000" placeholder="پاسخ خود را بنویسید…" aria-label="متن پاسخ"></textarea>
-            <div class="ann-composer-meta"><span class="ann-reply-counter">۰ / ۵٬۰۰۰</span><span>پاسخ شما زیر بیانیه نمایش داده می‌شود</span></div>
-            <div class="ann-modal-actions"><button type="button" class="modal-cancel ann-modal-cancel">انصراف</button><button type="button" class="ann-publish-button ann-reply-send">ارسال پاسخ</button></div>
+        <section class="modal-box ann-thread-box" role="dialog" aria-modal="true" aria-labelledby="ann-thread-title">
+            <header class="ann-thread-head">
+                <div class="ann-thread-grabber"></div>
+                <div class="ann-modal-head"><div><span class="ann-modal-kicker">گفت‌وگوی دیپلماتیک</span><h2 class="modal-title" id="ann-thread-title">پاسخ‌ها و گفتگو</h2><p>بیانیهٔ ${escapeHtml(title)}</p></div><button class="ann-modal-close" type="button" aria-label="بستن">×</button></div>
+            </header>
+            <div class="ann-thread-scroll">
+                <section class="ann-thread-original"><div class="ann-thread-original-label">متن بیانیه</div><div class="ann-thread-original-text ${String(announcement.text || "").length > 230 ? "is-collapsed" : ""}">${escapeHtml(announcement.text || "")}</div>${String(announcement.text || "").length > 230 ? `<button type="button" class="ann-original-expand">نمایش بیانیه کامل</button>` : ""}</section>
+                <div class="ann-thread-section-title"><strong>گفت‌وگو</strong><span class="ann-thread-count">${(announcement.comments || []).length.toLocaleString("fa-IR")} پاسخ</span></div>
+                <div class="ann-thread-comments" id="ann-thread-comments"></div>
+            </div>
+            <footer class="ann-thread-composer">
+                <div class="ann-reply-target hidden" id="ann-reply-target"><span id="ann-reply-target-name"></span><button type="button" id="ann-reply-target-clear" aria-label="لغو پاسخ">×</button></div>
+                <textarea class="ann-input ann-reply-text" maxlength="5000" placeholder="پاسخ خود را بنویسید…" aria-label="متن پاسخ"></textarea>
+                <div class="ann-thread-composer-bottom"><span class="ann-reply-counter">۰ / ۵٬۰۰۰</span><button type="button" class="ann-publish-button ann-reply-send">ارسال پاسخ <span>➤</span></button></div>
+            </footer>
         </section>`;
     document.body.appendChild(ov);
+
+    let replyingTo = null;
     const input = ov.querySelector(".ann-reply-text");
     const counter = ov.querySelector(".ann-reply-counter");
+    const commentsBox = ov.querySelector("#ann-thread-comments");
+    const targetBox = ov.querySelector("#ann-reply-target");
+    const targetName = ov.querySelector("#ann-reply-target-name");
+    const sendBtn = ov.querySelector(".ann-reply-send");
     const close = () => ov.remove();
+    const refreshTarget = () => {
+        targetBox.classList.toggle("hidden", !replyingTo);
+        targetName.textContent = replyingTo ? `در پاسخ به ${replyingTo.name}` : "";
+        input.placeholder = replyingTo ? `پاسخ به ${replyingTo.name}…` : "پاسخ خود را بنویسید…";
+    };
+    const renderThread = () => {
+        const current = announcementCache.get(String(id)) || announcement;
+        const comments = Array.isArray(current.comments) ? current.comments : [];
+        commentsBox.innerHTML = renderAnnouncementThread(comments);
+        if (!comments.length) commentsBox.innerHTML = `<div class="ann-thread-empty"><span>✦</span><strong>هنوز پاسخی ثبت نشده</strong><p>اولین پاسخ را بنویس و گفتگو را شروع کن.</p></div>`;
+        ov.querySelector(".ann-thread-count").textContent = `${comments.length.toLocaleString("fa-IR")} پاسخ`;
+        commentsBox.querySelectorAll("[data-reply-to-comment]").forEach(btn => btn.onclick = () => {
+            replyingTo = { id: btn.dataset.replyToComment, name: btn.dataset.replyToName || "کشور" };
+            refreshTarget();
+            input.focus({ preventScroll: true });
+            ov.querySelector(".ann-thread-composer").scrollIntoView({ block: "end", behavior: "smooth" });
+        });
+    };
     ov.querySelector(".ann-modal-close").onclick = close;
-    ov.querySelector(".ann-modal-cancel").onclick = close;
     ov.addEventListener("click", e => { if (e.target === ov) close(); });
+    ov.querySelector("#ann-reply-target-clear").onclick = () => { replyingTo = null; refreshTarget(); input.focus(); };
+    const originalExpand = ov.querySelector(".ann-original-expand");
+    if (originalExpand) originalExpand.onclick = () => {
+        const originalText = ov.querySelector(".ann-thread-original-text");
+        const expanded = originalText.classList.toggle("is-expanded");
+        originalText.classList.toggle("is-collapsed", !expanded);
+        originalExpand.textContent = expanded ? "نمایش کمتر" : "نمایش بیانیه کامل";
+    };
     input.addEventListener("input", () => { counter.textContent = `${input.value.length.toLocaleString("fa-IR")} / ۵٬۰۰۰`; });
-    ov.querySelector(".ann-reply-send").onclick = async () => {
+    sendBtn.onclick = async () => {
         const text = input.value.trim();
         if (!text) { showToast("متن پاسخ را بنویسید.", "error"); input.focus(); return; }
-        const btn = ov.querySelector(".ann-reply-send"); btn.disabled = true; btn.textContent = "در حال ارسال…";
+        sendBtn.disabled = true; sendBtn.textContent = "در حال ارسال…";
         try {
-            const d = await apiPost("/api/announcements/comment", { announcement_id: id, text });
-            if (!d.success) { showToast(d.message || "ارسال پاسخ انجام نشد.", "error"); btn.disabled = false; btn.textContent = "ارسال پاسخ"; return; }
-            close(); await loadAnnouncements(); showToast("پاسخ شما ثبت شد.", "success");
-        } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); btn.disabled = false; btn.textContent = "ارسال پاسخ"; }
+            const d = await apiPost("/api/announcements/comment", {
+                announcement_id: id, text, parent_comment_id: replyingTo?.id || null
+            });
+            if (!d.success) { showToast(d.message || "ارسال پاسخ انجام نشد.", "error"); return; }
+            input.value = ""; counter.textContent = "۰ / ۵٬۰۰۰"; replyingTo = null; refreshTarget();
+            await loadAnnouncements();
+            renderThread();
+            showToast("پاسخ شما ثبت شد.", "success");
+            ov.querySelector(".ann-thread-scroll").scrollTo({ top: ov.querySelector(".ann-thread-scroll").scrollHeight, behavior: "smooth" });
+        } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+        finally { sendBtn.disabled = false; sendBtn.innerHTML = `ارسال پاسخ <span>➤</span>`; }
     };
-    input.focus();
+    renderThread();
 }
 
 function escapeHtml(s) {
