@@ -1920,7 +1920,7 @@ async function loadWarLog() {
     renderWarNews(); renderWarHistory();
 }
 
-const WAR_EVENT_ICONS = { declare: "⚔️", occupy: "🚩", capture: "🚩", repel: "🛡️", release: "🏳️" };
+const WAR_EVENT_ICONS = { declare: "⚔️", occupy: "🚩", capture: "🚩", repel: "🛡️", release: "🏳️", send: "🧭", return: "🏠", turnback: "↩️" };
 
 function renderWarNews() {
     const box = document.getElementById("war-news-list");
