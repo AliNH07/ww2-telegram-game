@@ -1018,64 +1018,105 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 
 /* ==================== پیام خصوصی ==================== */
-.pm-conversation {
-    display: flex; flex-direction: column;
-    height: calc(100vh - 64px - 78px - 160px);
-    background: rgba(15, 20, 30, 0.75);
-    border: 1px solid rgba(var(--brand-rgb), 0.12);
-    border-radius: 14px; overflow: hidden;
+
+/* --- تب‌های ارتباطات: کوچک‌تر و ظریف‌تر --- */
+.comm-tabs, .pm-subtabs {
+    display: flex; gap: 2px; padding: 3px; margin-bottom: 12px;
+    background: rgba(12, 16, 24, 0.7);
+    border: 1px solid rgba(var(--brand-rgb), 0.1);
+    border-radius: 12px;
 }
+.comm-tab, .pm-subtab {
+    flex: 1; position: relative; padding: 6px 4px;
+    background: transparent; border: 1px solid transparent;
+    border-radius: 9px; color: #8b94a1;
+    font-size: 10.5px; line-height: 1.4; text-align: center;
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+    transition: all 0.2s ease;
+}
+.comm-tab.active, .pm-subtab.active {
+    background: rgba(var(--brand-rgb), 0.14); color: var(--brand);
+    border-color: rgba(var(--brand-rgb), 0.28);
+}
+.pm-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 15px; height: 15px; padding: 0 4px; margin-right: 5px;
+    border-radius: 8px; background: #ef4444; color: #fff;
+    font-size: 9px; font-weight: 600; line-height: 1; vertical-align: middle;
+}
+.pm-badge.hidden { display: none; }
+.pm-badge-static { margin: 0; }
+.pm-subtabs { max-width: 180px; }
+.contact-item { padding: 10px 13px; }
+.pm-conv-item { cursor: pointer; }
+.pm-conv-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pm-conv-last {
+    font-size: 10.5px; color: #7d8795; max-width: 200px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.message-button { padding: 5px 14px; font-size: 11px; border-radius: 9px; }
+
+/* --- چت تمام‌صفحه (روی هدر و فوتر) --- */
+.pm-conversation {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; flex-direction: column;
+    height: 100vh; height: 100dvh;
+    background: #0b0e15;
+}
+.pm-conversation.hidden { display: none; }
 .pm-header {
     display: flex; align-items: center; gap: 10px;
-    padding: 12px; border-bottom: 1px solid rgba(var(--brand-rgb), 0.08);
-    background: rgba(0, 0, 0, 0.2);
+    padding: 10px 12px; padding-top: calc(10px + env(safe-area-inset-top));
+    background: rgba(15, 20, 30, 0.95);
+    border-bottom: 1px solid rgba(var(--brand-rgb), 0.12);
 }
 .pm-back {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--brand); font-size: 12px;
-    padding: 6px 12px; border-radius: 8px;
-    border: 1px solid rgba(var(--brand-rgb), 0.12);
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, 0.05); color: var(--brand);
+    border: 1px solid rgba(var(--brand-rgb), 0.15); border-radius: 10px; padding: 0;
 }
-#pm-target-name { font-size: 13px; color: #f4f6f9; font-weight: 500; }
+.pm-back svg { width: 18px; height: 18px; }
+.pm-target-flag { display: flex; align-items: center; }
+#pm-target-name { font-size: 14px; color: #f4f6f9; font-weight: 500; }
 .pm-messages {
     flex: 1; overflow-y: auto; padding: 12px;
-    display: flex; flex-direction: column; gap: 8px;
+    display: flex; flex-direction: column; gap: 7px;
 }
 .pm-msg {
-    max-width: 75%; padding: 9px 13px;
-    border-radius: 14px; font-size: 12px; line-height: 1.6;
-    word-break: break-word;
+    max-width: 78%; padding: 8px 12px;
+    border-radius: 14px; font-size: 12.5px; line-height: 1.7;
+    word-break: break-word; white-space: pre-wrap;
 }
 .pm-mine {
-    align-self: flex-end;
-    background: rgba(var(--brand-rgb), 0.2);
-    color: #f4f6f9;
-    border-bottom-left-radius: 4px;
-}
-.pm-other {
     align-self: flex-start;
-    background: rgba(255, 255, 255, 0.06);
-    color: #e0e4e9;
+    background: rgba(var(--brand-rgb), 0.2); color: #f4f6f9;
     border-bottom-right-radius: 4px;
 }
+.pm-other {
+    align-self: flex-end;
+    background: rgba(255, 255, 255, 0.07); color: #e0e4e9;
+    border-bottom-left-radius: 4px;
+}
 .pm-input-row {
-    display: flex; gap: 6px; padding: 10px;
-    border-top: 1px solid rgba(var(--brand-rgb), 0.08);
-    background: rgba(0, 0, 0, 0.2);
+    display: flex; align-items: flex-end; gap: 8px;
+    padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    background: rgba(15, 20, 30, 0.95);
+    border-top: 1px solid rgba(var(--brand-rgb), 0.12);
 }
 .pm-input {
-    flex: 1; background: #101520;
-    border: 1px solid rgba(var(--brand-rgb), 0.2); color: #eee;
-    font-family: inherit; font-size: 12px;
-    padding: 8px 12px; border-radius: 10px;
-    min-height: 38px; resize: none; outline: none;
+    flex: 1; resize: none; max-height: 90px; min-height: 38px;
+    padding: 9px 13px; border-radius: 19px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(var(--brand-rgb), 0.15);
+    color: #f4f6f9; font-size: 13px; font-family: inherit; line-height: 1.5; outline: none;
 }
+.pm-input:focus { border-color: rgba(var(--brand-rgb), 0.45); }
 .pm-send {
-    background: linear-gradient(135deg, var(--brand), var(--brand-dark));
-    color: #0b0e15; font-weight: bold; font-size: 12px;
-    padding: 8px 18px; border-radius: 10px;
+    width: 38px; height: 38px; flex: none; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; background: var(--brand); color: #0b0e15; border: none;
 }
-
+.pm-send svg { width: 17px; height: 17px; transform: scaleX(-1); }
 /* ==================== رتبه‌بندی ==================== */
 .rankings-list { display: flex; flex-direction: column; gap: 8px; }
 .rank-row {
