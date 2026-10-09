@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261010straits2">
+<link rel="stylesheet" href="/style.css?v=20261010userfriendly3">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -330,6 +330,16 @@
     <main id="economy" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">💰</span>اقتصاد</span><span class="sb-money">$0</span></div>
         <div class="page-title"><span>سرمایه‌گذاری</span><h1>اقتصاد</h1></div>
+        <div class="economy-filter-wrap">
+            <div class="economy-filter-heading"><span>سرمایه‌گذاری</span><small>دسته را انتخاب کن یا همهٔ گزینه‌ها را ببین</small></div>
+            <div id="economy-filters" class="economy-filters" role="tablist" aria-label="دسته‌بندی سرمایه‌گذاری">
+                <button type="button" class="economy-filter active" data-economy-filter="all" role="tab" aria-selected="true">همه</button>
+                <button type="button" class="economy-filter" data-economy-filter="food" role="tab" aria-selected="false">کشاورزی</button>
+                <button type="button" class="economy-filter" data-economy-filter="industry" role="tab" aria-selected="false">صنعت</button>
+                <button type="button" class="economy-filter" data-economy-filter="trade" role="tab" aria-selected="false">تجارت</button>
+                <button type="button" class="economy-filter" data-economy-filter="finance" role="tab" aria-selected="false">خدمات و مالی</button>
+            </div>
+        </div>
         <div id="economy-list" class="infra-card-list"></div>
     </main>
 
@@ -692,6 +702,6 @@
 
 </section>
 
-<script src="/app.js?v=20261010straits2"></script>
+<script src="/app.js?v=20261010userfriendly3"></script>
 </body>
 </html>
