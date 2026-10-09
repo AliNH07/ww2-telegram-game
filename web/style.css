@@ -2015,3 +2015,13 @@ input, textarea, button { -webkit-touch-callout:none; }
 .wf-tr-bar i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .9s linear; }
 .wf-tr-bottom { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; }
 .wf-tr-cancel { padding: 6px 12px; border-radius: 10px; border: 1px solid rgba(255,120,120,.5); background: rgba(255,80,80,.12); color: #ff9a9a; font-weight: 700; font-size: 12px; }
+
+/* مسیر نیروها روی نقشه */
+.map-routes-btn { top: 42px; display: flex; align-items: center; justify-content: center; opacity: .55; }
+.map-routes-btn.active { opacity: 1; border-color: #ff5d5d; color: #ff8a8a; }
+.map-route-line { fill: none; stroke: rgba(255,255,255,.75); stroke-width: 1.3; stroke-dasharray: 4 3; stroke-linecap: round; }
+.map-route-line.mine { stroke: #7dffb0; }
+.map-route-dot { fill: #ff2b2b; stroke: #fff; stroke-width: 1; }
+.map-route-pulse { fill: rgba(255,43,43,.55); transform-box: fill-box; transform-origin: center; animation: routePulse .9s ease-out infinite; pointer-events: none; }
+.map-route-flag { font-size: 9px; pointer-events: none; paint-order: stroke; stroke: rgba(0,0,0,.6); stroke-width: 2px; }
+@keyframes routePulse { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(3.2); opacity: 0; } }
