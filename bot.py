@@ -1,4 +1,4 @@
-import os, json, hmac, hashlib, uuid, logging, asyncio, random, math
+import os, json, hmac, hashlib, uuid, logging, asyncio, random, math, copy
 from datetime import datetime, timezone, timedelta
 from urllib.parse import parse_qsl
 
@@ -850,6 +850,7 @@ war_events = []    # خبرهای جنگ
 war_history = []   # تاریخچهٔ درگیری‌ها
 transits = []      # نیروهای در راه
 loans = {}         # وام‌ها
+market_sanctions = {}  # کشور تحریم‌کننده -> مجموعه‌ای از کشورهای محروم از خرید
 
 def create_player(user_id):
     return {"user_id": user_id, "country": None, "money": STARTING_MONEY, "army": 0,
@@ -900,7 +901,7 @@ def remember_telegram_user(user):
             changed = True
     now = utcnow()
     last_seen = parse_dt(p.get("last_seen_at")) if p.get("last_seen_at") else None
-    if not last_seen or (now - last_seen).total_seconds() >= 300:
+    if not last_seen or (now - last_seen).total_seconds() >= 45:
         p["last_seen_at"] = now.isoformat()
         changed = True
     if changed:
@@ -935,20 +936,72 @@ def push_news(title, text, kind="info"):
                       "at": utcnow().isoformat()})
     if len(news_feed) > 200: del news_feed[:50]
 
+# هر دنیا نسخهٔ مستقل خود از داده‌های بازی را دارد. هنگام هر درخواست، وضعیت دنیای مربوط
+# به درخواست فعال می‌شود و پیش از بازگرداندن وضعیت قبلی ذخیره می‌گردد.
+WORLD_STATE_KEYS = [
+    "players", "diplomacy_proposals", "active_treaties", "map_holdings", "strait_holdings",
+    "occupied_countries", "war_declarations", "active_wars", "war_reports", "announcements",
+    "unions", "private_messages", "pm_read", "market_listings", "news_feed", "STRAITS_DATA",
+    "site_forces", "war_events", "war_history", "transits", "loans", "admin_audit", "market_sanctions",
+]
+DEFAULT_STRAITS_DATA = copy.deepcopy(STRAITS_DATA)
+worlds_registry = {"1": {"id": 1, "name": "دنیای ۱", "created_at": None}}
+world_states = {}
+active_world_id = "1"
+WORLD_SWITCH_LOCK = asyncio.Lock()
+
+
+def _fresh_world_state():
+    return {
+        "players": {}, "diplomacy_proposals": {}, "active_treaties": [], "map_holdings": {},
+        "strait_holdings": {}, "occupied_countries": {}, "war_declarations": {}, "active_wars": {},
+        "war_reports": [], "announcements": [], "unions": {}, "private_messages": {}, "pm_read": {},
+        "market_listings": {}, "news_feed": [], "STRAITS_DATA": copy.deepcopy(DEFAULT_STRAITS_DATA),
+        "site_forces": {}, "war_events": [], "war_history": [], "transits": [], "loans": {},
+        "admin_audit": [], "market_sanctions": {},
+    }
+
+
+def _capture_world_state():
+    return {key: globals().get(key) for key in WORLD_STATE_KEYS}
+
+
+def _persist_active_world_memory():
+    world_states[str(active_world_id)] = _capture_world_state()
+
+
+def _activate_world(world_id):
+    global active_world_id
+    wid = str(world_id)
+    if wid not in worlds_registry:
+        return False
+    state = world_states.get(wid)
+    if not isinstance(state, dict):
+        state = _fresh_world_state()
+        world_states[wid] = state
+    else:
+        fresh = _fresh_world_state()
+        for key, value in fresh.items(): state.setdefault(key, value)
+    for key in WORLD_STATE_KEYS:
+        globals()[key] = state.get(key, _fresh_world_state().get(key))
+    if not isinstance(players, dict): globals()["players"] = {}
+    # سازگاری با فایل‌های قدیمی که کلید بازیکن را رشته ذخیره کرده‌اند.
+    if players and any(not isinstance(k, int) for k in players):
+        globals()["players"] = {int(k): v for k, v in players.items()}
+    active_world_id = wid
+    world_states[wid] = _capture_world_state()
+    return True
+
+
 def save_state():
     try:
+        _persist_active_world_memory()
         os.makedirs(DATA_DIR, exist_ok=True)
-        state = {"players": {str(k): v for k, v in players.items()},
-                 "diplomacy_proposals": diplomacy_proposals, "active_treaties": active_treaties,
-                 "map_holdings": map_holdings, "strait_holdings": strait_holdings,
-                 "occupied_countries": occupied_countries, "war_declarations": war_declarations,
-                 "active_wars": active_wars, "war_reports": war_reports[-50:],
-                 "announcements": announcements[-100:], "unions": unions,
-                 "private_messages": private_messages, "pm_read": pm_read, "market_listings": market_listings,
-                 "news_feed": news_feed[-200:],
-                 "straits_data": STRAITS_DATA,
-                 "transits": transits, "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:],
-                 "loans": loans, "admin_audit": admin_audit[-250:]}
+        state = {
+            "version": 2,
+            "worlds": worlds_registry,
+            "world_states": {str(wid): payload for wid, payload in world_states.items()},
+        }
         tmp = STATE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False)
@@ -956,50 +1009,95 @@ def save_state():
     except Exception as e:
         logging.error("save_state failed: %s", e)
 
+
 def load_state():
-    global diplomacy_proposals, active_treaties, map_holdings, strait_holdings
-    global occupied_countries, war_declarations, active_wars, war_reports
-    global announcements, unions, private_messages, pm_read, market_listings, news_feed
-    global site_forces, war_events, war_history, loans, transits, admin_audit
+    global worlds_registry, world_states, active_world_id
     if not os.path.exists(STATE_FILE):
-        logging.info("No state, fresh start."); return
+        logging.info("No state, fresh start.")
+        world_states = {"1": _fresh_world_state()}
+        _activate_world("1")
+        return
     try:
-        with open(STATE_FILE, "r", encoding="utf-8") as f: state = json.load(f)
-        for k, v in state.get("players", {}).items(): players[int(k)] = v
-        diplomacy_proposals = state.get("diplomacy_proposals", {})
-        active_treaties = state.get("active_treaties", [])
-        map_holdings = state.get("map_holdings", {})
-        strait_holdings = state.get("strait_holdings", {})
-        occupied_countries = state.get("occupied_countries", {})
-        war_declarations = state.get("war_declarations", {})
-        active_wars = state.get("active_wars", {})
-        war_reports = state.get("war_reports", [])
-        announcements = state.get("announcements", [])
-        unions = state.get("unions", {})
-        private_messages = state.get("private_messages", {})
-        pm_read = state.get("pm_read", {})
-        market_listings = state.get("market_listings", {})
-        news_feed = state.get("news_feed", [])
-        for _sid, _sv in state.get("straits_data", {}).items():
-            if _sid in STRAITS_DATA:
-                STRAITS_DATA[_sid].update({
-                    "toll": max(0, int(_sv.get("toll", STRAITS_DATA[_sid].get("toll", 0)) or 0)),
-                    "closed": bool(_sv.get("closed", STRAITS_DATA[_sid].get("closed", False))),
-                    "country_rules": _sv.get("country_rules", {}) if isinstance(_sv.get("country_rules", {}), dict) else {},
-                })
-        site_forces = state.get("site_forces", {})
-        war_events = state.get("war_events", [])
-        war_history = state.get("war_history", [])
-        transits = state.get("transits", [])
-        loans = state.get("loans", {})
-        admin_audit = state.get("admin_audit", [])[-250:]
-        logging.info("State loaded: %d players", len(players))
+        with open(STATE_FILE, "r", encoding="utf-8") as f: saved = json.load(f)
+        if isinstance(saved.get("world_states"), dict):
+            worlds_registry = {str(k): v for k, v in (saved.get("worlds") or {}).items()}
+            worlds_registry.setdefault("1", {"id": 1, "name": "دنیای ۱", "created_at": None})
+            world_states = {str(k): v for k, v in saved["world_states"].items() if isinstance(v, dict)}
+            # اگر دنیای جدید در registry بوده ولی داده نداشته باشد، خالی ایجادش کن.
+            for wid in worlds_registry: world_states.setdefault(str(wid), _fresh_world_state())
+        else:
+            # مهاجرت خودکار فایل ذخیرهٔ قدیمی به دنیای ۱.
+            worlds_registry = {"1": {"id": 1, "name": "دنیای ۱", "created_at": None}}
+            legacy = _fresh_world_state()
+            for key in WORLD_STATE_KEYS:
+                source_key = "straits_data" if key == "STRAITS_DATA" else key
+                if source_key in saved: legacy[key] = saved[source_key]
+            world_states = {"1": legacy}
+        active_world_id = "1"
+        _activate_world("1")
+        logging.info("State loaded: %d players across %d worlds", len(players), len(worlds_registry))
+        save_state()
     except Exception as e:
         logging.error("load_state failed: %s", e)
 
+
+def world_scoped(handler):
+    """Execute an API handler against its selected world's isolated data snapshot."""
+    async def _wrapped(request):
+        wid = str(request.query.get("world_id", "1"))
+        if wid not in worlds_registry:
+            return web.json_response({"success": False, "error": "world_not_found", "message": "این دنیا وجود ندارد."}, status=404)
+        async with WORLD_SWITCH_LOCK:
+            previous = str(active_world_id)
+            _persist_active_world_memory()
+            _activate_world(wid)
+            try:
+                result = await handler(request)
+                save_state()
+                return result
+            finally:
+                _persist_active_world_memory()
+                _activate_world(previous if previous in worlds_registry else "1")
+    _wrapped.__name__ = getattr(handler, "__name__", "world_scoped_handler")
+    return _wrapped
+
+
+async def get_worlds(request):
+    async with WORLD_SWITCH_LOCK:
+        _persist_active_world_memory()
+        result = []
+        for wid, meta in sorted(worlds_registry.items(), key=lambda x: int(x[0])):
+            state = world_states.get(str(wid), {})
+            rows = state.get("players", {}) if isinstance(state, dict) else {}
+            result.append({"id": int(wid), "name": meta.get("name", f"دنیای {wid}"),
+                           "created_at": meta.get("created_at"), "players": len(rows),
+                           "countries_taken": len({p.get("country") for p in rows.values() if isinstance(p, dict) and p.get("country")})})
+        return web.json_response({"success": True, "worlds": result})
+
+
+async def admin_create_world(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    name = str(data.get("name", "")).strip()[:50]
+    async with WORLD_SWITCH_LOCK:
+        _persist_active_world_memory()
+        next_id = max([int(x) for x in worlds_registry.keys()] or [0]) + 1
+        if next_id > 100:
+            return web.json_response({"success": False, "message": "حداکثر ۱۰۰ دنیا می‌توان ساخت."}, status=400)
+        name = name or f"دنیای {next_id}"
+        worlds_registry[str(next_id)] = {"id": next_id, "name": name, "created_at": utcnow().isoformat()}
+        world_states[str(next_id)] = _fresh_world_state()
+        save_state()
+        log_admin_action("ساخت دنیای جدید", None, f"world_id={next_id}; name={name}")
+        save_state()
+        return web.json_response({"success": True, "world": worlds_registry[str(next_id)]})
+
 async def autosave_loop():
     while True:
-        await asyncio.sleep(60); save_state()
+        await asyncio.sleep(60)
+        async with WORLD_SWITCH_LOCK:
+            save_state()
 
 # =========================================================
 # Auth
@@ -1066,10 +1164,7 @@ class GameEntryButtonMiddleware(BaseRequestMiddleware):
             markup = getattr(method, "reply_markup", None)
             if isinstance(markup, InlineKeyboardMarkup):
                 rows = [list(row) for row in markup.inline_keyboard]
-                already_present = any(
-                    button.web_app is not None and button.web_app.url == WEB_APP_URL
-                    for row in rows for button in row
-                )
+                already_present = any(button.web_app is not None for row in rows for button in row)
                 if not already_present:
                     rows.append([entry_button])
                 method.reply_markup = InlineKeyboardMarkup(inline_keyboard=rows)
@@ -1084,14 +1179,19 @@ bot.session.middleware(GameEntryButtonMiddleware())
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
     user_id = message.from_user.id
-    remember_telegram_user(message.from_user)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🌍 ورود به بازی", web_app=WebAppInfo(url=WEB_APP_URL))]])
-    if players[user_id]["country"]:
-        c = COUNTRIES[players[user_id]["country"]]
-        text = f"⚔️ کشور شما: {c['flag']} {c['name']}\n\nبرای ورود روی دکمه بزنید."
+    # حساب داخل دنیای انتخاب‌شده ثبت می‌شود؛ /start نباید کاربر را ناخواسته به دنیای ۱ اضافه کند.
+    game_url = WEB_APP_URL
+    if int(user_id) == int(ADMIN_ID):
+        admin_url = WEB_APP_URL + ("&" if "?" in WEB_APP_URL else "?") + "open=admin"
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🎮 ورود به بازی", web_app=WebAppInfo(url=game_url))],
+            [InlineKeyboardButton(text="🛡️ ورود به پنل مدیریت", web_app=WebAppInfo(url=admin_url))],
+        ])
+        text = "🛡️ دسترسی مدیر اصلی\nاز یکی از دکمه‌های زیر وارد بازی یا مرکز مدیریت شو."
     else:
-        text = "⚔️ به FRONT-LINE 1993 خوش آمدید.\nابتدا کشور خود را انتخاب کنید."
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🌍 ورود به بازی", web_app=WebAppInfo(url=game_url))]])
+        text = "⚔️ به FRONT-LINE 1993 خوش آمدید.\nبرای آغاز، دنیا و سپس کشور خود را انتخاب کنید."
     await message.answer(text, reply_markup=kb)
 
 async def notify_admin(text, keyboard=None):
@@ -1102,36 +1202,97 @@ async def notify_admin(text, keyboard=None):
 @dp.callback_query(F.data.startswith("treaty:"))
 async def treaty_cb(cb: types.CallbackQuery):
     _, action, pid = cb.data.split(":")
-    p = diplomacy_proposals.get(pid)
-    if not p or p["status"] != "pending": await cb.answer("منقضی"); return
-    if cb.from_user.id != p["to_user"]: await cb.answer("برای شما نیست."); return
-    tn = TREATY_TYPE_NAMES[p["treaty_type"]]
-    if action == "accept":
-        p["status"] = "accepted"
-        active_treaties.append({"id": str(uuid.uuid4()), "country_a": p["from_country"],
-            "country_b": p["to_country"], "treaty_type": p["treaty_type"],
-            "expires_at": (utcnow() + timedelta(days=p["duration_days"])).isoformat()})
-        await cb.message.edit_text(f"✅ {tn} پذیرفته شد.")
-        push_news("پیمان جدید", f"{COUNTRIES[p['from_country']]['name']} و {COUNTRIES[p['to_country']]['name']} {tn} بستند.")
-    else:
-        p["status"] = "rejected"; await cb.message.edit_text(f"❌ {tn} رد شد.")
-    save_state(); await cb.answer()
+    # پاسخ دکمه باید در همان دنیایی اعمال شود که پیشنهاد در آن ساخته شده است.
+    response = None
+    async with WORLD_SWITCH_LOCK:
+        previous = str(active_world_id)
+        _persist_active_world_memory()
+        try:
+            for wid in sorted(worlds_registry, key=lambda x: int(x)):
+                _activate_world(wid)
+                p = diplomacy_proposals.get(pid)
+                if p is None:
+                    continue
+                if p.get("status") != "pending":
+                    response = ("منقضی", True)
+                    break
+                if int(cb.from_user.id) != int(p.get("to_user", -1)):
+                    response = ("این پیشنهاد برای شما نیست.", True)
+                    break
+                tn = TREATY_TYPE_NAMES.get(p.get("treaty_type"), "پیمان")
+                if action == "accept":
+                    p["status"] = "accepted"
+                    active_treaties.append({"id": str(uuid.uuid4()), "country_a": p["from_country"],
+                        "country_b": p["to_country"], "treaty_type": p["treaty_type"],
+                        "expires_at": (utcnow() + timedelta(days=p["duration_days"])).isoformat()})
+                    push_news("پیمان جدید", f"{COUNTRIES[p['from_country']]['name']} و {COUNTRIES[p['to_country']]['name']} {tn} بستند.")
+                    response = (f"✅ {tn} پذیرفته شد.", False)
+                else:
+                    p["status"] = "rejected"
+                    response = (f"❌ {tn} رد شد.", False)
+                save_state()
+                break
+            if response is None:
+                response = ("پیشنهاد در هیچ‌کدام از دنیاها پیدا نشد.", True)
+        finally:
+            _persist_active_world_memory()
+            _activate_world(previous if previous in worlds_registry else "1")
+            save_state()
+    text, alert = response
+    try:
+        await cb.message.edit_text(text)
+    except Exception:
+        pass
+    await cb.answer(text if alert else "ثبت شد", show_alert=alert)
 
 @dp.callback_query(F.data.startswith("war:"))
 async def war_cb(cb: types.CallbackQuery):
-    _, action, wid = cb.data.split(":")
-    if cb.from_user.id != ADMIN_ID: await cb.answer("دسترسی ندارید."); return
-    w = war_declarations.get(wid)
-    if not w or w["status"] != "pending_admin": await cb.answer("منقضی"); return
-    if action == "approve":
-        w["status"] = "negotiation"
-        w["negotiation_ends"] = (utcnow() + timedelta(hours=NEGOTIATION_HOURS)).isoformat()
-        await cb.message.edit_text("✅ تأیید شد. ۲۴ ساعت مذاکره آغاز شد.")
-        push_news("اعلام جنگ", f"{COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} اعلام جنگ کرد.")
-        push_war("declare", f"{COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} اعلان جنگ کرد.", [w["attacker"], w["defender"]])
-    else:
-        w["status"] = "rejected"; await cb.message.edit_text("❌ رد شد.")
-    save_state(); await cb.answer()
+    _, action, war_id = cb.data.split(":")
+    if cb.from_user.id != ADMIN_ID:
+        await cb.answer("دسترسی ندارید."); return
+    response = None
+    async with WORLD_SWITCH_LOCK:
+        previous = str(active_world_id)
+        _persist_active_world_memory()
+        try:
+            for wid in sorted(worlds_registry, key=lambda x: int(x)):
+                _activate_world(wid)
+                w = war_declarations.get(war_id)
+                if w is None:
+                    continue
+                if w.get("status") != "pending_admin":
+                    response = ("درخواست قبلاً بررسی شده یا منقضی است.", True)
+                    break
+                if action == "approve":
+                    w["status"] = "negotiation"
+                    w["negotiation_ends"] = (utcnow() + timedelta(hours=NEGOTIATION_HOURS)).isoformat()
+                    message = f"اعلان جنگ {COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} تأیید شد. دلیل: {w.get('reason', 'ثبت نشده')}. ۲۴ ساعت برای مذاکره فرصت دارید."
+                    push_news("اعلام جنگ", message, "warning")
+                    push_war("declare", message, [w["attacker"], w["defender"]])
+                    await notify_world_players(message)
+                    response = ("✅ تأیید شد؛ مهلت دیپلماسی ۲۴ ساعته آغاز شد.", False)
+                elif action == "reject":
+                    w["status"] = "rejected"
+                    message = f"درخواست اعلان جنگ {COUNTRIES[w['attacker']]['name']} علیه {COUNTRIES[w['defender']]['name']} رد شد."
+                    push_news("درخواست جنگ رد شد", message)
+                    await notify_world_players(message)
+                    response = ("❌ درخواست رد شد.", False)
+                else:
+                    response = ("عملیات نامعتبر است.", True)
+                save_state()
+                break
+            if response is None:
+                response = ("درخواست جنگ در هیچ‌کدام از دنیاها پیدا نشد.", True)
+        finally:
+            _persist_active_world_memory()
+            _activate_world(previous if previous in worlds_registry else "1")
+            save_state()
+    text, alert = response
+    try:
+        await cb.message.edit_text(text)
+    except Exception:
+        pass
+    await cb.answer(text, show_alert=alert)
 
 # =========================================================
 # API Player / Countries
@@ -1365,10 +1526,23 @@ def have_treaty(a, b, kind):
 # =========================================================
 # API War
 # =========================================================
+async def notify_world_players(message):
+    """Broadcast an in-game world event to each Telegram user registered in this world."""
+    for target_uid in list(players.keys()):
+        try:
+            await bot.send_message(chat_id=int(target_uid), text=str(message)[:3500])
+        except Exception as exc:
+            logging.debug("world broadcast failed for %s: %s", target_uid, exc)
+        await asyncio.sleep(0.02)
+
+
 async def declare_war(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
     data = await read_json(request); target = data.get("target")
+    reason = str(data.get("reason", "")).strip()[:1800]
+    if not reason:
+        return web.json_response({"success": False, "error": "reason_required", "message": "دلیل اعلان جنگ را بنویسید."}, status=400)
     if target not in COUNTRIES:
         return web.json_response({"success": False, "error": "invalid_target"}, status=400)
     if uid not in players: players[uid] = create_player(uid)
@@ -1395,13 +1569,11 @@ async def declare_war(request):
     wid = str(uuid.uuid4())
     war_declarations[wid] = {"id": wid, "attacker": attacker, "defender": target,
         "attacker_user": uid, "defender_user": tuid, "penalty": penalty,
-        "status": "pending_admin", "created_at": utcnow().isoformat(), "negotiation_ends": None}
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ تأیید", callback_data=f"war:approve:{wid}"),
-        InlineKeyboardButton(text="❌ رد", callback_data=f"war:reject:{wid}")]])
+        "reason": reason, "peace_votes": [], "status": "pending_admin", "created_at": utcnow().isoformat(), "negotiation_ends": None}
     await notify_admin(
-        f"⚔️ اعلام جنگ\n{COUNTRIES[attacker]['name']} → {COUNTRIES[target]['name']}\n"
-        f"جریمه اتحاد: {penalty}\nتأیید؟", kb)
+        f"⚔️ درخواست اعلان جنگ جدید در دنیای {worlds_registry.get(str(active_world_id), {}).get('name', active_world_id)}\n"
+        f"{COUNTRIES[attacker]['name']} → {COUNTRIES[target]['name']}\n"
+        f"دلیل: {reason}\nجریمه اتحاد: {penalty}\nبرای بررسی و تصمیم نهایی به بخش «بررسی جنگ‌ها» در پنل مدیریت بروید.")
     save_state()
     return web.json_response({"success": True, "message": "اعلام جنگ به سازمان ملل ارسال شد."})
 
@@ -1410,8 +1582,11 @@ async def get_wars(request):
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
     if uid not in players: players[uid] = create_player(uid)
     cid = players[uid].get("country")
-    pend = [w for w in war_declarations.values() if w["status"] in ("pending_admin", "negotiation")]
-    active = list(active_wars.values())
+    # درخواست تأییدنشده فقط برای فرستنده و مدیر دیده می‌شود؛ اعلان عمومی پس از تأیید آغاز می‌شود.
+    pend = [dict(w) for w in war_declarations.values()
+            if w.get("status") == "negotiation" or
+            (w.get("status") == "pending_admin" and int(w.get("attacker_user", -1)) == int(uid))]
+    active = [dict(w) for w in active_wars.values()]
     mine = [r for r in war_reports if r.get("attacker") == cid or r.get("defender") == cid][-10:]
     return web.json_response({"pending": pend, "active": active, "reports": mine,
                               "occupied": occupied_countries})
@@ -1425,8 +1600,10 @@ async def check_wars_tick():
             if end and now >= end:
                 w["status"] = "battle"
                 active_wars[wid] = w
-                push_news("جنگ آغاز شد",
-                    f"مذاکره بین {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} بی‌نتیجه ماند.")
+                msg = f"مهلت ۲۴ ساعتهٔ دیپلماسی بین {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} به پایان رسید؛ جنگ آغاز شد."
+                push_news("جنگ آغاز شد", msg, "warning")
+                push_war("war_started", msg, [w["attacker"], w["defender"]])
+                await notify_world_players(msg)
     # پیمان‌های منقضی را پاک کن
     active_treaties[:] = [
         t for t in active_treaties
@@ -1436,6 +1613,81 @@ async def check_wars_tick():
     for wid in list(active_wars.keys()):
         if active_wars[wid].get("resolved"):
             del active_wars[wid]
+
+async def peace_war(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    wid = str(data.get("war_id", ""))
+    w = war_declarations.get(wid)
+    if not w or w.get("status") != "negotiation":
+        return web.json_response({"success": False, "message": "این اعلان جنگ در مرحلهٔ مذاکره نیست."}, status=400)
+    p = players.get(uid); cid = p.get("country") if p else None
+    if cid not in (w.get("attacker"), w.get("defender")):
+        return web.json_response({"success": False, "message": "فقط دو کشور درگیر می‌توانند درخواست صلح بدهند."}, status=403)
+    end = parse_dt(w.get("negotiation_ends"))
+    if end and utcnow() >= end:
+        return web.json_response({"success": False, "message": "مهلت دیپلماسی به پایان رسیده است."}, status=400)
+    votes = set(w.get("peace_votes", [])); votes.add(cid); w["peace_votes"] = sorted(votes)
+    if w["attacker"] in votes and w["defender"] in votes:
+        w["status"] = "peace"
+        active_wars.pop(wid, None)
+        msg = f"🕊️ صلح برقرار شد! {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} با توافق دوطرفه از جنگ جلوگیری کردند."
+        push_news("صلح برقرار شد", msg)
+        push_war("peace", msg, [w["attacker"], w["defender"]])
+        await notify_world_players(msg)
+        save_state()
+        return web.json_response({"success": True, "peace": True, "message": "هر دو کشور صلح را پذیرفتند؛ جنگ لغو شد و همه مطلع شدند."})
+    other = w["defender"] if cid == w["attacker"] else w["attacker"]
+    other_uid = w.get("defender_user") if other == w["defender"] else w.get("attacker_user")
+    msg = f"🕊️ {COUNTRIES[cid]['name']} درخواست صلح را پذیرفته است. برای جلوگیری از جنگ، از بخش اعلان جنگ روی «صلح» بزنید."
+    if other_uid:
+        await notify_user(other_uid, msg)
+    push_news("درخواست صلح", f"{COUNTRIES[cid]['name']} برای جلوگیری از جنگ با {COUNTRIES[other]['name']} رأی صلح داد.")
+    save_state()
+    return web.json_response({"success": True, "peace": False, "message": "رأی صلح شما ثبت شد؛ منتظر تأیید کشور مقابل بمانید."})
+
+
+async def admin_wars(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    rows = []
+    for w in sorted(war_declarations.values(), key=lambda x: x.get("created_at", ""), reverse=True):
+        item = dict(w)
+        item["attacker_name"] = COUNTRIES.get(w.get("attacker"), {}).get("name", w.get("attacker", "—"))
+        item["defender_name"] = COUNTRIES.get(w.get("defender"), {}).get("name", w.get("defender", "—"))
+        rows.append(item)
+    return web.json_response({"success": True, "wars": rows})
+
+
+async def admin_review_war(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    wid = str(data.get("war_id", "")); action = str(data.get("action", ""))
+    w = war_declarations.get(wid)
+    if not w or w.get("status") != "pending_admin":
+        return web.json_response({"success": False, "message": "درخواست جنگ پیدا نشد یا قبلاً بررسی شده است."}, status=400)
+    attacker_name = COUNTRIES.get(w.get("attacker"), {}).get("name", w.get("attacker"))
+    defender_name = COUNTRIES.get(w.get("defender"), {}).get("name", w.get("defender"))
+    if action == "approve":
+        w["status"] = "negotiation"
+        w["negotiation_ends"] = (utcnow() + timedelta(hours=NEGOTIATION_HOURS)).isoformat()
+        msg = f"⚖️ درخواست اعلان جنگ {attacker_name} علیه {defender_name} تأیید شد.\nدلیل: {w.get('reason', 'ثبت نشده')}\nهر دو کشور ۲۴ ساعت فرصت دارند با دیپلماسی صلح کنند. اگر هر دو روی «صلح» بزنند جنگ لغو می‌شود؛ در غیر این صورت پس از ۲۴ ساعت جنگ آغاز خواهد شد."
+        push_news("اعلام جنگ تأیید شد", msg, "warning")
+        push_war("declare", f"{attacker_name} به {defender_name} اعلام جنگ کرد: {w.get('reason', '')}", [w["attacker"], w["defender"]])
+        await notify_world_players(msg)
+    elif action == "reject":
+        w["status"] = "rejected"
+        msg = f"❎ درخواست اعلان جنگ {attacker_name} علیه {defender_name} رد شد."
+        push_news("رد درخواست جنگ", msg)
+        await notify_world_players(msg)
+    else:
+        return web.json_response({"success": False, "message": "عملیات نامعتبر است."}, status=400)
+    log_admin_action("بررسی اعلان جنگ", None, f"world={active_world_id}; war={wid}; action={action}; reason={w.get('reason', '')[:200]}")
+    save_state()
+    return web.json_response({"success": True, "message": msg, "war": w})
+
 
 async def perform_battle(request):
     uid = get_auth_user_id(request)
@@ -2029,7 +2281,7 @@ def process_transits():
 async def transit_loop():
     while True:
         await asyncio.sleep(10)
-        try: process_transits()
+        try: await _run_ticks_for_all_worlds(include_transits=True)
         except Exception as e: logging.error("transit tick: %s", e)
 
 async def dispatch_forces(request):
@@ -2815,8 +3067,38 @@ async def get_market(request):
         else:
             v["routes"] = []
         rows.append(v)
-    return web.json_response({"listings": rows,
+    sanctions = [{"by": by, "target": target} for by, targets in market_sanctions.items() for target in (targets or [])]
+    return web.json_response({"listings": rows, "sanctions": sanctions,
+                              "my_sanctions": list(market_sanctions.get(viewer_cid, [])) if viewer_cid else [],
                               "trade_modes":{"land":True,"sea":True,"air":True}})
+
+
+async def set_market_sanction(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    target = data.get("target")
+    action = str(data.get("action", "sanction"))
+    p = players.get(uid)
+    cid = p.get("country") if p else None
+    if not cid: return web.json_response({"success": False, "message": "ابتدا کشور خود را انتخاب کنید."}, status=400)
+    if target not in COUNTRIES or target == cid:
+        return web.json_response({"success": False, "message": "کشور مقصد معتبر نیست."}, status=400)
+    blocked = set(market_sanctions.get(cid, []) or [])
+    if action == "lift":
+        blocked.discard(target)
+        if blocked: market_sanctions[cid] = sorted(blocked)
+        else: market_sanctions.pop(cid, None)
+        push_news("رفع تحریم بازار", f"{COUNTRIES[cid]['name']} تحریم بازار علیه {COUNTRIES[target]['name']} را برداشت.")
+        msg = "تحریم بازار برداشته شد."
+    elif action == "sanction":
+        blocked.add(target); market_sanctions[cid] = sorted(blocked)
+        push_news("تحریم بازار جهانی", f"{COUNTRIES[cid]['name']} کشور {COUNTRIES[target]['name']} را از خرید در بازار جهانی محروم کرد.", "warning")
+        msg = "تحریم ثبت شد؛ کشور هدف دیگر نمی‌تواند از بازار جهانی خرید کند."
+    else:
+        return web.json_response({"success": False, "message": "عملیات نامعتبر است."}, status=400)
+    save_state()
+    return web.json_response({"success": True, "message": msg, "sanctions": [{"by": by, "target": tg} for by, vals in market_sanctions.items() for tg in vals]})
 
 
 async def create_listing(request):
@@ -2903,6 +3185,11 @@ async def accept_listing(request):
     # for a buy order the visitor sells to the owner.
     seller_cid = owner_cid if side == "sell" else actor_cid
     buyer_cid = actor_cid if side == "sell" else owner_cid
+    # کشور تحریم‌شده در هیچ آگهی خریدی نمی‌تواند خریدار باشد.
+    blockers = [by for by, targets in market_sanctions.items() if buyer_cid in (targets or [])]
+    if blockers:
+        names = "، ".join(COUNTRIES.get(by, {}).get("name", by) for by in blockers)
+        return web.json_response({"success": False, "error": "sanctioned", "message": f"خرید این کشور به‌دلیل تحریم بازار ممکن نیست (تحریم‌کننده: {names})."}, status=403)
     _, seller = get_player_by_country(seller_cid); _, buyer = get_player_by_country(buyer_cid)
     if not seller or not buyer: return web.json_response({"success":False,"error":"player_gone","message":"یکی از کشورها دیگر بازیکن فعال ندارد."}, status=400)
     ensure_player_fields(seller); ensure_player_fields(buyer)
@@ -3409,11 +3696,11 @@ async def debug_auth(request):
 
 
 def _strict_telegram_uid(request):
-    """Admin APIs only accept a valid Telegram WebApp initData signature."""
+    """Admin APIs only accept a valid Telegram WebApp signature without creating a player in the selected world."""
     init_data = request.headers.get("X-Telegram-Init-Data", "")
     user = verify_init_data(init_data)
     try:
-        return remember_telegram_user(user) if user and user.get("id") else None
+        return int(user["id"]) if user and user.get("id") else None
     except (TypeError, ValueError, KeyError):
         return None
 
@@ -3441,12 +3728,46 @@ def _admin_player_row(uid, p):
         "telegram_username": str(p.get("telegram_username", "") or ""),
         "telegram_language_code": str(p.get("telegram_language_code", "") or ""),
         "last_seen_at": p.get("last_seen_at"),
+        "is_online": bool(parse_dt(p.get("last_seen_at")) and (utcnow() - parse_dt(p.get("last_seen_at"))).total_seconds() <= 120),
         "started_at": p.get("started_at"),
+        "infra_levels": dict(p.get("infra_levels", {}) or {}), "units": dict(p.get("units", {}) or {}),
+        "economy_levels": {key: int((p.get("infra_levels", {}) or {}).get(key, 0) or 0) for key in ECONOMY},
+        "building_catalog": {key: {"name": item.get("name", key), "group": "economy" if key in ECONOMY else "infrastructure",
+                                    "max_level": len(item.get("levels", []))}
+                             for key, item in {**INFRASTRUCTURE, **ECONOMY}.items()},
+        "army_catalog": {key: {"name": item.get("name", key), "group": item.get("group", "")}
+                         for key, item in ARMY_UNITS.items()},
+        "army_units": dict(p.get("units", {}) or {}),
         "money": int(p.get("money", 0) or 0), "manpower": int(p.get("manpower", 0) or 0),
         "resources": {k: int((p.get("resources") or {}).get(k, 0) or 0) for k in RESOURCE_NAMES},
         "daily_income": int(round(rates.get("net_income", 0) or 0)),
         "army": int(p.get("army", 0) or 0), "vip": bool(p.get("vip")),
         "is_eliminated": bool(p.get("is_eliminated")), "started": bool(p.get("started_at")),
+        "owned_sites": [{"id": sid, "name": info.get("name", sid), "type": info.get("type", "resource"),
+                          "production": int(info.get("production", 0) or 0)}
+                         for sid, info in MAP_RESOURCES.items() if map_holdings.get(sid) == cid],
+        "owned_straits": [{"id": sid, "name": info.get("name", sid), "toll": int(info.get("toll", 0) or 0)}
+                           for sid, info in STRAITS_DATA.items() if strait_holdings.get(sid) == cid],
+        "garrisons": [{"id": sid, "name": (MAP_RESOURCES.get(sid) or STRAITS_DATA.get(sid) or {}).get("name", sid),
+                       "units": dict((garrison_data or {}).get("units", {}) or {}),
+                       "owner": (garrison_data or {}).get("owner")}
+                      for sid, garrison_data in site_forces.items() if (garrison_data or {}).get("owner") == cid],
+        "treaties": [{**t, "with_country": t.get("country_b") if t.get("country_a") == cid else t.get("country_a"),
+                      "with_country_name": COUNTRIES.get(t.get("country_b") if t.get("country_a") == cid else t.get("country_a"), {}).get("name", "—")}
+                     for t in active_treaties if cid and cid in (t.get("country_a"), t.get("country_b"))
+                     and (not parse_dt(t.get("expires_at")) or parse_dt(t.get("expires_at")) > utcnow())],
+        "loans": [{"id": l.get("id"), "lender": l.get("lender"), "borrower": l.get("borrower"),
+                   "amount": int(l.get("amount", 0) or 0), "remaining": int(l.get("remaining", 0) or 0),
+                   "status": l.get("status", "unknown")}
+                  for l in loans.values() if cid and cid in (l.get("lender"), l.get("borrower"))],
+        "market_listings": [{"id": l.get("id"), "side": l.get("side", "sell"), "status": l.get("status", "unknown"),
+                             "resource": l.get("sell_resource") if l.get("side", "sell") == "sell" else l.get("buy_resource"),
+                             "amount": int(l.get("sell_amount", 0) if l.get("side", "sell") == "sell" else l.get("buy_amount", 0) or 0)}
+                            for l in market_listings.values() if cid and cid in (l.get("seller"), l.get("buyer"))],
+        "wars": [{"id": w.get("id"), "attacker": w.get("attacker"), "defender": w.get("defender"),
+                  "status": w.get("status"), "reason": w.get("reason", "")}
+                 for w in war_declarations.values() if cid and cid in (w.get("attacker"), w.get("defender"))],
+        "started_at": p.get("started_at"), "last_update": p.get("last_update"),
     }
 
 
@@ -3475,7 +3796,7 @@ async def admin_overview(request):
         seen = parse_dt(row.get("last_seen_at")) if row.get("last_seen_at") else None
         if seen and seen >= active_cutoff:
             active_count += 1
-    return web.json_response({"success": True, "players": rows, "countries_taken": taken,
+    return web.json_response({"success": True, "world_id": int(active_world_id), "world_name": worlds_registry.get(str(active_world_id), {}).get("name", f"دنیای {active_world_id}"), "players": rows, "countries_taken": taken,
                               "total_money": total_money,
                               "total_daily_income": sum(int(r.get("daily_income", 0) or 0) for r in rows),
                               "vip_count": sum(1 for r in rows if r.get("vip")),
@@ -3536,31 +3857,58 @@ async def admin_player_adjust(request):
         return web.json_response({"success": False, "message": "شناسه و مقدار معتبر وارد کن."}, status=400)
     field = str(data.get("field", ""))
     operation = str(data.get("operation", "add"))
-    if field not in {"money", "manpower", "food", "steel", "uranium", "oil"}:
-        return web.json_response({"success": False, "message": "منبع انتخاب‌شده معتبر نیست."}, status=400)
+    resource_fields = {"money", "manpower", "food", "steel", "uranium", "oil"}
+    if not (field in resource_fields or field.startswith("unit:") or field.startswith("building:")):
+        return web.json_response({"success": False, "message": "مورد انتخاب‌شده معتبر نیست."}, status=400)
     if amount <= 0 or amount > 1_000_000_000_000_000 or operation not in {"add", "subtract"}:
         return web.json_response({"success": False, "message": "مقدار یا نوع عملیات معتبر نیست."}, status=400)
     p = players.get(target_uid)
     if not p:
         return web.json_response({"success": False, "message": "بازیکن پیدا نشد."}, status=404)
-    if field == "money":
-        accrue_player(p)
-        current = int(p.get("money", 0) or 0)
-        next_value = current + amount if operation == "add" else current - amount
-        if next_value < 0: return web.json_response({"success": False, "message": "خزانه برای این کسر کافی نیست."}, status=409)
-        p["money"] = next_value
-    elif field == "manpower":
-        current = int(p.get("manpower", 0) or 0)
-        next_value = current + amount if operation == "add" else current - amount
-        if next_value < 0: return web.json_response({"success": False, "message": "نیروی انسانی برای این کسر کافی نیست."}, status=409)
-        p["manpower"] = next_value
-    else:
+    delta = amount if operation == "add" else -amount
+    if field in resource_fields:
+        if field == "money":
+            accrue_player(p)
+            current = int(p.get("money", 0) or 0)
+            next_value = current + delta
+            if next_value < 0: return web.json_response({"success": False, "message": "خزانه برای این کسر کافی نیست."}, status=409)
+            p["money"] = next_value
+        elif field == "manpower":
+            current = int(p.get("manpower", 0) or 0)
+            next_value = current + delta
+            if next_value < 0: return web.json_response({"success": False, "message": "نیروی انسانی برای این کسر کافی نیست."}, status=409)
+            p["manpower"] = next_value
+        else:
+            ensure_player_fields(p)
+            resources = p.setdefault("resources", {})
+            current = int(resources.get(field, 0) or 0)
+            next_value = current + delta
+            if next_value < 0: return web.json_response({"success": False, "message": "موجودی منبع برای این کسر کافی نیست."}, status=409)
+            resources[field] = next_value
+    elif field.startswith("unit:"):
+        unit_key = field.split(":", 1)[1]
+        if unit_key not in ARMY_UNITS:
+            return web.json_response({"success": False, "message": "یگان انتخاب‌شده معتبر نیست."}, status=400)
         ensure_player_fields(p)
-        resources = p.setdefault("resources", {})
-        current = int(resources.get(field, 0) or 0)
-        next_value = current + amount if operation == "add" else current - amount
-        if next_value < 0: return web.json_response({"success": False, "message": "موجودی منبع برای این کسر کافی نیست."}, status=409)
-        resources[field] = next_value
+        units = p.setdefault("units", {})
+        next_value = int(units.get(unit_key, 0) or 0) + delta
+        if next_value < 0: return web.json_response({"success": False, "message": "تعداد این یگان برای کسر کافی نیست."}, status=409)
+        if next_value > 1_000_000_000: return web.json_response({"success": False, "message": "تعداد یگان از سقف مجاز بیشتر است."}, status=400)
+        units[unit_key] = next_value
+        recompute_army(p)
+    else:
+        building_key = field.split(":", 1)[1]
+        catalog = {**INFRASTRUCTURE, **ECONOMY}
+        if building_key not in catalog:
+            return web.json_response({"success": False, "message": "ساختمان انتخاب‌شده معتبر نیست."}, status=400)
+        ensure_player_fields(p)
+        levels = p.setdefault("infra_levels", {})
+        current = int(levels.get(building_key, 0) or 0)
+        next_value = current + delta
+        max_level = len(catalog[building_key].get("levels", []))
+        if next_value < 0 or next_value > max_level:
+            return web.json_response({"success": False, "message": f"سطح مجاز این ساختمان بین صفر و {max_level} است."}, status=409)
+        levels[building_key] = next_value
     log_admin_action("تغییر سریع موجودی", target_uid, f"{field} {operation} {amount}; new={next_value}")
     save_state()
     return web.json_response({"success": True, "message": "موجودی با موفقیت به‌روزرسانی شد.", "player": _admin_player_row(target_uid, p)})
@@ -3656,6 +4004,7 @@ async def create_web_app():
     app.router.add_static("/images/", path=os.path.join(WEB_DIR, "images"), name="images")
     app.router.add_static("/fonts/", path=os.path.join(WEB_DIR, "fonts"), name="fonts")
 
+    app.router.add_get("/api/worlds", get_worlds)
     for path, h in [
         ("/api/player", get_player), ("/api/countries", get_countries),
         ("/api/army-units", get_army_units), ("/api/diplomacy", get_diplomacy),
@@ -3664,14 +4013,15 @@ async def create_web_app():
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
         ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
-        ("/api/debug-auth", debug_auth), ("/api/admin/overview", admin_overview), ("/health", health)]:
-        app.router.add_get(path, h)
+        ("/api/debug-auth", debug_auth), ("/api/admin/overview", admin_overview),
+        ("/api/admin/wars", admin_wars), ("/health", health)]:
+        app.router.add_get(path, h if path == "/health" else world_scoped(h))
 
     for path, h in [
         ("/api/select-country", select_country), ("/api/upgrade-infra", upgrade_infra),
         ("/api/upgrade-economy", upgrade_economy), ("/api/train-unit", train_unit),
         ("/api/propose-treaty", propose_treaty), ("/api/respond-treaty", respond_treaty),
-        ("/api/war/declare", declare_war), ("/api/war/battle", perform_battle),
+        ("/api/war/declare", declare_war), ("/api/war/peace", peace_war), ("/api/war/battle", perform_battle),
         ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/recall", recall_forces),
         ("/api/satellite/launch", sat_launch), ("/api/satellite/scan-site", sat_scan_site),
         ("/api/satellite/scan-country", sat_scan_country),
@@ -3684,13 +4034,15 @@ async def create_web_app():
         ("/api/union/leave", leave_union), ("/api/union/message", send_union_message),
         ("/api/pm/send", send_pm),
         ("/api/market/create", create_listing), ("/api/market/cancel", cancel_listing),
-        ("/api/market/accept", accept_listing), ("/api/strait/settings", set_strait_settings),
+        ("/api/market/accept", accept_listing), ("/api/market/sanction", set_market_sanction), ("/api/strait/settings", set_strait_settings),
         ("/api/loans/propose", propose_loan), ("/api/loans/respond", respond_loan),
         ("/api/loans/cancel", cancel_loan), ("/api/loans/repay", repay_loan),
         ("/api/border/settings", set_border_settings), ("/api/admin/player/update", admin_update_player),
         ("/api/admin/player/adjust", admin_player_adjust), ("/api/admin/player/message", admin_player_message),
-        ("/api/admin/bulk-adjust", admin_bulk_adjust), ("/api/admin/broadcast", admin_broadcast)]:
-        app.router.add_post(path, h)
+        ("/api/admin/bulk-adjust", admin_bulk_adjust), ("/api/admin/broadcast", admin_broadcast),
+        ("/api/admin/war/review", admin_review_war)]:
+        app.router.add_post(path, world_scoped(h))
+    app.router.add_post("/api/admin/worlds/create", admin_create_world)
 
     app.router.add_route("OPTIONS", "/{tail:.*}", lambda r: web.Response())
     return app
@@ -3702,15 +4054,30 @@ async def start_web_server():
     site = web.TCPSite(runner, "0.0.0.0", port); await site.start()
     logging.info("WEB SERVER STARTED | port=%s", port)
 
+async def _run_ticks_for_all_worlds(include_transits=False):
+    async with WORLD_SWITCH_LOCK:
+        previous = str(active_world_id)
+        _persist_active_world_memory()
+        for wid in sorted(worlds_registry.keys(), key=lambda x: int(x)):
+            _activate_world(wid)
+            try:
+                await check_wars_tick()
+                welfare_tick()
+                loan_tick()
+                if include_transits: process_transits()
+            except Exception as exc:
+                logging.error("world tick (%s): %s", wid, exc)
+            finally:
+                _persist_active_world_memory()
+        _activate_world(previous if previous in worlds_registry else "1")
+        save_state()
+
+
 async def war_tick_loop():
     while True:
         await asyncio.sleep(30)
-        try: await check_wars_tick()
-        except Exception as e: logging.error("war tick: %s", e)
-        try: welfare_tick()
-        except Exception as e: logging.error("welfare tick: %s", e)
-        try: loan_tick()
-        except Exception as e: logging.error("loan tick: %s", e)
+        try: await _run_ticks_for_all_worlds(include_transits=False)
+        except Exception as e: logging.error("war/world tick: %s", e)
 
 dp.message.register(vip_command, Command("vip"))
 
