@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261010admin2">
+<link rel="stylesheet" href="/style.css?v=20261010home3">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -114,127 +114,106 @@
 
     <!-- ==================== خانه ==================== -->
     <main id="home" class="game-page">
-        <div class="home-card">
-            <div class="home-card-body">
-                <div class="home-card-photo" id="home-card-photo"></div>
 
-                <div class="home-card-top">
-                    <span class="world-chip">🌐 World 1</span>
-                    <span class="home-country-chip">
+        <!-- هیرو: کشور و خزانه -->
+        <section class="hm-hero">
+            <div class="home-card-photo" id="home-card-photo"></div>
+            <div class="hm-hero-in">
+                <div class="hm-top">
+                    <span class="hm-country">
+                        <span class="flag-wrap flag-wrap-sm"><img id="home-country-flag" class="flag-img" src="" alt=""></span>
                         <span id="home-country-name">—</span>
-                        <div class="flag-wrap flag-wrap-sm"><img id="home-country-flag" class="flag-img" src="" alt=""></div>
                     </span>
+                    <span class="hm-season">🕐 <span id="home-season">بهار</span></span>
                 </div>
-
-                <div class="home-stats">
-                    <div class="hs-money">
-                        <span class="hs-label">🪙 خزانه</span>
-                        <strong class="hs-value" id="home-money">$0</strong>
-                        <span class="hs-sub">درآمد روزانه: <span id="home-income">$0</span></span>
-                    </div>
-
-                    <div class="hs-manpower">
-                        <span class="hs-label">👥 نیروی انسانی</span>
-                        <strong class="hs-value" id="home-manpower">0</strong>
-                        <span class="hs-sub">تولید: <span id="home-manpower-production">0</span> /روز</span>
-                    </div>
-
-                    <div class="hs-duo">
-                        <div>
-                            <span class="hs-label">⚡ برق</span>
-                            <strong class="hs-value" id="home-power">0</strong>
-                            <span class="hs-sub" id="home-power-sub">مصرف: 0</span>
-                        </div>
-                        <div>
-                            <span class="hs-label">⚔️ قدرت نظامی</span>
-                            <strong class="hs-value" id="home-army">0</strong>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="season-bar">
-                    <span id="home-season-end">—</span>
-                    <span class="season-tag">🕐 <span id="home-season">بهار</span></span>
-                    <span class="season-hint" id="home-season-hint"></span>
-                </div>
+                <div class="hm-money-label">خزانه</div>
+                <div class="hm-money" id="home-money">$0</div>
+                <div class="hm-income">درآمد روزانه <b id="home-income">$0</b></div>
             </div>
+        </section>
+
+        <!-- آمار کلیدی -->
+        <section class="hm-stats">
+            <div class="hm-stat">
+                <span class="hm-stat-label">👥 نیروی انسانی</span>
+                <strong id="home-manpower">0</strong>
+                <small>+<span id="home-manpower-production">0</span> در روز</small>
+            </div>
+            <div class="hm-stat">
+                <span class="hm-stat-label">⚡ برق آزاد</span>
+                <strong id="home-power">0</strong>
+                <small id="home-power-sub">مصرف: 0</small>
+            </div>
+            <div class="hm-stat">
+                <span class="hm-stat-label">⚔️ قدرت نظامی</span>
+                <strong id="home-army">0</strong>
+                <small>مجموع یگان‌ها</small>
+            </div>
+        </section>
+
+        <!-- وضعیت فصل -->
+        <div class="hm-season-line">
+            <span id="home-season-end">—</span>
+            <span id="home-season-hint"></span>
         </div>
 
-        <div class="action-grid">
-            <button class="action-card action-army" data-section="army">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/army.jpg" alt=""></span>
-                    <h3>ارتش</h3>
-                    <p>آموزش نیروی زمینی، هوایی و دریایی</p>
-                </div>
+        <!-- بخش‌های اصلی -->
+        <section class="hm-grid">
+            <button class="action-card hm-card" data-section="army">
+                <span class="hm-ico">🪖</span>
+                <strong>ارتش</strong>
+                <small>آموزش یگان‌ها</small>
             </button>
-            <button class="action-card action-war" data-section="war">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/war.jpg" alt=""></span>
-                    <h3>جنگ</h3>
-                    <p>اعلام جنگ و نبرد سه‌جبهه‌ای</p>
-                </div>
+            <button class="action-card hm-card" data-section="war">
+                <span class="hm-ico">⚔️</span>
+                <strong>جنگ</strong>
+                <small>نبرد و اعزام نیرو</small>
             </button>
-            <button class="action-card action-diplomacy" data-section="diplomacy">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/diplomacy.jpg" alt=""></span>
-                    <h3>دیپلماسی</h3>
-                    <p>پیمان اتحاد یا عدم تجاوز</p>
-                </div>
+            <button class="action-card hm-card" data-section="diplomacy">
+                <span class="hm-ico">🤝</span>
+                <strong>دیپلماسی</strong>
+                <small>پیمان‌ها</small>
             </button>
-            <button class="action-card action-economy" data-section="economy">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/economy.jpg" alt=""></span>
-                    <h3>اقتصاد</h3>
-                    <p>افزایش درآمد روزانه کشور</p>
-                </div>
+            <button class="action-card hm-card" data-section="economy">
+                <span class="hm-ico">💰</span>
+                <strong>اقتصاد</strong>
+                <small>افزایش درآمد</small>
             </button>
-            <button class="action-card action-infrastructure" data-section="infrastructure">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/infrastructure.jpg" alt=""></span>
-                    <h3>زیرساخت</h3>
-                    <p>برق، نیرو، منابع، نظامی</p>
-                </div>
+            <button class="action-card hm-card" data-section="infrastructure">
+                <span class="hm-ico">🏗️</span>
+                <strong>زیرساخت</strong>
+                <small>برق، منابع، نظامی</small>
             </button>
-            <button class="action-card action-market" data-section="market">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/market.jpg" alt=""></span>
-                    <h3>بازار جهانی</h3>
-                    <p>معاملات منابع بین کشورها</p>
-                </div>
+            <button class="action-card hm-card" data-section="market">
+                <span class="hm-ico">🌐</span>
+                <strong>بازار جهانی</strong>
+                <small>خرید و فروش منابع</small>
             </button>
-        </div>
+        </section>
 
-        <div class="action-grid action-grid-3">
-            <button class="action-card action-mini action-ranking" data-section="ranking">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/ranking.jpg" alt=""></span>
-                    <h3>رتبه جهانی</h3>
-                    <p>مقایسه با کشورها</p>
-                </div>
+        <!-- دسترسی سریع -->
+        <section class="hm-grid hm-grid-mini">
+            <button class="action-card hm-card hm-mini" data-section="ranking">
+                <span class="hm-ico">🏆</span>
+                <strong>رتبه‌بندی</strong>
+                <small></small>
             </button>
-            <button class="action-card action-mini action-transfer" data-section="transfer">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/transfer.jpg" alt=""></span>
-                    <h3>وام</h3>
-                    <p>وام‌دهی بین کشورها</p>
-                </div>
+            <button class="action-card hm-card hm-mini" data-section="transfer">
+                <span class="hm-ico">🏦</span>
+                <strong>وام</strong>
+                <small></small>
             </button>
-            <button class="action-card action-mini action-stats" data-section="stats">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/stats.jpg" alt=""></span>
-                    <h3>آمار کشور</h3>
-                    <p>جزئیات و وضعیت</p>
-                </div>
+            <button class="action-card hm-card hm-mini" data-section="stats">
+                <span class="hm-ico">📊</span>
+                <strong>آمار</strong>
+                <small></small>
             </button>
-            <button class="action-card action-mini action-welfare" data-section="welfare">
-                <div class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/stats.jpg" alt=""></span>
-                    <h3>رفاه و امنیت</h3>
-                    <p>سلامت، امنیت و رویدادها</p>
-                </div>
+            <button class="action-card hm-card hm-mini" data-section="welfare">
+                <span class="hm-ico">🛡️</span>
+                <strong>رفاه</strong>
+                <small></small>
             </button>
-        </div>
+        </section>
     </main>
 
     <!-- ==================== رتبه جهانی ==================== -->
@@ -794,6 +773,6 @@
 
 </section>
 
-<script src="/app.js?v=20261010admin2"></script>
+<script src="/app.js?v=20261010home3"></script>
 </body>
 </html>
