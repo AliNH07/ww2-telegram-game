@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261010home3">
+<link rel="stylesheet" href="/style.css?v=20261010home5">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -159,59 +159,75 @@
 
         <!-- بخش‌های اصلی -->
         <section class="hm-grid">
-            <button class="action-card hm-card" data-section="army">
-                <span class="hm-ico">🪖</span>
-                <strong>ارتش</strong>
-                <small>آموزش یگان‌ها</small>
+            <button class="action-card action-army hm-card" data-section="army">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/army.jpg" alt=""></span>
+                    <h3>ارتش</h3>
+                <p>آموزش یگان‌ها</p>
+                </span>
             </button>
-            <button class="action-card hm-card" data-section="war">
-                <span class="hm-ico">⚔️</span>
-                <strong>جنگ</strong>
-                <small>نبرد و اعزام نیرو</small>
+            <button class="action-card action-war hm-card" data-section="war">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/war.jpg" alt=""></span>
+                    <h3>جنگ</h3>
+                <p>نبرد و اعزام نیرو</p>
+                </span>
             </button>
-            <button class="action-card hm-card" data-section="diplomacy">
-                <span class="hm-ico">🤝</span>
-                <strong>دیپلماسی</strong>
-                <small>پیمان‌ها</small>
+            <button class="action-card action-diplomacy hm-card" data-section="diplomacy">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/diplomacy.jpg" alt=""></span>
+                    <h3>دیپلماسی</h3>
+                <p>پیمان‌ها</p>
+                </span>
             </button>
-            <button class="action-card hm-card" data-section="economy">
-                <span class="hm-ico">💰</span>
-                <strong>اقتصاد</strong>
-                <small>افزایش درآمد</small>
+            <button class="action-card action-economy hm-card" data-section="economy">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/economy.jpg" alt=""></span>
+                    <h3>اقتصاد</h3>
+                <p>افزایش درآمد</p>
+                </span>
             </button>
-            <button class="action-card hm-card" data-section="infrastructure">
-                <span class="hm-ico">🏗️</span>
-                <strong>زیرساخت</strong>
-                <small>برق، منابع، نظامی</small>
+            <button class="action-card action-infrastructure hm-card" data-section="infrastructure">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/infrastructure.jpg" alt=""></span>
+                    <h3>زیرساخت</h3>
+                <p>برق، منابع، نظامی</p>
+                </span>
             </button>
-            <button class="action-card hm-card" data-section="market">
-                <span class="hm-ico">🌐</span>
-                <strong>بازار جهانی</strong>
-                <small>خرید و فروش منابع</small>
+            <button class="action-card action-market hm-card" data-section="market">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/market.jpg" alt=""></span>
+                    <h3>بازار جهانی</h3>
+                <p>خرید و فروش منابع</p>
+                </span>
             </button>
         </section>
 
         <!-- دسترسی سریع -->
         <section class="hm-grid hm-grid-mini">
-            <button class="action-card hm-card hm-mini" data-section="ranking">
-                <span class="hm-ico">🏆</span>
-                <strong>رتبه‌بندی</strong>
-                <small></small>
+            <button class="action-card action-ranking hm-card hm-mini" data-section="ranking">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/ranking.jpg" alt=""></span>
+                    <h3>رتبه‌بندی</h3>
+                </span>
             </button>
-            <button class="action-card hm-card hm-mini" data-section="transfer">
-                <span class="hm-ico">🏦</span>
-                <strong>وام</strong>
-                <small></small>
+            <button class="action-card action-transfer hm-card hm-mini" data-section="transfer">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/transfer.jpg" alt=""></span>
+                    <h3>وام</h3>
+                </span>
             </button>
-            <button class="action-card hm-card hm-mini" data-section="stats">
-                <span class="hm-ico">📊</span>
-                <strong>آمار</strong>
-                <small></small>
+            <button class="action-card action-stats hm-card hm-mini" data-section="stats">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/stats.jpg" alt=""></span>
+                    <h3>آمار</h3>
+                </span>
             </button>
-            <button class="action-card hm-card hm-mini" data-section="welfare">
-                <span class="hm-ico">🛡️</span>
-                <strong>رفاه</strong>
-                <small></small>
+            <button class="action-card action-welfare hm-card hm-mini" data-section="welfare">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/stats.jpg" alt=""></span>
+                    <h3>رفاه</h3>
+                </span>
             </button>
         </section>
     </main>
@@ -773,6 +789,6 @@
 
 </section>
 
-<script src="/app.js?v=20261010home3"></script>
+<script src="/app.js?v=20261010home5"></script>
 </body>
 </html>
