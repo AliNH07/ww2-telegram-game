@@ -133,14 +133,6 @@ function showGamePage(id) {
 function formatMoney(v) { return "$" + Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
 function formatNumber(v) { return Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
 
-function formatDuration(seconds) {
-    if (!seconds || seconds <= 0) return "۰ ثانیه";
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    if (m === 0) return `${s} ثانیه`;
-    if (s === 0) return `${m} دقیقه`;
-    return `${m} دقیقه و ${s} ثانیه`;
-}
 
 let toastTimer = null;
 function showToast(msg, kind) {
@@ -159,30 +151,6 @@ function showToast(msg, kind) {
     toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
 }
 
-function askText(title, placeholder) {
-    return new Promise(resolve => {
-        const ov = document.createElement("div");
-        ov.className = "modal-overlay";
-        ov.innerHTML = `
-            <div class="modal-box">
-                <div class="modal-title"></div>
-                <textarea class="modal-input" maxlength="500"></textarea>
-                <div class="modal-actions">
-                    <button class="modal-cancel">انصراف</button>
-                    <button class="modal-ok">ارسال</button>
-                </div>
-            </div>`;
-        ov.querySelector(".modal-title").textContent = title;
-        ov.querySelector(".modal-input").placeholder = placeholder || "";
-        const close = v => { ov.remove(); resolve(v); };
-        ov.querySelector(".modal-cancel").onclick = () => close(null);
-        ov.querySelector(".modal-ok").onclick = () => {
-            close(ov.querySelector(".modal-input").value.trim() || null);
-        };
-        document.body.appendChild(ov);
-        ov.querySelector(".modal-input").focus();
-    });
-}
 
 async function loadArmyCatalog() {
     try { ARMY_UNITS = (await apiGet("/api/army-units")).units || {}; }
@@ -251,7 +219,6 @@ async function loadPlayer() {
     } catch (e) { console.error(e); }
 }
 
-let refreshController = null;
 async function refreshPlayer() {
     if (!userId || playerRefreshInFlight) return;
     playerRefreshInFlight = true;
@@ -405,6 +372,7 @@ async function showGame() {
     if (el < 600) await sleep(600 - el);
     document.getElementById("game").classList.remove("booting");
     startStatsPolling(); refreshNotificationBadge();
+    maybeShowGuide();
 }
 
 function updateGameHeader() {
@@ -970,48 +938,7 @@ async function renderInfraWelfareSummary() {
     }
 }
 
-function statBox(icon, value, label) {
-    return `<div class="stat-box">
-        <span class="stat-box-icon">${icon}</span>
-        <span class="stat-box-value">${value}</span>
-        <span class="stat-box-label">${label}</span>
-    </div>`;
-}
 
-function buildStatsHtml(item, levelData) {
-    if (!levelData) return "";
-    const g = item.group;
-    const boxes = [];
-
-    if (item.power_required && item.power_required > 0) {
-        boxes.push(statBox("⚡", formatNumber(item.power_required), "برق"));
-    }
-    if (g === "power" && levelData.capacity !== undefined) {
-        boxes.push(statBox("⚡", formatNumber(levelData.capacity), "ظرفیت"));
-    }
-    if (g === "manpower" && levelData.production !== undefined) {
-        boxes.push(statBox("👥", "+" + formatNumber(levelData.production), "نفر در روز"));
-    }
-    if (g === "resource" && levelData.production !== undefined) {
-        const icon = RESOURCE_ICONS[item.resource_key] || "📦";
-        boxes.push(statBox(icon, "+" + formatNumber(levelData.production), "در روز"));
-    }
-    if ((g === "land" || g === "naval" || g === "air") && levelData.capacity !== undefined) {
-        boxes.push(statBox("📦", formatNumber(levelData.capacity), "ظرفیت"));
-    }
-    if (g === "welfare" && levelData.welfare !== undefined) {
-        boxes.push(statBox("🛡️", "+" + levelData.welfare + "٪", "پاداش رفاه"));
-    }
-    if (levelData.income !== undefined) {
-        boxes.push(statBox("💰", "+" + formatMoney(levelData.income), "در روز"));
-    }
-    if (levelData.time !== undefined && levelData.time > 0) {
-        boxes.push(statBox("⏱️", formatDuration(levelData.time), "زمان"));
-    }
-
-    if (!boxes.length) return "";
-    return `<div class="stat-boxes-row">${boxes.join("")}</div>`;
-}
 
 function freePower() {
     return Math.max(0, (player?.power_capacity ?? 0) - (player?.power_consumption ?? 0));
@@ -1314,7 +1241,6 @@ const BASES = [
     { key: "port", infra: "naval_port", group: "naval" },
     { key: "missile", infra: "missile_depot", group: "missile" },
 ];
-const STORAGE_INFRA = { land: "land_barracks", naval: "naval_port", air: "air_airport", missile: "missile_depot" };
 
 function renderBaseCards() {
     if (!player?.infra) return;
@@ -2341,6 +2267,22 @@ const isAdminAccount = Number(userId) === ADMIN_TELEGRAM_ID;
 const adminMenuButton = document.getElementById("open-admin-menu");
 if (adminMenuButton) adminMenuButton.classList.toggle("hidden", !isAdminAccount);
 
+/* راهنمای شروع: فقط بار اول خودکار نمایش داده می‌شود */
+const guideModal = document.getElementById("guide-modal");
+const guideSeenKey = () => `fl93_guide_seen_${userId || "guest"}`;
+function openGuide() { guideModal?.classList.remove("hidden"); }
+function closeGuide() {
+    guideModal?.classList.add("hidden");
+    try { localStorage.setItem(guideSeenKey(), "1"); } catch (e) {}
+}
+function maybeShowGuide() {
+    let seen = false;
+    try { seen = localStorage.getItem(guideSeenKey()) === "1"; } catch (e) {}
+    if (!seen) openGuide();
+}
+document.getElementById("guide-close")?.addEventListener("click", closeGuide);
+guideModal?.addEventListener("click", (event) => { if (event.target === guideModal) closeGuide(); });
+
 const gameMenuButton = document.getElementById("game-menu-button");
 const gameMenuPanel = document.getElementById("game-menu-panel");
 function closeGameMenu() { gameMenuPanel?.classList.add("hidden"); }
@@ -2350,9 +2292,10 @@ gameMenuButton?.addEventListener("click", (event) => {
     gameMenuPanel.classList.toggle("hidden");
 });
 gameMenuPanel?.addEventListener("click", async (event) => {
-    const item = event.target.closest("[data-menu-page], #open-admin-menu");
+    const item = event.target.closest("[data-menu-page], #open-admin-menu, #open-guide-menu");
     if (!item) return;
     closeGameMenu();
+    if (item.id === "open-guide-menu") { openGuide(); return; }
     if (item.id === "open-admin-menu") {
         if (!isAdminAccount) { showToast("دسترسی ندارید.", "error"); return; }
         showGamePage("admin"); await loadAdminPanel(); return;
@@ -3823,8 +3766,6 @@ async function loadMyListings() {
 /* =========================================================
    Map — World globe
 ========================================================= */
-const WORLD_NAMES_FA = {4:"افغانستان",8:"آلبانی",10:"جنوبگان",12:"الجزایر",16:"ساموآی امریکا",20:"آندورا",24:"آنگولا",28:"آنتیگوا و باربودا",31:"جمهوری آذربایجان",32:"آرژانتین",36:"استرالیا",40:"اتریش",44:"باهاما",48:"بحرین",50:"بنگلادش",51:"ارمنستان",52:"باربادوس",56:"بلژیک",60:"برمودا",64:"بوتان",68:"بولیوی",70:"بوسنی",72:"بوتسوانا",76:"برزیل",84:"بلیز",90:"جزایر سلیمان",92:"جزایر ویرجین",96:"برونئی",100:"بلغارستان",104:"میانمار (برمه)",108:"بوروندی",112:"بلاروس",116:"کامبوج",120:"کامرون",124:"کانادا",132:"کیپ‌ورد",140:"آفریقای مرکزی",144:"سری‌لانکا",148:"چاد",152:"شیلی",156:"چین",158:"تایوان",170:"کلمبیا",174:"کومور",178:"کنگو",180:"کنگو (دموکراتیک)",184:"جزایر کوک",188:"کاستاریکا",191:"کرواسی",192:"کوبا",196:"قبرس",203:"چک",204:"بنین",208:"دانمارک",212:"دومینیکا",214:"جمهوری دومینیکن",218:"اکوادور",222:"السالوادور",226:"گینه استوایی",231:"اتیوپی",232:"اریتره",233:"استونی",234:"جزایر فارو",238:"فالکلند",239:"جورجیای جنوبی",242:"فیجی",246:"فنلاند",250:"فرانسه",254:"گویان فرانسه",258:"پلی‌نزی فرانسه",260:"سرزمین‌های فرانسوی جنوبی",262:"جیبوتی",266:"گابن",268:"گرجستان",270:"گامبیا",275:"فلسطین",276:"آلمان",288:"غنا",296:"کیریباتی",300:"یونان",304:"گرینلند",308:"گرنادا",316:"گوام",320:"گواتمالا",324:"گینه",328:"گویان",332:"هائیتی",340:"هندوراس",344:"هنگ‌کنگ",348:"مجارستان",352:"ایسلند",356:"هند",360:"اندونزی",364:"ایران",368:"عراق",372:"ایرلند",376:"اسرائیل",380:"ایتالیا",384:"ساحل عاج",388:"جامائیکا",392:"ژاپن",398:"قزاقستان",400:"اردن",404:"کنیا",408:"کره شمالی",410:"کره جنوبی",414:"کویت",417:"قرقیزستان",418:"لائوس",422:"لبنان",426:"لسوتو",428:"لتونی",430:"لیبریا",434:"لیبی",438:"لیختن‌اشتاین",440:"لیتوانی",442:"لوکزامبورگ",446:"ماکائو، منطقهٔ ویژهٔ اداری چین",450:"ماداگاسکار",454:"مالاوی",458:"مالزی",462:"مالدیو",466:"مالی",470:"مالت",478:"موریتانی",480:"موریس",484:"مکزیک",492:"موناکو",496:"مغولستان",498:"مولداوی",499:"مونته‌نگرو",504:"مراکش",508:"موزامبیک",512:"عمان",516:"نامیبیا",520:"نائورو",524:"نپال",528:"هلند",531:"کوراسائو",533:"آروبا",534:"سنت مارتن",535:"جزایر کارائیب هلند",540:"کالدونیای جدید",548:"وانواتو",554:"نیوزیلند",558:"نیکاراگوئه",562:"نیجر",566:"نیجریه",578:"نروژ",580:"ماریانای شمالی",583:"میکرونزی",584:"جزایر مارشال",585:"پالائو",586:"پاکستان",591:"پاناما",598:"پاپوآ گینه نو",600:"پاراگوئه",604:"پرو",608:"فیلیپین",612:"جزایر پیت‌کرن",616:"لهستان",620:"پرتغال",624:"گینه بیسائو",626:"تیمور شرقی",630:"پورتوریکو",634:"قطر",642:"رومانی",643:"شوروی",646:"رواندا",654:"سنت هلن",659:"سنت کیتس",660:"آنگویلا",662:"سنت لوسیا",670:"سنت وینسنت",674:"سان‌مارینو",678:"سائوتومه",682:"عربستان سعودی",686:"سنگال",688:"صربستان",690:"سیشل",694:"سیرالئون",702:"سنگاپور",703:"اسلواکی",704:"ویتنام",705:"اسلوونی",706:"سومالی",710:"افریقای جنوبی",716:"زیمبابوه",724:"اسپانیا",728:"سودان جنوبی",729:"سودان",732:"صحرای غربی",740:"سورینام",748:"اسواتینی",752:"سوئد",756:"سوئیس",760:"سوریه",762:"تاجیکستان",764:"تایلند",768:"توگو",776:"تونگا",780:"ترینیداد",784:"امارات",788:"تونس",792:"ترکیه",795:"ترکمنستان",796:"جزایر تورکس و کایکوس",798:"تووالو",800:"اوگاندا",804:"اوکراین",807:"مقدونیه شمالی",818:"مصر",826:"بریتانیا",834:"تانزانیا",840:"آمریکا",850:"جزایر ویرجین",854:"بورکینافاسو",858:"اروگوئه",860:"ازبکستان",862:"ونزوئلا",882:"ساموآ",887:"یمن",894:"زامبیا"};
-const MAP_ODD_NAMES = { "Kosovo": "کوزوو", "N. Cyprus": "قبرس شمالی", "Somaliland": "سومالیلند" };
 const MAP_COLORS = {
     own: "#2ecc71",        // کشور من و تصرف‌های من (تنگه، سکو، معدن) → سبز
     other: "#9fd8ff",      // بازیکنان فعال و منابع/تنگه‌های آزاد → آبی کمرنگ
@@ -4544,18 +4485,6 @@ async function renderSiteScan(site) {
     }
 }
 
-async function captureSite(siteId) {
-    if (!(await gameConfirm("۱ ناو برای تصرف فرستاده می‌شود. ادامه؟", { title: "تصرف" }))) return;
-    try {
-        const d = await apiPost("/api/map/capture", { site_id: siteId });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
-        showToast(d.message);
-        await loadMapSites();
-        renderMapSites();
-        updateMapSitePositions();
-        await refreshPlayer();
-    } catch (e) { showToast("خطا."); }
-}
 
 /* =========================================================
    Helpers for Globe
@@ -4571,115 +4500,12 @@ function viewCos(lon, lat, rot) {
     return Math.sin(l1) * Math.sin(l2) + Math.cos(l1) * Math.cos(l2) * Math.cos(dl);
 }
 
-function isPointVisible(lon, lat, rot) {
-    const clon = -rot[0], clat = -rot[1];
-    const r = d => (d * Math.PI) / 180;
-    const l1 = r(clat), l2 = r(lat), dl = r(lon - clon);
-    return Math.sin(l1) * Math.sin(l2) + Math.cos(l1) * Math.cos(l2) * Math.cos(dl) > 0;
-}
 
 /* =========================================================
    Preview Globe
 ========================================================= */
 let previewGlobeAbort = null;
 
-async function createPreviewGlobe(containerId, svgId, selected) {
-    const cont = document.getElementById(containerId);
-    const svgEl = document.getElementById(svgId);
-    if (!cont || !svgEl) return;
-
-    if (previewGlobeAbort) previewGlobeAbort.abort();
-    previewGlobeAbort = new AbortController();
-    const signal = previewGlobeAbort.signal;
-
-    const w = cont.clientWidth || 300;
-    const h = cont.clientHeight || 300;
-    const size = Math.min(w, h) * 0.46;
-    const minS = size * 0.8, maxS = size * 4;
-
-    d3.select(svgEl).selectAll("*").remove();
-    const svg = d3.select(svgEl).attr("viewBox", `0 0 ${w} ${h}`);
-    const proj = d3.geoOrthographic().scale(size).translate([w / 2, h / 2]).clipAngle(90);
-    const path = d3.geoPath(proj);
-
-    let world;
-    try { world = await loadWorldAtlas(); }
-    catch (e) { return; }
-    if (signal.aborted) return;
-    const land = topojson.feature(world, world.objects.countries);
-
-    svg.append("path").datum({ type: "Sphere" }).attr("class", "globe-water").attr("d", path);
-
-    svg.selectAll(".country-shape").data(land.features).enter().append("path")
-        .attr("class", "country-shape").attr("d", path)
-        .attr("fill", d => {
-            const cid = Number(d.id);
-            if (selected && COUNTRY_IDS[selected] === cid) return "#d98a25";
-            const taken = Object.values(countries).some(c => c.taken && COUNTRY_IDS[c.id] === cid);
-            if (taken) return "#b8862a";
-            const isGame = Object.values(COUNTRY_IDS).includes(cid);
-            return isGame ? "#111820" : "#151b21";
-        })
-        .attr("stroke", d => Object.values(COUNTRY_IDS).includes(Number(d.id)) ? "#26313c" : "none")
-        .attr("stroke-width", .6);
-
-    let rot = proj.rotate(), dragging = false, pinching = false, lx = 0, ly = 0, pd = 0, ps = size, raf = null;
-
-    function redraw() { svg.selectAll("path").attr("d", path); }
-    function autoRotate() {
-        if (signal.aborted) return;
-        if (!dragging && !pinching) { rot[0] += 0.08; proj.rotate(rot); redraw(); }
-        raf = requestAnimationFrame(autoRotate);
-    }
-    raf = requestAnimationFrame(autoRotate);
-    signal.addEventListener("abort", () => { if (raf) cancelAnimationFrame(raf); });
-
-    svgEl.addEventListener("mousedown", e => { dragging = true; lx = e.clientX; ly = e.clientY; }, { signal });
-    window.addEventListener("mouseup", () => { dragging = false; }, { signal });
-    window.addEventListener("mousemove", e => {
-        if (!dragging) return;
-        rot[0] += (e.clientX - lx) * 0.5;
-        rot[1] -= (e.clientY - ly) * 0.5;
-        rot[1] = Math.max(-90, Math.min(90, rot[1]));
-        proj.rotate(rot); redraw();
-        lx = e.clientX; ly = e.clientY;
-    }, { signal });
-
-    svgEl.addEventListener("wheel", e => {
-        e.preventDefault();
-        const n = proj.scale() * (e.deltaY > 0 ? 0.9 : 1.1);
-        proj.scale(Math.max(minS, Math.min(maxS, n))); redraw();
-    }, { passive: false, signal });
-
-    svgEl.addEventListener("touchstart", e => {
-        if (e.touches.length === 2) {
-            pinching = true; dragging = false;
-            pd = getTouchDistance(e.touches); ps = proj.scale(); return;
-        }
-        if (!e.touches.length) return;
-        dragging = true; lx = e.touches[0].clientX; ly = e.touches[0].clientY;
-    }, { passive: true, signal });
-
-    svgEl.addEventListener("touchend", e => {
-        dragging = false;
-        if (e.touches.length < 2) pinching = false;
-    }, { passive: true, signal });
-
-    svgEl.addEventListener("touchmove", e => {
-        if (pinching && e.touches.length === 2) {
-            e.preventDefault();
-            const r = getTouchDistance(e.touches) / pd;
-            proj.scale(Math.max(minS, Math.min(maxS, ps * r))); redraw(); return;
-        }
-        if (!dragging || !e.touches.length) return;
-        rot[0] += (e.touches[0].clientX - lx) * 0.5;
-        rot[1] -= (e.touches[0].clientY - ly) * 0.5;
-        rot[1] = Math.max(-90, Math.min(90, rot[1]));
-        proj.rotate(rot); redraw();
-        lx = e.touches[0].clientX; ly = e.touches[0].clientY;
-        e.preventDefault();
-    }, { passive: false, signal });
-}
 
 /* =========================================================
    Init
