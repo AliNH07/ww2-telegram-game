@@ -8,7 +8,7 @@ input, textarea, select, button { font-family: inherit; }
     --brand-dark: #a97a1f;
     --brand-rgb: 227, 176, 75;
     --brand-glow: rgba(227, 176, 75, 0.35);
-    --bg-deep: #0b0e15;
+    --bg-deep: #07131a;
     --bg-card: rgba(14, 18, 28, 0.82);
     --green: #4ade80;
     --red: #f87171;
@@ -37,12 +37,9 @@ body::before {
     z-index: -1;
     background:
         radial-gradient(ellipse 900px 500px at 50% -10%,
-            rgba(var(--brand-rgb), 0.16) 0%, rgba(var(--brand-rgb), 0) 60%),
-        linear-gradient(180deg,
-            rgba(11, 14, 21, 0.68) 0%,
-            rgba(11, 14, 21, 0.82) 50%,
-            rgba(6, 8, 13, 0.94) 100%),
-        url("/images/background.jfif") center / cover no-repeat;
+            rgba(var(--brand-rgb), 0.07) 0%, rgba(var(--brand-rgb), 0) 60%),
+        url("/images/game-bg.jpg") center / cover no-repeat,
+        var(--bg-deep);
     pointer-events: none;
 }
 
@@ -2901,28 +2898,19 @@ input, textarea, button { -webkit-touch-callout:none; }
 #home .hm-season-line #home-season-hint { color: var(--brand); opacity: .9; }
 
 #home .hm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
-#home .hm-card {
-    position: relative; min-height: 0; overflow: visible; box-shadow: none;
-    display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-    padding: 14px; text-align: right; border-radius: 20px;
-    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
-    transition: background .18s ease, border-color .18s ease, transform .15s ease;
+#home .hm-card { min-height: 118px; border-radius: 20px; box-shadow: 0 6px 16px rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.08); }
+#home .hm-card:hover { transform: none; }
+#home .hm-card:active { transform: scale(.97); }
+#home .hm-card .action-overlay {
+    padding: 14px; background: linear-gradient(180deg, rgba(8,12,20,.1) 0%, rgba(8,12,20,0) 35%, rgba(8,12,20,.85) 100%);
 }
-#home .hm-card:hover { transform: none; box-shadow: none; border-color: rgba(var(--brand-rgb), .4); }
-#home .hm-card:active { transform: scale(.97); background: rgba(var(--brand-rgb), .1); }
-#home .hm-ico {
-    width: 42px; height: 42px; display: grid; place-items: center; margin-bottom: 8px;
-    font-size: 21px; border-radius: 14px;
-    background: rgba(var(--brand-rgb), .12); border: 1px solid rgba(var(--brand-rgb), .2);
-}
-#home .hm-card strong { font-size: 14px; font-weight: 700; color: #f4f6f9; }
-#home .hm-card small { font-size: 10.5px; color: #8a96a7; line-height: 1.6; }
-
+#home .hm-card h3 { font-size: 15px; font-weight: 700; max-width: 100%; margin: 0; }
+#home .hm-card p { align-self: flex-start; max-width: 100%; font-size: 10.5px; margin: 2px 0 0; }
 #home .hm-grid-mini { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-#home .hm-mini { align-items: center; text-align: center; padding: 11px 4px; gap: 5px; border-radius: 16px; }
-#home .hm-mini .hm-ico { width: 34px; height: 34px; margin: 0; font-size: 17px; border-radius: 11px; }
-#home .hm-mini strong { font-size: 11px; font-weight: 600; }
-#home .hm-mini small { display: none; }
+#home .hm-mini { min-height: 92px; border-radius: 16px; }
+#home .hm-mini .action-overlay { padding: 8px; align-items: center; text-align: center; }
+#home .hm-mini .action-icon { position: static; width: 32px; height: 32px; margin-top: 4px; }
+#home .hm-mini h3 { align-self: center; text-align: center; font-size: 11px; font-weight: 600; }
 
 @media (max-width: 380px) {
     #home .hm-money { font-size: 32px; }
