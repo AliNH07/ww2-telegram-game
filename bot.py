@@ -32,8 +32,9 @@ STARTING_MONEY = 10_000_000
 STARTING_MANPOWER = 5_000
 BASE_DAILY_INCOME = 500_000
 BASE_MANPOWER_PRODUCTION = 1_000
-DAYS_PER_SEASON = 3
-GAME_TOTAL_DAYS = 12
+# تقویم هر دنیا از لحظهٔ شروع مدیر آغاز می‌شود؛ طول فصل‌ها در مجموع ۳۱ روز است.
+SEASON_LENGTH_DAYS = {"بهار": 7, "تابستان": 7, "پاییز": 7, "زمستان": 10}
+GAME_TOTAL_DAYS = 31
 
 # ---- وام ----
 LOAN_INTEREST_STEP_HOURS = 12      # به ازای هر ۱۲ ساعت کامل
@@ -45,25 +46,24 @@ LOAN_END_MARGIN_SECONDS = 60       # سررسید همه وام‌ها ۱ دقی
 LOAN_PENDING_TTL_HOURS = 24        # پیشنهادهای بی‌پاسخ منقضی می‌شوند
 SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
 
-# اثر هر فصل روی تولید غذا و نفت (ضریب)
-SEASON_FOOD_OIL_MULT = {
-    "بهار":   1.00,
-    "تابستان": 0.90,
-    "پاییز":   0.75,
-    "زمستان":  0.55,
+# درصدهای اثر فصل‌ها. اعداد منفی، کاهش درآمد/تولید و اعداد مثبت، افزایش مصرف هستند.
+SEASON_EFFECTS = {
+    "بهار":   {"income_pct": 0,   "food_oil_consumption_pct": 0,  "resource_production_pct": 0,   "manpower_production_pct": 0},
+    "تابستان": {"income_pct": -5,  "food_oil_consumption_pct": 0,  "resource_production_pct": 0,   "manpower_production_pct": 0},
+    "پاییز":  {"income_pct": -15, "food_oil_consumption_pct": 25, "resource_production_pct": 0,   "manpower_production_pct": 0},
+    "زمستان": {"income_pct": -30, "food_oil_consumption_pct": 50, "resource_production_pct": -25, "manpower_production_pct": -25},
 }
 SEASON_HINTS = {
-    "بهار":   "🌱 هوا معتدل",
-    "تابستان": "☀️ مصرف سوخت و غذا کمی افزایش می‌یابد",
-    "پاییز":  "🍂 مصرف سوخت و غذا بیشتر می‌شود",
-    "زمستان": "❄️ مصرف سوخت و غذا خیلی زیاد می‌شود",
+    "بهار": "🌱 بهار: همهٔ نرخ‌ها عادی هستند؛ اثر فصلی ۰٪.",
+    "تابستان": "☀️ تابستان: درآمد روزانه ۵٪ کمتر؛ سایر نرخ‌ها بدون تغییر فصلی.",
+    "پاییز": "🍂 پاییز: درآمد روزانه ۱۵٪ کمتر؛ مصرف غذا و نفت ۲۵٪ بیشتر.",
+    "زمستان": "❄️ زمستان: درآمد ۳۰٪ کمتر؛ مصرف غذا و نفت ۵۰٪ بیشتر؛ تولید منابع و نیروی انسانی ۲۵٪ کمتر.",
 }
 
 STARTING_RESOURCES = {"food": 5_000, "steel": 5_000, "uranium": 0, "oil": 5_000}
 RESOURCE_NAMES = {"food": "غذا", "steel": "آهن", "uranium": "اورانیوم", "oil": "نفت"}
 GROUP_NAMES = {"land": "زمینی", "naval": "دریایی", "air": "هوایی",
                "power": "برق", "manpower": "نیروی انسانی", "resource": "منابع", "missile": "موشکی"}
-TREATY_TYPE_NAMES = {"alliance": "پیمان اتحاد", "non_aggression": "پیمان عدم تجاوز"}
 ANN_COSTS = {1: 0, 2: 0, 3: 10_000, 4: 400_000}
 ANNOUNCEMENT_TZ = timezone(timedelta(hours=4))  # ریست سهمیه در نیمه‌شب باکو
 ANNOUNCEMENT_INTERVAL_SECONDS = 3600
@@ -92,7 +92,6 @@ def _announcement_cooldown_seconds(today_list, now=None):
     return max(0, int(ANNOUNCEMENT_INTERVAL_SECONDS - elapsed + 0.999))
 WAR_PENALTY_ALLIANCE = 2_000_000
 NEGOTIATION_HOURS = 24  # سازگاری با داده‌های قدیمی
-WAR_NEGOTIATION_SECONDS = max(30, min(86400, int(os.getenv("WAR_NEGOTIATION_SECONDS", "30"))))
 DEFAULT_COST = 150_000
 DEFAULT_TIME = 0
 
@@ -517,25 +516,56 @@ def parse_dt(s):
         return dt
     except: return None
 
-def get_game_time(player):
-    started_at = player.get("started_at")
-    if not started_at:
-        return {"day": 1, "season": SEASONS[0], "season_days_left": DAYS_PER_SEASON,
-                "season_hours_left": 0, "next_season": SEASONS[1],
-                "season_hint": SEASON_HINTS[SEASONS[0]]}
-    started = parse_dt(started_at); now = utcnow()
-    elapsed_days = max(0, (now - started).total_seconds() / 86400)
-    day = min(GAME_TOTAL_DAYS, int(elapsed_days) + 1)
-    si = ((day - 1) // DAYS_PER_SEASON) % len(SEASONS)
-    season_end = started + timedelta(days=(si + 1) * DAYS_PER_SEASON)
+def _world_meta(world_id=None):
+    return worlds_registry.get(str(world_id or active_world_id), {})
+
+
+def _season_for_elapsed_days(elapsed_days):
+    cursor = 0
+    for season in SEASONS:
+        cursor += SEASON_LENGTH_DAYS[season]
+        if elapsed_days < cursor:
+            return season, cursor
+    return "زمستان", GAME_TOTAL_DAYS
+
+
+def get_game_time(player=None, at_time=None):
+    meta = _world_meta()
+    started = parse_dt(meta.get("game_started_at"))
+    now = at_time or utcnow()
+    registration_open = bool(meta.get("registration_open", not bool(started)))
+    finished = bool(meta.get("game_finished"))
+    if not started:
+        return {
+            "day": 0, "season": "در انتظار شروع", "season_days_left": 0,
+            "season_hours_left": 0, "next_season": "بهار",
+            "season_hint": "منتظر فرمانده بمان؛ شروع روز اول برای همهٔ بازیکنان هم‌زمان است.",
+            "season_effects": dict(SEASON_EFFECTS["بهار"]),
+            "game_started": False, "game_finished": False,
+            "registration_open": registration_open, "game_started_at": None,
+            "game_ends_at": None, "game_winner": meta.get("winner"),
+        }
     game_end = started + timedelta(days=GAME_TOTAL_DAYS)
-    season_end = min(season_end, game_end)
-    remaining = season_end - now
-    if remaining.total_seconds() < 0: remaining = timedelta(0)
-    return {"season_end": season_end.isoformat(), "day": day, "season": SEASONS[si], "season_days_left": remaining.days,
-            "season_hours_left": remaining.seconds // 3600,
-            "next_season": SEASONS[(si + 1) % len(SEASONS)],
-            "season_hint": SEASON_HINTS.get(SEASONS[si], "")}
+    effective_now = min(max(now, started), game_end)
+    elapsed_seconds = max(0.0, (effective_now - started).total_seconds())
+    elapsed_days = min(float(GAME_TOTAL_DAYS), elapsed_seconds / 86400.0)
+    day = min(GAME_TOTAL_DAYS, int(elapsed_days) + 1)
+    season, boundary_day = _season_for_elapsed_days(elapsed_days)
+    season_end = min(started + timedelta(days=boundary_day), game_end)
+    remaining = max(timedelta(0), season_end - effective_now)
+    effects = dict(SEASON_EFFECTS[season])
+    hint = SEASON_HINTS[season]
+    winner = meta.get("winner")
+    return {
+        "season_end": season_end.isoformat(), "day": day, "season": season,
+        "season_days_left": remaining.days,
+        "season_hours_left": remaining.seconds // 3600,
+        "next_season": SEASONS[min(SEASONS.index(season) + 1, len(SEASONS) - 1)] if season != "زمستان" else "پایان بازی",
+        "season_hint": hint, "season_effects": effects,
+        "game_started": True, "game_finished": finished or now >= game_end,
+        "registration_open": registration_open, "game_started_at": started.isoformat(),
+        "game_ends_at": game_end.isoformat(), "game_winner": winner,
+    }
 
 def get_infra_level(player, item_id):
     return player.get("infra_levels", {}).get(item_id, 0)
@@ -662,7 +692,7 @@ def welfare_penalty_now(player):
 def welfare_bonus(player):
     return max(0.0, welfare_gross(player) - welfare_penalty_now(player))
 
-def compute_rates(player, _occ=True):
+def compute_rates(player, _occ=True, at_time=None):
     power_capacity = get_power_total(player)
     power_consumption = get_power_used(player)
     manpower_production = BASE_MANPOWER_PRODUCTION
@@ -717,32 +747,42 @@ def compute_rates(player, _occ=True):
             income += s["income"]
             strait_income += s["income"]
 
-    # کشور اشغال‌شده: ۳۰٪ درآمد روزانه و ۳۰٪ تولید نیروی انسانی آن به اشغالگر می‌رسد.
+    # کشور اشغال‌شده: ۳۰٪ درآمد پایه/اقتصادی و تولید نیروی انسانیِ کشور مغلوب به اشغالگر می‌رسد.
     if _occ:
         for target_country, occupier in occupied_countries.items():
             if occupier != country: continue
-            _, dp = get_player_by_country(target_country)
-            if not dp: continue
-            dr = compute_rates(dp, _occ=False)
-            share = int(max(0, dr["base_income"] + dr["economy_income"]) * 0.30)
+            yield_row = occupation_yields.get(target_country, {})
+            if yield_row and yield_row.get("owner") == country:
+                share = int(max(0, yield_row.get("daily_income", 0)) * 0.30)
+                mp_share = int(max(0, yield_row.get("manpower_production", 0)) * 0.30)
+            else:
+                # مهاجرت از ذخیره‌های قدیمی که هنوز snapshot درآمد اشغال نداشتند.
+                _, dp = get_player_by_country(target_country)
+                if not dp: continue
+                dr = compute_rates(dp, _occ=False, at_time=at_time)
+                share = int(max(0, dr["base_income"] + dr["economy_income"]) * 0.30)
+                mp_share = int(max(0, dr["manpower_production"]) * 0.30)
             income += share
             occupation_income += share
-            manpower_production += int(dr["manpower_production"] * 0.30)
+            manpower_production += mp_share
 
-    # پاداش رفاه روی درآمد کل روزانه اعمال می‌شود تا در خزانه و آمار روزانه دیده شود.
+    # اثر فصل بر درآمد روزانه
+    time_info = get_game_time(player, at_time=at_time)
+    season = time_info.get("season", "بهار")
+    effects = SEASON_EFFECTS.get(season, SEASON_EFFECTS["بهار"])
+    income *= max(0.0, 1 + effects["income_pct"] / 100.0)
+    manpower_production *= max(0.0, 1 + effects["manpower_production_pct"] / 100.0)
+
+    # اثر منفی پاییز و زمستان بر بازده تولید همهٔ منابع.
+    production_mult = max(0.0, 1 + effects["resource_production_pct"] / 100.0)
+    if production_mult != 1.0:
+        for key in resource_production:
+            resource_production[key] = int(resource_production[key] * production_mult)
+
+    # پاداش رفاه پس از اثر فصلی بر درآمد اعمال می‌شود.
     income_before_welfare = income
     welfare_extra_income = income_before_welfare * wb / 100.0
     income += welfare_extra_income
-
-    # ----- اثر فصل روی غذا/نفت -----
-    season = get_game_time(player)["season"]
-    mult = SEASON_FOOD_OIL_MULT.get(season, 1.0)
-    if mult < 1.0:
-        for key in ("food", "oil"):
-            raw = resource_production[key]
-            reduced = int(raw * mult)
-            resource_consumption[key] = raw - reduced
-            resource_production[key] = reduced
 
     # مصرف روزانهٔ نگهداریِ همهٔ یگان‌های کشور؛ هم در خانه، هم در مواضع و هم در مسیر.
     # یگان‌های اعزام‌شده از player["units"] خارج می‌شوند، بنابراین باید از موقعیت فعلی‌شان جمع شوند.
@@ -765,6 +805,11 @@ def compute_rates(player, _occ=True):
                 if k in resource_consumption:
                     resource_consumption[k] += a * n
 
+    # افزایش مصرف غذا و نفت را فقط یک بار و روی مصرف واقعی اعمال می‌کنیم.
+    consumption_mult = max(0.0, 1 + effects["food_oil_consumption_pct"] / 100.0)
+    for key in ("food", "oil"):
+        resource_consumption[key] = int(round(resource_consumption[key] * consumption_mult))
+
     return {"gross_income": income, "income_before_welfare": income_before_welfare,
             "base_income": base_income, "economy_income": eco_income,
             "map_income": map_income, "strait_income": strait_income,
@@ -776,48 +821,243 @@ def compute_rates(player, _occ=True):
             "resource_production": resource_production,
             "resource_consumption": resource_consumption}
 
-def occupy_country(attacker_cid, defender_cid, resolve_wars=True):
-    """سقوط پایتخت: کشور اشغال می‌شود و تمام تنگه/سکو/معدن‌هایش به اشغالگر می‌رسد."""
+def _season_boundary_after(started, when):
+    elapsed = max(0.0, (when - started).total_seconds() / 86400.0)
+    cursor = 0
+    for season in SEASONS:
+        cursor += SEASON_LENGTH_DAYS[season]
+        boundary = started + timedelta(days=cursor)
+        if boundary > when:
+            return boundary
+    return started + timedelta(days=GAME_TOTAL_DAYS)
+
+
+def _resolve_wars_between(attacker_cid, defender_cid):
+    for wid, war in list(active_wars.items()):
+        if {war.get("attacker"), war.get("defender")} == {attacker_cid, defender_cid}:
+            war["resolved"] = True
+            war["status"] = "resolved"
+            if wid in war_declarations:
+                war_declarations[wid]["resolved"] = True
+                war_declarations[wid]["status"] = "resolved"
+
+
+def occupy_country(attacker_cid, defender_cid, resolve_wars=True, announce_event=True):
+    """سقوط کشور اصلی؛ دارایی‌های اصلی به فاتح منتقل و ۳۰٪ درآمد/تولید نیروی پایه حفظ می‌شود."""
+    if not attacker_cid or not defender_cid or attacker_cid == defender_cid:
+        return
+    _, dfd = get_player_by_country(defender_cid)
+
+    # دارایی‌هایی را که پیش‌تر متعلق به مستعمره‌های کشور مغلوب بوده‌اند از دارایی‌های اصلی‌اش جدا می‌کنیم.
+    already_colony_map = set()
+    already_colony_straits = set()
+    for colony, record in occupied_assets.items():
+        if occupied_countries.get(colony) == defender_cid or record.get("owner") == defender_cid:
+            already_colony_map.update(record.get("map", []))
+            already_colony_straits.update(record.get("straits", []))
+    native_map_assets = [k for k, owner in map_holdings.items()
+                         if owner == defender_cid and k not in already_colony_map]
+    native_strait_assets = [k for k, owner in strait_holdings.items()
+                            if owner == defender_cid and k not in already_colony_straits]
+
+    if dfd:
+        # ذخیرهٔ تولید قبل از حذف بازیکن؛ مستعمره از این پس بازیکن مستقل ندارد.
+        rates = compute_rates(dfd, _occ=False)
+        captured_season = get_game_time(dfd).get("season", "بهار")
+        captured_effect = SEASON_EFFECTS.get(captured_season, SEASON_EFFECTS["بهار"])
+        captured_mp_mult = max(0.0, 1 + captured_effect["manpower_production_pct"] / 100.0)
+        raw_mp_total = rates.get("manpower_production", 0) / captured_mp_mult if captured_mp_mult > 0 else 0
+        # _occ=False یعنی تولید مستعمره‌ها اصلاً در این نرخ نیست؛ پس نباید دوباره از تولید کشور کم شود.
+        raw_mp = max(0, raw_mp_total)
+        base_economy_income = max(0, rates.get("base_income", 0) + rates.get("economy_income", 0))
+        source_welfare_mult = 1 + max(0.0, welfare_bonus(dfd)) / 100.0
+        occupation_yields[defender_cid] = {
+            "owner": attacker_cid,
+            "daily_income": int(round(base_economy_income * source_welfare_mult)),
+            "manpower_production": int(max(0, raw_mp)),
+        }
+
     occupied_countries[defender_cid] = attacker_cid
+    occupied_assets[defender_cid] = {
+        "owner": attacker_cid,
+        "map": native_map_assets,
+        "straits": native_strait_assets,
+    }
+
+    # مستعمره‌های اشغالگر شکست‌خورده نیز به فاتح جدید می‌رسند، اما همچنان به‌صورت مستعمره ثبت می‌مانند.
+    for colony, old_occupier in list(occupied_countries.items()):
+        if colony != defender_cid and old_occupier == defender_cid:
+            occupied_countries[colony] = attacker_cid
+            if colony in occupation_yields:
+                occupation_yields[colony]["owner"] = attacker_cid
+            if colony in occupied_assets:
+                occupied_assets[colony]["owner"] = attacker_cid
+
     for k, owner in list(map_holdings.items()):
-        if owner == defender_cid: map_holdings[k] = attacker_cid
+        if owner == defender_cid:
+            map_holdings[k] = attacker_cid
     for k, owner in list(strait_holdings.items()):
         if owner == defender_cid:
             strait_holdings[k] = attacker_cid
             reset_strait_policy(k)
+
     for k in list(site_forces):
-        if site_owner(k) != site_forces[k].get("owner"): del site_forces[k]
-    _, dfd = get_player_by_country(defender_cid)
-    if dfd: dfd["is_eliminated"] = True
-    for t in list(transits):
-        if t.get("owner") == defender_cid and t in transits: transits.remove(t)
+        force_owner = site_forces[k].get("owner")
+        if force_owner == defender_cid or site_owner(k) != force_owner:
+            del site_forces[k]
+    if dfd:
+        dfd["is_eliminated"] = True
+        dfd["country"] = None
+        dfd["units"] = {k: 0 for k in ARMY_UNITS}
+        dfd["army"] = 0
+    for transit in list(transits):
+        if transit.get("owner") == defender_cid:
+            transits.remove(transit)
+
+    # قراردادهای وام کشور حذف‌شده لغو می‌شوند تا بازیکن آیندهٔ آن کشور بدهیِ بازیکن قبلی را به ارث نبرد.
+    for loan in loans.values():
+        if defender_cid in (loan.get("lender"), loan.get("borrower")) and loan.get("status") in ("pending", "active", "overdue"):
+            loan["status"] = "cancelled_elimination"
+            loan["closed_at"] = utcnow().isoformat()
+
+    # سفارش‌های باز کشور حذف‌شده لغو می‌شوند و وثیقهٔ آن به حساب حذف‌شده بازمی‌گردد.
+    for lid, listing in list(market_listings.items()):
+        if listing.get("status") != "open" or defender_cid not in (listing.get("seller"), listing.get("buyer")):
+            continue
+        if listing.get("escrowed") and dfd:
+            if listing.get("side", "sell") == "sell":
+                key = listing.get("sell_resource")
+                if key in RESOURCE_NAMES:
+                    dfd.setdefault("resources", {}).setdefault(key, 0)
+                    dfd["resources"][key] += int(listing.get("sell_amount", 0) or 0)
+            else:
+                key = listing.get("offer_resource", "money")
+                value = int(listing.get("offer_amount", 0) or 0)
+                if key == "money": dfd["money"] = dfd.get("money", 0) + value
+                elif key in RESOURCE_NAMES:
+                    dfd.setdefault("resources", {}).setdefault(key, 0)
+                    dfd["resources"][key] += value
+        listing["status"] = "cancelled_eliminated"
+
     if resolve_wars:
-        for w in list(active_wars.values()):
-            if {w.get("attacker"), w.get("defender")} == {attacker_cid, defender_cid}:
-                w["resolved"] = True
-    push_news("اشغال کشور", f"{cname(attacker_cid)} با سقوط پایتخت، کشور {cname(defender_cid)} را اشغال کرد.")
-    push_war("occupy", f"پایتخت {cname(defender_cid)} سقوط کرد و کل کشور به اشغال {cname(attacker_cid)} درآمد؛ تمام تنگه‌ها، سکوها و معادن آن به {cname(attacker_cid)} رسید.", [attacker_cid, defender_cid])
+        _resolve_wars_between(attacker_cid, defender_cid)
+    if announce_event:
+        msg = (f"{cname(attacker_cid)} با سقوط پایتخت، کشور {cname(defender_cid)} را حذف کرد؛ "
+               "دارایی‌های نقشه و مستعمره‌های آن به فاتح منتقل شدند و ۳۰٪ درآمد پایه/اقتصادی و تولید نیروی انسانی آن حفظ می‌شود.")
+        push_news("اشغال کشور", msg, "warning")
+        push_war("occupy", msg, [attacker_cid, defender_cid])
+
+
+def occupy_colony(attacker_cid, colony_cid, previous_occupier):
+    """تسخیر مستعمره؛ دارایی‌ها و ۳۰٪ بازدهش منتقل می‌شود، ولی کشور اصلی اشغالگر حذف نمی‌شود."""
+    if (not attacker_cid or not colony_cid or attacker_cid == previous_occupier
+            or occupied_countries.get(colony_cid) != previous_occupier):
+        return False
+    assets = occupied_assets.setdefault(colony_cid, {"owner": previous_occupier, "map": [], "straits": []})
+    map_ids = set(assets.get("map", []))
+    strait_ids = set(assets.get("straits", []))
+    moved_map = []
+    moved_straits = []
+    for sid in map_ids:
+        if map_holdings.get(sid) == previous_occupier:
+            map_holdings[sid] = attacker_cid
+            moved_map.append(sid)
+    for sid in strait_ids:
+        if strait_holdings.get(sid) == previous_occupier:
+            strait_holdings[sid] = attacker_cid
+            reset_strait_policy(sid)
+            moved_straits.append(sid)
+    # نیروهای مستقر در دارایی‌هایی که منتقل شدند نیز زیر مالکیت جدید قرار می‌گیرند.
+    moved_site_ids = map_ids | strait_ids
+    for sid in moved_site_ids:
+        garrison_row = site_forces.get(sid)
+        if garrison_row and garrison_row.get("owner") == previous_occupier:
+            garrison_row["owner"] = attacker_cid
+
+    occupied_countries[colony_cid] = attacker_cid
+    assets["owner"] = attacker_cid
+    if colony_cid in occupation_yields:
+        occupation_yields[colony_cid]["owner"] = attacker_cid
+    # گرفتن یک مستعمره به‌تنهایی جنگ با کشور اصلی را تمام نمی‌کند؛ بازیکن می‌تواند به مستعمره‌های دیگر یا پایتخت حمله کند.
+    msg = (f"{cname(attacker_cid)} مستعمرهٔ {cname(colony_cid)} را از {cname(previous_occupier)} گرفت. "
+           f"{len(moved_map)} نقطهٔ منابع و {len(moved_straits)} تنگه/سکو منتقل شد؛ کشور اصلی {cname(previous_occupier)} همچنان فعال است.")
+    push_news("تغییر مالکیت مستعمره", msg, "warning")
+    push_war("colony_captured", msg, [attacker_cid, colony_cid, previous_occupier])
+    push_history("colony", f"تصرف مستعمرهٔ {cname(colony_cid)}", attacker_cid, colony_cid, "attacker", msg)
+    return True
+
 
 def accrue_player(player):
-    if not player.get("started_at") or player.get("is_eliminated"): return
+    """درآمد و منابع را با ساعت مشترک دنیا و با نرخ درستِ هر فصل محاسبه می‌کند."""
+    if player.get("is_eliminated") or not player.get("country"):
+        return
+    meta = _world_meta()
+    started = parse_dt(meta.get("game_started_at"))
+    if not started:
+        return  # تا فرمانده شروع نکند، اقتصاد و زمان بازی متوقف است.
     now = utcnow()
-    last = parse_dt(player.get("last_update")) or parse_dt(player["started_at"])
-    if not last: return
-    elapsed = max(0, (now - last).total_seconds())
-    rates = compute_rates(player)
-    f = elapsed / 86400
-    _gain = rates["net_income"] * f
-    player["money"] = max(0, player.get("money", STARTING_MONEY) + _gain)
-    if _gain > 0:
-        player["money"] -= loan_garnish(player, min(_gain, player["money"]))
-    player["manpower"] = player.get("manpower", STARTING_MANPOWER) + rates["manpower_production"] * f
+    game_end = started + timedelta(days=GAME_TOTAL_DAYS)
+    limit = min(now, game_end)
+    last = parse_dt(player.get("last_update")) or started
+    if last < started:
+        last = started
+    if last >= limit:
+        if now >= game_end:
+            player["last_update"] = game_end.isoformat()
+        return
     ensure_player_fields(player)
-    for key, amount in rates["resource_production"].items():
-        player["resources"][key] = player["resources"].get(key, 0) + amount * f
-    for key, amount in rates["resource_consumption"].items():
-        if amount > 0:
-            player["resources"][key] = max(0, player["resources"].get(key, 0) - amount * f)
-    player["last_update"] = now.isoformat()
+    while last < limit:
+        boundary = _season_boundary_after(started, last)
+        segment_end = min(limit, boundary)
+        seconds = max(0.0, (segment_end - last).total_seconds())
+        if seconds <= 0:
+            break
+        # نرخ برای فصل فعلی همین بازه؛ بازه‌های عبوری از مرز فصل جدا محاسبه می‌شوند.
+        rates = compute_rates(player, at_time=last + timedelta(microseconds=1))
+        fraction = seconds / 86400.0
+        gain = rates["net_income"] * fraction
+        player["money"] = max(0.0, player.get("money", STARTING_MONEY) + gain)
+        if gain > 0:
+            player["money"] -= loan_garnish(player, min(gain, player["money"]))
+        player["manpower"] = player.get("manpower", STARTING_MANPOWER) + rates["manpower_production"] * fraction
+        for key, amount in rates["resource_production"].items():
+            player["resources"][key] = player["resources"].get(key, 0) + amount * fraction
+        for key, amount in rates["resource_consumption"].items():
+            if amount > 0:
+                player["resources"][key] = max(0, player["resources"].get(key, 0) - amount * fraction)
+        last = segment_end
+    player["last_update"] = limit.isoformat()
+
+
+def finalize_world_if_due():
+    """در پایان روز ۳۱، اقتصاد را دقیقاً تا لحظهٔ پایان تسویه و برنده را ثبت می‌کند."""
+    meta = _world_meta()
+    started = parse_dt(meta.get("game_started_at"))
+    if not started or meta.get("game_finished"):
+        return False
+    end = started + timedelta(days=GAME_TOTAL_DAYS)
+    if utcnow() < end:
+        return False
+    for p in players.values():
+        if p.get("country") and not p.get("is_eliminated"):
+            accrue_player(p)
+    rows = compute_rankings()
+    winner = None
+    if rows:
+        first = rows[0]
+        winner = {"country": first["country"], "name": first["name"], "score": first["overall"], "rank": first["rank"]}
+    meta["game_finished"] = True
+    meta["registration_open"] = False
+    meta["game_finished_at"] = end.isoformat()
+    meta["winner"] = winner
+    if winner:
+        message = f"🏆 بازی پس از ۳۱ روز به پایان رسید؛ {winner['name']} با امتیاز نهایی {winner['score']} برنده شد."
+    else:
+        message = "بازی پس از ۳۱ روز به پایان رسید؛ بازیکن فعالی برای تعیین برنده وجود نداشت."
+    push_news("پایان بازی", message, "success")
+    push_war("game_finished", message, [winner["country"]] if winner else [])
+    save_state()
+    return True
 
 def build_catalog_status(player, catalog):
     result = {}
@@ -844,6 +1084,9 @@ def serialize_player(player):
     ensure_player_fields(player); accrue_player(player); recompute_army(player)
     rates = compute_rates(player)
     data = dict(player); data.update(get_game_time(player))
+    winner = data.get("game_winner") or {}
+    data["game_winner_name"] = winner.get("name") if isinstance(winner, dict) else None
+    data["game_winner_country"] = winner.get("country") if isinstance(winner, dict) else None
     data["resource_production"] = rates["resource_production"]
     data["resource_consumption"] = rates["resource_consumption"]
     data["power_capacity"] = rates["power_capacity"]
@@ -861,11 +1104,11 @@ def serialize_player(player):
 # State
 # =========================================================
 players = {}
-diplomacy_proposals = {}
-active_treaties = []
 map_holdings = {}
 strait_holdings = {}
 occupied_countries = {}
+occupied_assets = {}  # کشور مستعمره -> دارایی‌های نقشه‌ای که هنگام اشغال به مالک جدید منتقل شدند
+occupation_yields = {}  # کشور اشغال‌شده -> درآمد پایه/اقتصادی و تولید نیروی انسانی پیش از اشغال
 war_declarations = {}
 active_wars = {}
 war_reports = []
@@ -940,7 +1183,8 @@ def remember_telegram_user(user):
 
 def get_player_by_country(country_id):
     for uid_, p in players.items():
-        if p.get("country") == country_id: return uid_, p
+        if p.get("country") == country_id and not p.get("is_eliminated"):
+            return uid_, p
     return None, None
 
 def classify_news(title, text="", kind="info"):
@@ -950,8 +1194,8 @@ def classify_news(title, text="", kind="info"):
         return "union"
     if any(word in source for word in ("جنگ", "نبرد", "دفاع", "حمله", "اشغال", "تلفات", "نیرو", "ارتش", "پیروزی", "شکست")):
         return "military"
-    if any(word in source for word in ("پیمان", "عدم تجاوز", "اتحاد", "دیپلماسی", "بیانیه", "مذاکره")):
-        return "diplomacy"
+    if any(word in source for word in ("بیانیه", "اعلان", "اطلاعیه")):
+        return "general"
     if any(word in source for word in ("معامله", "تجارت", "بازار", "مرز زمینی", "حمل‌ونقل", "حمل و نقل")):
         return "trade"
     if any(word in source for word in ("تصرف", "تنگه", "قلمرو", "مرز", "منطقه")):
@@ -969,13 +1213,15 @@ def push_news(title, text, kind="info"):
 # هر دنیا نسخهٔ مستقل خود از داده‌های بازی را دارد. هنگام هر درخواست، وضعیت دنیای مربوط
 # به درخواست فعال می‌شود و پیش از بازگرداندن وضعیت قبلی ذخیره می‌گردد.
 WORLD_STATE_KEYS = [
-    "players", "diplomacy_proposals", "active_treaties", "map_holdings", "strait_holdings",
-    "occupied_countries", "war_declarations", "active_wars", "war_reports", "announcements",
+    "players", "map_holdings", "strait_holdings",
+    "occupied_countries", "occupied_assets", "occupation_yields", "war_declarations", "active_wars", "war_reports", "announcements",
     "unions", "private_messages", "pm_read", "market_listings", "news_feed", "STRAITS_DATA",
     "site_forces", "war_events", "war_history", "transits", "loans", "admin_audit", "market_sanctions",
 ]
 DEFAULT_STRAITS_DATA = copy.deepcopy(STRAITS_DATA)
-worlds_registry = {"1": {"id": 1, "name": "دنیای ۱", "created_at": None}}
+worlds_registry = {"1": {"id": 1, "name": "دنیای ۱", "created_at": None,
+                           "registration_open": True, "game_started_at": None,
+                           "game_finished": False, "winner": None}}
 world_states = {}
 active_world_id = "1"
 WORLD_SWITCH_LOCK = asyncio.Lock()
@@ -983,8 +1229,8 @@ WORLD_SWITCH_LOCK = asyncio.Lock()
 
 def _fresh_world_state():
     return {
-        "players": {}, "diplomacy_proposals": {}, "active_treaties": [], "map_holdings": {},
-        "strait_holdings": {}, "occupied_countries": {}, "war_declarations": {}, "active_wars": {},
+        "players": {}, "map_holdings": {},
+        "strait_holdings": {}, "occupied_countries": {}, "occupied_assets": {}, "occupation_yields": {}, "war_declarations": {}, "active_wars": {},
         "war_reports": [], "announcements": [], "unions": {}, "private_messages": {}, "pm_read": {},
         "market_listings": {}, "news_feed": [], "STRAITS_DATA": copy.deepcopy(DEFAULT_STRAITS_DATA),
         "site_forces": {}, "war_events": [], "war_history": [], "transits": [], "loans": {},
@@ -1055,14 +1301,42 @@ def load_state():
             world_states = {str(k): v for k, v in saved["world_states"].items() if isinstance(v, dict)}
             # اگر دنیای جدید در registry بوده ولی داده نداشته باشد، خالی ایجادش کن.
             for wid in worlds_registry: world_states.setdefault(str(wid), _fresh_world_state())
+            # دنیای قدیمی که ساعت مشترک نداشته باشد، در وضعیت انتظار می‌ماند؛
+            # شروع فصل فقط با دکمهٔ مدیر انجام می‌شود و ساعت‌های قدیمی بازیکنان نادیده گرفته می‌شوند.
+            for wid, meta in worlds_registry.items():
+                meta.setdefault("registration_open", True)
+                meta.setdefault("game_finished", False)
+                meta.setdefault("winner", None)
+                state_players = (world_states.get(str(wid), {}) or {}).get("players", {})
+                if not meta.get("game_started_at"):
+                    meta["registration_open"] = True
+                    for player_row in state_players.values():
+                        if isinstance(player_row, dict) and not player_row.get("is_eliminated"):
+                            player_row["started_at"] = None
+                            player_row["last_update"] = None
+                else:
+                    old_start = parse_dt(meta["game_started_at"])
+                    if old_start:
+                        meta.setdefault("game_ends_at", (old_start + timedelta(days=GAME_TOTAL_DAYS)).isoformat())
         else:
             # مهاجرت خودکار فایل ذخیرهٔ قدیمی به دنیای ۱.
-            worlds_registry = {"1": {"id": 1, "name": "دنیای ۱", "created_at": None}}
+            worlds_registry = {"1": {"id": 1, "name": "دنیای ۱", "created_at": None,
+                                     "registration_open": True, "game_started_at": None,
+                                     "game_finished": False, "winner": None}}
             legacy = _fresh_world_state()
             for key in WORLD_STATE_KEYS:
                 source_key = "straits_data" if key == "STRAITS_DATA" else key
                 if source_key in saved: legacy[key] = saved[source_key]
             world_states = {"1": legacy}
+        # Flat legacy saves also wait for an explicit manager start.
+        for wid, meta in worlds_registry.items():
+            if not meta.get("game_started_at"):
+                meta["registration_open"] = True
+                legacy_players = (world_states.get(str(wid), {}) or {}).get("players", {})
+                for player_row in legacy_players.values():
+                    if isinstance(player_row, dict) and not player_row.get("is_eliminated"):
+                        player_row["started_at"] = None
+                        player_row["last_update"] = None
         active_world_id = "1"
         _activate_world("1")
         logging.info("State loaded: %d players across %d worlds", len(players), len(worlds_registry))
@@ -1082,6 +1356,20 @@ def world_scoped(handler):
             _persist_active_world_memory()
             _activate_world(wid)
             try:
+                finalize_world_if_due()
+                path = request.path
+                exempt_before_start = {"/api/select-country", "/api/pm/send"}
+                is_admin_path = path.startswith("/api/admin/")
+                if request.method == "POST" and not is_admin_path and path not in exempt_before_start:
+                    meta = _world_meta()
+                    started = bool(meta.get("game_started_at"))
+                    finished = bool(meta.get("game_finished"))
+                    if not started:
+                        return web.json_response({"success": False, "error": "game_not_started",
+                            "message": "بعد از شروع فصل امکان‌پذیر است."}, status=403)
+                    if finished:
+                        return web.json_response({"success": False, "error": "game_finished",
+                            "message": "بازی پس از ۳۱ روز تمام شده است؛ انجام این کار دیگر امکان‌پذیر نیست."}, status=403)
                 result = await handler(request)
                 save_state()
                 return result
@@ -1096,14 +1384,72 @@ async def get_worlds(request):
     async with WORLD_SWITCH_LOCK:
         _persist_active_world_memory()
         result = []
+        now = utcnow()
         for wid, meta in sorted(worlds_registry.items(), key=lambda x: int(x[0])):
             state = world_states.get(str(wid), {})
             rows = state.get("players", {}) if isinstance(state, dict) else {}
+            start = parse_dt(meta.get("game_started_at"))
+            end = start + timedelta(days=GAME_TOTAL_DAYS) if start else None
+            elapsed_days = max(0.0, (now - start).total_seconds() / 86400.0) if start else 0.0
+            day = min(GAME_TOTAL_DAYS, int(elapsed_days) + 1) if start else 0
+            season, _ = _season_for_elapsed_days(min(elapsed_days, GAME_TOTAL_DAYS)) if start else ("در انتظار شروع", 0)
             result.append({"id": int(wid), "name": meta.get("name", f"دنیای {wid}"),
-                           "created_at": meta.get("created_at"), "players": len(rows),
-                           "countries_taken": len({p.get("country") for p in rows.values() if isinstance(p, dict) and p.get("country")})})
+                           "created_at": meta.get("created_at"), "players": sum(1 for p in rows.values() if isinstance(p, dict) and p.get("country") and not p.get("is_eliminated")),
+                           "countries_taken": len(
+                               {p.get("country") for p in rows.values() if isinstance(p, dict) and p.get("country") and not p.get("is_eliminated")}
+                               | set((state.get("occupied_countries", {}) or {}).keys())
+                           ),
+                           "registration_open": bool(meta.get("registration_open", not bool(start))),
+                           "game_started_at": start.isoformat() if start else None,
+                           "game_ends_at": end.isoformat() if end else None,
+                           "game_started": bool(start),
+                           "game_finished": bool(meta.get("game_finished") or (end and now >= end)),
+                           "day": day, "season": season, "winner": meta.get("winner")})
         return web.json_response({"success": True, "worlds": result})
 
+
+async def admin_start_world(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    meta = _world_meta()
+    if meta.get("game_started_at"):
+        return web.json_response({"success": False, "error": "already_started", "message": "این دنیا قبلاً شروع شده است."}, status=409)
+    active = [p for p in players.values() if p.get("country") and not p.get("is_eliminated")]
+    if not active:
+        return web.json_response({"success": False, "error": "no_players", "message": "پیش از شروع، دست‌کم یک کشور باید انتخاب شده باشد."}, status=400)
+    now = utcnow()
+    meta["game_started_at"] = now.isoformat()
+    meta["game_ends_at"] = (now + timedelta(days=GAME_TOTAL_DAYS)).isoformat()
+    meta["game_finished"] = False
+    meta["winner"] = None
+    meta["registration_open"] = False
+    meta["last_announced_season"] = "بهار"
+    for p in active:
+        p["started_at"] = now.isoformat()
+        p["last_update"] = now.isoformat()
+    message = f"🚩 فصل بازی در دنیای {meta.get('name', active_world_id)} آغاز شد! روز اول برای همهٔ بازیکنان هم‌زمان است؛ بازی ۳۱ روز ادامه دارد. اثر بهار: درآمد، تولید منابع و نیروی انسانی و مصرف غذا/نفت بدون تغییر فصلی (۰٪)."
+    push_news("آغاز فصل", message, "success")
+    push_war("season_started", message, [p.get("country") for p in active])
+    await notify_world_players(message)
+    log_admin_action("شروع فصل دنیا", None, f"world={active_world_id}; start={now.isoformat()}")
+    save_state()
+    return web.json_response({"success": True, "message": message, "game_started_at": now.isoformat(),
+                              "game_ends_at": meta["game_ends_at"]})
+
+
+async def admin_set_world_registration(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    meta = _world_meta()
+    if meta.get("game_finished"):
+        return web.json_response({"success": False, "message": "بازی تمام شده و ثبت‌نام دوباره قابل بازگشایی نیست."}, status=400)
+    opened = bool(data.get("open"))
+    meta["registration_open"] = opened
+    status = "بازگشایی شد؛ فقط کشورهای آزاد قابل انتخاب‌اند." if opened else "ثبت‌نام این دنیا بسته شد."
+    log_admin_action("تغییر وضعیت ثبت‌نام", None, f"world={active_world_id}; open={opened}")
+    save_state()
+    return web.json_response({"success": True, "message": status, "registration_open": opened})
 
 async def admin_create_world(request):
     denied = _admin_denied(request)
@@ -1116,7 +1462,9 @@ async def admin_create_world(request):
         if next_id > 100:
             return web.json_response({"success": False, "message": "حداکثر ۱۰۰ دنیا می‌توان ساخت."}, status=400)
         name = name or f"دنیای {next_id}"
-        worlds_registry[str(next_id)] = {"id": next_id, "name": name, "created_at": utcnow().isoformat()}
+        worlds_registry[str(next_id)] = {"id": next_id, "name": name, "created_at": utcnow().isoformat(),
+                                         "registration_open": True, "game_started_at": None,
+                                         "game_ends_at": None, "game_finished": False, "winner": None}
         world_states[str(next_id)] = _fresh_world_state()
         save_state()
         log_admin_action("ساخت دنیای جدید", None, f"world_id={next_id}; name={name}")
@@ -1231,49 +1579,7 @@ async def notify_admin(text, keyboard=None):
 
 @dp.callback_query(F.data.startswith("treaty:"))
 async def treaty_cb(cb: types.CallbackQuery):
-    _, action, pid = cb.data.split(":")
-    # پاسخ دکمه باید در همان دنیایی اعمال شود که پیشنهاد در آن ساخته شده است.
-    response = None
-    async with WORLD_SWITCH_LOCK:
-        previous = str(active_world_id)
-        _persist_active_world_memory()
-        try:
-            for wid in sorted(worlds_registry, key=lambda x: int(x)):
-                _activate_world(wid)
-                p = diplomacy_proposals.get(pid)
-                if p is None:
-                    continue
-                if p.get("status") != "pending":
-                    response = ("منقضی", True)
-                    break
-                if int(cb.from_user.id) != int(p.get("to_user", -1)):
-                    response = ("این پیشنهاد برای شما نیست.", True)
-                    break
-                tn = TREATY_TYPE_NAMES.get(p.get("treaty_type"), "پیمان")
-                if action == "accept":
-                    p["status"] = "accepted"
-                    active_treaties.append({"id": str(uuid.uuid4()), "country_a": p["from_country"],
-                        "country_b": p["to_country"], "treaty_type": p["treaty_type"],
-                        "expires_at": (utcnow() + timedelta(days=p["duration_days"])).isoformat()})
-                    push_news("پیمان جدید", f"{COUNTRIES[p['from_country']]['name']} و {COUNTRIES[p['to_country']]['name']} {tn} بستند.")
-                    response = (f"✅ {tn} پذیرفته شد.", False)
-                else:
-                    p["status"] = "rejected"
-                    response = (f"❌ {tn} رد شد.", False)
-                save_state()
-                break
-            if response is None:
-                response = ("پیشنهاد در هیچ‌کدام از دنیاها پیدا نشد.", True)
-        finally:
-            _persist_active_world_memory()
-            _activate_world(previous if previous in worlds_registry else "1")
-            save_state()
-    text, alert = response
-    try:
-        await cb.message.edit_text(text)
-    except Exception:
-        pass
-    await cb.answer(text if alert else "ثبت شد", show_alert=alert)
+    await cb.answer("پیمان‌ها و دیپلماسی از بازی حذف شده‌اند.", show_alert=True)
 
 @dp.callback_query(F.data.startswith("war:"))
 async def war_cb(cb: types.CallbackQuery):
@@ -1294,13 +1600,15 @@ async def war_cb(cb: types.CallbackQuery):
                     response = ("درخواست قبلاً بررسی شده یا منقضی است.", True)
                     break
                 if action == "approve":
-                    w["status"] = "negotiation"
-                    w["negotiation_ends"] = (utcnow() + timedelta(seconds=WAR_NEGOTIATION_SECONDS)).isoformat()
-                    message = f"اعلان جنگ {COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} تأیید شد. دلیل: {w.get('reason', 'ثبت نشده')}. {WAR_NEGOTIATION_SECONDS} ثانیه برای مذاکره فرصت دارید."
-                    push_news("اعلام جنگ", message, "warning")
-                    push_war("declare", message, [w["attacker"], w["defender"]])
+                    w["status"] = "battle"
+                    w["approved_at"] = utcnow().isoformat()
+                    w["negotiation_ends"] = None
+                    active_wars[war_id] = w
+                    message = f"اعلان جنگ {COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} تأیید شد و جنگ اکنون آغاز شده است. دلیل: {w.get('reason', 'ثبت نشده')}"
+                    push_news("آغاز جنگ", message, "warning")
+                    push_war("war_started", message, [w["attacker"], w["defender"]])
                     await notify_world_players(message)
-                    response = ("✅ تأیید شد؛ مهلت آزمایشی مذاکره {WAR_NEGOTIATION_SECONDS} ثانیه آغاز شد.", False)
+                    response = ("✅ درخواست تأیید شد و جنگ آغاز شد.", False)
                 elif action == "reject":
                     w["status"] = "rejected"
                     message = f"درخواست اعلان جنگ {COUNTRIES[w['attacker']]['name']} علیه {COUNTRIES[w['defender']]['name']} رد شد."
@@ -1349,18 +1657,30 @@ async def select_country(request):
         return web.json_response({"success": False, "error": "invalid_country"}, status=400)
     if uid not in players: players[uid] = create_player(uid)
     p = players[uid]
-    if p["country"]:
+    if p.get("is_eliminated"):
+        return web.json_response({"success": False, "error": "player_eliminated",
+                                  "message": "این حساب از دور جاری حذف شده و امکان انتخاب کشور دوباره را ندارد."}, status=403)
+    if p.get("country"):
         if p["country"] == cid: return web.json_response({"success": True, "player": serialize_player(p)})
         return web.json_response({"success": False, "error": "already_has_country"}, status=409)
+    meta = _world_meta()
+    if not meta.get("registration_open", not bool(meta.get("game_started_at"))):
+        return web.json_response({"success": False, "error": "registration_closed",
+                                  "message": "ثبت‌نام این دنیا بسته است. فرمانده باید از پنل مدیریت آن را بازگشایی کند."}, status=403)
     if cid in occupied_countries:
         return web.json_response({"success": False, "error": "occupied",
-                                  "message": "این کشور اشغال شده است."}, status=409)
+                                  "message": "این کشور اشغال شده است و قابل انتخاب نیست."}, status=409)
     oid, _ = get_player_by_country(cid)
     if oid is not None and oid != uid:
         return web.json_response({"success": False, "error": "country_taken"}, status=409)
     p["country"] = cid
-    if not p.get("started_at"):
-        now = utcnow().isoformat(); p["started_at"] = now; p["last_update"] = now
+    world_start = parse_dt(meta.get("game_started_at"))
+    if world_start:
+        p["started_at"] = world_start.isoformat()
+        p["last_update"] = utcnow().isoformat()
+    else:
+        p["started_at"] = None
+        p["last_update"] = None
     save_state()
     return web.json_response({"success": True, "player": serialize_player(p)})
 
@@ -1478,87 +1798,14 @@ async def get_army_units(request):
 # =========================================================
 # API Diplomacy
 # =========================================================
-async def propose_treaty(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request)
-    target = data.get("target"); ttype = data.get("type")
-    try: dur = int(data.get("duration_days", 10))
-    except: dur = 10
-    dur = max(1, min(dur, 30))
-    if target not in COUNTRIES or ttype not in TREATY_TYPE_NAMES:
-        return web.json_response({"success": False, "error": "invalid"}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]; fc = p.get("country")
-    if not fc: return web.json_response({"success": False, "error": "no_country"}, status=400)
-    if target == fc: return web.json_response({"success": False, "error": "self"}, status=400)
-    tuid, _ = get_player_by_country(target)
-    if tuid is None:
-        return web.json_response({"success": False, "error": "unowned"}, status=400)
-    pid = str(uuid.uuid4())
-    diplomacy_proposals[pid] = {"id": pid, "from_user": uid, "from_country": fc,
-        "to_user": tuid, "to_country": target, "treaty_type": ttype,
-        "duration_days": dur, "status": "pending", "created_at": utcnow().isoformat()}
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ قبول", callback_data=f"treaty:accept:{pid}"),
-        InlineKeyboardButton(text="❌ رد", callback_data=f"treaty:reject:{pid}")]])
-    try:
-        await bot.send_message(tuid,
-            f"📜 پیشنهاد {TREATY_TYPE_NAMES[ttype]}\nاز {COUNTRIES[fc]['name']} به مدت {dur} روز",
-            reply_markup=kb)
-    except Exception as e: logging.warning("treaty msg: %s", e)
-    save_state()
-    return web.json_response({"success": True, "message": "پیشنهاد ثبت شد."})
-
-async def get_diplomacy(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
-    if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]; accrue_player(p)
-    cid = p.get("country")
-    now = utcnow()
-    sent = [x for x in diplomacy_proposals.values() if x["from_user"] == uid and x["status"] == "pending"]
-    recv = [x for x in diplomacy_proposals.values() if x["to_user"] == uid and x["status"] == "pending"]
-    tr = [t for t in active_treaties if cid and (t["country_a"] == cid or t["country_b"] == cid)
-          and (parse_dt(t.get("expires_at")) or now) > now]
-    return web.json_response({"sent": sent, "received": recv, "treaties": tr})
-
-async def respond_treaty(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); pid = data.get("proposal_id"); accept = bool(data.get("accept"))
-    p = diplomacy_proposals.get(pid)
-    if not p or p["status"] != "pending":
-        return web.json_response({"success": False, "error": "invalid"}, status=400)
-    if p["to_user"] != uid:
-        return web.json_response({"success": False, "error": "not_yours"}, status=403)
-    if accept:
-        p["status"] = "accepted"
-        active_treaties.append({"id": str(uuid.uuid4()), "country_a": p["from_country"],
-            "country_b": p["to_country"], "treaty_type": p["treaty_type"],
-            "expires_at": (utcnow() + timedelta(days=p["duration_days"])).isoformat()})
-        push_news("پیمان جدید",
-            f"{COUNTRIES[p['from_country']]['name']} و {COUNTRIES[p['to_country']]['name']} {TREATY_TYPE_NAMES[p['treaty_type']]} بستند.")
-    else: p["status"] = "rejected"
-    save_state()
-    return web.json_response({"success": True})
-
-def have_treaty(a, b, kind):
-    now = utcnow()
-    for t in active_treaties:
-        if t["treaty_type"] != kind: continue
-        exp = parse_dt(t.get("expires_at"))
-        if exp and now >= exp: continue
-        if (t["country_a"] == a and t["country_b"] == b) or (t["country_a"] == b and t["country_b"] == a):
-            return True
-    return False
-
 # =========================================================
 # API War
 # =========================================================
 async def notify_world_players(message):
     """Broadcast an in-game world event to each Telegram user registered in this world."""
-    for target_uid in list(players.keys()):
+    for target_uid, target_player in list(players.items()):
+        if not target_player.get("country") or target_player.get("is_eliminated"):
+            continue
         try:
             await bot.send_message(chat_id=int(target_uid), text=str(message)[:3500])
         except Exception as exc:
@@ -1589,12 +1836,9 @@ async def declare_war(request):
     if tuid is None: return web.json_response({"success": False, "error": "unowned"}, status=400)
     if target in occupied_countries:
         return web.json_response({"success": False, "error": "already_occupied"}, status=400)
-    if have_treaty(attacker, target, "non_aggression"):
-        return web.json_response({"success": False, "error": "non_aggression",
-                                  "message": "پیمان عدم تجاوز فعال است."}, status=400)
-    penalty = WAR_PENALTY_ALLIANCE if have_treaty(attacker, target, "alliance") else 0
+    penalty = 0  # پیمان‌ها/دیپلماسی از بازی حذف شده‌اند.
     for w in war_declarations.values():
-        if w["status"] in ("pending_admin", "negotiation") and w["attacker"] == attacker and w["defender"] == target:
+        if w["status"] in ("pending_admin", "negotiation", "battle") and w["attacker"] == attacker and w["defender"] == target:
             return web.json_response({"success": False, "error": "duplicate"}, status=400)
     wid = str(uuid.uuid4())
     war_declarations[wid] = {"id": wid, "attacker": attacker, "defender": target,
@@ -1603,9 +1847,9 @@ async def declare_war(request):
     await notify_admin(
         f"⚔️ درخواست اعلان جنگ جدید در دنیای {worlds_registry.get(str(active_world_id), {}).get('name', active_world_id)}\n"
         f"{COUNTRIES[attacker]['name']} → {COUNTRIES[target]['name']}\n"
-        f"دلیل: {reason}\nجریمه اتحاد: {penalty}\nبرای بررسی و تصمیم نهایی به بخش «بررسی جنگ‌ها» در پنل مدیریت بروید.")
+        f"دلیل: {reason}\nبرای بررسی و تصمیم نهایی به بخش «بررسی جنگ‌ها» در پنل مدیریت بروید. پس از تأیید، جنگ بلافاصله شروع می‌شود.")
     save_state()
-    return web.json_response({"success": True, "message": "اعلام جنگ به سازمان ملل ارسال شد."})
+    return web.json_response({"success": True, "message": "درخواست اعلان جنگ برای بررسی مدیر ارسال شد؛ در صورت تأیید، جنگ بلافاصله آغاز می‌شود."})
 
 async def get_wars(request):
     uid = get_auth_user_id(request)
@@ -1622,61 +1866,24 @@ async def get_wars(request):
                               "occupied": occupied_countries})
 
 async def check_wars_tick():
-    global active_treaties
-    now = utcnow()
+    """جنگ‌ها فقط در بازهٔ فعال بازی به‌روزرسانی می‌شوند."""
+    meta = _world_meta()
+    started = parse_dt(meta.get("game_started_at"))
+    if not started or meta.get("game_finished") or utcnow() >= started + timedelta(days=GAME_TOTAL_DAYS):
+        return
     for wid, w in list(war_declarations.items()):
-        if w["status"] == "negotiation" and w.get("negotiation_ends"):
-            end = parse_dt(w["negotiation_ends"])
-            if end and now >= end:
-                w["status"] = "battle"
-                active_wars[wid] = w
-                msg = f"مهلت آزمایشی مذاکره بین {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} به پایان رسید؛ جنگ آغاز شد."
-                push_news("جنگ آغاز شد", msg, "warning")
-                push_war("war_started", msg, [w["attacker"], w["defender"]])
-                await notify_world_players(msg)
-    # پیمان‌های منقضی را پاک کن
-    active_treaties[:] = [
-        t for t in active_treaties
-        if not (parse_dt(t.get("expires_at")) and parse_dt(t.get("expires_at")) <= now)
-    ]
-    # جنگ‌های تمام‌شده را از active_wars حذف کن
+        if w.get("status") == "negotiation":
+            w["status"] = "battle"
+            w["approved_at"] = w.get("created_at") or utcnow().isoformat()
+            w["negotiation_ends"] = None
+            active_wars[wid] = w
+            msg = f"اعلان جنگ قدیمی بین {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} به جنگ فعال تبدیل شد."
+            push_news("آغاز جنگ", msg, "warning")
+            push_war("war_started", msg, [w["attacker"], w["defender"]])
+            await notify_world_players(msg)
     for wid in list(active_wars.keys()):
         if active_wars[wid].get("resolved"):
             del active_wars[wid]
-
-async def peace_war(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request)
-    wid = str(data.get("war_id", ""))
-    w = war_declarations.get(wid)
-    if not w or w.get("status") != "negotiation":
-        return web.json_response({"success": False, "message": "این اعلان جنگ در مرحلهٔ مذاکره نیست."}, status=400)
-    p = players.get(uid); cid = p.get("country") if p else None
-    if cid not in (w.get("attacker"), w.get("defender")):
-        return web.json_response({"success": False, "message": "فقط دو کشور درگیر می‌توانند درخواست صلح بدهند."}, status=403)
-    end = parse_dt(w.get("negotiation_ends"))
-    if end and utcnow() >= end:
-        return web.json_response({"success": False, "message": "مهلت دیپلماسی به پایان رسیده است."}, status=400)
-    votes = set(w.get("peace_votes", [])); votes.add(cid); w["peace_votes"] = sorted(votes)
-    if w["attacker"] in votes and w["defender"] in votes:
-        w["status"] = "peace"
-        active_wars.pop(wid, None)
-        msg = f"🕊️ صلح برقرار شد! {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} با توافق دوطرفه از جنگ جلوگیری کردند."
-        push_news("صلح برقرار شد", msg)
-        push_war("peace", msg, [w["attacker"], w["defender"]])
-        await notify_world_players(msg)
-        save_state()
-        return web.json_response({"success": True, "peace": True, "message": "هر دو کشور صلح را پذیرفتند؛ جنگ لغو شد و همه مطلع شدند."})
-    other = w["defender"] if cid == w["attacker"] else w["attacker"]
-    other_uid = w.get("defender_user") if other == w["defender"] else w.get("attacker_user")
-    msg = f"🕊️ {COUNTRIES[cid]['name']} درخواست صلح را پذیرفته است. برای جلوگیری از جنگ، از بخش اعلان جنگ روی «صلح» بزنید."
-    if other_uid:
-        await notify_user(other_uid, msg)
-    push_news("درخواست صلح", f"{COUNTRIES[cid]['name']} برای جلوگیری از جنگ با {COUNTRIES[other]['name']} رأی صلح داد.")
-    save_state()
-    return web.json_response({"success": True, "peace": False, "message": "رأی صلح شما ثبت شد؛ منتظر تأیید کشور مقابل بمانید."})
-
 
 async def admin_wars(request):
     denied = _admin_denied(request)
@@ -1693,6 +1900,10 @@ async def admin_wars(request):
 async def admin_review_war(request):
     denied = _admin_denied(request)
     if denied: return denied
+    meta = _world_meta()
+    started = parse_dt(meta.get("game_started_at"))
+    if not started or meta.get("game_finished") or utcnow() >= started + timedelta(days=GAME_TOTAL_DAYS):
+        return web.json_response({"success": False, "message": "بررسی اعلان جنگ فقط در طول بازی فعال است."}, status=403)
     data = await read_json(request)
     wid = str(data.get("war_id", "")); action = str(data.get("action", ""))
     w = war_declarations.get(wid)
@@ -1701,11 +1912,13 @@ async def admin_review_war(request):
     attacker_name = COUNTRIES.get(w.get("attacker"), {}).get("name", w.get("attacker"))
     defender_name = COUNTRIES.get(w.get("defender"), {}).get("name", w.get("defender"))
     if action == "approve":
-        w["status"] = "negotiation"
-        w["negotiation_ends"] = (utcnow() + timedelta(seconds=WAR_NEGOTIATION_SECONDS)).isoformat()
-        msg = f"⚖️ درخواست اعلان جنگ {attacker_name} علیه {defender_name} تأیید شد.\nدلیل: {w.get('reason', 'ثبت نشده')}\nهر دو کشور ۲۴ ساعت فرصت دارند با دیپلماسی صلح کنند. اگر هر دو روی «صلح» بزنند جنگ لغو می‌شود؛ در غیر این صورت پس از ۲۴ ساعت جنگ آغاز خواهد شد."
-        push_news("اعلام جنگ تأیید شد", msg, "warning")
-        push_war("declare", f"{attacker_name} به {defender_name} اعلام جنگ کرد: {w.get('reason', '')}", [w["attacker"], w["defender"]])
+        w["status"] = "battle"
+        w["approved_at"] = utcnow().isoformat()
+        w["negotiation_ends"] = None
+        active_wars[w["id"]] = w
+        msg = f"⚔️ اعلان جنگ {attacker_name} علیه {defender_name} تأیید شد و جنگ اکنون آغاز شده است."
+        push_news("آغاز جنگ", msg, "warning")
+        push_war("war_started", msg, [w["attacker"], w["defender"]])
         await notify_world_players(msg)
     elif action == "reject":
         w["status"] = "rejected"
@@ -1718,119 +1931,6 @@ async def admin_review_war(request):
     save_state()
     return web.json_response({"success": True, "message": msg, "war": w})
 
-
-async def perform_battle(request):
-    uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request)
-    wid = data.get("war_id")
-    fronts = data.get("fronts", {})
-    w = active_wars.get(wid)
-    if not w: return web.json_response({"success": False, "error": "no_war"}, status=400)
-    if w["attacker_user"] != uid: return web.json_response({"success": False, "error": "not_attacker"}, status=403)
-    if w.get("resolved"): return web.json_response({"success": False, "error": "resolved"}, status=400)
-
-    atk = players[w["attacker_user"]]
-    duid, dfd = get_player_by_country(w["defender"])
-    if not dfd: return web.json_response({"success": False, "error": "defender_gone"}, status=400)
-
-    def def_power(player, side_kind):
-        p = 0
-        for uid_, u in ARMY_UNITS.items():
-            if u["group"] != side_kind: continue
-            p += player.get("units", {}).get(uid_, 0) * u["defense"] * group_defense_mult(player, side_kind)
-        return p
-
-    def total_units(player, side_kind):
-        return {uid_: player.get("units", {}).get(uid_, 0)
-                for uid_, u in ARMY_UNITS.items() if u["group"] == side_kind}
-
-    sent_atk = {k: max(0, int(fronts.get(k, 0) or 0)) for k in ["land", "air", "naval"]}
-    report = {"attacker": w["attacker"], "defender": w["defender"], "fronts": {},
-              "at": utcnow().isoformat(), "winner": None}
-    attacker_wins = 0; defender_wins = 0; air_winner = None
-
-    has_carrier = atk["units"].get("aircraft_carrier", 0) > 0
-
-    for front in ["air", "naval", "land"]:
-        atk_attack = 0
-        # بدون ناو هواپیمابر، هیچ حملهٔ هوایی ممکن نیست
-        if front == "air" and not has_carrier:
-            dfd_def = def_power(dfd, front) * 1.10
-            dfd_final = dfd_def * (1 + random.uniform(-0.08, 0.08))
-            report["fronts"][front] = {"attacker_power": 0,
-                                       "defender_power": int(dfd_final),
-                                       "winner": "defender"}
-            defender_wins += 1
-            air_winner = w["defender"]
-            continue
-
-        available = total_units(atk, front)
-        requested = sent_atk.get(front, 0)
-        total_available = sum(available.values())
-        if total_available > 0 and requested > 0:
-            ratio = min(1.0, requested / total_available)
-            for uid_, count in available.items():
-                u = ARMY_UNITS[uid_]
-                sent = int(count * ratio)
-                atk_attack += sent * u["attack"]
-                atk["units"][uid_] -= sent
-        dfd_def = def_power(dfd, front) * 1.10
-        if air_winner == w["attacker"] and front in ["naval", "land"]: atk_attack *= 1.15
-        elif air_winner == w["defender"] and front in ["naval", "land"]: dfd_def *= 1.15
-        atk_final = atk_attack * (1 + random.uniform(-0.08, 0.08))
-        dfd_final = dfd_def * (1 + random.uniform(-0.08, 0.08))
-
-        if atk_final > dfd_final and atk_attack > 0:
-            fw = "attacker"; attacker_wins += 1
-            if front == "air": air_winner = w["attacker"]
-            for uid_, c in total_units(dfd, front).items(): dfd["units"][uid_] = int(c * 0.7)
-            for uid_, c in total_units(atk, front).items(): atk["units"][uid_] = int(c * 0.9)
-        else:
-            fw = "defender"; defender_wins += 1
-            if front == "air": air_winner = w["defender"]
-            for uid_, c in total_units(atk, front).items(): atk["units"][uid_] = int(c * 0.7)
-            for uid_, c in total_units(dfd, front).items(): dfd["units"][uid_] = int(c * 0.9)
-
-        report["fronts"][front] = {"attacker_power": int(atk_final), "defender_power": int(dfd_final),
-                                   "winner": fw}
-    report["attacker_wins"] = attacker_wins; report["defender_wins"] = defender_wins
-
-    if attacker_wins >= 2:
-        report["winner"] = "attacker"
-        occupied_countries[w["defender"]] = w["attacker"]
-        transfer_mp = int(dfd.get("manpower", 0) * 0.4)
-        dfd["manpower"] = int(dfd.get("manpower", 0) * 0.6)
-        atk["manpower"] = atk.get("manpower", 0) + transfer_mp
-        if w["penalty"] > 0: atk["money"] = max(0, atk.get("money", 0) - w["penalty"])
-        for k, owner in list(map_holdings.items()):
-            if owner == w["defender"]: map_holdings[k] = w["attacker"]
-        for k, owner in list(strait_holdings.items()):
-            if owner == w["defender"]:
-                strait_holdings[k] = w["attacker"]
-                reset_strait_policy(k)
-        for k in list(site_forces):
-            if site_owner(k) != site_forces[k].get("owner"): del site_forces[k]
-        dfd["is_eliminated"] = True
-        push_news("اشغال کشور",
-            f"{COUNTRIES[w['attacker']]['name']} کشور {COUNTRIES[w['defender']]['name']} را اشغال کرد.")
-    else:
-        report["winner"] = "defender"
-        push_news("دفاع موفق",
-            f"{COUNTRIES[w['defender']]['name']} در برابر {COUNTRIES[w['attacker']]['name']} مقاومت کرد.")
-
-    _an, _dn = COUNTRIES[w["attacker"]]["name"], COUNTRIES[w["defender"]]["name"]
-    push_history("country", f"حملهٔ {_an} به {_dn}", w["attacker"], w["defender"], report["winner"], "")
-    if report["winner"] == "attacker":
-        push_war("occupy", f"{_an} کشور {_dn} را اشغال کرد.", [w["attacker"], w["defender"]])
-    else:
-        push_war("repel", f"{_dn} حملهٔ {_an} را دفع کرد.", [w["attacker"], w["defender"]])
-    report["id"] = str(uuid.uuid4())
-    war_reports.append(report)
-    if len(war_reports) > 100: del war_reports[:50]
-    w["resolved"] = True; w["status"] = "resolved"
-    save_state()
-    return web.json_response({"success": True, "report": report})
 
 # =========================================================
 # API Map sites / Capture
@@ -1854,36 +1954,15 @@ async def get_map_sites(request):
     return web.json_response(sites)
 
 async def capture_site(request):
+    """Legacy endpoint disabled; all territorial capture must be resolved through real force dispatch."""
     uid = get_auth_user_id(request)
-    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
-    data = await read_json(request); site_id = data.get("site_id")
-    if site_id not in MAP_RESOURCES and site_id not in STRAITS_DATA:
-        return web.json_response({"success": False, "error": "invalid_site"}, status=400)
-    if is_mine(site_id):
-        return web.json_response({"success": False, "error": "need_army",
-            "message": "معدن را فقط با ارتش (پیاده‌نظام/تانک) و ناو ترابری می‌شود گرفت؛ از بخش جنگ نیرو اعزام کنید."}, status=400)
-    if uid not in players: players[uid] = create_player(uid)
-    p = players[uid]
-    if not p.get("country"): return web.json_response({"success": False, "error": "no_country"}, status=400)
-    if p.get("units", {}).get("ship", 0) < 1 and p.get("units", {}).get("submarine", 0) < 1:
-        return web.json_response({"success": False, "error": "no_navy",
-                                  "message": "برای تصرف به ناو نیاز دارید."}, status=400)
-    country = p["country"]
-    current = map_holdings.get(site_id) or strait_holdings.get(site_id)
-    if current == country:
-        return web.json_response({"success": False, "error": "already_own"}, status=400)
-    if p["units"].get("ship", 0) > 0: p["units"]["ship"] -= 1
-    else: p["units"]["submarine"] -= 1
-    divert_transits(site_id, country)
-    if site_id in MAP_RESOURCES:
-        map_holdings[site_id] = country
-        push_news("تصرف منبع", f"{COUNTRIES[country]['name']} {MAP_RESOURCES[site_id]['name']} را تصرف کرد.")
-    else:
-        strait_holdings[site_id] = country
-        reset_strait_policy(site_id)
-        push_news("تصرف تنگه", f"{COUNTRIES[country]['name']} {STRAITS_DATA[site_id]['name']} را تصرف کرد.")
-    save_state()
-    return web.json_response({"success": True, "message": "تصرف موفق."})
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    return web.json_response({
+        "success": False,
+        "error": "dispatch_required",
+        "message": "تصرف مستقیم حذف شده است؛ برای تصرف سکو، معدن یا تنگه، از بخش جنگ نیروها را روی نقشه اعزام کنید. برای حمله به دارایی دشمن، اعلان جنگ باید تأیید شده باشد."
+    }, status=400)
 
 # =========================================================
 # نیروها روی نقشه / اخبار و تاریخچهٔ جنگ / ماهواره
@@ -2315,12 +2394,6 @@ def _resolve_strait_passage(t, player):
     # A closed hostile strait is a combat checkpoint. A defeated fleet is lost;
     # a victor captures the strait and continues toward the original destination.
     if owner and owner != cid and policy["closed"]:
-        if have_treaty(cid, owner, "non_aggression"):
-            start_transit(cid, sid, origin, units, travel_minutes(cid, sid, origin), "back", origin=origin)
-            msg = f"عبور {cname(cid)} از {loc_label(sid)} به‌دلیل پیمان عدم تجاوز با {cname(owner)} متوقف شد؛ نیروها بازمی‌گردند."
-            announce("turnback", "عبور از تنگه متوقف شد", msg, [cid, owner])
-            notify_country(cid, "⛔ عبور از تنگه به‌دلیل پیمان عدم تجاوز ممکن نبود؛ نیروها بازمی‌گردند.")
-            return
         _, defender = get_player_by_country(owner)
         guards = garrison(sid)
         attack_power = units_power(units, player, "attack") * (1 + random.uniform(-0.08, 0.08))
@@ -2402,9 +2475,12 @@ def _start_ground_march(t, cid, target, ground, now):
     t["ground_march"] = True
     t.pop("arrival_battle", None)
     t.pop("route_battle", None)
-    msg = f"⚓ بندر {cname(target)} پس از نبرد دریایی در اختیار ناوگان {cname(cid)} قرار گرفت. کشتی‌های باقی‌مانده در بندر می‌مانند؛ {units_count(ground):,} نیروی زمینی با ناو ترابری از بندر به سمت پایتخت حرکت کرد و حدود {seconds} ثانیه دیگر به آن می‌رسد."
-    announce("ground_march_started", f"حرکت زمینی از بندر {cname(target)}", msg, [cid, target])
-    notify_country(cid, msg); notify_country(target, msg)
+    is_colony = target in occupied_countries and occupied_countries.get(target) != target
+    target_label = f"مستعمرهٔ {cname(target)}" if is_colony else cname(target)
+    defender_country = occupied_countries.get(target, target)
+    msg = f"⚓ بندر {target_label} پس از نبرد دریایی در اختیار ناوگان {cname(cid)} قرار گرفت. کشتی‌های باقی‌مانده در بندر می‌مانند؛ {units_count(ground):,} نیروی زمینی با ناو ترابری از بندر به سمت مرکز {target_label} حرکت کرد و حدود {seconds} ثانیه دیگر به آن می‌رسد."
+    announce("ground_march_started", f"حرکت زمینی از بندر {target_label}", msg, [cid, target, defender_country])
+    notify_country(cid, msg); notify_country(defender_country, msg)
     return True
 
 
@@ -2422,90 +2498,148 @@ def _start_ground_battle(t, now):
     t["from"] = "mid"
     t["from_ll"] = list(pos); t["to_ll"] = list(pos)
     t["start"] = now.isoformat(); t["arrive"] = t["arrival_battle"]["ends_at"]
-    msg = f"🪖 نیروهای زمینی {cname(cid)} به پایتخت {cname(target)} رسیدند؛ نبرد زمینی آغاز شد. نتیجه در ۳۰ تا ۶۰ ثانیهٔ آینده همراه با تلفات و مدت نبرد اعلام می‌شود."
-    announce("land_battle_started", f"آغاز نبرد زمینی در {cname(target)}", msg, [cid, target])
-    notify_country(cid, msg); notify_country(target, msg)
+    is_colony = target in occupied_countries and occupied_countries.get(target) != target
+    target_label = f"مستعمرهٔ {cname(target)}" if is_colony else f"پایتخت {cname(target)}"
+    defender_country = occupied_countries.get(target, target)
+    msg = f"🪖 نیروهای زمینی {cname(cid)} به {target_label} رسیدند؛ نبرد زمینی آغاز شد. نتیجه در ۳۰ تا ۶۰ ثانیهٔ آینده همراه با تلفات و مدت نبرد اعلام می‌شود."
+    announce("land_battle_started", f"آغاز نبرد زمینی در {target_label}", msg, [cid, target, defender_country])
+    notify_country(cid, msg); notify_country(defender_country, msg)
+
+
+def _defense_garrison_units(player, groups, colony=False):
+    """Pick defending unit counts. A colony receives one quarter of the occupier's matching home forces."""
+    out = {}
+    units = player.get("units", {})
+    groups = set(groups)
+    for unit_id, unit in ARMY_UNITS.items():
+        if unit.get("group") not in groups:
+            continue
+        count = max(0, int(units.get(unit_id, 0) or 0))
+        if not count:
+            continue
+        out[unit_id] = max(1, (count + 3) // 4) if colony else count
+    if colony and "naval" in groups and out.get("aircraft_carrier", 0) > 0:
+        for unit_id, unit in ARMY_UNITS.items():
+            if unit.get("group") == "air":
+                count = max(0, int(units.get(unit_id, 0) or 0))
+                if count:
+                    out[unit_id] = max(1, (count + 3) // 4)
+    return out
+
+
+def _apply_defender_losses(player, engaged_units, surviving_fraction):
+    """Apply losses only to the engaged slice; do not erase the rest of the occupier's army."""
+    total_lost = 0
+    for unit_id, engaged in (engaged_units or {}).items():
+        current = max(0, int(player.get("units", {}).get(unit_id, 0) or 0))
+        engaged = min(current, max(0, int(engaged or 0)))
+        survivors = int(engaged * max(0.0, min(1.0, surviving_fraction)))
+        lost = max(0, engaged - survivors)
+        player["units"][unit_id] = max(0, current - lost)
+        total_lost += lost
+    return total_lost
 
 
 def resolve_ground_arrival_battle(t):
     cid = t.get("owner"); target = t.get("invasion_target")
     _, attacker = get_player_by_country(cid)
-    _, defender = get_player_by_country(target)
+    defender_country = occupied_countries.get(target, target)
+    _, defender = get_player_by_country(defender_country)
     if not attacker or not defender:
         return
+    is_colony = defender_country != target
     force = _unit_group_subset(t.get("units") or {}, "land")
-    defender_ground = _unit_group_subset(defender.get("units", {}), "land")
+    defender_ground = _defense_garrison_units(defender, {"land"}, colony=is_colony)
     duration = int((t.get("arrival_battle") or {}).get("duration", 30))
     atk = units_power(force, attacker, "attack") * random.uniform(0.92, 1.08)
     dfn = units_power(defender_ground, defender, "defense") * 1.10 * random.uniform(0.92, 1.08)
     front_id = f"front:{target}:{cid}"
+    target_label = f"مستعمرهٔ {cname(target)}" if is_colony else f"پایتخت {cname(target)}"
+
     if not defender_ground or atk > dfn:
         force_before = units_count(force)
         defender_before = units_count(defender_ground)
         survivors = {k: max(1, int(n * 0.65)) for k, n in force.items() if n > 0}
-        for k, n in defender_ground.items(): defender["units"][k] = max(0, int(n * 0.25))
-        defender_after = units_count(_unit_group_subset(defender.get("units", {}), "land"))
+        if is_colony:
+            defender_lost = _apply_defender_losses(defender, defender_ground, 0.25)
+            defender_after = max(0, defender_before - defender_lost)
+        else:
+            for k, n in defender_ground.items():
+                defender["units"][k] = max(0, int(n * 0.25))
+            defender_after = units_count(_unit_group_subset(defender.get("units", {}), "land"))
         previous = site_forces.get(front_id, {}).get("units", {})
         _add_units(previous, survivors)
         site_forces[front_id] = {"owner": cid, "units": previous}
-        result = (f"🏆 نبرد زمینی در پایتخت {cname(target)} پس از {duration} ثانیه به پیروزی {cname(cid)} انجامید؛ "
-                  f"جبههٔ پایتخت به تصرف نیروهای مهاجم درآمد. مهاجم {force_before-units_count(survivors):,} یگان از دست داد "
-                  f"و {units_count(survivors):,} باقی ماند؛ مدافع {defender_before-defender_after:,} یگان از دست داد "
-                  f"و {defender_after:,} نیروی زمینی باقی دارد. قدرت حمله {int(atk)} در برابر دفاع {int(dfn)}.")
+        result = (f"🏆 نبرد زمینی در {target_label} پس از {duration} ثانیه به پیروزی {cname(cid)} رسید؛ "
+                  f"مهاجم {force_before-units_count(survivors):,} یگان از دست داد و {units_count(survivors):,} باقی ماند؛ "
+                  f"مدافع {defender_before-defender_after:,} یگان از دست داد. قدرت حمله {int(atk)} در برابر دفاع {int(dfn)}.")
         winner = "attacker"
-        occupy_country(cid, target)
+        if is_colony:
+            occupy_colony(cid, target, defender_country)
+        else:
+            occupy_country(cid, target)
     else:
         defender_before = units_count(defender_ground)
         force_before = units_count(force)
-        for k, n in defender_ground.items(): defender["units"][k] = max(0, int(n * 0.85))
-        defender_after = units_count(_unit_group_subset(defender.get("units", {}), "land"))
+        if is_colony:
+            defender_lost = _apply_defender_losses(defender, defender_ground, 0.85)
+            defender_after = max(0, defender_before - defender_lost)
+        else:
+            for k, n in defender_ground.items():
+                defender["units"][k] = max(0, int(n * 0.85))
+            defender_after = units_count(_unit_group_subset(defender.get("units", {}), "land"))
         returned = {k: int(n * 0.20) for k, n in force.items() if int(n * 0.20) > 0}
         _add_units(attacker["units"], returned)
-        result = (f"🛡️ نبرد زمینی در پایتخت {cname(target)} پس از {duration} ثانیه به پیروزی مدافعان انجامید؛ "
-                  f"نیروهای {cname(cid)} عقب نشستند؛ مهاجم {force_before-units_count(returned):,} یگان از دست داد "
-                  f"و {units_count(returned):,} به خانه بازگشت. مدافع {defender_before-defender_after:,} یگان از دست داد "
-                  f"و {defender_after:,} نیروی زمینی باقی دارد. قدرت حمله {int(atk)} در برابر دفاع {int(dfn)}.")
+        result = (f"🛡️ نبرد زمینی در {target_label} پس از {duration} ثانیه به پیروزی مدافعان رسید؛ "
+                  f"مهاجم {force_before-units_count(returned):,} یگان از دست داد و {units_count(returned):,} به خانه بازگشت؛ "
+                  f"مدافع {defender_before-defender_after:,} یگان از دست داد. قدرت حمله {int(atk)} در برابر دفاع {int(dfn)}.")
         winner = "defender"
-    push_history("invasion", f"نبرد زمینی در پایتخت {cname(target)}", cid, target, winner,
+    push_history("invasion", f"نبرد زمینی در {target_label}", cid, target, winner,
                  f"حمله {int(atk)} در برابر دفاع {int(dfn)}؛ مدت {duration} ثانیه")
-    announce("invasion_result", f"نتیجهٔ نبرد زمینی در {cname(target)}", result, [cid, target])
-    notify_country(cid, result); notify_country(target, result); save_state()
+    announce("invasion_result", f"نتیجهٔ نبرد زمینی در {target_label}", result, [cid, target, defender_country])
+    notify_country(cid, result); notify_country(defender_country, result)
+    save_state()
 
 
 def resolve_country_arrival(t, cid, p, target):
-    _, defender = get_player_by_country(target)
-    if not defender:
+    defender_country = occupied_countries.get(target, target)
+    _, defender = get_player_by_country(defender_country)
+    if not defender or defender_country == cid:
         _add_units(p["units"], t["units"]); return False
-    if not _war_between(cid, target):
+    if not _war_between(cid, defender_country):
         _add_units(p["units"], t["units"])
-        msg = f"نیروهای {cname(cid)} به بندر {cname(target)} رسیدند اما جنگ فعال نبود؛ نیروها بازگشتند."
-        announce("turnback", "بازگشت نیرو", msg, [cid, target]); notify_country(cid, msg); notify_country(target, msg); return False
+        msg = f"نیروهای {cname(cid)} به بندر {cname(target)} رسیدند اما جنگ فعالی با مالک آن وجود نداشت؛ نیروها بازگشتند."
+        announce("turnback", "بازگشت نیرو", msg, [cid, target, defender_country])
+        notify_country(cid, msg); notify_country(defender_country, msg); return False
+    is_colony = defender_country != target
     force = dict(t.get("units") or {})
     fleet = _unit_group_subset(force, "naval")
     ground = _unit_group_subset(force, "land")
-    # Carrier-based aircraft stay with the fleet at the captured port; they do not join the land battle.
+    # هواگردها تنها در ناوگانی همراه هواپیمابر مؤثرند.
     if fleet.get("aircraft_carrier", 0) > 0:
         fleet.update(_unit_group_subset(force, "air"))
-    defender_fleet = _unit_group_subset(defender.get("units", {}), "naval")
-    if defender_fleet.get("aircraft_carrier", 0) > 0:
-        defender_fleet.update(_unit_group_subset(defender.get("units", {}), "air"))
+    defender_fleet = _defense_garrison_units(defender, {"naval"}, colony=is_colony)
     fleet_atk = units_power(fleet, p, "attack") * random.uniform(0.92, 1.08)
     fleet_def = units_power(defender_fleet, defender, "defense") * 1.10 * random.uniform(0.92, 1.08)
     duration = int((t.get("arrival_battle") or {}).get("duration", 30))
+    target_label = f"بندر مستعمرهٔ {cname(target)}" if is_colony else f"بندر {cname(target)}"
     port_won = not defender_fleet or fleet_atk > fleet_def
     if not port_won:
         defender_before = units_count(defender_fleet)
         attacker_lost = units_count(force)
-        for k, n in defender_fleet.items(): defender["units"][k] = max(0, int(n * 0.85))
-        defender_after = units_count(_unit_group_subset(defender.get("units", {}), "naval"))
-        end_msg = (f"⚓ نبرد بندر {cname(target)} پس از {duration} ثانیه به پیروزی مدافعان انجامید؛ "
-                   f"عملیات آبی‌ـ‌خاکی {cname(cid)} شکست خورد و {attacker_lost:,} یگان مهاجم از دست رفت. "
-                   f"ناوگان مدافع {defender_before-defender_after:,} یگان از دست داد و {defender_after:,} یگان باقی ماند.")
-        push_history("port", f"نبرد بندر {cname(target)}", cid, target, "defender", f"حمله {int(fleet_atk)} در برابر دفاع {int(fleet_def)}؛ مدت {duration} ثانیه")
-        announce("port_battle_result", f"نتیجهٔ نبرد بندر {cname(target)}", end_msg, [cid, target])
-        notify_country(cid, end_msg); notify_country(target, end_msg); save_state(); return False
+        if is_colony:
+            defender_lost = _apply_defender_losses(defender, defender_fleet, 0.85)
+            defender_after = max(0, defender_before - defender_lost)
+        else:
+            for k, n in defender_fleet.items(): defender["units"][k] = max(0, int(n * 0.85))
+            defender_after = units_count(_unit_group_subset(defender.get("units", {}), "naval"))
+        end_msg = (f"⚓ نبرد {target_label} پس از {duration} ثانیه به پیروزی مدافعان انجامید؛ "
+                   f"عملیات آبی‌ـ‌خاکی {cname(cid)} شکست خورد و {attacker_lost:,} یگان مهاجم از دست رفت؛ "
+                   f"مدافع {defender_before-defender_after:,} یگان از دست داد.")
+        push_history("port", f"نبرد {target_label}", cid, target, "defender", f"حمله {int(fleet_atk)} در برابر دفاع {int(fleet_def)}؛ مدت {duration} ثانیه")
+        announce("port_battle_result", f"نتیجهٔ نبرد {target_label}", end_msg, [cid, target, defender_country])
+        notify_country(cid, end_msg); notify_country(defender_country, end_msg); save_state(); return False
 
-    # Winning ships stay at the port and never move into the capital battle.
     fleet_before = units_count(fleet)
     defender_before = units_count(defender_fleet)
     fleet_survivors = {k: max(0, int(n * 0.75)) for k, n in fleet.items() if n > 0}
@@ -2515,18 +2649,24 @@ def resolve_country_arrival(t, cid, p, target):
         _add_units(old, {k: n for k, n in fleet_survivors.items() if n > 0})
         site_forces[port_id] = {"owner": cid, "units": old}
     if defender_fleet:
-        for k, n in defender_fleet.items(): defender["units"][k] = max(0, int(n * 0.35))
-    defender_after = units_count(_unit_group_subset(defender.get("units", {}), "naval"))
-    port_msg = (f"✅ نبرد دریایی بندر {cname(target)} پس از {duration} ثانیه به پیروزی {cname(cid)} انجامید؛ "
-                f"ناوگان مهاجم {fleet_before-units_count(fleet_survivors):,} یگان از دست داد و {units_count(fleet_survivors):,} باقی ماند. "
-                f"مدافع {defender_before-defender_after:,} یگان دریایی از دست داد و {defender_after:,} باقی ماند؛ کشتی‌های مهاجم در بندر می‌مانند.")
-    push_history("port", f"نبرد بندر {cname(target)}", cid, target, "attacker", f"حمله {int(fleet_atk)} در برابر دفاع {int(fleet_def)}؛ مدت {duration} ثانیه")
-    announce("port_battle_result", f"نتیجهٔ نبرد بندر {cname(target)}", port_msg, [cid, target])
-    notify_country(cid, port_msg); notify_country(target, port_msg)
+        if is_colony:
+            defender_lost = _apply_defender_losses(defender, defender_fleet, 0.35)
+            defender_after = max(0, defender_before - defender_lost)
+        else:
+            for k, n in defender_fleet.items(): defender["units"][k] = max(0, int(n * 0.35))
+            defender_after = units_count(_unit_group_subset(defender.get("units", {}), "naval"))
+    else:
+        defender_after = 0
+    port_msg = (f"✅ نبرد دریایی در {target_label} پس از {duration} ثانیه به پیروزی {cname(cid)} رسید؛ "
+                f"ناوگان مهاجم {fleet_before-units_count(fleet_survivors):,} یگان از دست داد و {units_count(fleet_survivors):,} باقی ماند؛ "
+                f"مدافع {defender_before-defender_after:,} یگان از دست داد؛ کشتی‌های باقی‌ماندهٔ مهاجم در بندر می‌مانند.")
+    push_history("port", f"نبرد {target_label}", cid, target, "attacker", f"حمله {int(fleet_atk)} در برابر دفاع {int(fleet_def)}؛ مدت {duration} ثانیه")
+    announce("port_battle_result", f"نتیجهٔ نبرد {target_label}", port_msg, [cid, target, defender_country])
+    notify_country(cid, port_msg); notify_country(defender_country, port_msg)
     if not any(ground.values()):
         save_state(); return False
-    # A separate 10–60 second port-to-capital land march follows the naval victory.
     return _start_ground_march(t, cid, target, ground, utcnow())
+
 
 def resolve_arrival(t):
     cid = t["owner"]; units = t["units"]; dst = t["to"]
@@ -2554,9 +2694,6 @@ def resolve_arrival(t):
     if dst == "home":
         _add_units(p["units"], units); return
     meta = site_meta(dst); kind = meta["kind"]; owner = site_owner(dst)
-    if owner and owner != cid and have_treaty(cid, owner, "non_aggression"):
-        _add_units(p["units"], units)
-        announce("turnback", "بازگشت نیرو", f"{cname(cid)} نیروهایش را که به {meta['name']} رسیده بودند بازگرداند؛ دلیل: پیمان عدم تجاوز با {cname(owner)}.", [cid, owner]); return
     if owner == cid:
         g = site_forces.get(dst)
         if not g or g.get("owner") != cid: g = site_forces[dst] = {"owner": cid, "units": {}}
@@ -2716,17 +2853,27 @@ def _finish_route_battle(battle_id, now):
 
 def _start_arrival_battle(t, now):
     cid = t.get("owner"); target = str(t.get("to", "")).split(":", 1)[1]
+    defender_country = occupied_countries.get(target, target)
+    is_colony = defender_country != target
+    target_label = f"مستعمرهٔ {cname(target)}" if is_colony else cname(target)
     seconds = random.randint(30, 60)
     pos = loc_coords(cid, t.get("to"))
     if not pos: pos = loc_coords(target, "home")
     t["arrival_battle"] = {"phase": "port", "started_at": now.isoformat(), "ends_at": (now + timedelta(seconds=seconds)).isoformat(), "position": list(pos or (0, 0)), "duration": seconds}
     t["from_ll"] = list(pos or (0, 0)); t["to_ll"] = list(pos or (0, 0))
     t["from"] = "mid"; t["start"] = now.isoformat(); t["arrive"] = t["arrival_battle"]["ends_at"]
-    msg = f"⚓ نیروی {cname(cid)} به بندر {cname(target)} رسید؛ نبرد بندر آغاز شد و نتیجه بین ۳۰ تا ۶۰ ثانیهٔ آینده اعلام می‌شود."
-    announce("port_battle_started", f"آغاز نبرد در بندر {cname(target)}", msg, [cid, target]); notify_country(cid, msg); notify_country(target, msg)
+    msg = f"⚓ نیروی {cname(cid)} به بندر {target_label} رسید؛ نبرد بندر آغاز شد و نتیجه بین ۳۰ تا ۶۰ ثانیهٔ آینده اعلام می‌شود."
+    announce("port_battle_started", f"آغاز نبرد در بندر {target_label}", msg, [cid, target, defender_country])
+    notify_country(cid, msg); notify_country(defender_country, msg)
 
 def process_transits():
-    changed = _check_transit_encounters(utcnow())
+    # حرکت و درگیری فقط در بازهٔ فعال بازی مجاز است؛ پیش از شروع و پس از روز ۳۱ منجمد می‌شود.
+    meta = _world_meta()
+    started = parse_dt(meta.get("game_started_at"))
+    now = utcnow()
+    if not started or meta.get("game_finished") or now >= started + timedelta(days=GAME_TOTAL_DAYS):
+        return
+    changed = _check_transit_encounters(now)
     now = utcnow()
     seen_battles = set()
     for t in list(transits):
@@ -2791,9 +2938,14 @@ async def dispatch_forces(request):
     if dst != "home" and not site_meta(dst): return _bad("مقصد نامعتبر است.")
     if src != "home" and (not site_meta(src) or site_owner(src) != cid): return _bad("این مکان در اختیار شما نیست.")
     target_country = dst.split(":", 1)[1] if isinstance(dst, str) and dst.startswith("country:") else None
+    target_owner = occupied_countries.get(target_country, target_country) if target_country else None
     if target_country:
-        if target_country == cid: return _bad("نمی‌توانید به کشور خودتان حمله کنید.")
-        if not _war_between(cid, target_country): return _bad("برای اعزام به کشور، جنگ باید تأیید شده و مهلت مذاکره تمام شده باشد.")
+        if target_country == cid or target_owner == cid:
+            return _bad("نمی‌توانید به کشور یا مستعمرهٔ خودتان حمله کنید.")
+        if target_country not in COUNTRIES:
+            return _bad("کشور مقصد معتبر نیست.")
+        if not _war_between(cid, target_owner):
+            return _bad("برای حمله به کشور اصلی یا مستعمرهٔ آن، ابتدا علیه کشور مالک اعلان جنگ کنید.")
     pool = p["units"] if src == "home" else garrison(src)
     units = {}
     for k, v in (data.get("units") or {}).items():
@@ -2803,9 +2955,9 @@ async def dispatch_forces(request):
     if not units: return _bad("هیچ یگانی انتخاب نشده.")
     for k, n in units.items():
         if pool.get(k, 0) < n: return _bad("تعداد انتخابی بیشتر از موجودی آن مکان است.")
-    owner = target_country or (site_owner(dst) if dst != "home" else None)
-    if owner and owner != cid and have_treaty(cid, owner, "non_aggression"):
-        return _bad("با این کشور پیمان عدم تجاوز دارید.")
+    owner = target_owner if target_country else (site_owner(dst) if dst != "home" else None)
+    if owner and owner != cid and not _war_between(cid, owner):
+        return _bad("برای حمله به کشور اصلی یا مستعمره‌ها و دارایی‌های نقشهٔ آن، ابتدا باید علیه کشور مالک اعلان جنگ کنید.")
 
     if dst != "home":
         combined = dict(units)
@@ -2846,8 +2998,6 @@ async def dispatch_forces(request):
         if sid in NAVAL_WAYPOINTS: continue
         sid_owner = site_owner(sid)
         policy = strait_policy(sid, cid)
-        if sid_owner and sid_owner != cid and policy["closed"] and have_treaty(cid, sid_owner, "non_aggression"):
-            return _bad(f"مسیر از تنگهٔ بستهٔ {STRAITS_DATA[sid]['name']} می‌گذرد و پیمان عدم تجاوز اجازهٔ درگیری نمی‌دهد.")
         if sid_owner and sid_owner != cid and not policy["closed"]:
             toll_due += max(0, int(policy.get("toll", 0)))
     if p.get("money", 0) < toll_due:
@@ -3877,27 +4027,28 @@ def compute_rankings():
     rows = []
     for uid, p in players.items():
         cid = p.get("country")
-        if not cid: continue
+        if not cid or p.get("is_eliminated"):
+            continue
         ensure_player_fields(p); recompute_army(p); rates = compute_rates(p)
         eco = max(0, int(rates["net_income"] // 1000)); mil = p.get("army", 0)
-        dip = 0
-        for t in active_treaties:
-            if t["country_a"] == cid or t["country_b"] == cid: dip += 100
-        for u in unions.values():
-            if cid in u.get("members", []): dip += 150
         dev = sum(p.get("infra_levels", {}).values()) * 50
         terr = (sum(1 for o in map_holdings.values() if o == cid)
                 + sum(1 for o in strait_holdings.values() if o == cid)
                 + 5 * sum(1 for o in occupied_countries.values() if o == cid))
         rows.append({"country": cid, "name": COUNTRIES[cid]["name"], "flag": COUNTRIES[cid]["flag"],
-                     "economy": eco, "military": mil, "territory": terr, "diplomacy": dip,
-                     "development": dev, "is_eliminated": p.get("is_eliminated", False)})
-    W = {"economy": 30, "military": 25, "territory": 20, "development": 15, "diplomacy": 10}
-    mx = {k: max([r[k] for r in rows] + [0]) for k in W}
-    for r in rows:
-        r["overall"] = round(sum(W[k] * r[k] / mx[k] for k in W if mx[k] > 0), 1)
-    rows.sort(key=lambda x: x["overall"], reverse=True)
-    for i, r in enumerate(rows): r["rank"] = i + 1
+                     "economy": eco, "military": mil, "territory": terr,
+                     "development": dev, "is_eliminated": False})
+    weights = {"economy": 35, "military": 30, "territory": 20, "development": 15}
+    maxima = {key: max([row[key] for row in rows] + [0]) for key in weights}
+    for row in rows:
+        row["overall"] = round(sum(weights[key] * row[key] / maxima[key] for key in weights if maxima[key] > 0), 1)
+    rows.sort(key=lambda row: row["overall"], reverse=True)
+    for i, row in enumerate(rows): row["rank"] = i + 1
+    meta = _world_meta()
+    winner = meta.get("winner") or {}
+    if meta.get("game_finished") and winner:
+        for row in rows:
+            row["winner"] = row["country"] == winner.get("country")
     return rows
 
 async def get_rankings(request):
@@ -3910,11 +4061,9 @@ async def get_rankings(request):
 # Loans (وام بین کشورها)
 # =========================================================
 def _game_window():
-    starts = [parse_dt(p.get("started_at")) for p in players.values() if p.get("started_at")]
-    starts = [s for s in starts if s]
-    if not starts: return None, None
-    start = min(starts)
-    return start, start + timedelta(days=GAME_TOTAL_DAYS)
+    started = parse_dt(_world_meta().get("game_started_at"))
+    if not started: return None, None
+    return started, started + timedelta(days=GAME_TOTAL_DAYS)
 
 def loan_rate_for_hours(hours):
     steps = int(hours // LOAN_INTEREST_STEP_HOURS)
@@ -4006,6 +4155,10 @@ def loan_garnish(player, available):
     return _apply_payment(l, available)
 
 def loan_tick():
+    meta = _world_meta()
+    started = parse_dt(meta.get("game_started_at"))
+    if not started or meta.get("game_finished") or utcnow() >= started + timedelta(days=GAME_TOTAL_DAYS):
+        return
     now = utcnow(); changed = False
     _, end = _game_window()
     lending_ok, _why = loan_lending_open()
@@ -4154,6 +4307,10 @@ async def vip_command(message: types.Message):
 # =========================================================
 def welfare_tick():
     import random
+    meta = _world_meta()
+    started = parse_dt(meta.get("game_started_at"))
+    if not started or meta.get("game_finished") or utcnow() >= started + timedelta(days=GAME_TOTAL_DAYS):
+        return
     now = utcnow(); changed = False
     for uid_, p in players.items():
         cid = p.get("country")
@@ -4293,10 +4450,6 @@ def _admin_player_row(uid, p):
                        "units": dict((garrison_data or {}).get("units", {}) or {}),
                        "owner": (garrison_data or {}).get("owner")}
                       for sid, garrison_data in site_forces.items() if (garrison_data or {}).get("owner") == cid],
-        "treaties": [{**t, "with_country": t.get("country_b") if t.get("country_a") == cid else t.get("country_a"),
-                      "with_country_name": COUNTRIES.get(t.get("country_b") if t.get("country_a") == cid else t.get("country_a"), {}).get("name", "—")}
-                     for t in active_treaties if cid and cid in (t.get("country_a"), t.get("country_b"))
-                     and (not parse_dt(t.get("expires_at")) or parse_dt(t.get("expires_at")) > utcnow())],
         "loans": [{"id": l.get("id"), "lender": l.get("lender"), "borrower": l.get("borrower"),
                    "amount": int(l.get("amount", 0) or 0), "remaining": int(l.get("remaining", 0) or 0),
                    "status": l.get("status", "unknown")}
@@ -4323,7 +4476,7 @@ async def admin_overview(request):
         except Exception as exc:
             logging.warning("admin overview player %s: %s", uid, exc)
     rows.sort(key=lambda item: (item.get("country") is None, item.get("country_name", ""), item["user_id"]))
-    taken = len({r["country"] for r in rows if r.get("country")})
+    taken = len({r["country"] for r in rows if r.get("country")} | set(occupied_countries.keys()))
     total_money = sum(r["money"] for r in rows)
     if rows: save_state()
     recent = []
@@ -4548,7 +4701,7 @@ async def create_web_app():
     app.router.add_get("/api/worlds", get_worlds)
     for path, h in [
         ("/api/player", get_player), ("/api/countries", get_countries),
-        ("/api/army-units", get_army_units), ("/api/diplomacy", get_diplomacy),
+        ("/api/army-units", get_army_units),
         ("/api/wars", get_wars), ("/api/map-sites", get_map_sites),
         ("/api/announcements", get_announcements), ("/api/announcements/status", get_announcement_status), ("/api/announcement", get_announcement_detail),
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
@@ -4561,8 +4714,7 @@ async def create_web_app():
     for path, h in [
         ("/api/select-country", select_country), ("/api/upgrade-infra", upgrade_infra),
         ("/api/upgrade-economy", upgrade_economy), ("/api/train-unit", train_unit),
-        ("/api/propose-treaty", propose_treaty), ("/api/respond-treaty", respond_treaty),
-        ("/api/war/declare", declare_war), ("/api/war/peace", peace_war), ("/api/war/battle", perform_battle),
+        ("/api/war/declare", declare_war),
         ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/recall", recall_forces),
         ("/api/satellite/launch", sat_launch), ("/api/satellite/scan-site", sat_scan_site),
         ("/api/satellite/scan-country", sat_scan_country),
@@ -4584,6 +4736,8 @@ async def create_web_app():
         ("/api/admin/war/review", admin_review_war)]:
         app.router.add_post(path, world_scoped(h))
     app.router.add_post("/api/admin/worlds/create", admin_create_world)
+    app.router.add_post("/api/admin/world/start", world_scoped(admin_start_world))
+    app.router.add_post("/api/admin/world/registration", world_scoped(admin_set_world_registration))
 
     app.router.add_route("OPTIONS", "/{tail:.*}", lambda r: web.Response())
     return app
@@ -4595,6 +4749,29 @@ async def start_web_server():
     site = web.TCPSite(runner, "0.0.0.0", port); await site.start()
     logging.info("WEB SERVER STARTED | port=%s", port)
 
+
+async def _announce_season_transition_if_needed():
+    meta = _world_meta()
+    if not parse_dt(meta.get("game_started_at")) or meta.get("game_finished"):
+        return
+    info = get_game_time(at_time=utcnow())
+    season = info.get("season")
+    if not season or season == "در انتظار شروع" or season == meta.get("last_announced_season"):
+        return
+    effects = SEASON_EFFECTS.get(season, SEASON_EFFECTS["بهار"])
+    message = (
+        f"🌦️ فصل {season} آغاز شد (روز {info.get('day')}/{GAME_TOTAL_DAYS}). "
+        f"اثر فصل: درآمد روزانه {effects['income_pct']:+d}٪؛ "
+        f"مصرف غذا و نفت {effects['food_oil_consumption_pct']:+d}٪؛ "
+        f"تولید منابع {effects['resource_production_pct']:+d}٪؛ "
+        f"تولید نیروی انسانی {effects['manpower_production_pct']:+d}٪."
+    )
+    meta["last_announced_season"] = season
+    push_news(f"آغاز فصل {season}", message, "warning" if season in ("پاییز", "زمستان") else "info")
+    push_war("season_changed", message, [])
+    await notify_world_players(message)
+
+
 async def _run_ticks_for_all_worlds(include_transits=False):
     async with WORLD_SWITCH_LOCK:
         previous = str(active_world_id)
@@ -4602,7 +4779,9 @@ async def _run_ticks_for_all_worlds(include_transits=False):
         for wid in sorted(worlds_registry.keys(), key=lambda x: int(x)):
             _activate_world(wid)
             try:
+                finalize_world_if_due()
                 await check_wars_tick()
+                await _announce_season_transition_if_needed()
                 welfare_tick()
                 loan_tick()
                 if include_transits: process_transits()
