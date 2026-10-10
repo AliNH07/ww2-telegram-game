@@ -2330,6 +2330,153 @@ document.querySelectorAll(".nav-item").forEach(item => {
     });
 });
 
+/* =========================================================
+   پنل مدیریت اختصاصی مدیر اصلی
+========================================================= */
+const ADMIN_TELEGRAM_ID = 8290076602;
+let adminOverviewCache = null;
+let adminSelectedPlayerId = null;
+const adminCountryLabels = {germany:"آلمان",britain:"بریتانیا",ussr:"شوروی",usa:"آمریکا",france:"فرانسه",italy:"ایتالیا",china:"چین",japan:"ژاپن"};
+const isAdminAccount = Number(userId) === ADMIN_TELEGRAM_ID;
+const adminMenuButton = document.getElementById("open-admin-menu");
+if (adminMenuButton) adminMenuButton.classList.toggle("hidden", !isAdminAccount);
+
+const gameMenuButton = document.getElementById("game-menu-button");
+const gameMenuPanel = document.getElementById("game-menu-panel");
+function closeGameMenu() { gameMenuPanel?.classList.add("hidden"); }
+gameMenuButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!gameMenuPanel) return;
+    gameMenuPanel.classList.toggle("hidden");
+});
+gameMenuPanel?.addEventListener("click", async (event) => {
+    const item = event.target.closest("[data-menu-page], #open-admin-menu");
+    if (!item) return;
+    closeGameMenu();
+    if (item.id === "open-admin-menu") {
+        if (!isAdminAccount) { showToast("دسترسی ندارید.", "error"); return; }
+        showGamePage("admin"); await loadAdminPanel(); return;
+    }
+    const page = item.dataset.menuPage;
+    showGamePage(page);
+    if (page === "map") setTimeout(() => initWorldMap(), 30);
+    else if (page === "communications") { resetNewsFilter(); loadAnnouncements(); loadUnion(); loadNews(); }
+    else if (page === "home") updateHomeStats();
+});
+document.addEventListener("click", (event) => {
+    if (gameMenuPanel && !gameMenuPanel.classList.contains("hidden") && !gameMenuPanel.contains(event.target) && event.target !== gameMenuButton) closeGameMenu();
+});
+
+function adminFormatNumber(value) { return Math.round(Number(value || 0)).toLocaleString("en-US"); }
+function adminPlayerMatches(player, q) {
+    if (!q) return true;
+    return `${player.user_id} ${player.country_name} ${player.country || ""}`.toLowerCase().includes(q.toLowerCase());
+}
+async function loadAdminPanel() {
+    if (!isAdminAccount) { showGamePage("home"); showToast("این بخش فقط برای مدیر اصلی است.", "error"); return; }
+    const error = document.getElementById("admin-access-error");
+    error?.classList.add("hidden");
+    const list = document.getElementById("admin-player-list");
+    if (list && !adminOverviewCache) list.innerHTML = `<div class="admin-empty"><span class="admin-loader"></span>در حال دریافت اطلاعات بازی…</div>`;
+    try {
+        const data = await apiGet("/api/admin/overview");
+        if (!data?.success) {
+            if (error) { error.textContent = data?.message || (data?.error === "forbidden" ? "دسترسی به پنل مدیریت رد شد." : "احراز هویت تلگرام تأیید نشد؛ بازی را از داخل تلگرام باز کن."); error.classList.remove("hidden"); }
+            if (list) list.innerHTML = `<div class="admin-empty">اطلاعات مدیریت دریافت نشد.</div>`;
+            return;
+        }
+        adminOverviewCache = data;
+        renderAdminOverview();
+    } catch (e) {
+        if (error) { error.textContent = "ارتباط با سرور برقرار نشد. دوباره تلاش کن."; error.classList.remove("hidden"); }
+        if (list) list.innerHTML = `<div class="admin-empty">خطا در دریافت اطلاعات.</div>`;
+    }
+}
+function renderAdminOverview() {
+    if (!adminOverviewCache) return;
+    const data = adminOverviewCache;
+    const playersList = data.players || [];
+    const el = id => document.getElementById(id);
+    if (el("admin-total-players")) el("admin-total-players").textContent = adminFormatNumber(playersList.length);
+    if (el("admin-country-count")) el("admin-country-count").textContent = adminFormatNumber(data.countries_taken || 0);
+    if (el("admin-total-money")) el("admin-total-money").textContent = "$" + adminFormatNumber(data.total_money || 0);
+    if (el("admin-player-count")) el("admin-player-count").textContent = adminFormatNumber(playersList.length);
+    const q = el("admin-player-search")?.value?.trim() || "";
+    const list = el("admin-player-list");
+    const filtered = playersList.filter(p => adminPlayerMatches(p, q));
+    if (list) {
+        if (!filtered.length) list.innerHTML = `<div class="admin-empty">بازیکنی مطابق جستجو پیدا نشد.</div>`;
+        else list.innerHTML = filtered.map(p => `<button type="button" class="admin-player-row ${Number(adminSelectedPlayerId) === Number(p.user_id) ? "selected" : ""} ${p.is_eliminated ? "eliminated" : ""}" data-admin-player="${p.user_id}"><span class="admin-player-flag">${escapeHtml(p.country_flag || "🌐")}</span><span class="admin-player-main"><b>${escapeHtml(p.country_name || "بدون کشور")}</b><small>ID: ${p.user_id}${p.vip ? " · VIP" : ""}${p.is_eliminated ? " · حذف‌شده" : ""}</small></span><span class="admin-player-metrics"><b>$${adminFormatNumber(p.money)}</b><small>نیرو ${adminFormatNumber(p.manpower)}</small></span><span class="admin-player-chevron">›</span></button>`).join("");
+    }
+    const selected = playersList.find(p => Number(p.user_id) === Number(adminSelectedPlayerId));
+    if (selected) renderAdminPlayerEditor(selected);
+    else { el("admin-player-editor")?.classList.add("hidden"); }
+    const news = el("admin-recent-news");
+    if (news) {
+        const items = data.recent_news || [];
+        news.innerHTML = items.length ? items.map(n => `<article class="admin-news-row"><span class="admin-news-dot"></span><div><b>${escapeHtml(n.title || "خبر")}</b><p>${escapeHtml(n.text || "")}</p><small>${escapeHtml(n.at ? new Date(n.at).toLocaleString("fa-IR") : "")}</small></div></article>`).join("") : `<div class="admin-empty">هنوز خبری ثبت نشده است.</div>`;
+    }
+}
+function renderAdminPlayerEditor(p) {
+    const el = id => document.getElementById(id);
+    el("admin-player-editor")?.classList.remove("hidden");
+    if (el("admin-editor-title")) el("admin-editor-title").textContent = `${p.country_flag || "🌐"} ${p.country_name || "بدون کشور"}`;
+    if (el("admin-editor-subtitle")) el("admin-editor-subtitle").textContent = `شناسهٔ تلگرام: ${p.user_id} · درآمد خالص روزانه: $${adminFormatNumber(p.daily_income)}`;
+    for (const key of ["money", "manpower"]) if (el(`admin-edit-${key}`)) el(`admin-edit-${key}`).value = Number(p[key] || 0);
+    for (const key of ["food", "steel", "uranium", "oil"]) if (el(`admin-edit-${key}`)) el(`admin-edit-${key}`).value = Number(p.resources?.[key] || 0);
+    if (el("admin-edit-country")) el("admin-edit-country").value = p.country || "";
+    const vip = el("admin-toggle-vip"); if (vip) { vip.textContent = p.vip ? "✓ غیرفعال‌کردن VIP" : "✦ فعال‌کردن VIP"; vip.classList.toggle("enabled", !!p.vip); }
+    const out = el("admin-toggle-eliminated"); if (out) { out.textContent = p.is_eliminated ? "↩ بازگرداندن بازیکن" : "⛔ حذف بازیکن از بازی"; out.classList.toggle("danger", !p.is_eliminated); }
+}
+async function adminApplyPlayerChange(field, value) {
+    if (!isAdminAccount || adminSelectedPlayerId == null) return;
+    try {
+        const result = await apiPost("/api/admin/player/update", { user_id: Number(adminSelectedPlayerId), field, value });
+        if (!result?.success) { showToast(result?.message || "تغییر ذخیره نشد.", "error"); return; }
+        showToast(result.message || "ذخیره شد.", "success");
+        await loadAdminPanel();
+    } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+}
+document.getElementById("admin-refresh")?.addEventListener("click", () => loadAdminPanel());
+document.getElementById("admin-player-search")?.addEventListener("input", () => renderAdminOverview());
+document.getElementById("admin-player-list")?.addEventListener("click", event => {
+    const row = event.target.closest("[data-admin-player]"); if (!row) return;
+    adminSelectedPlayerId = Number(row.dataset.adminPlayer); renderAdminOverview();
+});
+document.querySelectorAll("[data-admin-save]").forEach(button => button.addEventListener("click", () => {
+    const field = button.dataset.adminSave;
+    const fieldEl = document.getElementById(`admin-edit-${field}`);
+    const value = field === "country" ? (fieldEl?.value || "") : Number(fieldEl?.value);
+    if (field !== "country" && (!Number.isFinite(value) || value < 0 || !Number.isInteger(value))) { showToast("یک عدد صحیح و صفر یا بیشتر وارد کن.", "error"); return; }
+    adminApplyPlayerChange(field, value);
+}));
+document.querySelectorAll("[data-admin-toggle]").forEach(button => button.addEventListener("click", () => {
+    const p = adminOverviewCache?.players?.find(x => Number(x.user_id) === Number(adminSelectedPlayerId));
+    if (!p) return;
+    const field = button.dataset.adminToggle;
+    if (field === "is_eliminated" && !p.is_eliminated && !confirm("این بازیکن از بازی حذف شود؟")) return;
+    adminApplyPlayerChange(field, !p[field]);
+}));
+document.querySelectorAll("[data-admin-tab]").forEach(button => button.addEventListener("click", () => {
+    const tab = button.dataset.adminTab;
+    document.querySelectorAll("[data-admin-tab]").forEach(b => b.classList.toggle("active", b === button));
+    document.querySelectorAll(".admin-panel").forEach(panel => panel.classList.toggle("hidden", panel.id !== `admin-panel-${tab}`));
+}));
+document.getElementById("admin-broadcast-form")?.addEventListener("submit", async event => {
+    event.preventDefault(); if (!isAdminAccount) return;
+    const title = document.getElementById("admin-broadcast-title")?.value?.trim() || "";
+    const text = document.getElementById("admin-broadcast-text")?.value?.trim() || "";
+    if (!title || !text) { showToast("عنوان و متن خبر را وارد کن.", "error"); return; }
+    const button = event.currentTarget.querySelector("[type=submit]");
+    if (button) { button.disabled = true; button.textContent = "در حال ارسال…"; }
+    try {
+        const result = await apiPost("/api/admin/broadcast", { title, text });
+        if (!result?.success) showToast(result?.message || "خبر ارسال نشد.", "error");
+        else { showToast(`خبر ثبت شد؛ ارسال موفق: ${result.sent}، ناموفق: ${result.failed}`, result.failed ? "error" : "success"); event.currentTarget.reset(); await loadAdminPanel(); document.querySelector('[data-admin-tab="activity"]')?.click(); }
+    } catch (e) { showToast("خطا در ارسال خبر.", "error"); }
+    finally { if (button) { button.disabled = false; button.textContent = "📣 ارسال به همهٔ بازیکنان"; } }
+});
+
 // هدر همراه اسکرول صفحه به‌آرامی از قاب خارج می‌شود؛ بدون تأخیر و جمع‌شدن ناگهانی.
 const gameShellForHeader = document.getElementById("game");
 const gameHeaderForScroll = document.querySelector("#game .game-header");
