@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261010admin1">
+<link rel="stylesheet" href="/style.css?v=20261010admin2">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -657,34 +657,41 @@
         </div>
     </main>
 
-    <!-- ==================== پنل مدیریت (فقط مدیر اصلی) ==================== -->
-    <main id="admin" class="game-page hidden">
+    <!-- ==================== پنل مدیریت اختصاصی مدیر اصلی ==================== -->
+    <main id="admin" class="game-page hidden admin-dashboard">
         <div class="sub-back-bar admin-back-bar">
             <button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
-            <span class="sb-title"><span class="sb-icon">🛡️</span>پنل مدیریت</span>
-            <button id="admin-refresh" class="admin-refresh-btn" type="button" aria-label="تازه‌سازی">⟳</button>
+            <span class="sb-title"><span class="sb-icon">🛡️</span>مرکز مدیریت</span>
+            <button id="admin-refresh" class="admin-refresh-btn" type="button" aria-label="تازه‌سازی" title="تازه‌سازی اطلاعات">⟳</button>
         </div>
         <section class="admin-hero">
             <div class="admin-hero-icon">🛡️</div>
-            <div><span class="admin-eyebrow">CONTROL CENTER</span><h2>مرکز کنترل بازی</h2><p>دسترسی اختصاصی مدیر اصلی · تغییرات با ثبت در سرور ذخیره می‌شوند.</p></div>
+            <div class="admin-hero-copy"><span class="admin-eyebrow">FRONT-LINE · CONTROL CENTER</span><h2>همه‌چیز تحت کنترل توست</h2><p>مدیریت بازیکنان، اقتصاد و اطلاعیه‌ها از یک صفحهٔ منظم.</p><div class="admin-session-line"><span class="admin-online-dot"></span> مدیر اصلی <b>8290076602</b></div></div>
         </section>
         <div id="admin-access-error" class="admin-alert hidden" role="alert"></div>
-        <section class="admin-summary-grid" aria-label="خلاصه بازی">
-            <article class="admin-summary-card"><span>بازیکنان ثبت‌شده</span><strong id="admin-total-players">—</strong><small>کل حساب‌ها</small></article>
-            <article class="admin-summary-card"><span>کشورهای انتخاب‌شده</span><strong id="admin-country-count">—</strong><small>از ۸ کشور</small></article>
-            <article class="admin-summary-card"><span>خزانهٔ کل</span><strong id="admin-total-money">—</strong><small>مجموع همه کشورها</small></article>
+        <section class="admin-summary-grid admin-summary-grid-wide" aria-label="خلاصه بازی">
+            <article class="admin-summary-card"><span>👥 بازیکنان</span><strong id="admin-total-players">—</strong><small>کل حساب‌ها</small></article>
+            <article class="admin-summary-card"><span>🌍 کشورهای گرفته‌شده</span><strong id="admin-country-count">—</strong><small>از ۸ کشور</small></article>
+            <article class="admin-summary-card"><span>💰 خزانهٔ کل</span><strong id="admin-total-money">—</strong><small>مجموع موجودی‌ها</small></article>
+            <article class="admin-summary-card"><span>📈 درآمد روزانه</span><strong id="admin-total-income">—</strong><small>مجموع درآمد خالص</small></article>
+            <article class="admin-summary-card"><span>🟢 فعال در ۱۵ دقیقه</span><strong id="admin-active-count">—</strong><small>بر اساس آخرین ورود</small></article>
+            <article class="admin-summary-card"><span>✦ کاربران VIP</span><strong id="admin-vip-count">—</strong><small>عضویت ویژه</small></article>
         </section>
-        <div class="admin-tabs" role="tablist">
+        <div class="admin-tabs" role="tablist" aria-label="بخش‌های مدیریت">
             <button class="admin-tab active" type="button" data-admin-tab="players">👥 بازیکنان</button>
-            <button class="admin-tab" type="button" data-admin-tab="broadcast">📣 خبر و اعلان</button>
-            <button class="admin-tab" type="button" data-admin-tab="activity">📰 اخبار اخیر</button>
+            <button class="admin-tab" type="button" data-admin-tab="economy">💰 اقتصاد</button>
+            <button class="admin-tab" type="button" data-admin-tab="broadcast">📣 پیام‌ها</button>
+            <button class="admin-tab" type="button" data-admin-tab="activity">🧾 گزارش عملیات</button>
         </div>
         <section id="admin-panel-players" class="admin-panel">
-            <div class="admin-section-head"><div><h3>مدیریت بازیکنان</h3><p>بازیکن را انتخاب کن و موجودی یا وضعیت او را تغییر بده.</p></div><span id="admin-player-count" class="admin-count-pill">۰</span></div>
-            <label class="admin-search"><span>⌕</span><input id="admin-player-search" type="search" placeholder="جستجو با نام کشور یا شناسهٔ کاربر…" autocomplete="off"></label>
-            <div id="admin-player-list" class="admin-player-list"><div class="admin-empty">برای دریافت اطلاعات، تازه‌سازی را بزن.</div></div>
+            <div class="admin-section-head"><div><span class="admin-section-kicker">PLAYER DIRECTORY</span><h3>فهرست و مدیریت بازیکنان</h3><p>نام، آیدی عددی و نام کاربری تلگرام کنار اطلاعات کشور دیده می‌شود.</p></div><span id="admin-player-count" class="admin-count-pill">۰</span></div>
+            <label class="admin-search"><span>⌕</span><input id="admin-player-search" type="search" placeholder="جستجو با نام، @username، آیدی یا کشور…" autocomplete="off"><button type="button" id="admin-clear-search" title="پاک‌کردن جستجو" aria-label="پاک‌کردن جستجو">×</button></label>
+            <div class="admin-filter-row"><label>نمایش <select id="admin-player-filter"><option value="all">همهٔ بازیکنان</option><option value="countryless">بدون کشور</option><option value="vip">VIP</option><option value="eliminated">حذف‌شده از بازی</option><option value="active">فعال در ۱۵ دقیقهٔ اخیر</option></select></label><span id="admin-filter-result" class="admin-filter-result"></span></div>
+            <div class="admin-player-list-wrap"><div id="admin-player-list" class="admin-player-list"><div class="admin-empty">برای دریافت اطلاعات، تازه‌سازی را بزن.</div></div></div>
             <section id="admin-player-editor" class="admin-editor hidden">
-                <div class="admin-editor-head"><div><span class="admin-eyebrow">PLAYER SETTINGS</span><h3 id="admin-editor-title">تنظیم بازیکن</h3><p id="admin-editor-subtitle"></p></div><span class="admin-editor-badge">انتخاب‌شده</span></div>
+                <div class="admin-editor-head"><div><span class="admin-eyebrow">PLAYER PROFILE</span><h3 id="admin-editor-title">پروفایل بازیکن</h3><p id="admin-editor-subtitle"></p></div><span class="admin-editor-badge">انتخاب‌شده</span></div>
+                <div id="admin-identity-card" class="admin-identity-card"></div>
+                <div class="admin-editor-section-title"><b>موجودی و کشور</b><span>ثبت مقدار نهایی</span></div>
                 <div class="admin-edit-grid">
                     <label>خزانه ($)<div class="admin-edit-control"><input id="admin-edit-money" type="number" min="0" step="1" inputmode="numeric"><button type="button" data-admin-save="money">ثبت</button></div></label>
                     <label>نیروی انسانی<div class="admin-edit-control"><input id="admin-edit-manpower" type="number" min="0" step="1" inputmode="numeric"><button type="button" data-admin-save="manpower">ثبت</button></div></label>
@@ -694,21 +701,43 @@
                     <label>نفت<div class="admin-edit-control"><input id="admin-edit-oil" type="number" min="0" step="1" inputmode="numeric"><button type="button" data-admin-save="oil">ثبت</button></div></label>
                     <label>کشور<div class="admin-edit-control"><select id="admin-edit-country"><option value="">بدون کشور</option><option value="germany">آلمان</option><option value="britain">بریتانیا</option><option value="ussr">شوروی</option><option value="usa">آمریکا</option><option value="france">فرانسه</option><option value="italy">ایتالیا</option><option value="china">چین</option><option value="japan">ژاپن</option></select><button type="button" data-admin-save="country">ثبت</button></div></label>
                 </div>
+                <div class="admin-quick-adjust">
+                    <div class="admin-editor-section-title"><b>افزایش یا کسر سریع</b><span>به‌جای جایگزینی موجودی</span></div>
+                    <div class="admin-quick-grid"><label>منبع<select id="admin-adjust-field"><option value="money">خزانه</option><option value="manpower">نیروی انسانی</option><option value="food">غذا</option><option value="steel">آهن</option><option value="uranium">اورانیوم</option><option value="oil">نفت</option></select></label><label>مقدار<input id="admin-adjust-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="مثلاً 100000"></label></div>
+                    <div class="admin-quick-actions"><button type="button" id="admin-adjust-add" class="admin-quick-add">＋ افزودن به موجودی</button><button type="button" id="admin-adjust-subtract" class="admin-quick-subtract">− کسر از موجودی</button></div>
+                </div>
                 <div class="admin-toggle-actions"><button type="button" id="admin-toggle-vip" data-admin-toggle="vip">تغییر وضعیت VIP</button><button type="button" id="admin-toggle-eliminated" data-admin-toggle="is_eliminated">حذف / بازگرداندن بازیکن</button></div>
-                <p class="admin-editor-note">مقادیر عددی، موجودی نهایی را جایگزین می‌کنند؛ به آن اضافه نمی‌شوند. تغییر کشور فقط در صورت آزاد بودن کشور پذیرفته می‌شود.</p>
+                <div class="admin-direct-message"><div class="admin-editor-section-title"><b>پیام مستقیم به بازیکن</b><span>ارسال در تلگرام</span></div><textarea id="admin-player-message-text" rows="3" maxlength="1200" placeholder="پیام اختصاصی برای این بازیکن…"></textarea><button id="admin-send-player-message" type="button" class="admin-primary-btn">✉️ ارسال پیام</button></div>
+                <p class="admin-editor-note">مقادیر بخش بالا موجودی را جایگزین می‌کنند؛ «افزایش یا کسر سریع» به موجودی اضافه یا از آن کم می‌کند. نام و نام کاربری تلگرام برای بازیکنانی ثبت می‌شود که پس از نصب این نسخه وارد بازی یا ربات شوند.</p>
             </section>
         </section>
+        <section id="admin-panel-economy" class="admin-panel hidden">
+            <div class="admin-section-head"><div><span class="admin-section-kicker">ECONOMY TOOLS</span><h3>ابزار اقتصادی گروهی</h3><p>می‌توانی به همه یا کشور مشخصی منابع بدهی یا از موجودی‌شان کم کنی.</p></div></div>
+            <form id="admin-bulk-adjust-form" class="admin-bulk-form">
+                <label>دامنهٔ اجرا<select id="admin-bulk-scope"><option value="all">همهٔ بازیکنان</option><option value="country">فقط یک کشور</option></select></label>
+                <label id="admin-bulk-country-wrap" class="hidden">کشور<select id="admin-bulk-country"><option value="germany">آلمان</option><option value="britain">بریتانیا</option><option value="ussr">شوروی</option><option value="usa">آمریکا</option><option value="france">فرانسه</option><option value="italy">ایتالیا</option><option value="china">چین</option><option value="japan">ژاپن</option></select></label>
+                <label>منبع<select id="admin-bulk-field"><option value="money">خزانه</option><option value="manpower">نیروی انسانی</option><option value="food">غذا</option><option value="steel">آهن</option><option value="uranium">اورانیوم</option><option value="oil">نفت</option></select></label>
+                <label>عملیات<select id="admin-bulk-operation"><option value="add">افزودن</option><option value="subtract">کسر کردن</option></select></label>
+                <label>مقدار برای هر بازیکن<input id="admin-bulk-amount" type="number" min="1" step="1" required placeholder="مقدار را وارد کن"></label>
+                <button type="submit" class="admin-primary-btn">⚖️ اجرای تغییر گروهی</button>
+                <p class="admin-editor-note">بازیکنانی که موجودی کافی برای کسر نداشته باشند از عملیات کسر عبور داده می‌شوند و در گزارش تعدادشان نمایش داده می‌شود. قبل از اجرا، دامنه و مقدار را دوباره بررسی کن.</p>
+            </form>
+            <div class="admin-economy-shortcuts"><h4>دسترسی سریع</h4><button type="button" id="admin-jump-players">انتخاب یک بازیکن برای ویرایش جزئیات ←</button></div>
+        </section>
         <section id="admin-panel-broadcast" class="admin-panel hidden">
-            <div class="admin-section-head"><div><h3>ارسال خبر عمومی</h3><p>خبر در بخش اخبار بازی ثبت می‌شود و برای بازیکنان در تلگرام هم ارسال می‌شود.</p></div></div>
+            <div class="admin-section-head"><div><span class="admin-section-kicker">MESSAGES & NEWS</span><h3>خبر عمومی و اعلان</h3><p>خبر در بخش اخبار بازی ثبت می‌شود و به کاربران تلگرام هم ارسال خواهد شد.</p></div></div>
             <form id="admin-broadcast-form" class="admin-broadcast-form">
-                <label>عنوان خبر<input id="admin-broadcast-title" maxlength="100" required placeholder="مثلاً: رویداد جدید آغاز شد"></label>
-                <label>متن پیام<textarea id="admin-broadcast-text" maxlength="1200" rows="5" required placeholder="متن اعلان را بنویس…"></textarea></label>
+                <label>عنوان خبر<input id="admin-broadcast-title" maxlength="100" required placeholder="مثلاً: رویداد تازه آغاز شد"></label>
+                <label>متن پیام<textarea id="admin-broadcast-text" maxlength="1200" rows="5" required placeholder="متن پیام را واضح و کوتاه بنویس…"></textarea></label>
+                <div class="admin-message-preview"><b>پیش‌نمایش پیام</b><strong id="admin-broadcast-preview-title">عنوان خبر اینجا نمایش داده می‌شود</strong><p id="admin-broadcast-preview-text">متن پیام را وارد کن تا پیش‌نمایش دیده شود.</p><small>دکمهٔ ورود به بازی به پیام تلگرام اضافه می‌شود.</small></div>
                 <button type="submit" class="admin-primary-btn">📣 ارسال به همهٔ بازیکنان</button>
-                <p class="admin-editor-note">ارسال پیام تلگرامی ممکن است برای حساب‌هایی که ربات را مسدود کرده‌اند ناموفق باشد؛ نتیجهٔ ارسال گزارش می‌شود.</p>
+                <p class="admin-editor-note">ارسال به حساب‌هایی که ربات را مسدود کرده‌اند ممکن است ناموفق باشد؛ تعداد موفق و ناموفق گزارش می‌شود.</p>
             </form>
         </section>
         <section id="admin-panel-activity" class="admin-panel hidden">
-            <div class="admin-section-head"><div><h3>اخبار اخیر بازی</h3><p>آخرین خبرهایی که در جریان بازی ثبت شده‌اند.</p></div></div>
+            <div class="admin-section-head"><div><span class="admin-section-kicker">AUDIT LOG</span><h3>گزارش عملیات مدیریت</h3><p>آخرین تغییرات مدیریتی برای بررسی و پیگیری ثبت می‌شوند.</p></div><span class="admin-count-pill">آخرین ۶۰ مورد</span></div>
+            <div id="admin-audit-list" class="admin-news-list"><div class="admin-empty">هنوز عملیاتی ثبت نشده است.</div></div>
+            <div class="admin-section-head admin-news-head"><div><h3>اخبار اخیر بازی</h3><p>آخرین خبرهای ثبت‌شده در جریان بازی.</p></div></div>
             <div id="admin-recent-news" class="admin-news-list"><div class="admin-empty">خبری برای نمایش نیست.</div></div>
         </section>
     </main>
@@ -765,6 +794,6 @@
 
 </section>
 
-<script src="/app.js?v=20261010admin1"></script>
+<script src="/app.js?v=20261010admin2"></script>
 </body>
 </html>
