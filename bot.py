@@ -2212,7 +2212,8 @@ def _add_units(dest, sent):
     for k, n in sent.items(): dest[k] = dest.get(k, 0) + n
 
 def start_transit(cid, src, dst, units, minutes, kind="go", dst_free=False, origin=None,
-                  passage=False, route_final_dst=None, route_remaining_straits=None, route_total_arrive=None):
+                  passage=False, route_final_dst=None, route_remaining_straits=None, route_total_arrive=None,
+                  full_path=None, leg=0):
     now = utcnow()
     t = {"id": str(uuid.uuid4()), "owner": cid, "from": src, "to": dst, "units": dict(units), "kind": kind,
          "dst_free": dst_free, "origin": origin or src, "passage": bool(passage),
@@ -2220,6 +2221,7 @@ def start_transit(cid, src, dst, units, minutes, kind="go", dst_free=False, orig
          "route_remaining_straits": list(route_remaining_straits or []),
          "from_ll": (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, src)) if src == "home" and has_naval_units(units) else loc_coords(cid, src)), "to_ll": (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, dst)) if dst == "home" and has_naval_units(units) else loc_coords(cid, dst)),
          "route_total_arrive": route_total_arrive,
+         "full_path": [list(p) for p in full_path] if full_path else None, "leg": int(leg or 0),
          "start": now.isoformat(), "arrive": (now + timedelta(minutes=max(0.0, float(minutes)))).isoformat()}
     transits.append(t); return t
 
@@ -2240,6 +2242,7 @@ def _turn_back(t, now, reason=None):
     here = geo_interp(fr, to, min(1.0, elapsed / total)) if (fr and to and total > 0) else fr
     t["from_ll"] = here; t["to_ll"] = (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, t["origin"])) if t["origin"] == "home" and has_naval_units(t.get("units", {})) else loc_coords(cid, t["origin"]))
     t["kind"] = "back"; t["to"] = t["origin"]; t["from"] = "mid"; t["dst_free"] = False
+    t["full_path"] = None; t["leg"] = 0; t["passage"] = False
     t["start"] = now.isoformat(); t["arrive"] = (now + timedelta(minutes=elapsed)).isoformat()
     back_name = loc_label(t["to"])
     announce("turnback", "بازگشت نیرو از میانهٔ راه",
@@ -2271,7 +2274,8 @@ def _continue_strait_passage(t, units):
     start_transit(cid, current, next_dst, units, minutes, "go",
                   dst_free=(next_dst != "home" and not next_owner), origin=t.get("origin") or t.get("from"),
                   passage=passage, route_final_dst=final_dst if passage else None,
-                  route_remaining_straits=remaining if passage else None, route_total_arrive=total_end.isoformat())
+                  route_remaining_straits=remaining if passage else None, route_total_arrive=total_end.isoformat(),
+                  full_path=t.get("full_path"), leg=int(t.get("leg") or 0) + 1)
 
 def _resolve_strait_passage(t, player):
     cid, units, sid = t["owner"], dict(t["units"]), t["to"]
@@ -2827,11 +2831,19 @@ async def dispatch_forces(request):
     legs = len(route_straits) + 1 if passage else 1
     minutes = total_minutes / legs
     total_arrive = (utcnow() + timedelta(minutes=total_minutes)).isoformat()
+    full_path = None
+    if passage:
+        naval = has_naval_units(units)
+        def _ll(loc):
+            return (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, loc)) if loc == "home" and naval else loc_coords(cid, loc))
+        pts = [_ll(src)] + [loc_coords(cid, x) for x in route_straits] + [_ll(dst)]
+        if all(pts): full_path = pts
     start_transit(cid, src, first_target, units, minutes, "go",
                   dst_free=(first_target != "home" and not site_owner(first_target)), origin=src,
                   passage=passage, route_final_dst=dst if passage else None,
                   route_remaining_straits=route_straits[1:] if passage else None,
-                  route_total_arrive=total_arrive if passage else None)
+                  route_total_arrive=total_arrive if passage else None,
+                  full_path=full_path, leg=0)
     if dst == "home":
         announce("return", "بازگشت نیرو", f"{cname(cid)} از {loc_label(src)} نیروهایش را به خانه فرستاد.", [cid])
     else:
@@ -2866,7 +2878,9 @@ async def get_map_transits(request):
         to = resume.get("to_ll") if rb else t.get("to_ll")
         fr = fr or loc_coords(cid, t["from"]); to = to or loc_coords(cid, t["to"])
         if not fr or not to: continue
+        fp = None if rb else t.get("full_path")
         out.append({"id": t["id"], "country": cid, "from_ll": list(fr), "to_ll": list(to),
+                    "path": fp, "leg": int(t.get("leg") or 0),
                     "battle_ll": list((rb or t.get("arrival_battle") or {}).get("position") or []) or None, "kind": t["kind"],
                     "from_name": "⚔️ نبرد در مسیر" if (t.get("route_battle") or t.get("arrival_battle")) else ("میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"])),
                     "to_name": "درگیری" if (t.get("route_battle") or t.get("arrival_battle")) else loc_label(t["to"]),
@@ -3420,10 +3434,10 @@ async def get_pm(request):
 # =========================================================
 # API Market — international trade
 # =========================================================
-TRADE_COUNTRY_COORDS = {
-    "germany": (10.45, 51.16), "france": (2.21, 46.23), "italy": (12.57, 41.87),
-    "britain": (-3.44, 55.38), "ussr": (90.00, 55.00), "usa": (-100.00, 38.00),
-    "china": (103.82, 35.86), "japan": (138.25, 36.20),
+TRADE_COUNTRY_COORDS = {  # پایتخت هر کشور (نقطهٔ خانه برای نیروهای زمینی)
+    "germany": (13.40, 52.52), "france": (2.35, 48.86), "italy": (12.50, 41.90),
+    "britain": (-0.13, 51.51), "ussr": (37.62, 55.75), "usa": (-77.04, 38.90),
+    "china": (116.40, 39.90), "japan": (139.69, 35.69),
 }
 # فقط همسایهٔ مستقیم؛ کشور واسطه برای تجارت زمینی استفاده نمی‌شود.
 LAND_NEIGHBORS = {
