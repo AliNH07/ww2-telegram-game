@@ -11,7 +11,16 @@ if (tg) {
 
 const userId = tg?.initDataUnsafe?.user?.id || null;
 const initData = tg?.initData || "";
-let selectedWorldId = (() => { try { return String(localStorage.getItem("fl93_world_id") || "1"); } catch { return "1"; } })();
+const worldIdKey = () => `fl93_world_id_${userId || "guest"}`;
+let selectedWorldId = (() => { try { return String(localStorage.getItem(worldIdKey()) || localStorage.getItem("fl93_world_id") || "1"); } catch { return "1"; } })();
+const worldChoiceKey = () => `fl93_world_chosen_${userId || "guest"}`;
+function hasSavedWorldChoice() {
+    try { return localStorage.getItem(worldChoiceKey()) === "1"; }
+    catch { return false; }
+}
+let lastUserActionButton = null;
+let lastActionErrorMessage = "";
+let lastActionErrorAt = 0;
 let availableWorlds = [];
 let adminWarsCache = [];
 let adminWorldsCache = [];
@@ -95,14 +104,46 @@ async function apiPost(path, body = {}) {
     if (initData) headers["X-Telegram-Init-Data"] = initData;
     const controller = new AbortController();
     const to = setTimeout(() => controller.abort(), 15000);
+    const focusedButton = document.activeElement?.closest?.("button");
+    const actionButton = focusedButton || lastUserActionButton;
     try {
         const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(body),
             signal: controller.signal });
         const text = await r.text();
-        try { return JSON.parse(text); }
-        catch { return { success: false, error: "invalid_json", raw: text }; }
+        let result;
+        try { result = JSON.parse(text); }
+        catch { result = { success: false, error: "invalid_json", raw: text }; }
+        const message = String(result?.message || result?.detail || "");
+        const errorText = `${message} ${result?.error || ""} ${result?.code || ""}`;
+        const isInsufficient = /کافی نیست|کافی ندارید|پول کافی|خزانه.*کافی|موجودی.*کافی|not[_ -]?enough|insufficient(?:[_ -]funds)?/i.test(errorText)
+            || (/(منابع|برق|نیروی انسانی|تعداد این یگان)/.test(errorText) && /کافی|کمبود/.test(errorText));
+        if (result?.success === false && isInsufficient) {
+            lastActionErrorMessage = message || (/money|funds|پول|خزانه/i.test(errorText) ? "پول کافی نیست." : "منابع کافی نیست.");
+            lastActionErrorAt = Date.now();
+            if (actionButton?.isConnected) {
+                actionButton.classList.add("action-denied");
+                actionButton.title = lastActionErrorMessage;
+                actionButton.dataset.actionError = lastActionErrorMessage;
+                if (!actionButton.querySelector(".action-error-inline")) {
+                    const note = document.createElement("span");
+                    note.className = "action-error-inline";
+                    note.textContent = /پول|خزانه/.test(lastActionErrorMessage) ? "پول کافی نیست" : "منابع کافی نیست";
+                    actionButton.appendChild(note);
+                }
+            }
+        }
+        return result;
     } finally { clearTimeout(to); }
 }
+
+document.addEventListener("click", event => {
+    const button = event.target?.closest?.("button");
+    if (!button) return;
+    lastUserActionButton = button;
+    button.classList.remove("action-denied");
+    button.querySelector(".action-error-inline")?.remove();
+    button.removeAttribute("data-action-error");
+});
 
 /* =========================================================
    Helpers
@@ -142,6 +183,10 @@ function formatNumber(v) { return Math.round(Number(v ?? 0)).toLocaleString("en-
 
 let toastTimer = null;
 function showToast(msg, kind) {
+    if (/^خطا[.!…]*$/.test(String(msg || "").trim()) && lastActionErrorMessage && Date.now() - lastActionErrorAt < 8000) {
+        msg = lastActionErrorMessage;
+        kind = "error";
+    }
     let el = document.getElementById("app-toast");
     if (!el) {
         el = document.createElement("div");
@@ -223,28 +268,40 @@ async function fetchAvailableWorlds() {
     return availableWorlds;
 }
 
+let enteringWorld = false;
 function renderWorldChoices() {
     const list = document.getElementById("world-select-list");
-    const start = document.getElementById("world-select-start");
     if (!list) return;
     list.innerHTML = availableWorlds.map(w => `
-        <button type="button" class="world-select-card ${String(w.id) === String(selectedWorldId) ? "selected" : ""}" data-world-choice="${w.id}">
-            <span class="world-select-globe">🌍</span><span class="world-select-info"><b>${escapeHtml(w.name || `دنیای ${w.id}`)}</b><small>${formatNumber(w.players || 0)} بازیکن · ${formatNumber(w.countries_taken || 0)} کشور انتخاب‌شده</small></span><span class="world-select-check">${String(w.id) === String(selectedWorldId) ? "✓" : "○"}</span>
+        <button type="button" class="world-select-card ${String(w.id) === String(selectedWorldId) ? "selected" : ""}" data-world-choice="${w.id}" aria-label="ورود به ${escapeHtml(w.name || `دنیای ${w.id}`)}">
+            <span class="world-select-globe">🌍</span><span class="world-select-info"><b>${escapeHtml(w.name || `دنیای ${w.id}`)}</b><small>${formatNumber(w.players || 0)} بازیکن · ${formatNumber(w.countries_taken || 0)} کشور انتخاب‌شده</small></span><span class="world-select-check">↵</span>
         </button>`).join("");
     list.querySelectorAll("[data-world-choice]").forEach(b => b.addEventListener("click", () => {
+        if (enteringWorld) return;
         selectedWorldId = String(b.dataset.worldChoice);
-        renderWorldChoices();
+        try {
+            localStorage.setItem("fl93_world_id", selectedWorldId);
+            localStorage.setItem(worldIdKey(), selectedWorldId);
+            localStorage.setItem(worldChoiceKey(), "1");
+        } catch {}
+        enterSelectedWorld();
     }));
-    if (start) start.disabled = !availableWorlds.some(w => String(w.id) === String(selectedWorldId));
 }
 
-function showWorldSelection() { showOnly("world-select"); renderWorldChoices(); }
+async function showWorldSelection() {
+    showOnly("world-select");
+    try { await fetchAvailableWorlds(); } catch (e) { console.error("World list:", e); renderWorldChoices(); }
+}
 
 async function enterSelectedWorld() {
-    const button = document.getElementById("world-select-start");
-    if (button) { button.disabled = true; button.textContent = "در حال ورود به دنیا…"; }
+    if (enteringWorld) return;
+    enteringWorld = true;
     try {
-        try { localStorage.setItem("fl93_world_id", String(selectedWorldId)); } catch {}
+        try {
+            localStorage.setItem("fl93_world_id", String(selectedWorldId));
+            localStorage.setItem(worldIdKey(), String(selectedWorldId));
+            localStorage.setItem(worldChoiceKey(), "1");
+        } catch {}
         showOnly("loading");
         await loadCountries();
         await loadPlayer();
@@ -255,13 +312,13 @@ async function enterSelectedWorld() {
             showCountrySelection();
         }
     } catch (e) {
-        console.error(e); showToast("ورود به دنیا ناموفق بود. دوباره تلاش کن.", "error"); showWorldSelection();
+        console.error(e); showToast("ورود به دنیا ناموفق بود. دوباره تلاش کن.", "error"); showOnly("world-select"); renderWorldChoices();
     } finally {
-        if (button) { button.disabled = false; button.textContent = "ورود به دنیای انتخاب‌شده ←"; }
+        enteringWorld = false;
     }
 }
 
-document.getElementById("world-select-start")?.addEventListener("click", enterSelectedWorld);
+document.getElementById("country-change-world")?.addEventListener("click", showWorldSelection);
 
 /* =========================================================
    Player / Countries
@@ -1223,16 +1280,17 @@ function renderEconomyList() {
         const incomeGain = nextIncome - currentIncome;
         const maxPips = Array.from({length:item.max_level || 0}, (_,i) => `<i class="${i < item.level ? "on" : ""}"></i>`).join("");
         const statusText = !built ? "آمادهٔ سرمایه‌گذاری" : `سطح ${item.level} از ${item.max_level}`;
-        const buttonText = !next ? "حداکثر سطح" : (built ? `ارتقای سرمایه‌گذاری · ${formatMoney(next.cost)}` : `سرمایه‌گذاری · ${formatMoney(next.cost)}`);
+        const cannotAfford = !!next && Number(player.money || 0) < Number(next.cost || 0);
+        const buttonText = !next ? "حداکثر سطح" : (cannotAfford ? "پول کافی نیست" : (built ? `ارتقای سرمایه‌گذاری · ${formatMoney(next.cost)}` : `سرمایه‌گذاری · ${formatMoney(next.cost)}`));
         card.innerHTML = `
             <div class="eco-card-top"><span class="eco-card-icon">${item.icon || "💼"}</span><div class="eco-card-title"><h3>${escapeHtml(item.name || "سرمایه‌گذاری")}</h3><small>${statusText}</small></div><span class="eco-card-level">${built ? `${item.level}/${item.max_level}` : "جدید"}</span></div>
             <p class="eco-card-desc">${escapeHtml(item.desc || "")}</p>
             <div class="eco-level-pips">${maxPips}</div>
             <div class="eco-income-panel"><small>درآمد روزانهٔ ${built ? "فعلی" : "سطح ۱"}</small><strong>${formatMoney(built ? currentIncome : Number(next?.income || 0))}</strong>${built && next ? `<span>پس از ارتقا: ${formatMoney(nextIncome)} <i>(${incomeGain >= 0 ? "+" : "−"}${formatMoney(Math.abs(incomeGain))})</i></span>` : !built ? `<span>قابل ارتقا تا ${item.max_level} سطح</span>` : `<span>بالاترین سطح</span>`}</div>
             <div class="eco-card-facts"><span>⚡ برق لازم <b>${formatNumber(item.power_required || 0)}</b></span><span>🪙 هزینه <b>${next ? formatMoney(next.cost) : "—"}</b></span></div>
-            <button class="eco-invest-button" ${!next ? "disabled" : ""}>${buttonText}</button>`;
+            <button class="eco-invest-button ${cannotAfford ? "action-denied" : ""}" ${!next || cannotAfford ? "disabled" : ""} ${cannotAfford ? `title="پول لازم: ${formatMoney(next.cost)} · موجودی شما: ${formatMoney(player.money || 0)}"` : ""}>${buttonText}${cannotAfford ? `<span class="action-error-inline">کمبود ${formatMoney(next.cost - Number(player.money || 0))}</span>` : ""}</button>`;
         const btn = card.querySelector(".eco-invest-button");
-        if (next) btn.addEventListener("click", () => upgradeEconomy(iid));
+        if (next && !cannotAfford) btn.addEventListener("click", () => upgradeEconomy(iid));
         c.appendChild(card);
     });
 }
@@ -2363,8 +2421,6 @@ let adminSelectedPlayerId = null;
 let adminSelectedPlayerDetailOpen = false;
 const adminCountryLabels = {germany:"آلمان",britain:"بریتانیا",ussr:"شوروی",usa:"آمریکا",france:"فرانسه",italy:"ایتالیا",china:"چین",japan:"ژاپن"};
 const isAdminAccount = Number(userId) === ADMIN_TELEGRAM_ID;
-const adminMenuButton = document.getElementById("open-admin-menu");
-if (adminMenuButton) adminMenuButton.classList.toggle("hidden", !isAdminAccount);
 
 /* راهنمای شروع: فقط بار اول خودکار نمایش داده می‌شود */
 const guideModal = document.getElementById("guide-modal");
@@ -2391,14 +2447,10 @@ gameMenuButton?.addEventListener("click", (event) => {
     gameMenuPanel.classList.toggle("hidden");
 });
 gameMenuPanel?.addEventListener("click", async (event) => {
-    const item = event.target.closest("[data-menu-page], #open-admin-menu, #open-guide-menu");
+    const item = event.target.closest("[data-menu-page], #open-guide-menu");
     if (!item) return;
     closeGameMenu();
     if (item.id === "open-guide-menu") { openGuide(); return; }
-    if (item.id === "open-admin-menu") {
-        if (!isAdminAccount) { showToast("دسترسی ندارید.", "error"); return; }
-        showGamePage("admin"); await loadAdminPanel(); return;
-    }
     const page = item.dataset.menuPage;
     showGamePage(page);
     if (page === "map") setTimeout(() => initWorldMap(), 30);
@@ -4779,8 +4831,14 @@ let previewGlobeAbort = null;
     const elapsed = Date.now() - t0;
     if (elapsed < 550) await new Promise(r => setTimeout(r, 550 - elapsed));
     const openAdmin = new URLSearchParams(window.location.search).get("open") === "admin";
-    if (openAdmin && isAdminAccount) {
-        // ورود مستقیم مدیر نباید او را ناخواسته به‌عنوان بازیکن به دنیایی اضافه کند.
+    if (openAdmin) {
+        if (!isAdminAccount) {
+            showToast("این پیوند مخصوص مدیر اصلی است.", "error");
+            showWorldSelection();
+            return;
+        }
+        // پنل مدیریت یک مسیر مستقل است؛ هدر و منوی بازی نمایش داده نمی‌شوند.
+        document.body.classList.add("admin-direct");
         await loadArmyCatalog();
         showOnly("game");
         document.getElementById("game")?.classList.remove("booting");
@@ -4788,7 +4846,36 @@ let previewGlobeAbort = null;
         await loadAdminPanel();
         return;
     }
-    showWorldSelection();
+    if (hasSavedWorldChoice()) {
+        if (!availableWorlds.some(w => String(w.id) === String(selectedWorldId))) {
+            selectedWorldId = String(availableWorlds[0]?.id || "1");
+            try { localStorage.setItem("fl93_world_id", selectedWorldId); localStorage.setItem(worldIdKey(), selectedWorldId); } catch {}
+        }
+        await enterSelectedWorld();
+    } else {
+        // Upgrade migration: if an older version already has this player's country in its saved world,
+        // preserve that session and record the new per-user marker instead of showing worlds again.
+        let restoredExistingPlayer = false;
+        let hadLegacyWorld = false;
+        try { hadLegacyWorld = !!localStorage.getItem("fl93_world_id"); } catch {}
+        if (hadLegacyWorld && userId) {
+            try {
+                await loadCountries();
+                await loadPlayer();
+                restoredExistingPlayer = !!player?.country;
+            } catch (e) { console.warn("Could not migrate saved world selection:", e); }
+        }
+        if (restoredExistingPlayer) {
+            try {
+                localStorage.setItem(worldIdKey(), String(selectedWorldId));
+                localStorage.setItem(worldChoiceKey(), "1");
+            } catch {}
+            await loadArmyCatalog();
+            await showGame();
+        } else {
+            showWorldSelection();
+        }
+    }
 })();
 
 
