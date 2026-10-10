@@ -2676,3 +2676,28 @@ input, textarea, button { -webkit-touch-callout:none; }
 .admin-player-last-seen{font-size:8px!important;color:#8a9ab0!important;line-height:1.8;overflow-wrap:anywhere}
 
 .admin-inventory-detail{padding:9px 10px;border:1px solid rgba(149,169,200,.11);border-radius:10px;background:rgba(255,255,255,.015)}.admin-inventory-detail summary{font-size:10px;color:#d4c17f;cursor:pointer;padding:3px 0}.admin-inventory-detail[open] summary{margin-bottom:9px}.admin-inventory-detail .admin-inventory-grid{margin-top:5px}
+
+
+/* One-click world selection and return to world list before claiming a country. */
+.country-world-back{display:inline-flex;align-items:center;justify-content:center;gap:7px;margin:0 auto 14px;padding:9px 13px;border-radius:10px;border:1px solid rgba(227,176,75,.24);background:rgba(227,176,75,.07);color:#efd18b;font:inherit;font-size:11px;font-weight:800}
+.world-select-card{cursor:pointer;text-align:right}
+.world-select-card:active{transform:scale(.99)}
+
+/* Direct administrator entry: no game header, hamburger menu, or bottom navigation. */
+body.admin-direct #game .game-header,
+body.admin-direct #game .bottom-nav,
+body.admin-direct #game-menu-panel,
+body.admin-direct #dashboard-loading,
+body.admin-direct #guide-modal{display:none!important}
+body.admin-direct #game{height:100dvh;min-height:100dvh;overflow:hidden}
+body.admin-direct #admin.game-page{height:100dvh;min-height:100dvh;padding:0 12px 24px;overflow-y:auto;overscroll-behavior:contain}
+body.admin-direct #admin .admin-back-bar [data-back-to="home"]{display:none!important}
+
+/* Any server-rejected purchase due to insufficient money/resources is visibly red. */
+button.action-denied,
+button.action-denied:disabled,
+#economy .eco-invest-button.action-denied,
+.ic-btn--short{background:linear-gradient(135deg,rgba(174,41,49,.96),rgba(111,24,32,.98))!important;border:1px solid rgba(255,111,118,.7)!important;color:#fff!important;opacity:1!important;box-shadow:0 0 0 1px rgba(248,113,113,.1),0 4px 13px rgba(100,12,21,.2)!important;cursor:not-allowed!important}
+.action-error-inline{display:block;flex-basis:100%;width:100%;margin-top:4px;color:#fff;font-size:10px;font-weight:900;line-height:1.45;text-align:center;white-space:normal}
+button.action-denied .action-error-inline{color:#ffe5e5}
+#economy .eco-invest-button.action-denied{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:47px}
