@@ -91,8 +91,8 @@ def _announcement_cooldown_seconds(today_list, now=None):
     elapsed = max(0, (now - last).total_seconds())
     return max(0, int(ANNOUNCEMENT_INTERVAL_SECONDS - elapsed + 0.999))
 WAR_PENALTY_ALLIANCE = 2_000_000
-NEGOTIATION_SECONDS = max(1, int(os.getenv("WAR_NEGOTIATION_SECONDS", "30")))  # حالت آزمایشی پیش‌فرض: ۳۰ ثانیه
-WAR_INTERCEPT_RADIUS_KM = 240.0
+NEGOTIATION_HOURS = 24  # سازگاری با داده‌های قدیمی
+WAR_NEGOTIATION_SECONDS = max(30, min(86400, int(os.getenv("WAR_NEGOTIATION_SECONDS", "30"))))
 DEFAULT_COST = 150_000
 DEFAULT_TIME = 0
 
@@ -746,11 +746,6 @@ def compute_rates(player):
             continue
         for uid_, n in (garrison.get("units") or {}).items():
             unit_totals[uid_] = unit_totals.get(uid_, 0) + max(0, int(n or 0))
-    for target_garrison in globals().get("country_garrisons", {}).values():
-        if target_garrison.get("owner") != country_id:
-            continue
-        for uid_, n in (target_garrison.get("units") or {}).items():
-            unit_totals[uid_] = unit_totals.get(uid_, 0) + max(0, int(n or 0))
     for transit in globals().get("transits", []):
         if transit.get("owner") != country_id:
             continue
@@ -948,7 +943,7 @@ WORLD_STATE_KEYS = [
     "players", "diplomacy_proposals", "active_treaties", "map_holdings", "strait_holdings",
     "occupied_countries", "war_declarations", "active_wars", "war_reports", "announcements",
     "unions", "private_messages", "pm_read", "market_listings", "news_feed", "STRAITS_DATA",
-    "site_forces", "country_garrisons", "war_events", "war_history", "transits", "loans", "admin_audit", "market_sanctions",
+    "site_forces", "war_events", "war_history", "transits", "loans", "admin_audit", "market_sanctions",
 ]
 DEFAULT_STRAITS_DATA = copy.deepcopy(STRAITS_DATA)
 worlds_registry = {"1": {"id": 1, "name": "دنیای ۱", "created_at": None}}
@@ -963,7 +958,7 @@ def _fresh_world_state():
         "strait_holdings": {}, "occupied_countries": {}, "war_declarations": {}, "active_wars": {},
         "war_reports": [], "announcements": [], "unions": {}, "private_messages": {}, "pm_read": {},
         "market_listings": {}, "news_feed": [], "STRAITS_DATA": copy.deepcopy(DEFAULT_STRAITS_DATA),
-        "site_forces": {}, "country_garrisons": {}, "war_events": [], "war_history": [], "transits": [], "loans": {},
+        "site_forces": {}, "war_events": [], "war_history": [], "transits": [], "loans": {},
         "admin_audit": [], "market_sanctions": {},
     }
 
@@ -1271,12 +1266,12 @@ async def war_cb(cb: types.CallbackQuery):
                     break
                 if action == "approve":
                     w["status"] = "negotiation"
-                    w["negotiation_ends"] = (utcnow() + timedelta(seconds=NEGOTIATION_SECONDS)).isoformat()
-                    message = f"اعلان جنگ {COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} تأیید شد. دلیل: {w.get('reason', 'ثبت نشده')}. ۳۰ ثانیه برای مذاکره فرصت دارید."
+                    w["negotiation_ends"] = (utcnow() + timedelta(seconds=WAR_NEGOTIATION_SECONDS)).isoformat()
+                    message = f"اعلان جنگ {COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} تأیید شد. دلیل: {w.get('reason', 'ثبت نشده')}. {WAR_NEGOTIATION_SECONDS} ثانیه برای مذاکره فرصت دارید."
                     push_news("اعلام جنگ", message, "warning")
                     push_war("declare", message, [w["attacker"], w["defender"]])
                     await notify_world_players(message)
-                    response = ("✅ تأیید شد؛ مهلت دیپلماسی ۳۰ ثانیه‌ای آغاز شد.", False)
+                    response = ("✅ تأیید شد؛ مهلت آزمایشی مذاکره {WAR_NEGOTIATION_SECONDS} ثانیه آغاز شد.", False)
                 elif action == "reject":
                     w["status"] = "rejected"
                     message = f"درخواست اعلان جنگ {COUNTRIES[w['attacker']]['name']} علیه {COUNTRIES[w['defender']]['name']} رد شد."
@@ -1588,12 +1583,11 @@ async def get_wars(request):
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
     if uid not in players: players[uid] = create_player(uid)
     cid = players[uid].get("country")
-    # فقط دو کشور درگیر، جنگ‌های جاری خود را در رابط کاربری دریافت می‌کنند.
-    involved = lambda w: cid in (w.get("attacker"), w.get("defender"))
+    # درخواست تأییدنشده فقط برای فرستنده و مدیر دیده می‌شود؛ اعلان عمومی پس از تأیید آغاز می‌شود.
     pend = [dict(w) for w in war_declarations.values()
-            if (w.get("status") == "negotiation" and involved(w)) or
+            if w.get("status") == "negotiation" or
             (w.get("status") == "pending_admin" and int(w.get("attacker_user", -1)) == int(uid))]
-    active = [dict(w) for w in active_wars.values() if involved(w) and not w.get("resolved")]
+    active = [dict(w) for w in active_wars.values()]
     mine = [r for r in war_reports if r.get("attacker") == cid or r.get("defender") == cid][-10:]
     return web.json_response({"pending": pend, "active": active, "reports": mine,
                               "occupied": occupied_countries})
@@ -1607,7 +1601,7 @@ async def check_wars_tick():
             if end and now >= end:
                 w["status"] = "battle"
                 active_wars[wid] = w
-                msg = f"مهلت ۳۰ ثانیه‌ای دیپلماسی بین {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} به پایان رسید؛ جنگ آغاز شد."
+                msg = f"مهلت آزمایشی مذاکره بین {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} به پایان رسید؛ جنگ آغاز شد."
                 push_news("جنگ آغاز شد", msg, "warning")
                 push_war("war_started", msg, [w["attacker"], w["defender"]])
                 await notify_world_players(msg)
@@ -1679,8 +1673,8 @@ async def admin_review_war(request):
     defender_name = COUNTRIES.get(w.get("defender"), {}).get("name", w.get("defender"))
     if action == "approve":
         w["status"] = "negotiation"
-        w["negotiation_ends"] = (utcnow() + timedelta(seconds=NEGOTIATION_SECONDS)).isoformat()
-        msg = f"⚖️ درخواست اعلان جنگ {attacker_name} علیه {defender_name} تأیید شد.\nدلیل: {w.get('reason', 'ثبت نشده')}\nهر دو کشور ۳۰ ثانیه فرصت دارند با دیپلماسی صلح کنند. اگر هر دو روی «صلح» بزنند جنگ لغو می‌شود؛ در غیر این صورت پس از ۳۰ ثانیه جنگ آغاز خواهد شد."
+        w["negotiation_ends"] = (utcnow() + timedelta(seconds=WAR_NEGOTIATION_SECONDS)).isoformat()
+        msg = f"⚖️ درخواست اعلان جنگ {attacker_name} علیه {defender_name} تأیید شد.\nدلیل: {w.get('reason', 'ثبت نشده')}\nهر دو کشور ۲۴ ساعت فرصت دارند با دیپلماسی صلح کنند. اگر هر دو روی «صلح» بزنند جنگ لغو می‌شود؛ در غیر این صورت پس از ۲۴ ساعت جنگ آغاز خواهد شد."
         push_news("اعلام جنگ تأیید شد", msg, "warning")
         push_war("declare", f"{attacker_name} به {defender_name} اعلام جنگ کرد: {w.get('reason', '')}", [w["attacker"], w["defender"]])
         await notify_world_players(msg)
@@ -1822,6 +1816,12 @@ async def get_map_sites(request):
                       "zone": "sea", "owner": strait_holdings.get(k),
                       "toll": int(info.get("toll", 0) or 0), "closed": bool(info.get("closed", False)),
                       "country_rules": info.get("country_rules", {}) if isinstance(info.get("country_rules", {}), dict) else {}})
+    for sid, g in site_forces.items():
+        if not isinstance(sid, str) or not sid.startswith(("port:", "front:")): continue
+        meta = site_meta(sid)
+        xy = loc_coords(g.get("owner"), sid)
+        if meta and xy:
+            sites.append({**meta, "lon": xy[0], "lat": xy[1], "owner": g.get("owner"), "zone": meta.get("zone", "land"), "units": g.get("units", {})})
     return web.json_response(sites)
 
 async def capture_site(request):
@@ -1843,29 +1843,16 @@ async def capture_site(request):
     current = map_holdings.get(site_id) or strait_holdings.get(site_id)
     if current == country:
         return web.json_response({"success": False, "error": "already_own"}, status=400)
-    defender_garrison = garrison(site_id) if current and current != country else {}
-    if current and current != country and units_count(defender_garrison) > 0:
-        return web.json_response({"success": False, "error": "site_defended",
-            "message": f"این موضع با {units_count(defender_garrison)} یگان دفاع می‌شود؛ برای تصرف، از بخش جنگ نیرو اعزام کنید."}, status=400)
-    if p["units"].get("ship", 0) > 0:
-        p["units"]["ship"] -= 1; consumed_naval = "ناو"
-    else:
-        p["units"]["submarine"] -= 1; consumed_naval = "زیردریایی"
+    if p["units"].get("ship", 0) > 0: p["units"]["ship"] -= 1
+    else: p["units"]["submarine"] -= 1
     divert_transits(site_id, country)
-    site_name = MAP_RESOURCES[site_id]["name"] if site_id in MAP_RESOURCES else STRAITS_DATA[site_id]["name"]
-    site_kind_name = "منبع" if site_id in MAP_RESOURCES else "تنگه"
     if site_id in MAP_RESOURCES:
         map_holdings[site_id] = country
+        push_news("تصرف منبع", f"{COUNTRIES[country]['name']} {MAP_RESOURCES[site_id]['name']} را تصرف کرد.")
     else:
         strait_holdings[site_id] = country
         reset_strait_policy(site_id)
-    site_forces.pop(site_id, None)  # no active guard remains when the quick capture path is allowed
-    msg = f"{COUNTRIES[country]['name']} {site_name} را تصرف کرد؛ یک {consumed_naval} برای تصرف مصرف شد."
-    push_war("capture", msg, [country] + ([current] if current else []))
-    push_news(f"تصرف {site_kind_name}", msg)
-    notify_country(country, f"✅ تصرف موفق! {site_name} را گرفتید؛ یک {consumed_naval} مصرف شد و موضع اکنون در اختیار شماست.")
-    if current and current != country:
-        notify_country(current, f"🚨 {COUNTRIES[country]['name']} {site_name} را از شما گرفت؛ موضع از دست رفت. در این تصرف سریع پادگان فعالی حضور نداشت و نیروی مستقر شما تلف نشد.")
+        push_news("تصرف تنگه", f"{COUNTRIES[country]['name']} {STRAITS_DATA[site_id]['name']} را تصرف کرد.")
     save_state()
     return web.json_response({"success": True, "message": "تصرف موفق."})
 
@@ -1880,16 +1867,25 @@ COUNTRY_SCAN_COST = 1_100_000
 def cname(cid): return COUNTRIES[cid]["name"] if cid in COUNTRIES else "—"
 
 def site_meta(site_id):
-    # پایتخت کشور اشغال‌شده نیز مثل یک موضع قابل اعزام/استقرار شناخته می‌شود.
-    if isinstance(site_id, str) and site_id.startswith("country:"):
-        target = site_id.split(":", 1)[1]
-        if target in COUNTRIES:
-            return {"id": site_id, "name": f"پایتخت {cname(target)}", "kind": "country", "type": "country", "zone": "land", "country_id": target}
     if site_id in MAP_RESOURCES:
         i = MAP_RESOURCES[site_id]
         return {"id": site_id, "name": i["name"], "kind": "resource", "type": i.get("type"), "zone": i.get("zone", "land")}
     if site_id in STRAITS_DATA:
         return {"id": site_id, "name": STRAITS_DATA[site_id]["name"], "kind": "strait", "type": "strait", "zone": "sea"}
+    if site_id in NAVAL_WAYPOINTS:
+        return {"id": site_id, "name": "مسیر دریایی", "kind": "waypoint", "type": "waypoint", "zone": "sea"}
+    if isinstance(site_id, str) and site_id.startswith("country:"):
+        target = site_id.split(":", 1)[1]
+        if target in COUNTRIES:
+            return {"id": site_id, "name": f"بندر {COUNTRIES[target]['name']}", "kind": "country", "type": "country_port", "zone": "sea", "country": target}
+    if isinstance(site_id, str) and site_id.startswith("port:"):
+        parts = site_id.split(":")
+        if len(parts) == 3 and parts[1] in COUNTRIES and parts[2] in COUNTRIES:
+            return {"id": site_id, "name": f"بندر {COUNTRIES[parts[1]]['name']}", "kind": "port", "type": "port", "zone": "sea", "country": parts[1], "owner": parts[2]}
+    if isinstance(site_id, str) and site_id.startswith("front:"):
+        parts = site_id.split(":")
+        if len(parts) == 3 and parts[1] in COUNTRIES and parts[2] in COUNTRIES:
+            return {"id": site_id, "name": f"جبههٔ {COUNTRIES[parts[1]]['name']}", "kind": "front", "type": "front", "zone": "land", "country": parts[1], "owner": parts[2]}
     return None
 
 def site_zone(site_id):
@@ -1931,9 +1927,9 @@ def is_mine(site_id):
     return bool(i and i.get("type") in ("steel", "uranium"))
 
 def site_owner(site_id):
-    if isinstance(site_id, str) and site_id.startswith("country:"):
-        target = site_id.split(":", 1)[1]
-        return occupied_countries.get(target) or (target if target in COUNTRIES else None)
+    if isinstance(site_id, str) and site_id.startswith(("port:", "front:")):
+        parts = site_id.split(":")
+        if len(parts) == 3: return parts[2]
     return map_holdings.get(site_id) or strait_holdings.get(site_id)
 
 def set_site_owner(site_id, cid):
@@ -1966,11 +1962,6 @@ def reset_strait_policy(site_id):
         STRAITS_DATA[site_id]["country_rules"] = {}
 
 def garrison(site_id):
-    if isinstance(site_id, str) and site_id.startswith("country:"):
-        target = site_id.split(":", 1)[1]
-        g = country_garrisons.get(target)
-        if g and g.get("owner") and g["owner"] == site_owner(site_id): return g["units"]
-        return {}
     g = site_forces.get(site_id)
     if g and g.get("owner") and g["owner"] == site_owner(site_id): return g["units"]
     return {}
@@ -1981,9 +1972,6 @@ def deployed_units(cid):
     for sid, g in site_forces.items():
         if g.get("owner") == cid and site_owner(sid) == cid:
             for k, n in g["units"].items(): t[k] = t.get(k, 0) + n
-    for target, g in country_garrisons.items():
-        if g.get("owner") == cid and site_owner(f"country:{target}") == cid:
-            for k, n in g.get("units", {}).items(): t[k] = t.get(k, 0) + n
     return t
 
 def units_count(units): return sum(n for n in units.values() if n > 0)
@@ -2021,32 +2009,97 @@ async def get_forces(request):
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
     process_transits()
     p = _me(uid); cid = p.get("country"); sites = []
-    for sid in list(site_forces):
-        if cid and site_owner(sid) == cid:
-            g = garrison(sid)
-            if units_count(g) > 0:
-                sites.append({**site_meta(sid), "units": {k: n for k, n in g.items() if n > 0}})
-    for target, saved_garrison in list(country_garrisons.items()):
-        site_id = f"country:{target}"
-        if cid and saved_garrison.get("owner") == cid and site_owner(site_id) == cid:
-            units_here = garrison(site_id)
-            if units_count(units_here) > 0:
-                sites.append({**site_meta(site_id), "units": {k: n for k, n in units_here.items() if n > 0}})
-    mine = [{"id": t["id"], "from": t["from"], "to": t["to"], "from_name": "میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"]),
-             "to_name": loc_label(t["to"]), "kind": t["kind"], "units": t["units"], "start": t["start"], "arrive": t["arrive"]}
+    owned_ids = set()
+    if cid:
+        owned_ids.update(sid for sid, owner in map_holdings.items() if owner == cid)
+        owned_ids.update(sid for sid, owner in strait_holdings.items() if owner == cid)
+        owned_ids.update(sid for sid, g in site_forces.items() if g.get("owner") == cid and (sid.startswith("port:") or sid.startswith("front:")))
+        owned_ids.update(sid for sid, g in site_forces.items() if g.get("owner") == cid and site_owner(sid) == cid)
+    for sid in sorted(owned_ids):
+        meta = site_meta(sid)
+        if not meta: continue
+        g = dict(site_forces.get(sid, {}).get("units", {})) if sid.startswith(("port:", "front:")) else dict(garrison(sid))
+        clean = {k: int(n) for k, n in g.items() if int(n or 0) > 0}
+        sites.append({**meta, "owner": cid, "units": clean, "power": int(units_power(clean, p))})
+    mine = [{"id": t["id"], "from": t["from"], "to": t["to"],
+             "from_name": "⚔️ نبرد در مسیر" if (t.get("route_battle") or t.get("arrival_battle")) else ("میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"])),
+             "to_name": "درگیری" if (t.get("route_battle") or t.get("arrival_battle")) else loc_label(t["to"]), "kind": t["kind"], "units": t["units"],
+             "start": (t.get("route_battle") or t.get("arrival_battle") or {}).get("started_at", t["start"]),
+             "arrive": (t.get("route_battle") or t.get("arrival_battle") or {}).get("ends_at", t["arrive"]),
+             "eta_arrive": ((t["arrive"] if (t.get("route_battle") or t.get("arrival_battle")) else
+                             (t.get("route_total_arrive") if parse_dt(t.get("route_total_arrive")) and parse_dt(t.get("route_total_arrive")) > utcnow() else t["arrive"]))),
+             "battle": bool(t.get("route_battle") or t.get("arrival_battle")), "from_ll": t.get("from_ll"), "to_ll": t.get("to_ll")}
             for t in transits if t["owner"] == cid]
     return web.json_response({"home": {k: n for k, n in p["units"].items() if n > 0}, "sites": sites,
                               "transits": mine, "now": utcnow().isoformat()})
 
 # ---------------- زمان سفر نیروها ----------------
-TRAVEL_KM_PER_MIN = 40      # سرعت: ۴۰ کیلومتر در دقیقه (۱۰٬۰۰۰ کیلومتر ≈ ۴ ساعت)
-TRAVEL_MIN_MINUTES = 3
-TRAVEL_MAX_MINUTES = 480
+TRAVEL_MIN_SECONDS = 10
+TRAVEL_MAX_SECONDS = 60
+TRAVEL_MIN_MINUTES = TRAVEL_MIN_SECONDS / 60
+TRAVEL_MAX_MINUTES = TRAVEL_MAX_SECONDS / 60
+
+COUNTRY_PORT_COORDS = {
+    "germany": (8.15, 53.53), "britain": (-1.10, 50.80), "ussr": (30.20, 59.93),
+    "usa": (-76.30, 36.90), "france": (-4.49, 48.39), "italy": (14.27, 40.85),
+    "china": (121.50, 31.23), "japan": (139.65, 35.45),
+}
+NAVAL_WAYPOINTS = {
+    "sea:north": (3.0, 57.0), "sea:channel": (-3.8, 50.0), "sea:biscay": (-12.0, 45.0),
+    "sea:westmed": (-1.0, 38.0), "sea:red": (38.0, 20.0), "sea:arabian": (58.0, 14.0),
+    "sea:indian": (75.0, 2.0), "sea:southchina": (112.0, 10.0), "sea:natlantic": (-35.0, 43.0),
+    "sea:baltic": (18.0, 57.0), "sea:arcticwest": (12.0, 68.0), "sea:arcticmid": (55.0, 74.0),
+    "sea:arcticeast": (105.0, 73.0), "sea:bering": (170.0, 61.0), "sea:northpacific": (160.0, 43.0),
+    "sea:eastpacific": (-140.0, 28.0), "sea:caribbean": (-72.0, 18.0), "sea:westafrica": (-20.0, 25.0),
+    "sea:centralmed": (15.0, 35.5), "sea:eastmed": (28.0, 34.0), "sea:eastchina": (126.0, 29.0),
+    "sea:westpacific": (129.0, 14.0), "sea:seajapan": (138.0, 32.0), "sea:iceland": (-20.0, 64.0),
+    "sea:tyrrhenian": (12.5, 39.0), "sea:skagerrak": (9.0, 58.0),
+    "sea:norwegian": (0.0, 65.0), "sea:barents": (35.0, 72.0),
+}
+COUNTRY_SEA_LANES = {
+    # مسیرها به ترتیب از کشور اول به کشور دوم نوشته شده‌اند؛ معکوس آن‌ها به‌طور خودکار برعکس می‌شود.
+    ("germany", "britain"): ["sea:north", "dover"],
+    ("france", "britain"): ["sea:channel", "dover"],
+    ("germany", "france"): ["sea:north", "dover", "sea:channel"],
+    ("germany", "italy"): ["sea:north", "dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:tyrrhenian"],
+    ("france", "italy"): ["sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:tyrrhenian"],
+    ("italy", "britain"): ["sea:tyrrhenian", "sea:westmed", "gibraltar", "sea:westafrica", "sea:biscay", "sea:channel", "dover"],
+    ("germany", "china"): ["sea:north", "dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:eastchina"],
+    ("france", "china"): ["sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:eastchina"],
+    ("italy", "china"): ["sea:tyrrhenian", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:eastchina"],
+    ("britain", "china"): ["dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:eastchina"],
+    ("ussr", "japan"): ["sea:baltic", "sea:skagerrak", "sea:norwegian", "sea:arcticmid", "sea:barents", "sea:arcticeast", "sea:bering", "sea:northpacific", "sea:seajapan"],
+    ("china", "japan"): ["sea:eastchina", "sea:seajapan"],
+    ("usa", "japan"): ["sea:caribbean", "panama", "sea:eastpacific", "sea:northpacific", "sea:seajapan"],
+    ("usa", "china"): ["sea:caribbean", "panama", "sea:eastpacific", "sea:northpacific", "sea:westpacific", "sea:eastchina"],
+    ("usa", "germany"): ["sea:natlantic", "sea:biscay", "sea:channel", "dover", "sea:north"],
+    ("usa", "france"): ["sea:natlantic", "sea:biscay"],
+    ("usa", "italy"): ["sea:natlantic", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:tyrrhenian"],
+    ("usa", "britain"): ["sea:natlantic", "sea:biscay", "sea:channel", "dover"],
+    ("usa", "ussr"): ["sea:natlantic", "sea:iceland", "sea:norwegian", "sea:skagerrak", "sea:baltic"],
+    ("ussr", "china"): ["sea:baltic", "sea:skagerrak", "sea:norwegian", "sea:arcticmid", "sea:barents", "sea:arcticeast", "sea:bering", "sea:northpacific", "sea:westpacific", "sea:eastchina"],
+    ("france", "ussr"): ["sea:channel", "dover", "sea:north", "sea:skagerrak", "sea:baltic"],
+    ("italy", "ussr"): ["sea:tyrrhenian", "sea:westmed", "gibraltar", "sea:westafrica", "sea:biscay", "sea:channel", "dover", "sea:north", "sea:skagerrak", "sea:baltic"],
+    ("britain", "ussr"): ["dover", "sea:north", "sea:skagerrak", "sea:baltic"],
+    ("germany", "ussr"): ["sea:north", "sea:skagerrak", "sea:baltic"],
+    ("britain", "japan"): ["dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:seajapan"],
+    ("france", "japan"): ["sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:seajapan"],
+    ("italy", "japan"): ["sea:tyrrhenian", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:seajapan"],
+    ("germany", "japan"): ["sea:north", "dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:seajapan"],
+}
 
 def loc_coords(cid, loc):
     if loc == "home": return TRADE_COUNTRY_COORDS.get(cid)
+    if loc in NAVAL_WAYPOINTS:
+        return NAVAL_WAYPOINTS[loc]
     if isinstance(loc, str) and loc.startswith("country:"):
-        return TRADE_COUNTRY_COORDS.get(loc.split(":", 1)[1])
+        return COUNTRY_PORT_COORDS.get(loc.split(":", 1)[1])
+    if isinstance(loc, str) and loc.startswith("port:"):
+        parts = loc.split(":")
+        return COUNTRY_PORT_COORDS.get(parts[1]) if len(parts) == 3 else None
+    if isinstance(loc, str) and loc.startswith("front:"):
+        parts = loc.split(":")
+        return TRADE_COUNTRY_COORDS.get(parts[1]) if len(parts) == 3 else None
     i = MAP_RESOURCES.get(loc) or STRAITS_DATA.get(loc)
     return (i["lon"], i["lat"]) if i else None
 
@@ -2061,13 +2114,19 @@ def geo_interp(a, b, f):
     z = A * math.sin(lat1) + B * math.sin(lat2)
     return (math.degrees(math.atan2(y, x)), math.degrees(math.atan2(z, math.hypot(x, y))))
 
-def travel_minutes(cid, a, b):
-    ca, cb = loc_coords(cid, a), loc_coords(cid, b)
+def travel_minutes(cid, a, b, units=None):
+    if a == "home" and has_naval_units(units or {}):
+        ca = COUNTRY_PORT_COORDS.get(cid, TRADE_COUNTRY_COORDS.get(cid))
+    else:
+        ca = loc_coords(cid, a)
+    if b == "home" and has_naval_units(units or {}):
+        cb = COUNTRY_PORT_COORDS.get(cid, TRADE_COUNTRY_COORDS.get(cid))
+    else:
+        cb = loc_coords(cid, b)
     if not ca or not cb: return TRAVEL_MIN_MINUTES
-    lon1, lat1, lon2, lat2 = map(math.radians, (ca[0], ca[1], cb[0], cb[1]))
-    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
-    km = 6371 * 2 * math.asin(min(1, math.sqrt(h)))
-    return max(TRAVEL_MIN_MINUTES, min(TRAVEL_MAX_MINUTES, km / TRAVEL_KM_PER_MIN))
+    km = _great_circle_km(ca, cb)
+    seconds = TRAVEL_MIN_SECONDS + (TRAVEL_MAX_SECONDS - TRAVEL_MIN_SECONDS) * min(1.0, max(0.0, km / 10000.0))
+    return max(TRAVEL_MIN_MINUTES, min(TRAVEL_MAX_MINUTES, seconds / 60.0))
 
 def _great_circle_km(a, b):
     if not a or not b: return float("inf")
@@ -2080,6 +2139,30 @@ STRAIT_PASSAGE_RADIUS_KM = 280.0
 
 def has_naval_units(units):
     return any(n > 0 and ARMY_UNITS.get(k, {}).get("group") == "naval" for k, n in (units or {}).items())
+
+def _country_route_straits(src_country, dst_country, traveler):
+    """Return a sea-lane ordered from the origin country toward the destination port."""
+    if not src_country or not dst_country or src_country == dst_country:
+        return []
+    route = COUNTRY_SEA_LANES.get((src_country, dst_country))
+    if route is not None:
+        return list(route)
+    route = COUNTRY_SEA_LANES.get((dst_country, src_country))
+    if route is not None:
+        return list(reversed(route))
+    return _country_route_straits_fallback(src_country, dst_country, traveler)
+
+def _country_route_straits_fallback(src_country, dst_country, traveler):
+    options = SEA_ROUTE_HINTS.get(frozenset((src_country, dst_country))) if "SEA_ROUTE_HINTS" in globals() else None
+    if not options: return []
+    candidates = []
+    for route in options:
+        route = list(route or [])
+        if all(s in STRAITS_DATA or s in NAVAL_WAYPOINTS for s in route):
+            blocked = any(s in STRAITS_DATA and site_owner(s) and site_owner(s) != traveler and strait_policy(s, traveler).get("closed") for s in route)
+            candidates.append((blocked, not bool(route), len(route), route))
+    candidates.sort(key=lambda row: (row[0], row[1], row[2]))
+    return candidates[0][3] if candidates else []
 
 def straits_on_route(cid, src, dst):
     """Approximate straits crossed by a sea force along its great-circle route, ordered by progress."""
@@ -2108,9 +2191,7 @@ def straits_on_route(cid, src, dst):
 
 def loc_label(loc):
     if loc == "home": return "خانه"
-    if isinstance(loc, str) and loc.startswith("country:"):
-        target = loc.split(":", 1)[1]
-        return f"پایتخت {cname(target)}" if target in COUNTRIES else "کشور نامشخص"
+    if loc == "mid": return "میانهٔ راه"
     m = site_meta(loc); return m["name"] if m else "—"
 
 def announce(kind, title, text, countries=()):
@@ -2131,15 +2212,14 @@ def _add_units(dest, sent):
     for k, n in sent.items(): dest[k] = dest.get(k, 0) + n
 
 def start_transit(cid, src, dst, units, minutes, kind="go", dst_free=False, origin=None,
-                  passage=False, route_final_dst=None, route_remaining_straits=None,
-                  war_id=None, target_country=None):
+                  passage=False, route_final_dst=None, route_remaining_straits=None, route_total_arrive=None):
     now = utcnow()
     t = {"id": str(uuid.uuid4()), "owner": cid, "from": src, "to": dst, "units": dict(units), "kind": kind,
          "dst_free": dst_free, "origin": origin or src, "passage": bool(passage),
          "route_final_dst": route_final_dst,
          "route_remaining_straits": list(route_remaining_straits or []),
-         "war_id": war_id, "target_country": target_country,
-         "from_ll": loc_coords(cid, src), "to_ll": loc_coords(cid, dst),
+         "from_ll": (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, src)) if src == "home" and has_naval_units(units) else loc_coords(cid, src)), "to_ll": (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, dst)) if dst == "home" and has_naval_units(units) else loc_coords(cid, dst)),
+         "route_total_arrive": route_total_arrive,
          "start": now.isoformat(), "arrive": (now + timedelta(minutes=max(0.0, float(minutes)))).isoformat()}
     transits.append(t); return t
 
@@ -2158,7 +2238,7 @@ def _turn_back(t, now, reason=None):
     total = (ar - st).total_seconds() / 60 if (st and ar) else 0
     fr = t.get("from_ll") or loc_coords(cid, t["from"]); to = t.get("to_ll") or loc_coords(cid, t["to"])
     here = geo_interp(fr, to, min(1.0, elapsed / total)) if (fr and to and total > 0) else fr
-    t["from_ll"] = here; t["to_ll"] = loc_coords(cid, t["origin"])
+    t["from_ll"] = here; t["to_ll"] = (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, t["origin"])) if t["origin"] == "home" and has_naval_units(t.get("units", {})) else loc_coords(cid, t["origin"]))
     t["kind"] = "back"; t["to"] = t["origin"]; t["from"] = "mid"; t["dst_free"] = False
     t["start"] = now.isoformat(); t["arrive"] = (now + timedelta(minutes=elapsed)).isoformat()
     back_name = loc_label(t["to"])
@@ -2180,13 +2260,18 @@ def _continue_strait_passage(t, units):
     else:
         next_dst = final_dst
         passage = False
-    minutes = 0.0 if next_dst in STRAITS_DATA and has_naval_units(units) else travel_minutes(cid, current, next_dst)
+    total_end = parse_dt(t.get("route_total_arrive"))
+    if total_end and total_end > utcnow():
+        remaining_seconds = max(1.0, (total_end - utcnow()).total_seconds())
+        minutes = (remaining_seconds / max(1, len(remaining) + 1)) / 60.0
+    else:
+        minutes = travel_minutes(cid, current, next_dst, units)
+        total_end = utcnow() + timedelta(minutes=minutes * (len(remaining) + 1))
     next_owner = site_owner(next_dst) if next_dst != "home" else None
     start_transit(cid, current, next_dst, units, minutes, "go",
                   dst_free=(next_dst != "home" and not next_owner), origin=t.get("origin") or t.get("from"),
                   passage=passage, route_final_dst=final_dst if passage else None,
-                  route_remaining_straits=remaining if passage else None,
-                  war_id=t.get("war_id"), target_country=t.get("target_country"))
+                  route_remaining_straits=remaining if passage else None, route_total_arrive=total_end.isoformat())
 
 def _resolve_strait_passage(t, player):
     cid, units, sid = t["owner"], dict(t["units"]), t["to"]
@@ -2208,31 +2293,38 @@ def _resolve_strait_passage(t, player):
         attack_power = units_power(units, player, "attack") * (1 + random.uniform(-0.08, 0.08))
         defense_power = units_power(guards, defender, "defense") * 1.10 * (1 + random.uniform(-0.08, 0.08))
         if units_count(guards) == 0 or attack_power > defense_power:
+            attacker_before = units_count(units)
+            defender_before = units_count(guards)
             survivors = {k: max(1, int(n * 0.8)) for k, n in units.items() if n > 0}
+            attacker_lost = attacker_before - units_count(survivors)
             old_owner = owner
-            defender_losses = units_count(guards)
             set_site_owner(sid, cid)
             site_forces.pop(sid, None)
             reset_strait_policy(sid)
-            msg = f"{cname(cid)} از تنگهٔ بستهٔ {loc_label(sid)} عبور کرد و آن را از {cname(old_owner)} گرفت؛ ناوگان باقی‌مانده به مسیر خود ادامه می‌دهد."
+            msg = (f"{cname(cid)} از تنگهٔ بستهٔ {loc_label(sid)} عبور کرد و آن را از {cname(old_owner)} گرفت؛ "
+                   f"مهاجم {attacker_lost:,} یگان از دست داد و {units_count(survivors):,} باقی ماند؛ "
+                   f"مدافع {defender_before:,} یگان در این موضع از دست داد. ناوگان باقی‌مانده به مسیر خود ادامه می‌دهد.")
             announce("capture", "تصرف تنگه در نبرد", msg, [cid, old_owner])
             push_history("strait", f"نبرد عبور از {loc_label(sid)}", cid, old_owner, "attacker",
                          f"قدرت حمله {int(attack_power)} در برابر دفاع {int(defense_power)}")
-            losses = max(0, units_count(units) - units_count(survivors))
-            notify_country(cid, f"✅ پیروزی در تنگهٔ {loc_label(sid)}؛ تلفات شما {losses} یگان بود و {units_count(survivors)} یگان به مسیر کشور مقابل ادامه می‌دهند.")
-            notify_country(old_owner, f"🚨 {cname(cid)} در نبرد تنگهٔ {loc_label(sid)} را تصرف کرد؛ موضع از دست رفت و {defender_losses} یگان مدافع مستقر در آن تلف شد.")
+            notify_country(cid, f"✅ {msg}")
+            notify_country(old_owner, f"⚠️ {msg}")
             _continue_strait_passage(t, survivors)
         else:
             # The attacking force does not survive a failed forced passage attempt.
+            attacker_lost = units_count(units)
+            defender_before = units_count(guards)
             for k in list(guards):
                 guards[k] = int(guards[k] * 0.8)
                 if guards[k] <= 0: guards.pop(k, None)
-            msg = f"{cname(owner)} عبور {cname(cid)} از تنگهٔ بستهٔ {loc_label(sid)} را دفع کرد؛ ناوگان مهاجم از بین رفت و تنگه بسته ماند."
+            defender_lost = defender_before - units_count(guards)
+            msg = (f"{cname(owner)} عبور {cname(cid)} از تنگهٔ بستهٔ {loc_label(sid)} را دفع کرد؛ "
+                   f"مهاجم {attacker_lost:,} یگان از دست داد و {defender_lost:,} یگان مدافع نیز تلف شد؛ تنگه بسته ماند.")
             announce("repel", "دفاع از تنگه", msg, [cid, owner])
             push_history("strait", f"دفاع از {loc_label(sid)}", cid, owner, "defender",
                          f"قدرت حمله {int(attack_power)} در برابر دفاع {int(defense_power)}")
-            notify_country(cid, f"❌ ناوگان شما هنگام تلاش برای عبور از {loc_label(sid)} شکست خورد و از بین رفت.")
-            notify_country(owner, f"🛡️ نیروهای شما عبور {cname(cid)} از {loc_label(sid)} را دفع کردند.")
+            notify_country(cid, f"❌ {msg}")
+            notify_country(owner, f"🛡️ {msg}")
         return
 
     # Open passage: collect a fixed toll once, credit the strait owner, then continue.
@@ -2252,252 +2344,181 @@ def _resolve_strait_passage(t, player):
             push_news("پرداخت عوارض تنگه", f"{cname(cid)} برای عبور از {loc_label(sid)} مبلغ {toll:,}$ به {cname(owner)} پرداخت کرد.")
     _continue_strait_passage(t, units)
 
+def _unit_group_subset(units, group):
+    return {k: int(n) for k, n in (units or {}).items() if int(n or 0) > 0 and ARMY_UNITS.get(k, {}).get("group") == group}
 
-def _country_war(a, b, war_id=None):
-    """Return the live battle record for an opposing country pair."""
-    candidates = []
-    if war_id:
-        candidate = active_wars.get(str(war_id)) or war_declarations.get(str(war_id))
-        if candidate: candidates.append(candidate)
-    else:
-        candidates.extend(active_wars.values())
-    for candidate in candidates:
-        if candidate.get("status") == "battle" and not candidate.get("resolved") and {candidate.get("attacker"), candidate.get("defender")} == {a, b}:
-            return candidate
-    return None
-
-
-def _finish_country_war(war):
-    if not war: return
-    war["resolved"] = True
-    war["status"] = "resolved"
-    active_wars.pop(str(war.get("id")), None)
-
-
-def _capture_country_from_transit(attacker_cid, target_cid, attacker, defender, war, incoming_units,
-                                  attack_power, defense_power):
-    """Transfer a conquered country and station surviving attackers at its capital."""
-    total_sent = units_count(incoming_units)
-    defender_losses = units_count(defender.get("units", {}))
-    survivors = {k: int(n * 0.72) for k, n in incoming_units.items() if int(n * 0.72) > 0}
-    losses = max(0, total_sent - units_count(survivors))
-    occupied_countries[target_cid] = attacker_cid
-    country_garrisons[target_cid] = {"owner": attacker_cid, "units": survivors}
-    manpower_transfer = int(defender.get("manpower", 0) * 0.4)
-    defender["manpower"] = int(defender.get("manpower", 0) * 0.6)
-    attacker["manpower"] = attacker.get("manpower", 0) + manpower_transfer
-    defender["units"] = {k: 0 for k in defender.get("units", {})}
-    defender["is_eliminated"] = True
-    for site_id, owner in list(map_holdings.items()):
-        if owner == target_cid: map_holdings[site_id] = attacker_cid
-    for site_id, owner in list(strait_holdings.items()):
-        if owner == target_cid:
-            strait_holdings[site_id] = attacker_cid
-            reset_strait_policy(site_id)
-    for conquered_country, occupier in list(occupied_countries.items()):
-        if conquered_country != target_cid and occupier == target_cid:
-            occupied_countries[conquered_country] = attacker_cid
-    for garrison_data in country_garrisons.values():
-        if garrison_data.get("owner") == target_cid:
-            garrison_data["owner"] = attacker_cid
-    for site_id in list(site_forces):
-        if site_owner(site_id) != site_forces[site_id].get("owner"):
-            del site_forces[site_id]
-    _finish_country_war(war)
-    detail = f"قدرت حمله {int(attack_power)} در برابر دفاع {int(defense_power)}؛ تلفات مهاجم {losses} یگان؛ {units_count(survivors)} یگان در پایتخت مستقر شد."
-    msg = f"{cname(attacker_cid)} در نبرد پایتخت پیروز شد و کشور {cname(target_cid)} را اشغال کرد؛ {losses} یگان مهاجم تلف شد و نیروهای باقی‌مانده در پایتخت مستقر شدند."
-    announce("capture", "اشغال کشور در نبرد", msg, [attacker_cid, target_cid])
-    push_history("country", f"نبرد پایتخت {cname(target_cid)}", war.get("attacker"), war.get("defender"),
-                 "attacker" if attacker_cid == war.get("attacker") else "defender", detail)
-    notify_country(attacker_cid, f"✅ پیروزی! کشور {cname(target_cid)} را اشغال کردی. تلفات: {losses} از {total_sent} یگان؛ {units_count(survivors)} یگان در پایتخت باقی ماندند.")
-    notify_country(target_cid, f"🚨 کشور شما توسط {cname(attacker_cid)} اشغال شد. دفاع پایتخت شکست خورد و {defender_losses} یگان مدافع در خانه از دست رفتند.")
-
-
-def _resolve_country_arrival(t, attacker):
-    attacker_cid = t.get("owner")
-    target_cid = t.get("target_country") or str(t.get("to", "")).split(":", 1)[-1]
-    incoming = dict(t.get("units") or {})
-    total_sent = units_count(incoming)
-    _, _attacker_check = get_player_by_country(attacker_cid)
-    if not attacker_cid or target_cid not in COUNTRIES or attacker_cid == target_cid:
-        _add_units(attacker.setdefault("units", {}), incoming); return
-
-    # If this capital was already conquered by the same side, reinforce its garrison.
-    if occupied_countries.get(target_cid) == attacker_cid:
-        saved = country_garrisons.setdefault(target_cid, {"owner": attacker_cid, "units": {}})
-        saved["owner"] = attacker_cid
-        _add_units(saved.setdefault("units", {}), incoming)
-        msg = f"نیروهای {cname(attacker_cid)} به پایتخت اشغال‌شدهٔ {cname(target_cid)} رسیدند و پادگان را تقویت کردند."
-        announce("send", "تقویت پایتخت اشغال‌شده", msg, [attacker_cid, target_cid])
-        notify_country(attacker_cid, f"✅ {total_sent} یگان به پایتخت {cname(target_cid)} رسیدند و به پادگان پیوستند.")
-        return
-
-    war = _country_war(attacker_cid, target_cid, t.get("war_id"))
-    if not war:
-        _add_units(attacker.setdefault("units", {}), incoming)
-        notify_country(attacker_cid, f"ℹ️ جنگ با {cname(target_cid)} پایان یافته بود؛ نیروها به خانه برگشتند.")
-        return
-
-    owner = site_owner(f"country:{target_cid}")
-    if owner not in (target_cid, attacker_cid):
-        _add_units(attacker.setdefault("units", {}), incoming)
-        notify_country(attacker_cid, f"⚠️ مقصد {cname(target_cid)} اکنون در اختیار کشور دیگری است؛ نیروها به خانه برگشتند.")
-        return
-
-    target_uid, defender = get_player_by_country(target_cid)
-    if not defender:
-        occupied_countries[target_cid] = attacker_cid
-        country_garrisons[target_cid] = {"owner": attacker_cid, "units": incoming}
-        _finish_country_war(war)
-        msg = f"{cname(attacker_cid)} پایتخت {cname(target_cid)} را بدون مدافع تصرف کرد و {total_sent} یگان در آن مستقر شد."
-        announce("capture", "اشغال پایتخت بدون مدافع", msg, [attacker_cid, target_cid])
-        notify_country(attacker_cid, f"✅ پیروزی! پایتخت {cname(target_cid)} خالی بود و تصرف شد؛ {total_sent} یگان در آن مستقر شدند.")
-        notify_country(target_cid, f"🚨 پایتخت کشور شما توسط {cname(attacker_cid)} تصرف شد؛ پادگان فعالی برای دفاع وجود نداشت.")
-        return
-    ensure_player_fields(defender)
-    defending_units = dict(defender.get("units") or {})
-    attack_power = units_power(incoming, attacker, "attack") * (1 + random.uniform(-0.08, 0.08))
-    defense_power = units_power(defending_units, defender, "defense") * 1.10 * (1 + random.uniform(-0.08, 0.08))
-    if units_count(defending_units) == 0 or attack_power > defense_power:
-        _capture_country_from_transit(attacker_cid, target_cid, attacker, defender, war, incoming, attack_power, defense_power)
-        return
-
-    # The capital holds: most attackers are lost, a small surviving force retreats home.
-    survivors = {k: int(n * 0.20) for k, n in incoming.items() if int(n * 0.20) > 0}
-    attacker_losses = max(0, total_sent - units_count(survivors))
-    defender_losses = 0
-    for k, n in list(defender.get("units", {}).items()):
-        left = int(n * 0.8)
-        defender_losses += max(0, n - left)
-        defender["units"][k] = left
-    _add_units(attacker.setdefault("units", {}), survivors)
-    role = "defender" if target_cid == war.get("defender") else "attacker"
-    detail = f"قدرت حمله {int(attack_power)} در برابر دفاع {int(defense_power)}؛ تلفات مهاجم {attacker_losses} یگان و مدافع {defender_losses} یگان."
-    msg = f"{cname(target_cid)} در نبرد پایتخت، حملهٔ {cname(attacker_cid)} را دفع کرد؛ {attacker_losses} یگان مهاجم تلف شد و {units_count(survivors)} یگان بازمانده به خانه برگشت."
-    announce("repel", "دفاع موفق از پایتخت", msg, [attacker_cid, target_cid])
-    push_history("country", f"دفاع از پایتخت {cname(target_cid)}", war.get("attacker"), war.get("defender"), role, detail)
-    notify_country(attacker_cid, f"❌ حمله به پایتخت {cname(target_cid)} شکست خورد؛ {attacker_losses} از {total_sent} یگان تلف شد و {units_count(survivors)} یگان به خانه برگشت.")
-    notify_country(target_cid, f"🛡️ دفاع موفق! حملهٔ {cname(attacker_cid)} به پایتخت کشور شما دفع شد؛ تلفات دفاعی: {defender_losses} یگان.")
-
-
-def _transit_position_at(t, at):
-    st, ar = parse_dt(t.get("start")), parse_dt(t.get("arrive"))
-    fr = t.get("from_ll") or loc_coords(t.get("owner"), t.get("from"))
-    to = t.get("to_ll") or loc_coords(t.get("owner"), t.get("to"))
-    if not st or not ar or not fr or not to: return None
-    span = max(0.001, (ar - st).total_seconds())
-    fraction = max(0.0, min(1.0, (at - st).total_seconds() / span))
-    return geo_interp(fr, to, fraction)
-
-
-def _resolve_transit_collision(first, second, collision_point, now, war):
-    """Resolve two hostile war columns meeting on their shared route; winner keeps moving."""
-    if first not in transits or second not in transits: return False
-    c1, c2 = first.get("owner"), second.get("owner")
-    _, p1 = get_player_by_country(c1); _, p2 = get_player_by_country(c2)
-    if not p1 or not p2: return False
-    u1, u2 = dict(first.get("units") or {}), dict(second.get("units") or {})
-    n1, n2 = units_count(u1), units_count(u2)
-    power1 = units_power(u1, p1) * (1 + random.uniform(-0.08, 0.08))
-    power2 = units_power(u2, p2) * (1 + random.uniform(-0.08, 0.08))
-    if abs(power1 - power2) < 0.001:
-        winner, loser, winner_units, loser_units, winner_cid, loser_cid = (first, second, u1, u2, c1, c2) if random.choice((True, False)) else (second, first, u2, u1, c2, c1)
-    elif power1 > power2:
-        winner, loser, winner_units, loser_units, winner_cid, loser_cid = first, second, u1, u2, c1, c2
-    else:
-        winner, loser, winner_units, loser_units, winner_cid, loser_cid = second, first, u2, u1, c2, c1
-
-    transits.remove(first); transits.remove(second)
-    survivors = {k: max(1, int(n * 0.70)) for k, n in winner_units.items() if int(n) > 0}
-    winner_losses = max(0, units_count(winner_units) - units_count(survivors))
-    loser_losses = units_count(loser_units)  # defeated formation is destroyed in this test battle model
-    winner["units"] = survivors
-    winner["from"] = "mid"
-    winner["from_ll"] = list(collision_point)
-    winner["start"] = now.isoformat()
-    destination_point = winner.get("to_ll") or loc_coords(winner_cid, winner.get("to"))
-    km_left = _great_circle_km(collision_point, destination_point)
-    minutes_left = max(TRAVEL_MIN_MINUTES, min(TRAVEL_MAX_MINUTES, km_left / TRAVEL_KM_PER_MIN))
-    winner["arrive"] = (now + timedelta(minutes=minutes_left)).isoformat()
-    # Both original transits were removed for the encounter; put the winning column back on the route.
-    transits.append(winner)
-    total_rem = units_count(survivors)
-    front = "دریایی" if (has_naval_units(winner_units) or has_naval_units(loser_units)) else "زمینی"
-    final_dst = winner.get("target_country") or str(winner.get("route_final_dst") or winner.get("to") or "").replace("country:", "")
-    target_name = cname(final_dst)
-    role = "attacker" if winner_cid == war.get("attacker") else "defender"
-    detail = f"برنده: {cname(winner_cid)}؛ قدرت‌ها {int(power1)} و {int(power2)}؛ تلفات برنده {winner_losses} و تلفات بازنده {loser_losses} یگان."
-    msg = f"درگیری {front} در راه کشور {target_name}: {cname(winner_cid)} پیروز شد؛ {winner_losses} یگان از نیروهای برنده و تمام {loser_losses} یگان نیروی بازنده تلف شدند. {total_rem} یگان باقی‌ماندهٔ {cname(winner_cid)} به سمت کشور {target_name} به حرکت ادامه می‌دهند."
-    announce("battle", "درگیری نیروهای دو کشور در مسیر", msg, [c1, c2])
-    push_history("country", f"درگیری در مسیر {cname(c1)} و {cname(c2)}", war.get("attacker"), war.get("defender"), role, detail)
-    notify_country(winner_cid, f"✅ پیروزی در نبرد {front}! تلفات شما {winner_losses} یگان بود؛ {total_rem} یگان باقی مانده و به سمت {target_name} حرکت را ادامه می‌دهند.")
-    notify_country(loser_cid, f"❌ در نبرد {front} با {cname(winner_cid)} شکست خوردید؛ {loser_losses} یگان اعزامی از بین رفت و نیروی شما به مقصد نرسید.")
-    save_state()
+def _start_ground_march(t, cid, target, ground, now):
+    """After winning the port fight, unload ground troops and move them from the port to the capital."""
+    ground = {k: int(n) for k, n in (ground or {}).items() if int(n or 0) > 0}
+    if not ground:
+        return False
+    port_id = f"port:{target}:{cid}"
+    front_id = f"front:{target}:{cid}"
+    port_xy = COUNTRY_PORT_COORDS.get(target, loc_coords(cid, port_id))
+    capital_xy = TRADE_COUNTRY_COORDS.get(target)
+    seconds = max(TRAVEL_MIN_SECONDS, min(TRAVEL_MAX_SECONDS,
+        int(math.ceil(travel_minutes(cid, port_id, front_id, ground) * 60))))
+    t["units"] = ground
+    t["invasion_target"] = target
+    t["from"] = port_id
+    t["to"] = front_id
+    t["from_ll"] = list(port_xy or (0, 0))
+    t["to_ll"] = list(capital_xy or (0, 0))
+    t["start"] = now.isoformat()
+    t["arrive"] = (now + timedelta(seconds=seconds)).isoformat()
+    t["ground_march"] = True
+    t.pop("arrival_battle", None)
+    t.pop("route_battle", None)
+    msg = f"⚓ بندر {cname(target)} پس از نبرد دریایی در اختیار ناوگان {cname(cid)} قرار گرفت. کشتی‌های باقی‌مانده در بندر می‌مانند؛ {units_count(ground):,} نیروی زمینی با ناو ترابری از بندر به سمت پایتخت حرکت کرد و حدود {seconds} ثانیه دیگر به آن می‌رسد."
+    announce("ground_march_started", f"حرکت زمینی از بندر {cname(target)}", msg, [cid, target])
+    notify_country(cid, msg); notify_country(target, msg)
     return True
 
 
-def process_transit_collisions(now=None):
-    """Find hostile columns travelling toward each other's capitals and stop them at their meeting point."""
-    now = now or utcnow()
-    candidates = [t for t in list(transits) if t.get("kind") == "go" and t.get("target_country") and t.get("war_id")]
-    for index, first in enumerate(candidates):
-        if first not in transits: continue
-        for second in candidates[index + 1:]:
-            if second not in transits or first.get("war_id") != second.get("war_id"): continue
-            c1, c2 = first.get("owner"), second.get("owner")
-            if not c1 or not c2 or c1 == c2: continue
-            if first.get("target_country") != c2 or second.get("target_country") != c1: continue
-            war = _country_war(c1, c2, first.get("war_id"))
-            if not war: continue
-            a1, b1 = parse_dt(first.get("start")), parse_dt(first.get("arrive"))
-            a2, b2 = parse_dt(second.get("start")), parse_dt(second.get("arrive"))
-            if not all((a1, b1, a2, b2)): continue
-            left, right = max(a1, a2), min(b1, b2)
-            if right < left: continue
-            span = max(0.0, (right - left).total_seconds())
-            samples = max(20, min(120, int(span / 5) + 1))
-            closest, point = float("inf"), None
-            for i in range(samples + 1):
-                when = left + timedelta(seconds=span * i / samples)
-                p1 = _transit_position_at(first, when)
-                p2 = _transit_position_at(second, when)
-                if not p1 or not p2: continue
-                distance = _great_circle_km(p1, p2)
-                if distance < closest:
-                    closest, point = distance, ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)
-            if point is not None and closest <= WAR_INTERCEPT_RADIUS_KM:
-                return _resolve_transit_collision(first, second, point, now, war)
-    return False
+def _start_ground_battle(t, now):
+    """Start the timed land battle once transported units have reached the capital/front."""
+    cid = t.get("owner"); target = t.get("invasion_target")
+    if not cid or not target or target not in COUNTRIES:
+        return
+    seconds = random.randint(30, 60)
+    pos = TRADE_COUNTRY_COORDS.get(target) or loc_coords(target, "home") or (0, 0)
+    t["ground_march"] = False
+    t["arrival_battle"] = {"phase": "land", "started_at": now.isoformat(),
+                           "ends_at": (now + timedelta(seconds=seconds)).isoformat(),
+                           "position": list(pos), "duration": seconds}
+    t["from"] = "mid"
+    t["from_ll"] = list(pos); t["to_ll"] = list(pos)
+    t["start"] = now.isoformat(); t["arrive"] = t["arrival_battle"]["ends_at"]
+    msg = f"🪖 نیروهای زمینی {cname(cid)} به پایتخت {cname(target)} رسیدند؛ نبرد زمینی آغاز شد. نتیجه در ۳۰ تا ۶۰ ثانیهٔ آینده همراه با تلفات و مدت نبرد اعلام می‌شود."
+    announce("land_battle_started", f"آغاز نبرد زمینی در {cname(target)}", msg, [cid, target])
+    notify_country(cid, msg); notify_country(target, msg)
 
+
+def resolve_ground_arrival_battle(t):
+    cid = t.get("owner"); target = t.get("invasion_target")
+    _, attacker = get_player_by_country(cid)
+    _, defender = get_player_by_country(target)
+    if not attacker or not defender:
+        return
+    force = _unit_group_subset(t.get("units") or {}, "land")
+    defender_ground = _unit_group_subset(defender.get("units", {}), "land")
+    duration = int((t.get("arrival_battle") or {}).get("duration", 30))
+    atk = units_power(force, attacker, "attack") * random.uniform(0.92, 1.08)
+    dfn = units_power(defender_ground, defender, "defense") * 1.10 * random.uniform(0.92, 1.08)
+    front_id = f"front:{target}:{cid}"
+    if not defender_ground or atk > dfn:
+        force_before = units_count(force)
+        defender_before = units_count(defender_ground)
+        survivors = {k: max(1, int(n * 0.65)) for k, n in force.items() if n > 0}
+        for k, n in defender_ground.items(): defender["units"][k] = max(0, int(n * 0.25))
+        defender_after = units_count(_unit_group_subset(defender.get("units", {}), "land"))
+        previous = site_forces.get(front_id, {}).get("units", {})
+        _add_units(previous, survivors)
+        site_forces[front_id] = {"owner": cid, "units": previous}
+        result = (f"🏆 نبرد زمینی در پایتخت {cname(target)} پس از {duration} ثانیه به پیروزی {cname(cid)} انجامید؛ "
+                  f"جبههٔ پایتخت به تصرف نیروهای مهاجم درآمد. مهاجم {force_before-units_count(survivors):,} یگان از دست داد "
+                  f"و {units_count(survivors):,} باقی ماند؛ مدافع {defender_before-defender_after:,} یگان از دست داد "
+                  f"و {defender_after:,} نیروی زمینی باقی دارد. قدرت حمله {int(atk)} در برابر دفاع {int(dfn)}.")
+        winner = "attacker"
+    else:
+        defender_before = units_count(defender_ground)
+        force_before = units_count(force)
+        for k, n in defender_ground.items(): defender["units"][k] = max(0, int(n * 0.85))
+        defender_after = units_count(_unit_group_subset(defender.get("units", {}), "land"))
+        returned = {k: int(n * 0.20) for k, n in force.items() if int(n * 0.20) > 0}
+        _add_units(attacker["units"], returned)
+        result = (f"🛡️ نبرد زمینی در پایتخت {cname(target)} پس از {duration} ثانیه به پیروزی مدافعان انجامید؛ "
+                  f"نیروهای {cname(cid)} عقب نشستند؛ مهاجم {force_before-units_count(returned):,} یگان از دست داد "
+                  f"و {units_count(returned):,} به خانه بازگشت. مدافع {defender_before-defender_after:,} یگان از دست داد "
+                  f"و {defender_after:,} نیروی زمینی باقی دارد. قدرت حمله {int(atk)} در برابر دفاع {int(dfn)}.")
+        winner = "defender"
+    push_history("invasion", f"نبرد زمینی در پایتخت {cname(target)}", cid, target, winner,
+                 f"حمله {int(atk)} در برابر دفاع {int(dfn)}؛ مدت {duration} ثانیه")
+    announce("invasion_result", f"نتیجهٔ نبرد زمینی در {cname(target)}", result, [cid, target])
+    notify_country(cid, result); notify_country(target, result); save_state()
+
+
+def resolve_country_arrival(t, cid, p, target):
+    _, defender = get_player_by_country(target)
+    if not defender:
+        _add_units(p["units"], t["units"]); return False
+    if not _war_between(cid, target):
+        _add_units(p["units"], t["units"])
+        msg = f"نیروهای {cname(cid)} به بندر {cname(target)} رسیدند اما جنگ فعال نبود؛ نیروها بازگشتند."
+        announce("turnback", "بازگشت نیرو", msg, [cid, target]); notify_country(cid, msg); notify_country(target, msg); return False
+    force = dict(t.get("units") or {})
+    fleet = _unit_group_subset(force, "naval")
+    ground = _unit_group_subset(force, "land")
+    # Carrier-based aircraft stay with the fleet at the captured port; they do not join the land battle.
+    if fleet.get("aircraft_carrier", 0) > 0:
+        fleet.update(_unit_group_subset(force, "air"))
+    defender_fleet = _unit_group_subset(defender.get("units", {}), "naval")
+    if defender_fleet.get("aircraft_carrier", 0) > 0:
+        defender_fleet.update(_unit_group_subset(defender.get("units", {}), "air"))
+    fleet_atk = units_power(fleet, p, "attack") * random.uniform(0.92, 1.08)
+    fleet_def = units_power(defender_fleet, defender, "defense") * 1.10 * random.uniform(0.92, 1.08)
+    duration = int((t.get("arrival_battle") or {}).get("duration", 30))
+    port_won = not defender_fleet or fleet_atk > fleet_def
+    if not port_won:
+        defender_before = units_count(defender_fleet)
+        attacker_lost = units_count(force)
+        for k, n in defender_fleet.items(): defender["units"][k] = max(0, int(n * 0.85))
+        defender_after = units_count(_unit_group_subset(defender.get("units", {}), "naval"))
+        end_msg = (f"⚓ نبرد بندر {cname(target)} پس از {duration} ثانیه به پیروزی مدافعان انجامید؛ "
+                   f"عملیات آبی‌ـ‌خاکی {cname(cid)} شکست خورد و {attacker_lost:,} یگان مهاجم از دست رفت. "
+                   f"ناوگان مدافع {defender_before-defender_after:,} یگان از دست داد و {defender_after:,} یگان باقی ماند.")
+        push_history("port", f"نبرد بندر {cname(target)}", cid, target, "defender", f"حمله {int(fleet_atk)} در برابر دفاع {int(fleet_def)}؛ مدت {duration} ثانیه")
+        announce("port_battle_result", f"نتیجهٔ نبرد بندر {cname(target)}", end_msg, [cid, target])
+        notify_country(cid, end_msg); notify_country(target, end_msg); save_state(); return False
+
+    # Winning ships stay at the port and never move into the capital battle.
+    fleet_before = units_count(fleet)
+    defender_before = units_count(defender_fleet)
+    fleet_survivors = {k: max(0, int(n * 0.75)) for k, n in fleet.items() if n > 0}
+    if any(fleet_survivors.values()):
+        port_id = f"port:{target}:{cid}"
+        old = site_forces.get(port_id, {}).get("units", {})
+        _add_units(old, {k: n for k, n in fleet_survivors.items() if n > 0})
+        site_forces[port_id] = {"owner": cid, "units": old}
+    if defender_fleet:
+        for k, n in defender_fleet.items(): defender["units"][k] = max(0, int(n * 0.35))
+    defender_after = units_count(_unit_group_subset(defender.get("units", {}), "naval"))
+    port_msg = (f"✅ نبرد دریایی بندر {cname(target)} پس از {duration} ثانیه به پیروزی {cname(cid)} انجامید؛ "
+                f"ناوگان مهاجم {fleet_before-units_count(fleet_survivors):,} یگان از دست داد و {units_count(fleet_survivors):,} باقی ماند. "
+                f"مدافع {defender_before-defender_after:,} یگان دریایی از دست داد و {defender_after:,} باقی ماند؛ کشتی‌های مهاجم در بندر می‌مانند.")
+    push_history("port", f"نبرد بندر {cname(target)}", cid, target, "attacker", f"حمله {int(fleet_atk)} در برابر دفاع {int(fleet_def)}؛ مدت {duration} ثانیه")
+    announce("port_battle_result", f"نتیجهٔ نبرد بندر {cname(target)}", port_msg, [cid, target])
+    notify_country(cid, port_msg); notify_country(target, port_msg)
+    if not any(ground.values()):
+        save_state(); return False
+    # A separate 10–60 second port-to-capital land march follows the naval victory.
+    return _start_ground_march(t, cid, target, ground, utcnow())
 
 def resolve_arrival(t):
     cid = t["owner"]; units = t["units"]; dst = t["to"]
     _, p = get_player_by_country(cid)
-    if not p: return
+    if not p: return False
     ensure_player_fields(p)
+    if (t.get("arrival_battle") or {}).get("phase") == "land":
+        resolve_ground_arrival_battle(t); return False
+    if isinstance(dst, str) and dst.startswith("country:"):
+        return resolve_country_arrival(t, cid, p, dst.split(":", 1)[1])
     if t["kind"] == "back":
         if dst == "home" or site_owner(dst) != cid:
             _add_units(p["units"], units)
-        elif isinstance(dst, str) and dst.startswith("country:"):
-            target = dst.split(":", 1)[1]
-            g = country_garrisons.get(target)
-            if not g or g.get("owner") != cid:
-                g = country_garrisons[target] = {"owner": cid, "units": {}}
-            _add_units(g.setdefault("units", {}), units)
         else:
             g = site_forces.get(dst)
             if not g or g.get("owner") != cid: g = site_forces[dst] = {"owner": cid, "units": {}}
             _add_units(g["units"], units)
-        notify_country(cid, f"🏠 نیروهای بازگشتی به {loc_label(dst)} رسیدند؛ {units_count(units)} یگان به پادگان اضافه شد.")
+        return
+    if t.get("passage") and dst in NAVAL_WAYPOINTS:
+        _continue_strait_passage(t, units)
         return
     if t.get("passage") and dst in STRAITS_DATA:
         _resolve_strait_passage(t, p)
         return
     if dst == "home":
         _add_units(p["units"], units); return
-    if isinstance(dst, str) and dst.startswith("country:"):
-        _resolve_country_arrival(t, p)
-        return
     meta = site_meta(dst); kind = meta["kind"]; owner = site_owner(dst)
     if owner and owner != cid and have_treaty(cid, owner, "non_aggression"):
         _add_units(p["units"], units)
@@ -2520,40 +2541,173 @@ def resolve_arrival(t):
         def_p = units_power(gar, dfd, "defense") * 1.10 * (1 + random.uniform(-0.08, 0.08))
         empty = units_count(gar) == 0
         if empty or atk_p > def_p:
-            before_attack_count = units_count(units)
-            before_defense_count = units_count(gar)
+            attacker_before = units_count(units)
+            defender_before = units_count(gar)
             surv = dict(units) if empty else {k: max(1, int(n * 0.8)) for k, n in units.items()}
-            attacker_losses = max(0, before_attack_count - units_count(surv))
+            attacker_lost = attacker_before - units_count(surv)
             site_forces[dst] = {"owner": cid, "units": surv}; set_site_owner(dst, cid)
             if kind == "strait": reset_strait_policy(dst)
-            push_war("capture", f"{cname(cid)} {meta['name']} را از {cname(owner)} گرفت.", [cid, owner])
+            msg = (f"{cname(cid)} {meta['name']} را از {cname(owner)} تصرف کرد؛ "
+                   f"مهاجم {attacker_lost:,} یگان از دست داد و {units_count(surv):,} باقی ماند؛ "
+                   f"مدافع {defender_before:,} یگان پادگان را از دست داد.")
+            push_war("capture", msg, [cid, owner])
             push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "attacker",
-                         f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}")
-            push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را از {cname(owner)} گرفت.")
-            notify_country(cid, f"✅ حمله موفق بود! {meta['name']} را از {cname(owner)} گرفتید؛ {attacker_losses} یگان از {before_attack_count} یگان شما تلف شد و {units_count(surv)} یگان در موضع باقی ماند.")
-            notify_country(owner, f"🚨 {cname(cid)} {meta['name']} را از شما گرفت؛ موضع اشغال شد و {before_defense_count} یگان مدافع مستقر در آن از دست رفتند.")
+                         f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}؛ تلفات مهاجم {attacker_lost}؛ تلفات مدافع {defender_before}")
+            push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", msg)
+            notify_country(cid, f"✅ {msg}")
+            notify_country(owner, f"⚠️ {msg}")
         else:
-            before_attack_count = units_count(units)
-            before_defense_count = units_count(gar)
-            returned_units = {k: int(n * 0.3) for k, n in units.items() if int(n * 0.3) > 0}
-            _add_units(p["units"], returned_units)
+            attacker_before = units_count(units)
+            defender_before = units_count(gar)
+            returned = {k: int(n * 0.3) for k, n in units.items() if int(n * 0.3) > 0}
+            _add_units(p["units"], returned)
             for k in list(gar): gar[k] = int(gar[k] * 0.8)
-            defender_losses = max(0, before_defense_count - units_count(gar))
-            attacker_losses = max(0, before_attack_count - units_count(returned_units))
-            push_war("repel", f"{cname(owner)} حملهٔ {cname(cid)} به {meta['name']} را دفع کرد.", [cid, owner])
+            defender_after = units_count(gar)
+            msg = (f"{cname(owner)} حملهٔ {cname(cid)} به {meta['name']} را دفع کرد؛ "
+                   f"مهاجم {attacker_before-units_count(returned):,} یگان از دست داد و {units_count(returned):,} به خانه برگشت؛ "
+                   f"مدافع {defender_before-defender_after:,} یگان از دست داد و {defender_after:,} باقی ماند.")
+            push_war("repel", msg, [cid, owner])
             push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "defender",
-                         f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}")
-            notify_country(cid, f"❌ حمله شما به {meta['name']} دفع شد؛ {attacker_losses} یگان از {before_attack_count} یگان تلف شد و {units_count(returned_units)} یگان به خانه برگشت.")
-            notify_country(owner, f"🛡️ حملهٔ {cname(cid)} به {meta['name']} را دفع کردید؛ تلفات دفاعی شما {defender_losses} یگان بود و موضع حفظ شد.")
+                         f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}؛ تلفات مهاجم {attacker_before-units_count(returned)}؛ تلفات مدافع {defender_before-defender_after}")
+            notify_country(cid, f"❌ {msg}")
+            notify_country(owner, f"🛡️ {msg}")
+
+def _transit_position(t, now):
+    if t.get("route_battle"):
+        return tuple(t["route_battle"].get("position") or t.get("from_ll") or (0, 0))
+    a, b = t.get("from_ll"), t.get("to_ll")
+    if not a or not b: return None
+    st, ar = parse_dt(t.get("start")), parse_dt(t.get("arrive"))
+    if not st or not ar: return tuple(a)
+    span = max(0.001, (ar - st).total_seconds())
+    f = max(0.0, min(1.0, (now - st).total_seconds() / span))
+    return geo_interp(a, b, f)
+
+def _active_war_pair(a, b):
+    # Movement collisions are combat only after negotiation has expired and the war is actually active.
+    return bool(a and b and any(not w.get("resolved") and w.get("status") == "battle"
+                                and {w.get("attacker"), w.get("defender")} == {a, b}
+                                for w in active_wars.values()))
+
+def _start_route_battle(a, b, now, position):
+    bid = str(uuid.uuid4())
+    seconds = random.randint(30, 60)
+    start = now.isoformat(); end = (now + timedelta(seconds=seconds)).isoformat()
+    sea_battle = has_naval_units(a.get("units")) and has_naval_units(b.get("units"))
+    front = "naval" if sea_battle else "land"
+    for t in (a, b):
+        resume = {k: t.get(k) for k in ("from", "to", "from_ll", "to_ll", "start", "arrive", "kind", "dst_free", "origin", "passage", "route_final_dst", "route_remaining_straits")}
+        t["route_battle"] = {"id": bid, "front": front, "started_at": start, "ends_at": end, "position": list(position), "resume": resume}
+        t["from"] = "mid"; t["to"] = "mid"; t["from_ll"] = list(position); t["to_ll"] = list(position)
+        t["start"] = start; t["arrive"] = end
+    elapsed_msg = (f"⚓ دو ناوگان دشمن در دریا به هم رسیدند؛ نبرد دریایی آغاز شد و حدود {seconds} ثانیه طول می‌کشد. محل برخورد روی نقشه قرمز است."
+                   if sea_battle else f"⚔️ دو نیروی دشمن در مسیر به هم رسیدند؛ نبرد آغاز شد و حدود {seconds} ثانیه طول می‌کشد. محل برخورد روی نقشه قرمز است.")
+    announce("route_battle_started", "آغاز نبرد دریایی در مسیر" if sea_battle else "آغاز نبرد در مسیر", elapsed_msg, [a["owner"], b["owner"]])
+    notify_country(a["owner"], elapsed_msg); notify_country(b["owner"], elapsed_msg)
+
+def _check_transit_encounters(now):
+    changed = False
+    movers = [t for t in list(transits) if t.get("kind") == "go" and not t.get("route_battle") and not t.get("arrival_battle") and t.get("to") not in ("home", "mid")]
+    # Sample the previous second as well as the current moment. This prevents two fast test-speed
+    # fleets from crossing between one-second server ticks without ever being observed together.
+    sample_times = [now - timedelta(seconds=1) + timedelta(milliseconds=250 * i) for i in range(5)]
+    for i, a in enumerate(movers):
+        if a not in transits: continue
+        for b in movers[i + 1:]:
+            if b not in transits or a["owner"] == b["owner"] or not _active_war_pair(a["owner"], b["owner"]): continue
+            closest = None
+            closest_distance = float("inf")
+            for sample_at in sample_times:
+                pa, pb = _transit_position(a, sample_at), _transit_position(b, sample_at)
+                if not pa or not pb: continue
+                distance = _great_circle_km(pa, pb)
+                if distance < closest_distance:
+                    closest_distance, closest = distance, (pa, pb)
+            if closest and closest_distance <= 450:
+                pa, pb = closest
+                # Dateline-safe midpoint to keep the encounter marker on the correct side of the globe.
+                mid_lon = pa[0] + (((pb[0] - pa[0] + 180) % 360) - 180) / 2
+                mid_lat = (pa[1] + pb[1]) / 2
+                _start_route_battle(a, b, now, (mid_lon, mid_lat))
+                changed = True
+                break
+    return changed
+
+def _finish_route_battle(battle_id, now):
+    members = [t for t in list(transits) if t.get("route_battle", {}).get("id") == battle_id]
+    if len(members) < 2:
+        for t in members: t.pop("route_battle", None)
+        return
+    a, b = members[0], members[1]
+    _, pa = get_player_by_country(a.get("owner")); _, pb = get_player_by_country(b.get("owner"))
+    power_a = units_power(a.get("units", {}), pa, "attack") * random.uniform(0.92, 1.08)
+    power_b = units_power(b.get("units", {}), pb, "attack") * random.uniform(0.92, 1.08)
+    winner, loser, wp = (a, b, power_a) if power_a >= power_b else (b, a, power_b)
+    battle_front = winner["route_battle"].get("front", "land")
+    pos = tuple(winner["route_battle"].get("position") or winner.get("from_ll") or (0, 0))
+    start_dt = parse_dt(winner["route_battle"].get("started_at"))
+    elapsed = max(1, int((now - start_dt).total_seconds())) if start_dt else 30
+    # Loser loses the expedition. Winner loses 25%, then resumes its original destination from the meeting point.
+    winner_before = units_count(winner.get("units", {}))
+    loser_before = units_count(loser.get("units", {}))
+    winner_units = {k: max(1, int(n * 0.75)) for k, n in winner.get("units", {}).items() if n > 0}
+    winner["units"] = {k:n for k,n in winner_units.items() if n > 0}
+    loser_country = loser.get("owner"); winner_country = winner.get("owner")
+    transits.remove(loser)
+    resume = winner["route_battle"].get("resume") or {}
+    for key, val in resume.items(): winner[key] = val
+    winner.pop("route_battle", None)
+    if not winner["units"]:
+        if winner in transits: transits.remove(winner)
+    else:
+        target = winner.get("to")
+        end_ll = loc_coords(winner_country, target)
+        if not end_ll and winner.get("to_ll"): end_ll = winner["to_ll"]
+        if end_ll:
+            winner["from"] = "mid"; winner["from_ll"] = list(pos); winner["to_ll"] = list(end_ll)
+            winner["start"] = now.isoformat()
+            distance = _great_circle_km(pos, end_ll)
+            seconds = TRAVEL_MIN_SECONDS + (TRAVEL_MAX_SECONDS - TRAVEL_MIN_SECONDS) * min(1.0, max(0.0, distance / 10000.0))
+            winner["arrive"] = (now + timedelta(seconds=seconds)).isoformat()
+    title = "نبرد دریایی در مسیر" if battle_front == "naval" else "نبرد در مسیر"
+    final_target = winner.get("route_final_dst") or winner.get("to")
+    msg = (f"🏆 {title} پس از {elapsed} ثانیه پایان یافت؛ {cname(winner_country)} پیروز شد. "
+           f"نیروی پیروز {winner_before-units_count(winner.get('units', {})):,} یگان از دست داد و {units_count(winner.get('units', {})):,} باقی ماند؛ "
+           f"نیروی {cname(loser_country)} تمام {loser_before:,} یگان اعزام‌شده را از دست داد و از مسیر خارج شد. "
+           f"نیروی پیروز به‌سمت {loc_label(final_target)} ادامه می‌دهد.")
+    push_history("naval_route" if battle_front == "naval" else "route", title, winner_country, loser_country, "attacker", f"قدرت پیروزی {int(wp)}؛ مدت {elapsed} ثانیه")
+    announce("route_battle_result", f"نتیجهٔ {title}", msg, [winner_country, loser_country])
+    notify_country(winner_country, msg); notify_country(loser_country, msg)
+    save_state()
+
+def _start_arrival_battle(t, now):
+    cid = t.get("owner"); target = str(t.get("to", "")).split(":", 1)[1]
+    seconds = random.randint(30, 60)
+    pos = loc_coords(cid, t.get("to"))
+    if not pos: pos = loc_coords(target, "home")
+    t["arrival_battle"] = {"phase": "port", "started_at": now.isoformat(), "ends_at": (now + timedelta(seconds=seconds)).isoformat(), "position": list(pos or (0, 0)), "duration": seconds}
+    t["from_ll"] = list(pos or (0, 0)); t["to_ll"] = list(pos or (0, 0))
+    t["from"] = "mid"; t["start"] = now.isoformat(); t["arrive"] = t["arrival_battle"]["ends_at"]
+    msg = f"⚓ نیروی {cname(cid)} به بندر {cname(target)} رسید؛ نبرد بندر آغاز شد و نتیجه بین ۳۰ تا ۶۰ ثانیهٔ آینده اعلام می‌شود."
+    announce("port_battle_started", f"آغاز نبرد در بندر {cname(target)}", msg, [cid, target]); notify_country(cid, msg); notify_country(target, msg)
 
 def process_transits():
-    changed = False
+    changed = _check_transit_encounters(utcnow())
+    now = utcnow()
+    seen_battles = set()
+    for t in list(transits):
+        rb = t.get("route_battle")
+        if rb:
+            bid = rb.get("id")
+            if bid and bid not in seen_battles:
+                seen_battles.add(bid)
+                end = parse_dt(rb.get("ends_at"))
+                if end and end <= now:
+                    _finish_route_battle(bid, now); changed = True
+            continue
     # Process newly-created zero-minute strait legs immediately as well.
     for _ in range(100):
         now = utcnow()
-        if process_transit_collisions(now):
-            changed = True
-            continue
         due = []
         for t in list(transits):
             ar = parse_dt(t.get("arrive"))
@@ -2564,6 +2718,22 @@ def process_transits():
             if t not in transits: continue
             ar = parse_dt(t.get("arrive"))
             if ar and ar > now: continue
+            if t.get("ground_march"):
+                _start_ground_battle(t, now); changed = True
+                continue
+            if t.get("arrival_battle"):
+                ends = parse_dt(t["arrival_battle"].get("ends_at"))
+                if ends and ends > now: continue
+                try:
+                    continuing = bool(resolve_arrival(t))
+                except Exception as e:
+                    logging.error("resolve_arrival: %s", e); continuing = False
+                if not continuing and t in transits: transits.remove(t)
+                changed = True
+                continue
+            if isinstance(t.get("to"), str) and t["to"].startswith("country:") and t.get("kind") == "go":
+                _start_arrival_battle(t, now); changed = True
+                continue
             transits.remove(t); changed = True
             try: resolve_arrival(t)
             except Exception as e: logging.error("resolve_arrival: %s", e)
@@ -2584,20 +2754,12 @@ async def dispatch_forces(request):
     p = _me(uid); cid = p.get("country")
     if not cid or p.get("is_eliminated"): return _bad("کشوری ندارید.")
     if src == dst: return _bad("مبدأ و مقصد یکی است.")
-    is_country_target = isinstance(dst, str) and dst.startswith("country:")
-    target_country = dst.split(":", 1)[1] if is_country_target else None
-    war = None
-    if is_country_target:
-        if target_country not in COUNTRIES or target_country == cid:
-            return _bad("کشور مقصد معتبر نیست.")
-        war = next((candidate for candidate in active_wars.values()
-                    if not candidate.get("resolved") and candidate.get("status") == "battle"
-                    and {candidate.get("attacker"), candidate.get("defender")} == {cid, target_country}), None)
-        if not war:
-            return _bad("فقط در جنگ فعال می‌توان به کشور مقابل نیرو فرستاد.")
-    elif dst != "home" and not site_meta(dst):
-        return _bad("مقصد نامعتبر است.")
+    if dst != "home" and not site_meta(dst): return _bad("مقصد نامعتبر است.")
     if src != "home" and (not site_meta(src) or site_owner(src) != cid): return _bad("این مکان در اختیار شما نیست.")
+    target_country = dst.split(":", 1)[1] if isinstance(dst, str) and dst.startswith("country:") else None
+    if target_country:
+        if target_country == cid: return _bad("نمی‌توانید به کشور خودتان حمله کنید.")
+        if not _war_between(cid, target_country): return _bad("برای اعزام به کشور، جنگ باید تأیید شده و مهلت مذاکره تمام شده باشد.")
     pool = p["units"] if src == "home" else garrison(src)
     units = {}
     for k, v in (data.get("units") or {}).items():
@@ -2607,27 +2769,47 @@ async def dispatch_forces(request):
     if not units: return _bad("هیچ یگانی انتخاب نشده.")
     for k, n in units.items():
         if pool.get(k, 0) < n: return _bad("تعداد انتخابی بیشتر از موجودی آن مکان است.")
-    owner = site_owner(dst) if dst != "home" and not is_country_target else None
+    owner = target_country or (site_owner(dst) if dst != "home" else None)
     if owner and owner != cid and have_treaty(cid, owner, "non_aggression"):
         return _bad("با این کشور پیمان عدم تجاوز دارید.")
 
-    if dst != "home" and not is_country_target:
+    if dst != "home":
         combined = dict(units)
-        if owner == cid:  # تقویت موضع خودی: پشتیبانی‌های ازقبل مستقرشده هم حساب می‌شوند
+        if owner == cid:
             for k, n in garrison(dst).items(): combined[k] = combined.get(k, 0) + n
-        errs = dispatch_rule_errors(combined, site_zone(dst))
+        zone = "sea" if target_country else site_zone(dst)
+        errs = dispatch_rule_errors(combined, zone)
         if errs: return _bad(errs[0])
+        if target_country:
+            ground_count = units.get("infantry", 0) + units.get("tank", 0)
+            if ground_count and units.get("transport_ship", 0) < 1:
+                return _bad("برای فرستادن پیاده‌نظام یا تانک به کشور دشمن، ناو ترابری لازم است.")
+            if not has_naval_units(units):
+                return _bad("اعزام به کشور دشمن دریایی است؛ ناو جنگی یا ناو ترابری انتخاب کنید.")
         if is_mine(dst) and owner != cid and (units.get("infantry", 0) + units.get("tank", 0)) < 1:
             return _bad("برای تصرف معدن باید ارتش (پیاده‌نظام یا تانک) با ناو ترابری اعزام شود؛ ناو و زیردریایی به‌تنهایی کافی نیست.")
-    if src != "home" and not (isinstance(src, str) and src.startswith("country:")):  # در سکوها/تنگه‌ها پشتیبان باید باقی بماند
+    if src != "home":  # با رفتن این یگان‌ها، نیروهای باقی‌مانده نباید بی‌پشتیبان بمانند
         zs = site_zone(src)
         after = {k: pool.get(k, 0) - units.get(k, 0) for k in pool}
         if not dispatch_rule_errors(pool, zs) and dispatch_rule_errors(after, zs):
             return _bad("با خروج این یگان‌ها، نیروهای باقی‌مانده در این موضع بدون پشتیبان (ناو ترابری / ناو هواپیمابر / سوخت‌رسان) می‌مانند.")
 
-    route_straits = straits_on_route(cid, src, dst) if has_naval_units(units) else []
+    route_straits = []
+    if has_naval_units(units):
+        if target_country:
+            route_straits = _country_route_straits(cid, target_country, cid)
+            if src != "home" and route_straits:
+                src_xy = loc_coords(cid, src)
+                candidates = [(i, _great_circle_km(src_xy, loc_coords(cid, node)))
+                              for i, node in enumerate(route_straits) if src_xy and loc_coords(cid, node)]
+                if candidates:
+                    nearest_i, nearest_km = min(candidates, key=lambda row: row[1])
+                    route_straits = route_straits[nearest_i + (1 if route_straits[nearest_i] == src else 0):]
+        else:
+            route_straits = straits_on_route(cid, src, dst)
     toll_due = 0
     for sid in route_straits:
+        if sid in NAVAL_WAYPOINTS: continue
         sid_owner = site_owner(sid)
         policy = strait_policy(sid, cid)
         if sid_owner and sid_owner != cid and policy["closed"] and have_treaty(cid, sid_owner, "non_aggression"):
@@ -2641,33 +2823,32 @@ async def dispatch_forces(request):
     # Move to the next strait first when the selected naval route crosses one.
     first_target = route_straits[0] if route_straits else dst
     passage = bool(route_straits)
-    minutes = 0.0 if first_target in STRAITS_DATA and has_naval_units(units) else travel_minutes(cid, src, first_target)
+    total_minutes = travel_minutes(cid, src, dst, units)
+    legs = len(route_straits) + 1 if passage else 1
+    minutes = total_minutes / legs
+    total_arrive = (utcnow() + timedelta(minutes=total_minutes)).isoformat()
     start_transit(cid, src, first_target, units, minutes, "go",
                   dst_free=(first_target != "home" and not site_owner(first_target)), origin=src,
                   passage=passage, route_final_dst=dst if passage else None,
                   route_remaining_straits=route_straits[1:] if passage else None,
-                  war_id=war.get("id") if war else None, target_country=target_country)
+                  route_total_arrive=total_arrive if passage else None)
     if dst == "home":
         announce("return", "بازگشت نیرو", f"{cname(cid)} از {loc_label(src)} نیروهایش را به خانه فرستاد.", [cid])
-    elif is_country_target:
-        msg = f"{cname(cid)} از {loc_label(src)} به سمت کشور {cname(target_country)} نیرو فرستاد. نیروها در راه هستند."
-        announce("send", "اعزام نیرو به کشور دشمن", msg, [cid, target_country])
-        notify_country(cid, f"🧭 اعزام انجام شد: {loc_label(src)} → {cname(target_country)}. نیروها در راه‌اند.")
-        notify_country(target_country, f"⚠️ {cname(cid)} از {loc_label(src)} به سمت کشور شما نیرو فرستاد؛ وضعیت حرکت و درگیری را در بخش جنگ دنبال کنید.")
     else:
         target = f"به {loc_label(dst)}" if owner == cid else f"برای {loc_label(dst)}"
         if src == "home":
             announce("send", "اعزام نیرو", f"{cname(cid)} {target} نیرو فرستاد.", [cid] + ([owner] if owner and owner != cid else []))
         else:
             announce("send", "اعزام نیرو", f"{cname(cid)} از {loc_label(src)} نیروهایش را {target} فرستاد.", [cid] + ([owner] if owner and owner != cid else []))
-    process_transits()
-    save_state()
-    mins = int(math.ceil(minutes))
-    eta = f"{mins} دقیقه" if mins < 60 else f"{mins // 60} ساعت و {mins % 60} دقیقه"
     if minutes <= 0:
-        msg = "نیروها فوراً به تنگه رسیدند؛ وضعیت عبور و درگیری بررسی شد."
+        process_transits()
+    save_state()
+    secs = max(0, int(math.ceil(total_minutes * 60)))
+    eta = f"{secs} ثانیه" if secs < 60 else "۱ دقیقه"
+    if minutes <= 0:
+        msg = "نیروها رسیدند؛ وضعیت عبور و درگیری بررسی شد."
     else:
-        msg = f"نیروها به راه افتادند؛ رسیدن: حدود {eta}."
+        msg = f"نیروها به راه افتادند؛ زمان رسیدن آزمایشی: حدود {eta}."
     return web.json_response({"success": True, "outcome": "sent", "message": msg,
                               "player": serialize_player(p)})
 
@@ -2679,11 +2860,19 @@ async def get_map_transits(request):
     out = []
     for t in transits:
         cid = t["owner"]
-        fr = t.get("from_ll") or loc_coords(cid, t["from"]); to = t.get("to_ll") or loc_coords(cid, t["to"])
+        rb = t.get("route_battle")
+        resume = (rb or {}).get("resume") or {}
+        fr = resume.get("from_ll") if rb else t.get("from_ll")
+        to = resume.get("to_ll") if rb else t.get("to_ll")
+        fr = fr or loc_coords(cid, t["from"]); to = to or loc_coords(cid, t["to"])
         if not fr or not to: continue
-        out.append({"id": t["id"], "country": cid, "from_ll": list(fr), "to_ll": list(to), "kind": t["kind"],
-                    "from_name": "میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"]), "to_name": loc_label(t["to"]),
-                    "start": t["start"], "arrive": t["arrive"]})
+        out.append({"id": t["id"], "country": cid, "from_ll": list(fr), "to_ll": list(to),
+                    "battle_ll": list((rb or t.get("arrival_battle") or {}).get("position") or []) or None, "kind": t["kind"],
+                    "from_name": "⚔️ نبرد در مسیر" if (t.get("route_battle") or t.get("arrival_battle")) else ("میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"])),
+                    "to_name": "درگیری" if (t.get("route_battle") or t.get("arrival_battle")) else loc_label(t["to"]),
+                    "start": (t.get("route_battle") or t.get("arrival_battle") or {}).get("started_at", t["start"]),
+                    "arrive": (t.get("route_battle") or t.get("arrival_battle") or {}).get("ends_at", t["arrive"]),
+                    "battle": bool(t.get("route_battle") or t.get("arrival_battle"))})
     return web.json_response({"transits": out, "now": utcnow().isoformat()})
 
 async def recall_forces(request):
@@ -4383,7 +4572,7 @@ async def _run_ticks_for_all_worlds(include_transits=False):
 
 async def war_tick_loop():
     while True:
-        await asyncio.sleep(1)
+        await asyncio.sleep(30)
         try: await _run_ticks_for_all_worlds(include_transits=False)
         except Exception as e: logging.error("war/world tick: %s", e)
 
