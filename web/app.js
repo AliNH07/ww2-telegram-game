@@ -56,7 +56,6 @@ const RESOURCE_NAMES = { food: "غذا", steel: "آهن", uranium: "اورانی
 const RESOURCE_ICONS = { food: "🌾", steel: "⚙️", uranium: "☢️", oil: "🛢️" };
 const GROUP_ICONS = { land: "🪖", naval: "⚓", air: "✈️", missile: "🚀", strategy: "🛰️" };
 const GROUP_TITLES = { land: "زمینی", naval: "دریایی", air: "هوایی", missile: "موشکی", strategy: "استراتژیک" };
-const TREATY_TYPE_NAMES = { alliance: "پیمان اتحاد", non_aggression: "پیمان عدم تجاوز" };
 
 // [طول, عرض, اسم, حداقل زوم, حداکثر زوم] — اقیانوس‌ها همیشه، دریاها فقط با زوم بیشتر
 const OCEAN_LABELS = [
@@ -98,8 +97,8 @@ async function apiGet(path, params = {}) {
     } finally { clearTimeout(to); }
 }
 
-async function apiPost(path, body = {}) {
-    const url = getApiUrl(path, {});
+async function apiPost(path, body = {}, params = {}) {
+    const url = getApiUrl(path, params);
     const headers = { "Content-Type": "application/json" };
     if (initData) headers["X-Telegram-Init-Data"] = initData;
     const controller = new AbortController();
@@ -272,10 +271,14 @@ let enteringWorld = false;
 function renderWorldChoices() {
     const list = document.getElementById("world-select-list");
     if (!list) return;
-    list.innerHTML = availableWorlds.map(w => `
-        <button type="button" class="world-select-card" data-world-choice="${w.id}" aria-label="ورود به ${escapeHtml(w.name || `دنیای ${w.id}`)}">
-            <span class="world-select-globe">🌍</span><span class="world-select-info"><b>${escapeHtml(w.name || `دنیای ${w.id}`)}</b><small>${formatNumber(w.players || 0)} بازیکن · ${formatNumber(w.countries_taken || 0)} کشور انتخاب‌شده</small></span><span class="world-select-check">↵</span>
-        </button>`).join("");
+    list.innerHTML = availableWorlds.map(w => {
+        const status = w.game_finished ? `پایان‌یافته · برنده: ${escapeHtml(w.winner?.name || "—")}`
+            : w.game_started ? `روز ${w.day} از ۳۱ · ${escapeHtml(w.season || "")}${w.registration_open ? " · ثبت‌نام باز" : " · ثبت‌نام بسته"}`
+            : (w.registration_open ? "در انتظار شروع فرمانده · ثبت‌نام باز" : "در انتظار شروع فرمانده · ثبت‌نام بسته");
+        return `<button type="button" class="world-select-card" data-world-choice="${w.id}" aria-label="ورود به ${escapeHtml(w.name || `دنیای ${w.id}`)}">
+            <span class="world-select-globe">🌍</span><span class="world-select-info"><b>${escapeHtml(w.name || `دنیای ${w.id}`)}</b><small>${formatNumber(w.players || 0)} بازیکن · ${formatNumber(w.countries_taken || 0)} کشور انتخاب‌شده</small><small>${status}</small></span><span class="world-select-check">↵</span>
+        </button>`;
+    }).join("");
     list.querySelectorAll("[data-world-choice]").forEach(b => b.addEventListener("click", () => {
         if (enteringWorld) return;
         selectedWorldId = String(b.dataset.worldChoice);
@@ -303,13 +306,22 @@ async function enterSelectedWorld() {
             localStorage.setItem(worldChoiceKey(), "1");
         } catch {}
         showOnly("loading");
+        await fetchAvailableWorlds();
         await loadCountries();
         await loadPlayer();
         await loadArmyCatalog();
-        if (player?.country) showGame();
-        else {
+        if (player?.country && !player?.is_eliminated) showGame();
+        else if (player?.registration_open && !player?.is_eliminated && !player?.game_finished) {
             await Promise.all(Object.keys(COUNTRY_IMAGE_EXT).map(cid => preloadImage(countryImageUrl(cid))));
             showCountrySelection();
+        } else {
+            const msg = document.getElementById("registration-closed-message");
+            if (msg) msg.textContent = player?.is_eliminated
+                ? "کشور شما اشغال شده و از دور جاری حذف شده‌اید؛ این حساب نمی‌تواند دوباره وارد همین دور شود."
+                : player?.game_finished
+                    ? "این بازی ۳۱روزه تمام شده است و ثبت‌نام دوباره امکان‌پذیر نیست."
+                    : "ثبت‌نام این دنیا بسته است. برای انتخاب کشور آزاد باید منتظر بازگشایی ثبت‌نام توسط فرمانده بمانید.";
+            showOnly("registration-closed");
         }
     } catch (e) {
         console.error(e); showToast("ورود به دنیا ناموفق بود. دوباره تلاش کن.", "error"); showOnly("world-select"); renderWorldChoices();
@@ -319,6 +331,7 @@ async function enterSelectedWorld() {
 }
 
 document.getElementById("country-change-world")?.addEventListener("click", showWorldSelection);
+document.getElementById("registration-back-worlds")?.addEventListener("click", showWorldSelection);
 
 /* =========================================================
    Player / Countries
@@ -339,6 +352,24 @@ async function refreshPlayer() {
         if (fresh && !fresh.error) {
             player = fresh;
             selectedCountry = player?.country || null;
+            const gameScreen = document.getElementById("game");
+            const closedScreen = document.getElementById("registration-closed");
+            const isInGame = Boolean(gameScreen && !gameScreen.classList.contains("hidden"));
+            const isRegistrationClosed = Boolean(closedScreen && !closedScreen.classList.contains("hidden"));
+            const countryless = !player.country || player.is_eliminated;
+            if (countryless && !player.is_eliminated && player.registration_open && !player.game_finished && (isInGame || isRegistrationClosed)) {
+                await loadCountries();
+                showCountrySelection();
+                return;
+            }
+            if (countryless && isInGame) {
+                const msg = document.getElementById("registration-closed-message");
+                if (msg) msg.textContent = player.is_eliminated
+                    ? "کشور شما اشغال شده و از دور جاری حذف شده‌اید؛ این حساب نمی‌تواند دوباره وارد همین دور شود."
+                    : "ثبت‌نام این دنیا بسته است. اگر فرمانده ثبت‌نام را بازگشایی کند، می‌توانید یکی از کشورهای آزاد را انتخاب کنید.";
+                showOnly("registration-closed");
+                return;
+            }
             updateHomeStats();
             // اگر کاربر در همین لحظه در صفحات مالی/رفاه باشد، اعداد سربرگ هم زنده بمانند.
             document.querySelectorAll(".sb-money").forEach(e => { e.textContent = formatMoney(player.money); });
@@ -380,7 +411,7 @@ function updateCountryCards() {
         const cid = card.dataset.country;
         const c = countries[cid];
         if (!c) return;
-        if (c.taken) {
+        if (c.taken || c.occupier) {
             if (player?.country === cid) card.classList.remove("taken");
             else card.classList.add("taken");
         } else card.classList.remove("taken");
@@ -391,8 +422,8 @@ document.querySelectorAll("[data-country-card]").forEach(card => {
     card.addEventListener("click", () => {
         const cid = card.dataset.country;
         const c = countries[cid];
-        if (c?.taken && player?.country !== cid) {
-            showMessage("این کشور قبلاً انتخاب شده است."); return;
+        if ((c?.taken || c?.occupier) && player?.country !== cid) {
+            showMessage(c?.occupier ? `این کشور مستعمرهٔ ${COUNTRY_NAMES[c.occupier] || c.occupier} است و قابل انتخاب نیست.` : "این کشور قبلاً انتخاب شده است."); return;
         }
         selectedCountry = cid;
         confirmCountrySelection();
@@ -428,6 +459,7 @@ async function confirmCountrySelection() {
                 showGame(); return;
             }
             if (data.error === "occupied") { showToast("این کشور اشغال شده است."); showCountrySelection(); return; }
+            if (data.error === "registration_closed") { showToast(data.message || "ثبت‌نام بسته است.", "error"); showOnly("registration-closed"); return; }
             showToast(data.message || "خطا در انتخاب کشور."); showCountrySelection(); return;
         }
         player = data.player; await loadCountries(); showGame();
@@ -634,10 +666,10 @@ document.getElementById("game-notification-button")?.addEventListener("click", o
    Home
 ========================================================= */
 const SEASON_HINTS = {
-    "بهار":    "🌱 هوا معتدل",
-    "تابستان": "☀️ مصرف سوخت و غذا کمی بیشتر",
-    "پاییز":   "🍂 مصرف سوخت و غذا بیشتر",
-    "زمستان":  "❄️ مصرف سوخت و غذا خیلی زیاد",
+    "بهار":    "بهار: درآمد، مصرف غذا/نفت و تولید منابع و نیروی انسانی ۰٪ تغییر فصلی دارند.",
+    "تابستان": "تابستان: درآمد روزانه ۵٪ کمتر؛ سایر نرخ‌ها بدون تغییر فصلی.",
+    "پاییز":   "پاییز: درآمد ۱۵٪ کمتر؛ مصرف غذا و نفت ۲۵٪ بیشتر.",
+    "زمستان":  "زمستان: درآمد ۳۰٪ کمتر؛ مصرف غذا و نفت ۵۰٪ بیشتر؛ تولید منابع و نیروی انسانی ۲۵٪ کمتر.",
 };
 
 function updateHomeStats() {
@@ -669,25 +701,74 @@ function updateHomeStats() {
     document.getElementById("home-power").textContent = formatNumber(Math.max(0, pCap - pUse));   // برق آزاد = ظرفیت − مصرف
     document.getElementById("home-power-sub").textContent = `مصرف: ${formatNumber(pUse)} از ${formatNumber(pCap)}`;
     document.getElementById("home-army").textContent = formatNumber(player.army);
-    const season = player.season ?? "بهار";
+    const season = player.season ?? "در انتظار شروع";
     document.getElementById("home-season").textContent = season;
-    document.getElementById("home-season-end").textContent =
-        `پایان فصل تا ${player.season_days_left ?? 0} روز و ${player.season_hours_left ?? 0} ساعت`;
+    document.getElementById("home-season-end").textContent = player.game_started
+        ? (player.game_finished ? "بازی به پایان رسیده است" : `پایان فصل تا ${player.season_days_left ?? 0} روز و ${player.season_hours_left ?? 0} ساعت`)
+        : "تا شروع فرمانده منتظر بمان";
     const hint = document.getElementById("home-season-hint");
     if (hint) hint.textContent = SEASON_HINTS[season] || player.season_hint || "";
+    updateSeasonGateBanner();
     const mm = document.getElementById("map-money");
     if (mm) mm.textContent = formatMoney(player.money);
     document.querySelectorAll(".sb-money").forEach(e => { e.textContent = formatMoney(player.money); });
     renderResourceBars();
 }
 
+function updateSeasonGateBanner() {
+    const banner = document.getElementById("season-gate-banner");
+    if (!banner || !player?.country) return;
+    const started = Boolean(player.game_started);
+    const finished = Boolean(player.game_finished);
+    const gameRoot = document.getElementById("game");
+    if (gameRoot) gameRoot.classList.toggle("season-locked", !started || finished);
+    if (started && !finished) {
+        const effects = player.season_effects || {};
+        const fmt = (v) => `${Number(v) > 0 ? "+" : ""}${Number(v || 0)}٪`;
+        banner.textContent = `روز ${player.day || 1} از ۳۱ · فصل ${player.season} | اثر فصل: درآمد روزانه ${fmt(effects.income_pct)}؛ مصرف غذا و نفت ${fmt(effects.food_oil_consumption_pct)}؛ تولید منابع ${fmt(effects.resource_production_pct)}؛ تولید نیروی انسانی ${fmt(effects.manpower_production_pct)}.`;
+        banner.classList.remove("hidden", "is-waiting", "is-finished");
+        return;
+    }
+    if (finished) {
+        const winner = player.game_winner_name || "مشخص نشده";
+        banner.textContent = `بازی پس از ۳۱ روز به پایان رسید. برندهٔ نهایی: ${winner}. تمام عملیات بازی بسته شده‌اند و پیام خصوصی همچنان فعال است.`;
+        banner.classList.remove("hidden", "is-waiting"); banner.classList.add("is-finished");
+        return;
+    }
+    banner.textContent = "فصل هنوز شروع نشده است. منتظر فرمانده بمان؛ با زدن دکمهٔ «شروع فصل» در پنل مدیریت، روز اول برای همهٔ بازیکنان هم‌زمان آغاز می‌شود. تا آن زمان فقط پیام خصوصی بین کشورها فعال است.";
+    banner.classList.remove("hidden", "is-finished"); banner.classList.add("is-waiting");
+}
+
+// پیش از شروع فصل و پس از پایان روز ۳۱، تمام عملیات بازی جز پیام خصوصی قفل می‌شوند.
+document.addEventListener("click", event => {
+    if (!player?.country) return;
+    if (player.game_started && !player.game_finished) return;
+    const target = event.target?.closest?.("button, a, [role=button]");
+    if (!target) return;
+    const canOpenAdmin = isAdminAccount && (
+        target.matches('[data-page="admin"]') || target.id === "game-menu-button" ||
+        Boolean(target.closest("#admin"))
+    );
+    if (canOpenAdmin) return;
+    const opensCommunications = target.matches('[data-page="communications"], [data-menu-page="communications"]');
+    const opensPrivateMessages = target.matches('[data-tab="comm-contacts"]');
+    const closesGuide = target.matches("#guide-close");
+    const isPrivateMessageControl = Boolean(
+        target.closest("#pm-conversation") ||
+        (target.closest("#comm-contacts") && target.closest(".pm-subtabs, #pm-inbox, #contact-list, #contact-search-wrap"))
+    );
+    if (opensCommunications || opensPrivateMessages || isPrivateMessageControl || closesGuide) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    showToast(player.game_finished ? "بازی تمام شده است؛ فقط پیام خصوصی فعال مانده." : "بعد از شروع فصل امکان‌پذیر است.", "error");
+}, true);
+
 const RK_TABS = [
-    { id: "overall", key: "overall", label: "کلی", info: "<b>کلی</b> ترکیبِ پنج دستهٔ دیگر است. امتیازِ هر دسته نسبت به بهترین کشورِ همان دسته محاسبه می‌شود؛ بنابراین یک عددِ بسیار بزرگ در یک دسته، امتیازِ دسته‌های دیگر را محو نمی‌کند." },
+    { id: "overall", key: "overall", label: "کلی", info: "<b>کلی</b> ترکیبِ چهار دستهٔ دیگر است. امتیازِ هر دسته نسبت به بهترین کشورِ همان دسته محاسبه می‌شود؛ بنابراین یک عددِ بسیار بزرگ در یک دسته، امتیازِ دسته‌های دیگر را محو نمی‌کند." },
     { id: "economy", key: "economy", label: "اقتصادی", info: "<b>اقتصادی</b> بر چه اساسیه: درآمدِ خالصِ روزانه‌ی کشور، بعد از کسرِ هزینه‌ی نگهداری — هر $1,000 یک امتیاز." },
     { id: "military", key: "military", label: "قدرت نظامی", info: "<b>قدرت نظامی</b> بر چه اساسیه: مجموعِ قدرتِ همه‌ی یگان‌ها — هر یگان به اندازه‌ی حمله + دفاعش امتیاز دارد. یگان‌های مستقر در سکوها و تنگه‌ها هم حساب می‌شوند." },
     { id: "territory", key: "territory", label: "قلمرو", info: "<b>قلمرو</b> بر چه اساسیه: منابعِ نقشه و تنگه‌هایی که زیرِ کنترلِ کشورند، هر کدام ۱ امتیاز، به‌اضافه‌ی هر کشورِ اشغال‌شده ۵ امتیاز." },
     { id: "development", key: "development", label: "توسعه", info: "<b>توسعه</b> بر چه اساسیه: مجموعِ سطحِ همه‌ی ساختمان‌ها در زیرساخت و اقتصاد — هر سطح ۵۰ امتیاز." },
-    { id: "diplomacy", key: "diplomacy", label: "دیپلماسی", info: "<b>دیپلماسی</b> بر چه اساسیه: پیمان‌های فعال (هر کدام ۱۰۰ امتیاز) و عضویت در اتحادیه (۱۵۰ امتیاز)." },
 ];
 let rkTab = "overall", rkRows = [];
 
@@ -741,7 +822,7 @@ document.getElementById("rk-help-btn")?.addEventListener("click", () => {
     ov.innerHTML = `<div class="rk-help-sheet-box" role="dialog" aria-modal="true" aria-labelledby="rk-help-title">
         <div class="rk-help-head"><div><small>راهنمای امتیازدهی</small><h3 id="rk-help-title">رتبه‌بندی چگونه محاسبه می‌شود؟</h3></div><button class="rk-help-close" type="button" aria-label="بستن">×</button></div>
         <div class="rk-help-content"><p class="rk-help-lead">وزن هر دسته در رتبهٔ کلی:</p>
-            <div class="rk-weight-grid"><span>اقتصاد <b>۳۰٪</b></span><span>قدرت نظامی <b>۲۵٪</b></span><span>قلمرو <b>۲۰٪</b></span><span>توسعه <b>۱۵٪</b></span><span>دیپلماسی <b>۱۰٪</b></span></div>
+            <div class="rk-weight-grid"><span>اقتصاد <b>۳۵٪</b></span><span>قدرت نظامی <b>۳۰٪</b></span><span>قلمرو <b>۲۰٪</b></span><span>توسعه <b>۱۵٪</b></span></div>
             ${sections}
         </div></div>`;
     document.body.appendChild(ov);
@@ -757,7 +838,6 @@ function openSectionHelp(title, body) {
 }
 document.getElementById("infra-help-btn")?.addEventListener("click", () => openSectionHelp("🏗️ راهنمای زیرساخت", "در این بخش می‌توانی نیروگاه، تولید منابع، آموزش نیروی انسانی و ساختمان‌های نظامی را بسازی و ارتقا بدهی. هزینه و نیاز برق هر گزینه پیش از ساخت نمایش داده می‌شود."));
 document.getElementById("economy-help-btn")?.addEventListener("click", () => openSectionHelp("💰 راهنمای اقتصاد", "سرمایه‌گذاری‌های اقتصادی درآمد و توان تولید کشور را افزایش می‌دهند. دسته‌ها را انتخاب کن، هزینه و زمان ساخت را ببین و سپس ارتقا را انجام بده."));
-document.getElementById("diplomacy-help-btn")?.addEventListener("click", () => openSectionHelp("📜 راهنمای دیپلماسی", "در دیپلماسی می‌توانی برای کشورهای دیگر پیمان پیشنهاد کنی. پیمان عدم تجاوز از اعلان جنگ جلوگیری می‌کند و اتحاد ممکن است پیامدهای سیاسی و نظامی داشته باشد."));
 
 /* =========================================================
    Actions
@@ -768,7 +848,6 @@ document.querySelectorAll(".action-card").forEach(card => {
         if (s === "infrastructure") openInfrastructureMenu();
         else if (s === "army") openArmyPage();
         else if (s === "war") openWarPage();
-        else if (s === "diplomacy") openDiplomacyPage();
         else if (s === "economy") openEconomyPage();
         else if (s === "market") { showGamePage("market"); loadMarketListings(); }
         else if (s === "ranking") { showGamePage("ranking"); loadRankings(); }
@@ -1680,6 +1759,7 @@ async function openWarPage(opts = {}) {
     showGamePage("war");
     fillCountrySelects();
     if (!Object.keys(ARMY_UNITS).length) await loadArmyCatalog();
+    await loadWarData(); // فهرست جنگ‌ها و مستعمره‌های دشمن قبل از اعزام آماده باشد.
     dispatchOpen = !!opts.dispatchTo;
     dispatchSel = { from: null, to: opts.dispatchTo || null, units: {} };
     expandedLoc = null; forcesFilter = "all";
@@ -1700,7 +1780,10 @@ async function loadForces() {
 function poolOf(loc) { return loc === "home" ? warForces.home : (warForces.sites.find(s => s.id === loc)?.units || {}); }
 function locName(loc) {
     if (loc === "home") return "خانه";
-    if (typeof loc === "string" && loc.startsWith("country:")) return `بندر ${COUNTRY_NAMES[loc.split(":")[1]] || loc.split(":")[1]}`;
+    if (typeof loc === "string" && loc.startsWith("country:")) {
+        const cid = loc.split(":")[1];
+        return countries[cid]?.occupier ? `بندر مستعمرهٔ ${COUNTRY_NAMES[cid] || cid}` : `بندر ${COUNTRY_NAMES[cid] || cid}`;
+    }
     return siteLabel(loc);
 }
 const wfStat = (n, label) => `<div class="wf-stat"><b>${formatNumber(n)}</b><span>${label}</span></div>`;
@@ -1980,7 +2063,11 @@ function openPlaceSheet(mode) {
     } else {
         const list = [];
         if (dispatchSel.from !== "home") list.push(placeRow("home", "🏠", "خانه", "بازگشت نیروها"));
-        (window.__activeWarTargets || []).forEach(cid => list.push(placeRow(`country:${cid}`, "⚓", `بندر ${COUNTRY_NAMES[cid] || cid}`, "مسیر دریایی جنگ · ناو ترابری برای نیروهای زمینی لازم است")));
+        (window.__activeWarTargets || []).forEach(cid => {
+            const colonyOwner = countries[cid]?.occupier;
+            const label = colonyOwner ? `مستعمرهٔ ${COUNTRY_NAMES[cid] || cid}` : `کشور ${COUNTRY_NAMES[cid] || cid}`;
+            list.push(placeRow(`country:${cid}`, "⚓", label, `حمله از مسیر دریایی${colonyOwner ? ` · متعلق به ${COUNTRY_NAMES[colonyOwner] || colonyOwner}` : ""} · ناو ترابری برای نیروی زمینی لازم است`));
+        });
         const order = s => !s.owner ? 0 : (s.owner !== selectedCountry ? 1 : 2);
         warSites.filter(s => s.id !== dispatchSel.from).sort((a, b) => order(a) - order(b)).forEach(s => {
             let st = "بی‌صاحب";
@@ -2052,16 +2139,21 @@ function renderWarTargets() {
         if (cid === selectedCountry) return;
         if (warSearchQ && !COUNTRY_NAMES[cid].includes(warSearchQ)) return;
         const occupied = countries[cid]?.occupier;
+        const alreadyAtWar = occupied && (window.__activeWarTargets || []).includes(occupied);
+        const warTarget = occupied || cid;
         const card = document.createElement("div");
         card.className = "war-target-card";
-        const occText = occupied ? ` (اشغال توسط ${COUNTRY_NAMES[occupied] || occupied})` : "";
+        const occText = occupied ? ` (مستعمرهٔ ${COUNTRY_NAMES[occupied] || occupied})` : "";
+        const buttonText = occupied
+            ? (alreadyAtWar ? `🔴 جنگ با ${COUNTRY_NAMES[occupied] || occupied} فعال است؛ از نقشه حمله کن` : `⚔️ اعلان جنگ با ${COUNTRY_NAMES[occupied] || occupied}`)
+            : "⚔️ اعلان جنگ";
         card.innerHTML = `
             <div class="war-target-top">
                 <div class="flag-wrap"><img class="flag-img" src="${countryImageUrl(cid)}" alt=""></div>
                 <span class="war-target-name">${COUNTRY_NAMES[cid]}${occText}</span>
             </div>
-            <button class="war-attack-button" data-declare="${cid}">⚔️ اعلان جنگ</button>`;
-        card.querySelector("[data-declare]").addEventListener("click", () => declareWar(cid));
+            <button class="war-attack-button" data-declare="${warTarget}" ${alreadyAtWar ? "disabled" : ""}>${buttonText}</button>`;
+        if (!alreadyAtWar) card.querySelector("[data-declare]").addEventListener("click", () => declareWar(warTarget));
         c.appendChild(card);
     });
 }
@@ -2072,7 +2164,7 @@ async function askWarReason(target) {
         ov.innerHTML = `<section class="modal-box war-reason-dialog" role="dialog" aria-modal="true" aria-labelledby="war-reason-title">
             <div class="ann-modal-head"><div><span class="ann-modal-kicker">درخواست رسمی</span><h2 class="modal-title" id="war-reason-title">اعلان جنگ به ${escapeHtml(COUNTRY_NAMES[target] || target)}</h2></div><button type="button" class="ann-modal-close" aria-label="بستن">×</button></div>
             <p>دلیل اعلان جنگ شما به کشور انتخابی چیست؟ این دلیل برای بررسی به سازمان ملل ارسال می‌شود و پس از تأیید به بازیکنان نمایش داده خواهد شد.</p>
-            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید، هر دو کشور ۲۴ ساعت برای حل اختلاف از راه دیپلماسی فرصت دارند.</small>
+            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید مدیر، جنگ بلافاصله آغاز می‌شود؛ نیروها را از روی نقشه اعزام کن.</small>
             <div class="ann-modal-actions"><button type="button" class="modal-cancel" data-war-reason-cancel>انصراف</button><button type="button" class="ann-publish-button" data-war-reason-submit>ارسال به سازمان ملل</button></div>
         </section>`;
         document.body.appendChild(ov); const input = ov.querySelector("#war-reason-input");
@@ -2098,9 +2190,17 @@ async function declareWar(target) {
 
 async function loadWarData() {
     try {
+        await loadCountries(); // وضعیت مستعمره‌ها و مالک فعلی‌شان باید تازه باشد.
         const d = await apiGet("/api/wars");
 
-        window.__activeWarTargets = [...new Set([...(d.active || [])].filter(w => w.status === "battle" && [w.attacker, w.defender].includes(selectedCountry)).map(w => w.attacker === selectedCountry ? w.defender : w.attacker))];
+        const enemyCountries = [...new Set([...(d.active || [])]
+            .filter(w => w.status === "battle" && [w.attacker, w.defender].includes(selectedCountry))
+            .map(w => w.attacker === selectedCountry ? w.defender : w.attacker))];
+        const enemyColonies = Object.keys(countries || {}).filter(colony => {
+            const occupier = countries[colony]?.occupier;
+            return Boolean(occupier && enemyCountries.includes(occupier));
+        });
+        window.__activeWarTargets = [...new Set([...enemyCountries, ...enemyColonies])];
         const act = document.getElementById("war-active-list");
         if (act) {
             act.innerHTML = "";
@@ -2109,64 +2209,18 @@ async function loadWarData() {
             all.forEach(w => {
                 const div = document.createElement("div");
                 div.className = "war-active-card";
-                let statusText = w.status === "pending_admin" ? "در انتظار تأیید سازمان ملل" :
-                                 w.status === "negotiation" ? "در حال مذاکره (۳۰ ثانیه‌ای)" :
-                                 w.status === "battle" ? "🔴 در جنگ" : w.status;
+                let statusText = w.status === "pending_admin" ? "در انتظار تأیید مدیر" :
+                                 w.status === "battle" ? "🔴 در جنگ؛ حرکت نیروها روی نقشه فعال است" : w.status;
                 div.innerHTML = `
-                    <div class="war-live-strip">${w.status === "battle" ? "🔴 در جنگ — حرکت نیروها و برخورد مسیر فعال است" : w.status === "negotiation" ? "🕊️ مهلت صلح فعال است" : "وضعیت جنگ"}</div>
+                    <div class="war-live-strip">${w.status === "battle" ? "🔴 در جنگ — نیروها را روی نقشه اعزام کن" : "وضعیت جنگ"}</div>
                     <h4>${COUNTRY_NAMES[w.attacker]} → ${COUNTRY_NAMES[w.defender]}</h4>
-                    <p>${statusText}${w.penalty ? ` — جریمه اتحاد: ${formatMoney(w.penalty)}` : ""}</p>
-                    ${w.reason ? `<p class="war-reason-display"><b>دلیل:</b> ${escapeHtml(w.reason)}</p>` : ""}
-                    ${w.status === "negotiation" ? `<p class="war-peace-votes">رأی صلح: ${(w.peace_votes || []).map(cid => COUNTRY_NAMES[cid] || cid).join("، ") || "هنوز ثبت نشده"}</p>` : ""}`;
-                if (w.status === "negotiation" && [w.attacker, w.defender].includes(selectedCountry)) {
-                    const peace = document.createElement("button"); peace.className = "war-peace-button war-peace-button-top";
-                    peace.textContent = (w.peace_votes || []).includes(selectedCountry) ? "✓ رأی صلح ثبت شد" : "🕊️ صلح";
-                    peace.disabled = (w.peace_votes || []).includes(selectedCountry);
-                    peace.addEventListener("click", async () => {
-                        peace.disabled = true;
-                        try { const r = await apiPost("/api/war/peace", { war_id: w.id }); showToast(r.message || (r.success ? "رأی صلح ثبت شد." : "خطا"), r.success ? "success" : "error"); await loadWarData(); }
-                        catch { showToast("ارتباط با سرور برقرار نشد.", "error"); peace.disabled = false; }
-                    });
-                    div.insertBefore(peace, div.firstChild);
-                }
-                if (w.status === "battle" && w.attacker === selectedCountry) {
-                    const btn = document.createElement("button");
-                    btn.className = "infra-upgrade-button";
-                    btn.textContent = "ارسال نیروها و اجرای نبرد";
-                    btn.addEventListener("click", () => openBattleModal(w.id));
-                    div.appendChild(btn);
-                }
+                    <p>${statusText}${w.penalty ? ` — جریمهٔ ثبت‌شده: ${formatMoney(w.penalty)}` : ""}</p>
+                    ${w.reason ? `<p class="war-reason-display"><b>دلیل:</b> ${escapeHtml(w.reason)}</p>` : ""}`;
                 act.appendChild(div);
             });
         }
+        if (currentWarTab === "war-targets-panel") renderWarTargets();
 
-        const rep = document.getElementById("war-reports-list");
-        if (rep) {
-            rep.innerHTML = "";
-            if (!d.reports?.length) rep.innerHTML = `<div class="diplomacy-item-empty">گزارشی نیست.</div>`;
-            d.reports?.slice().reverse().forEach(r => {
-                const div = document.createElement("div");
-                div.className = "war-report-card";
-                const winnerName = r.winner === "attacker" ? COUNTRY_NAMES[r.attacker] : COUNTRY_NAMES[r.defender];
-                let fronts = "";
-                ["air", "naval", "land"].forEach(f => {
-                    if (!r.fronts[f]) return;
-                    const label = f === "air" ? "✈️ هوا" : f === "naval" ? "⚓ دریا" : "🪖 زمین";
-                    fronts += `<div class="front-item">
-                        <div class="front-label">${label}</div>
-                        <div class="front-values">
-                            <span class="front-atk">${formatNumber(r.fronts[f].attacker_power)}</span> /
-                            <span class="front-def">${formatNumber(r.fronts[f].defender_power)}</span>
-                        </div>
-                    </div>`;
-                });
-                div.innerHTML = `
-                    <h4>${COUNTRY_NAMES[r.attacker]} ⚔️ ${COUNTRY_NAMES[r.defender]}</h4>
-                    <p>برنده: <strong>${winnerName}</strong></p>
-                    <div class="front-bar">${fronts}</div>`;
-                rep.appendChild(div);
-            });
-        }
     } catch (e) { console.error(e); }
 }
 
@@ -2280,140 +2334,6 @@ async function renderSatTab() {
     root.querySelectorAll(".sat-scan").forEach(b => b.onclick = () => act("/api/satellite/scan-country", { country: b.dataset.c }));
 }
 
-function openBattleModal(wid) {
-    const hasCarrier = (player?.units?.aircraft_carrier || 0) > 0;
-    const airLabel = hasCarrier ? "✈️ هوایی (تعداد)" : "✈️ هوایی — بدون ناو هواپیمابر غیرفعال";
-    const ov = document.createElement("div");
-    ov.className = "modal-overlay";
-    ov.innerHTML = `
-        <div class="modal-box">
-            <div class="modal-title">ارسال نیروها به جبهه‌ها</div>
-            <label class="diplomacy-label">🪖 زمینی (تعداد)</label>
-            <input id="bt-land" class="diplomacy-input" type="number" value="0" min="0">
-            <label class="diplomacy-label">⚓ دریایی (تعداد)</label>
-            <input id="bt-naval" class="diplomacy-input" type="number" value="0" min="0">
-            <label class="diplomacy-label">${airLabel}</label>
-            <input id="bt-air" class="diplomacy-input" type="number" value="0" min="0" ${hasCarrier ? "" : "disabled"}>
-            <div class="modal-actions">
-                <button class="modal-cancel">انصراف</button>
-                <button class="modal-ok">اجرای نبرد</button>
-            </div>
-        </div>`;
-    ov.querySelector(".modal-cancel").onclick = () => ov.remove();
-    ov.querySelector(".modal-ok").onclick = async () => {
-        const fronts = {
-            land: Number(ov.querySelector("#bt-land").value) || 0,
-            naval: Number(ov.querySelector("#bt-naval").value) || 0,
-            air: hasCarrier ? (Number(ov.querySelector("#bt-air").value) || 0) : 0,
-        };
-        if (!fronts.land && !fronts.naval && !fronts.air) {
-            showToast("حداقل یک جبهه را پر کنید."); return;
-        }
-        ov.remove();
-        try {
-            const d = await apiPost("/api/war/battle", { war_id: wid, fronts });
-            if (!d.success) { showToast(d.message || "خطا"); return; }
-            showToast(d.report?.winner === "attacker" ? "پیروزی!" : "شکست در نبرد.");
-            await refreshPlayer();
-            loadWarData();
-            loadCountries();
-        } catch (e) { showToast("خطا."); }
-    };
-    document.body.appendChild(ov);
-}
-
-/* =========================================================
-   Diplomacy
-========================================================= */
-function openDiplomacyPage() {
-    showGamePage("diplomacy");
-    const sel = document.getElementById("diplomacy-target");
-    sel.innerHTML = "";
-    Object.keys(COUNTRY_NAMES).forEach(cid => {
-        if (cid === selectedCountry) return;
-        const o = document.createElement("option");
-        o.value = cid; o.textContent = COUNTRY_NAMES[cid];
-        sel.appendChild(o);
-    });
-    loadDiplomacyStatus();
-}
-
-document.getElementById("diplomacy-propose-button").addEventListener("click", async () => {
-    if (!userId) return;
-    const target = document.getElementById("diplomacy-target").value;
-    const type = document.getElementById("diplomacy-type").value;
-    const dur = document.getElementById("diplomacy-duration").value;
-    try {
-        const d = await apiPost("/api/propose-treaty", { target, type, duration_days: Number(dur) });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
-        showToast(d.message); loadDiplomacyStatus();
-    } catch (e) { showToast("خطا."); }
-});
-
-async function loadDiplomacyStatus() {
-    if (!userId) return;
-    try {
-        const d = await apiGet("/api/diplomacy");
-        renderReceivedProposals(d.received || []);
-        renderTreatyList(d.treaties || []);
-        renderSentProposals(d.sent || []);
-    } catch (e) { console.error(e); }
-}
-
-function renderReceivedProposals(list) {
-    const c = document.getElementById("diplomacy-received");
-    c.innerHTML = "";
-    if (!list.length) {
-        c.innerHTML = `<div class="diplomacy-item-empty">پیشنهاد دریافتی نیست.</div>`; return;
-    }
-    list.forEach(p => {
-        const div = document.createElement("div");
-        div.className = "diplomacy-item";
-        div.innerHTML = `
-            <span>${TREATY_TYPE_NAMES[p.treaty_type]} از ${flagInline(p.from_country, true)} ${COUNTRY_NAMES[p.from_country]} — ${p.duration_days} روز</span>
-            <span>
-                <button class="message-button" data-accept="${p.id}" style="background:rgba(74,222,128,.15);color:#4ade80;border-color:rgba(74,222,128,.3);">قبول</button>
-                <button class="message-button" data-reject="${p.id}">رد</button>
-            </span>`;
-        c.appendChild(div);
-    });
-    c.querySelectorAll("[data-accept]").forEach(b => b.onclick = () => respondTreaty(b.dataset.accept, true));
-    c.querySelectorAll("[data-reject]").forEach(b => b.onclick = () => respondTreaty(b.dataset.reject, false));
-}
-
-async function respondTreaty(pid, accept) {
-    try {
-        const d = await apiPost("/api/respond-treaty", { proposal_id: pid, accept });
-        if (!d.success) { showToast("خطا"); return; }
-        showToast(accept ? "پذیرفته شد." : "رد شد.");
-        loadDiplomacyStatus();
-    } catch (e) { showToast("خطا."); }
-}
-
-function renderTreatyList(list) {
-    const c = document.getElementById("diplomacy-treaties");
-    c.innerHTML = "";
-    if (!list.length) { c.innerHTML = `<div class="diplomacy-item-empty">پیمانی نیست.</div>`; return; }
-    list.forEach(t => {
-        const other = t.country_a === selectedCountry ? t.country_b : t.country_a;
-        const div = document.createElement("div");
-        div.className = "diplomacy-item";
-        div.innerHTML = `<span>${TREATY_TYPE_NAMES[t.treaty_type]} با ${flagInline(other, true)} ${COUNTRY_NAMES[other] || other}</span>`;
-        c.appendChild(div);
-    });
-}
-
-function renderSentProposals(list) {
-    const c = document.getElementById("diplomacy-sent");
-    c.innerHTML = "";
-    if (!list.length) { c.innerHTML = `<div class="diplomacy-item-empty">پیشنهاد ارسالی نیست.</div>`; return; }
-    list.forEach(p => {
-        const div = document.createElement("div");
-        div.className = "diplomacy-item";
-        div.innerHTML = `<span>${TREATY_TYPE_NAMES[p.treaty_type]} به ${flagInline(p.to_country, true)} ${COUNTRY_NAMES[p.to_country]}</span><span>در انتظار</span>`;
-        c.appendChild(div);
-    });
-}
 
 /* =========================================================
    Bottom Nav
@@ -2426,7 +2346,13 @@ document.querySelectorAll(".nav-item").forEach(item => {
         item.classList.add("active");
         if (page === "home") { updateHomeStats(); refreshNotificationBadge(); }
         else if (page === "map") setTimeout(() => initWorldMap(), 30);
-        else if (page === "communications") { resetNewsFilter(); loadAnnouncements(); loadUnion(); loadNews(); refreshNotificationBadge(); }
+        else if (page === "communications") {
+            if (player && (!player.game_started || player.game_finished)) {
+                document.querySelector('.comm-tab[data-tab="comm-contacts"]')?.click();
+            } else {
+                resetNewsFilter(); loadAnnouncements(); loadUnion(); loadNews(); refreshNotificationBadge();
+            }
+        }
         else if (page === "market") { loadMarketListings(); loadMyListings(); }
     });
 });
@@ -2473,7 +2399,14 @@ gameMenuPanel?.addEventListener("click", async (event) => {
     const page = item.dataset.menuPage;
     showGamePage(page);
     if (page === "map") setTimeout(() => initWorldMap(), 30);
-    else if (page === "communications") { resetNewsFilter(); loadAnnouncements(); loadUnion(); loadNews(); }
+    else if (page === "communications") {
+        if (player && (!player.game_started || player.game_finished)) {
+            // انتظار شروع/پس از پایان: فقط بخش پیام خصوصی را باز می‌کنیم.
+            document.querySelector('.comm-tab[data-tab="comm-contacts"]')?.click();
+        } else {
+            resetNewsFilter(); loadAnnouncements(); loadUnion(); loadNews();
+        }
+    }
     else if (page === "home") updateHomeStats();
 });
 document.addEventListener("click", (event) => {
@@ -2538,17 +2471,16 @@ async function loadAdminPanel() {
 }
 function renderAdminWars() {
     const root = document.getElementById("admin-war-list"); if (!root) return;
-    const pending = (adminWarsCache || []).filter(w => ["pending_admin", "negotiation", "battle", "peace", "rejected"].includes(w.status));
+    const pending = (adminWarsCache || []).filter(w => ["pending_admin", "battle", "rejected", "resolved"].includes(w.status));
     if (!pending.length) { root.innerHTML = `<div class="admin-empty">درخواست جنگی برای این دنیا ثبت نشده است.</div>`; return; }
     root.innerHTML = pending.map(w => {
-        const status = w.status === "pending_admin" ? "در انتظار بررسی مدیر" : w.status === "negotiation" ? "مهلت دیپلماسی فعال" : w.status === "battle" ? "جنگ آغاز شده" : w.status === "peace" ? "با صلح خاتمه یافت" : "رد شده";
-        const end = w.negotiation_ends ? `پایان مذاکره: ${new Date(w.negotiation_ends).toLocaleString("fa-IR")}` : "";
-        const votes = (w.peace_votes || []).map(cid => COUNTRY_NAMES[cid] || cid).join("، ") || "هیچ‌کس";
-        return `<article class="admin-war-card"><div class="admin-war-card-head"><div><b>${escapeHtml(w.attacker_name || COUNTRY_NAMES[w.attacker] || w.attacker)} ← ${escapeHtml(w.defender_name || COUNTRY_NAMES[w.defender] || w.defender)}</b><small>${escapeHtml(status)} · ${escapeHtml(w.created_at ? new Date(w.created_at).toLocaleString("fa-IR") : "")}</small></div><span class="admin-war-status">${escapeHtml(w.status)}</span></div><details class="admin-war-detail"><summary>👁️ بازکردن جزئیات و دلیل اعلان جنگ</summary><div class="admin-war-reason"><b>دلیل اعلان جنگ</b><p>${escapeHtml(w.reason || "دلیلی ثبت نشده است.")}</p></div>${end ? `<small class="admin-war-meta">${escapeHtml(end)}</small>` : ""}${w.status === "negotiation" ? `<small class="admin-war-meta">رأی صلح: ${escapeHtml(votes)}</small>` : ""}</details>${w.status === "pending_admin" ? `<div class="admin-war-actions"><button type="button" data-war-review="approve" data-war-id="${escapeHtml(w.id)}">✅ تأیید و شروع مهلت ۲۴ ساعته</button><button type="button" data-war-review="reject" data-war-id="${escapeHtml(w.id)}">✕ رد درخواست</button></div>` : ""}</article>`;
+        const status = w.status === "pending_admin" ? "در انتظار بررسی مدیر" : w.status === "battle" ? "جنگ آغاز شده" : w.status === "resolved" ? "مختومه" : "رد شده";
+        const end = "";
+        return `<article class="admin-war-card"><div class="admin-war-card-head"><div><b>${escapeHtml(w.attacker_name || COUNTRY_NAMES[w.attacker] || w.attacker)} ← ${escapeHtml(w.defender_name || COUNTRY_NAMES[w.defender] || w.defender)}</b><small>${escapeHtml(status)} · ${escapeHtml(w.created_at ? new Date(w.created_at).toLocaleString("fa-IR") : "")}</small></div><span class="admin-war-status">${escapeHtml(w.status)}</span></div><details class="admin-war-detail"><summary>👁️ بازکردن جزئیات و دلیل اعلان جنگ</summary><div class="admin-war-reason"><b>دلیل اعلان جنگ</b><p>${escapeHtml(w.reason || "دلیلی ثبت نشده است.")}</p></div>${end ? `<small class="admin-war-meta">${escapeHtml(end)}</small>` : ""}</details>${w.status === "pending_admin" ? `<div class="admin-war-actions"><button type="button" data-war-review="approve" data-war-id="${escapeHtml(w.id)}">✅ تأیید و آغاز فوری جنگ</button><button type="button" data-war-review="reject" data-war-id="${escapeHtml(w.id)}">✕ رد درخواست</button></div>` : ""}</article>`;
     }).join("");
     root.querySelectorAll("[data-war-review]").forEach(button => button.addEventListener("click", async () => {
         const action = button.dataset.warReview, warId = button.dataset.warId;
-        if (action === "approve" && !confirm("درخواست را تأیید می‌کنی؟ همهٔ کاربران این دنیا مطلع می‌شوند و مهلت دیپلماسی ۲۴ ساعته آغاز می‌شود.")) return;
+        if (action === "approve" && !confirm("درخواست را تأیید می‌کنی؟ جنگ بلافاصله آغاز می‌شود و همهٔ کاربران این دنیا مطلع می‌شوند.")) return;
         button.disabled = true;
         try {
             const result = await apiPost("/api/admin/war/review", { war_id: warId, action });
@@ -2586,13 +2518,53 @@ function renderAdminWorldSwitcher() {
 function renderAdminWorlds() {
     const root = document.getElementById("admin-world-list"); if (!root) return;
     if (!adminWorldsCache?.length) { root.innerHTML = `<div class="admin-empty">هنوز دنیایی ثبت نشده است.</div>`; return; }
-    root.innerHTML = adminWorldsCache.map(w => `<article class="admin-world-card ${String(w.id) === String(selectedWorldId) ? "current" : ""}"><div><b>🌍 ${escapeHtml(w.name || `دنیای ${w.id}`)}</b><small>شناسه: ${w.id} · ${formatNumber(w.players || 0)} بازیکن · ${formatNumber(w.countries_taken || 0)} کشور گرفته‌شده</small><small>${w.created_at ? `ساخته‌شده: ${escapeHtml(new Date(w.created_at).toLocaleString("fa-IR"))}` : "دنیای اصلی"}</small></div><button type="button" data-enter-world="${w.id}">${String(w.id) === String(selectedWorldId) ? "دنیای فعلی" : "مدیریت این دنیا"}</button></article>`).join("");
+    root.innerHTML = adminWorldsCache.map(w => {
+        const status = w.game_finished ? `پایان‌یافته · برنده: ${escapeHtml(w.winner?.name || "—")}`
+            : w.game_started ? `روز ${w.day} از ۳۱ · فصل ${escapeHtml(w.season || "")}`
+            : "هنوز شروع نشده";
+        const started = Boolean(w.game_started_at);
+        const finished = Boolean(w.game_finished);
+        const registrationOpen = Boolean(w.registration_open);
+        return `<article class="admin-world-card ${String(w.id) === String(selectedWorldId) ? "current" : ""}">
+            <div><b>🌍 ${escapeHtml(w.name || `دنیای ${w.id}`)}</b>
+                <small>شناسه: ${w.id} · ${formatNumber(w.players || 0)} بازیکن · ${formatNumber(w.countries_taken || 0)} کشور گرفته‌شده</small>
+                <small>${w.created_at ? `ساخته‌شده: ${escapeHtml(new Date(w.created_at).toLocaleString("fa-IR"))}` : "دنیای اصلی"}</small>
+                <small class="admin-world-status">وضعیت: ${status} · ثبت‌نام ${registrationOpen ? "باز" : "بسته"}${w.game_ends_at ? ` · پایان: ${escapeHtml(new Date(w.game_ends_at).toLocaleString("fa-IR"))}` : ""}</small>
+            </div>
+            <div class="admin-world-actions">
+                <button type="button" data-enter-world="${w.id}">${String(w.id) === String(selectedWorldId) ? "دنیای فعلی" : "مدیریت این دنیا"}</button>
+                ${!started && !finished ? `<button type="button" data-world-start="${w.id}">▶ شروع فصل ۳۱روزه</button>` : ""}
+                ${!finished ? `<button type="button" data-world-registration="${w.id}" data-open="${registrationOpen ? "0" : "1"}">${registrationOpen ? "🔒 بستن ثبت‌نام" : "🔓 بازگشایی ثبت‌نام"}</button>` : ""}
+            </div>
+        </article>`;
+    }).join("");
     root.querySelectorAll("[data-enter-world]").forEach(button => button.addEventListener("click", async () => {
         button.disabled = true;
         try {
             await switchAdminWorld(button.dataset.enterWorld);
             document.querySelector('[data-admin-tab="players"]')?.click();
         } catch { showToast("تغییر دنیا ناموفق بود.", "error"); }
+        finally { button.disabled = false; }
+    }));
+    root.querySelectorAll("[data-world-start]").forEach(button => button.addEventListener("click", async () => {
+        const wid = String(button.dataset.worldStart);
+        if (!confirm(`فصل دنیای ${wid} همین حالا آغاز شود؟ ثبت‌نام بسته می‌شود و زمان ۳۱ روزه برای همه یکسان خواهد بود.`)) return;
+        button.disabled = true;
+        try {
+            const result = await apiPost("/api/admin/world/start", {}, { world_id: wid });
+            showToast(result.message || (result.success ? "فصل شروع شد." : "شروع فصل انجام نشد."), result.success ? "success" : "error");
+            if (result.success) { await fetchAvailableWorlds(); await loadAdminPanel(); }
+        } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+        finally { button.disabled = false; }
+    }));
+    root.querySelectorAll("[data-world-registration]").forEach(button => button.addEventListener("click", async () => {
+        const wid = String(button.dataset.worldRegistration), open = button.dataset.open === "1";
+        button.disabled = true;
+        try {
+            const result = await apiPost("/api/admin/world/registration", { open }, { world_id: wid });
+            showToast(result.message || (result.success ? "وضعیت ثبت‌نام تغییر کرد." : "عملیات انجام نشد."), result.success ? "success" : "error");
+            if (result.success) { await fetchAvailableWorlds(); await loadAdminPanel(); }
+        } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
         finally { button.disabled = false; }
     }));
 }
@@ -2691,15 +2663,14 @@ function renderAdminPlayerEditor(p) {
         const resources = Object.entries(p.resources || {}).map(([key, amount]) => `<div class="admin-inventory-row"><span>${escapeHtml(RESOURCE_NAMES[key] || key)} <small>منبع</small></span><b>${formatNumber(amount)}</b></div>`).join("");
         const infoRows = (rows, renderRow, empty) => rows?.length ? rows.map(renderRow).join("") : `<p class="admin-inventory-empty">${empty}</p>`;
         const sites = p.owned_sites || [], straits = p.owned_straits || [], garrisons = p.garrisons || [];
-        const treaties = p.treaties || [], loans = p.loans || [], listings = p.market_listings || [], wars = p.wars || [];
+        const loans = p.loans || [], listings = p.market_listings || [], wars = p.wars || [];
         const siteHtml = infoRows(sites, x => `<div class="admin-inventory-row"><span>${escapeHtml(x.name || x.id)} <small>${escapeHtml(x.type || "سکو / معدن")}</small></span><b>${formatNumber(x.production || 0)} / روز</b></div>`, "سکو یا معدنی در اختیار ندارد.");
         const straitHtml = infoRows(straits, x => `<div class="admin-inventory-row"><span>${escapeHtml(x.name || x.id)} <small>تنگه</small></span><b>عوارض ${formatNumber(x.toll || 0)}</b></div>`, "تنگه‌ای در اختیار ندارد.");
         const garrisonHtml = infoRows(garrisons, x => `<div class="admin-inventory-row"><span>${escapeHtml(x.name || x.id)} <small>پادگان موضع</small></span><b>${formatNumber(Object.values(x.units || {}).reduce((a, v) => a + Number(v || 0), 0))} یگان</b></div>`, "نیروی مستقر در سکو یا تنگه ندارد.");
-        const treatyHtml = infoRows(treaties, x => `<div class="admin-inventory-row"><span>${escapeHtml(TREATY_TYPE_NAMES[x.treaty_type] || x.treaty_type || "پیمان")}</span><b>${escapeHtml(x.with_country_name || COUNTRY_NAMES[x.with_country] || "—")}</b></div>`, "پیمان فعالی ندارد.");
         const loanHtml = infoRows(loans, x => `<div class="admin-inventory-row"><span>${x.lender === p.country ? "وام‌دهنده" : "وام‌گیرنده"} <small>${escapeHtml(x.status || "نامشخص")}</small></span><b>$${adminFormatNumber(x.remaining ?? x.amount ?? 0)}</b></div>`, "وام مرتبطی ندارد.");
         const marketHtml = infoRows(listings, x => `<div class="admin-inventory-row"><span>${x.side === "buy" ? "درخواست خرید" : "آگهی فروش"} <small>${escapeHtml(x.status || "نامشخص")}</small></span><b>${escapeHtml(RESOURCE_NAMES[x.resource] || x.resource || "کالا")} · ${formatNumber(x.amount || 0)}</b></div>`, "آگهی بازاری ثبت نکرده است.");
         const warHtml = infoRows(wars, x => `<div class="admin-inventory-row"><span>${escapeHtml(COUNTRY_NAMES[x.attacker] || x.attacker || "—")} ← ${escapeHtml(COUNTRY_NAMES[x.defender] || x.defender || "—")} <small>${escapeHtml(x.status || "نامشخص")}</small></span><b>${escapeHtml((x.reason || "").slice(0, 45) || "بدون دلیل")}</b></div>`, "درخواست یا سابقهٔ جنگی ثبت نشده است.");
-        extra.innerHTML = `<div class="admin-editor-section-title"><b>ساختمان‌ها و ارتقاها</b><span>${Object.values(levels).filter(v => Number(v) > 0).length} مورد</span></div><div class="admin-inventory-grid">${buildingRows || `<p class="admin-inventory-empty">هنوز ساختمانی ساخته نشده است.</p>`}</div><div class="admin-editor-section-title"><b>یگان‌های ارتش</b><span>${Object.values(p.army_units || p.units || {}).reduce((a, v) => a + Number(v || 0), 0).toLocaleString("en-US")}</span></div><div class="admin-inventory-grid">${unitRows || `<p class="admin-inventory-empty">هنوز یگانی آموزش داده نشده است.</p>`}</div><div class="admin-editor-section-title"><b>موجودی منابع</b><span>وضعیت فعلی</span></div><div class="admin-inventory-grid">${resources || `<p class="admin-inventory-empty">منبعی ثبت نشده است.</p>`}</div><details class="admin-inventory-detail"><summary>🛢️ سکوها و معادن (${sites.length})</summary><div class="admin-inventory-grid">${siteHtml}</div></details><details class="admin-inventory-detail"><summary>⚓ تنگه‌ها (${straits.length})</summary><div class="admin-inventory-grid">${straitHtml}</div></details><details class="admin-inventory-detail"><summary>🪖 نیروهای مستقر (${garrisons.length})</summary><div class="admin-inventory-grid">${garrisonHtml}</div></details><details class="admin-inventory-detail"><summary>📜 پیمان‌های فعال (${treaties.length})</summary><div class="admin-inventory-grid">${treatyHtml}</div></details><details class="admin-inventory-detail"><summary>💳 وام‌ها (${loans.length})</summary><div class="admin-inventory-grid">${loanHtml}</div></details><details class="admin-inventory-detail"><summary>🌐 آگهی‌های بازار (${listings.length})</summary><div class="admin-inventory-grid">${marketHtml}</div></details><details class="admin-inventory-detail"><summary>⚔️ درخواست‌ها و سوابق جنگ (${wars.length})</summary><div class="admin-inventory-grid">${warHtml}</div></details>`;
+        extra.innerHTML = `<div class="admin-editor-section-title"><b>ساختمان‌ها و ارتقاها</b><span>${Object.values(levels).filter(v => Number(v) > 0).length} مورد</span></div><div class="admin-inventory-grid">${buildingRows || `<p class="admin-inventory-empty">هنوز ساختمانی ساخته نشده است.</p>`}</div><div class="admin-editor-section-title"><b>یگان‌های ارتش</b><span>${Object.values(p.army_units || p.units || {}).reduce((a, v) => a + Number(v || 0), 0).toLocaleString("en-US")}</span></div><div class="admin-inventory-grid">${unitRows || `<p class="admin-inventory-empty">هنوز یگانی آموزش داده نشده است.</p>`}</div><div class="admin-editor-section-title"><b>موجودی منابع</b><span>وضعیت فعلی</span></div><div class="admin-inventory-grid">${resources || `<p class="admin-inventory-empty">منبعی ثبت نشده است.</p>`}</div><details class="admin-inventory-detail"><summary>🛢️ سکوها و معادن (${sites.length})</summary><div class="admin-inventory-grid">${siteHtml}</div></details><details class="admin-inventory-detail"><summary>⚓ تنگه‌ها (${straits.length})</summary><div class="admin-inventory-grid">${straitHtml}</div></details><details class="admin-inventory-detail"><summary>🪖 نیروهای مستقر (${garrisons.length})</summary><div class="admin-inventory-grid">${garrisonHtml}</div></details><details class="admin-inventory-detail"><summary>💳 وام‌ها (${loans.length})</summary><div class="admin-inventory-grid">${loanHtml}</div></details><details class="admin-inventory-detail"><summary>🌐 آگهی‌های بازار (${listings.length})</summary><div class="admin-inventory-grid">${marketHtml}</div></details><details class="admin-inventory-detail"><summary>⚔️ درخواست‌ها و سوابق جنگ (${wars.length})</summary><div class="admin-inventory-grid">${warHtml}</div></details>`;
     }
     // ویرایش سریع مدیر شامل منابع، تعداد یگان‌ها و سطح ساختمان‌هاست.
     const adjustSelect = el("admin-adjust-field");
@@ -3591,7 +3562,7 @@ function inferNewsCategory(item) {
     const source = `${item.title || ""} ${item.text || ""}`;
     if (source.includes("اتحادیه")) return "union";
     if (["جنگ", "نبرد", "دفاع", "حمله", "اشغال", "تلفات", "نیرو", "ارتش", "پیروزی", "شکست"].some(x => source.includes(x))) return "military";
-    if (["پیمان", "عدم تجاوز", "اتحاد", "دیپلماسی", "بیانیه", "مذاکره"].some(x => source.includes(x))) return "diplomacy";
+    if (["بیانیه"].some(x => source.includes(x))) return "general";
     if (["معامله", "تجارت", "بازار", "مرز زمینی", "حمل‌ونقل", "حمل و نقل"].some(x => source.includes(x))) return "trade";
     if (["تصرف", "تنگه", "قلمرو", "مرز", "منطقه"].some(x => source.includes(x))) return "territory";
     if (["وام", "درآمد", "اقتصاد", "تسویه", "غذا", "نفت", "آهن", "اورانیوم", "منبع", "منابع"].some(x => source.includes(x))) return "economy";
@@ -3610,7 +3581,7 @@ function renderNewsList() {
     list.forEach(item => {
         const div = document.createElement("article");
         div.className = `news-item news-category-${inferNewsCategory(item)}`;
-        const categoryNames = { military: "نظامی", diplomacy: "دیپلماسی", economy: "اقتصاد", trade: "تجارت", territory: "قلمرو", union: "اتحادیه", general: "عمومی" };
+        const categoryNames = { military: "نظامی", economy: "اقتصاد", trade: "تجارت", territory: "قلمرو", union: "اتحادیه", general: "عمومی" };
         div.innerHTML = `<div class="news-item-top"><h3>${escapeHtml(item.title || "خبر")}</h3><span class="news-category-label">${categoryNames[inferNewsCategory(item)] || "عمومی"}</span></div>
             <p>${escapeHtml(item.text || "")}</p>${item.at ? `<time>${escapeHtml(formatNewsTime(item.at))}</time>` : ""}`;
         c.appendChild(div);
