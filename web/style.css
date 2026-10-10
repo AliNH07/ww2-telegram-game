@@ -38,7 +38,7 @@ body::before {
     background:
         radial-gradient(ellipse 900px 500px at 50% -10%,
             rgba(var(--brand-rgb), 0.07) 0%, rgba(var(--brand-rgb), 0) 60%),
-        url("/images/game-bg.jpg") center / cover no-repeat,
+        url("/images/background.jpg") center / cover no-repeat,
         var(--bg-deep);
     pointer-events: none;
 }
