@@ -2716,3 +2716,21 @@ button.action-denied .action-error-inline{color:#ffe5e5}
 /* درگیری زندهٔ مسیر و زمان نتیجه */
 .wf-transit-live{border-color:rgba(248,113,113,.75)!important;box-shadow:0 0 0 1px rgba(248,113,113,.12)}
 .wf-transit-live .wf-tr-bar i{background:linear-gradient(90deg,#ef4444,#fb7185)!important}
+
+
+/* وضعیت فصل مشترک دنیا و ثبت‌نام */
+.season-gate-banner{margin:0 12px 8px;padding:10px 12px;border-radius:12px;border:1px solid rgba(227,176,75,.28);background:rgba(10,17,27,.92);color:#e9d49f;font-size:11px;line-height:1.9;box-shadow:0 6px 20px rgba(0,0,0,.16)}
+.season-gate-banner.is-waiting{border-color:rgba(96,165,250,.35);background:rgba(11,25,40,.95);color:#c9e1ff}
+.season-gate-banner.is-finished{border-color:rgba(74,222,128,.3);background:rgba(10,31,24,.94);color:#c0f1d1}
+.registration-back-button{display:block;width:100%;margin-top:18px;padding:12px;border-radius:12px;border:1px solid rgba(227,176,75,.3);background:rgba(227,176,75,.08);color:#efd18b;font:inherit;font-size:12px;font-weight:800}
+.admin-world-card{align-items:flex-start}
+.admin-world-actions{display:grid;gap:6px;min-width:132px;flex-shrink:0}
+.admin-world-card .admin-world-status{color:#e4cb8f}
+@media(max-width:430px){.admin-world-actions{width:100%;min-width:0}.admin-world-card{align-items:stretch}.season-gate-banner{font-size:10px}}
+
+#game.season-locked .hm-grid .action-card,#game.season-locked .bottom-nav .nav-item:not([data-page="communications"]){opacity:.42;filter:grayscale(.72)}
+#game.season-locked .hm-grid .action-card{cursor:not-allowed}
+
+/* در انتظار شروع یا پس از پایان دور، رابط ارتباطات فقط پیام خصوصی را نشان می‌دهد. */
+#game.season-locked .comm-tabs .comm-tab:not([data-tab="comm-contacts"]){display:none!important}
+#game.season-locked #comm-announcements,#game.season-locked #comm-unions,#game.season-locked #comm-news{display:none!important}
