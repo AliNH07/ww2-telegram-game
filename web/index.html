@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261010home6">
+<link rel="stylesheet" href="/style.css?v=20261010opt7">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -102,6 +102,7 @@
         <button type="button" class="game-menu-item" data-menu-page="home">🏠 <span>خانه</span></button>
         <button type="button" class="game-menu-item" data-menu-page="map">🗺️ <span>نقشه</span></button>
         <button type="button" class="game-menu-item" data-menu-page="communications">💬 <span>ارتباطات و اخبار</span></button>
+        <button type="button" id="open-guide-menu" class="game-menu-item" role="menuitem">📖 <span>راهنمای بازی</span></button>
         <button type="button" id="open-admin-menu" class="game-menu-item game-menu-admin hidden" role="menuitem">🛡️ <span>پنل مدیریت</span><small>مدیر اصلی</small></button>
     </div>
 
@@ -110,6 +111,22 @@
         <span class="loading-spinner"></span>
         <p class="loading-text">در حال ورود به داشبورد...</p>
         <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+    </div>
+
+        <!-- ==================== راهنمای شروع ==================== -->
+    <div id="guide-modal" class="guide-modal hidden" role="dialog" aria-modal="true" aria-label="راهنمای بازی">
+        <div class="guide-box">
+            <h2>شروع درست بازی</h2>
+            <p class="guide-sub">چهار قدم کوتاه تا یک کشور قوی</p>
+            <ol class="guide-steps">
+                <li><span>🏗️</span><div><b>همه‌چیز از زیرساخت شروع می‌شود</b><small>هر بخش بازی به زیرساخت نیاز دارد، پس اول سراغ آن برو.</small></div></li>
+                <li><span>⚡</span><div><b>اول از همه برق</b><small>هر ساخت‌وساز برق می‌خواهد؛ قبل از بقیه، برق کافی تأمین کن.</small></div></li>
+                <li><span>💰</span><div><b>بعد اقتصاد و ارتش</b><small>درآمد بساز، سپس یگان آموزش بده.</small></div></li>
+                <li><span>⚔️</span><div><b>در آخر جنگ و دیپلماسی</b><small>وقتی آماده شدی وارد میدان شو.</small></div></li>
+            </ol>
+            <button type="button" id="guide-close" class="guide-btn">متوجه شدم</button>
+            <p class="guide-foot">هر وقت خواستی: منوی ☰ ← راهنمای بازی</p>
+        </div>
     </div>
 
     <!-- ==================== خانه ==================== -->
@@ -789,6 +806,6 @@
 
 </section>
 
-<script src="/app.js?v=20261010home6"></script>
+<script src="/app.js?v=20261010opt7"></script>
 </body>
 </html>
