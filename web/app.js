@@ -4324,19 +4324,6 @@ async function loadMapRoutes() {
         mapTransits = Array.isArray(d?.transits) ? d.transits : [];
         if (d?.now) mapRouteSkew = Date.parse(d.now) - Date.now();
         mapTransits.forEach(t => { t.pathOffset = 0; });
-        const km = (a, b) => (!a || !b) ? Infinity : d3.geoDistance(a, b) * 6371;
-        for (let i = 0; i < mapTransits.length; i++) {
-            const a = mapTransits[i];
-            for (let k = i + 1; k < mapTransits.length; k++) {
-                const b = mapTransits[k];
-                if (a.country === b.country) continue;
-                const reversed = km(a.from_ll, b.to_ll) < 160 && km(a.to_ll, b.from_ll) < 160;
-                if (!reversed) continue;
-                if (a.country === selectedCountry) { a.pathOffset = -3; b.pathOffset = 3; }
-                else if (b.country === selectedCountry) { a.pathOffset = 3; b.pathOffset = -3; }
-                else { a.pathOffset = -3; b.pathOffset = 3; }
-            }
-        }
     } catch (e) { mapTransits = []; }
     renderMapRoutes();
 }
@@ -4374,7 +4361,7 @@ function updateMapRoutes() {
         const pos = d.battle && Array.isArray(d.battle_ll) && d.battle_ll.length === 2
             ? d.battle_ll
             : (poly.length > 2 && d.path[d.leg] && d.path[d.leg + 1]
-                ? d3.geoInterpolate(d.path[d.leg], d.path[d.leg + 1])(f)
+                ? d3.geoInterpolate(d.from_ll, d.to_ll)(f)
                 : d3.geoInterpolate(d.from_ll, d.to_ll)(f));
         const p = viewCos(pos[0], pos[1], rot) > 0.02 ? mapProjection(pos) : null;
         const head = d3.select(this).select(".map-route-head");
@@ -4668,7 +4655,7 @@ function updateMapLabels() {
 function mapFillFor(m) {
     if (!m.key) return MAP_COLORS.nogame;   // هنوز به بازی اضافه نشده → طوسی ساده
     const info = countries[m.key];
-    if (info?.occupier) return info.occupier === selectedCountry ? MAP_COLORS.own : MAP_COLORS.taken;
+    if (info?.occupier) return mapFillFor({ key: info.occupier });   // رنگ اشغالگر
     if (m.key === selectedCountry) return MAP_COLORS.own;
     if (info?.taken) return MAP_COLORS.other;
     return MAP_COLORS.inactive;
