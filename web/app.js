@@ -11,6 +11,11 @@ if (tg) {
 
 const userId = tg?.initDataUnsafe?.user?.id || null;
 const initData = tg?.initData || "";
+let selectedWorldId = (() => { try { return String(localStorage.getItem("fl93_world_id") || "1"); } catch { return "1"; } })();
+let availableWorlds = [];
+let adminWarsCache = [];
+let adminWorldsCache = [];
+let adminAutoRefreshTimer = null;
 
 let player = null;
 let countries = {};
@@ -65,6 +70,7 @@ const OCEAN_LABELS = [
 ========================================================= */
 function getApiUrl(path, params = {}) {
     const url = new URL(path, window.location.origin);
+    url.searchParams.set("world_id", String(selectedWorldId || "1"));
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
     return url.toString();
 }
@@ -208,6 +214,55 @@ async function loadWorldAtlas() {
     return worldData;
 }
 
+async function fetchAvailableWorlds() {
+    const data = await apiGet("/api/worlds");
+    availableWorlds = Array.isArray(data?.worlds) ? data.worlds : [];
+    if (!availableWorlds.length) availableWorlds = [{ id: 1, name: "دنیای ۱", players: 0, countries_taken: 0 }];
+    if (!availableWorlds.some(w => String(w.id) === String(selectedWorldId))) selectedWorldId = String(availableWorlds[0].id);
+    renderWorldChoices();
+    return availableWorlds;
+}
+
+function renderWorldChoices() {
+    const list = document.getElementById("world-select-list");
+    const start = document.getElementById("world-select-start");
+    if (!list) return;
+    list.innerHTML = availableWorlds.map(w => `
+        <button type="button" class="world-select-card ${String(w.id) === String(selectedWorldId) ? "selected" : ""}" data-world-choice="${w.id}">
+            <span class="world-select-globe">🌍</span><span class="world-select-info"><b>${escapeHtml(w.name || `دنیای ${w.id}`)}</b><small>${formatNumber(w.players || 0)} بازیکن · ${formatNumber(w.countries_taken || 0)} کشور انتخاب‌شده</small></span><span class="world-select-check">${String(w.id) === String(selectedWorldId) ? "✓" : "○"}</span>
+        </button>`).join("");
+    list.querySelectorAll("[data-world-choice]").forEach(b => b.addEventListener("click", () => {
+        selectedWorldId = String(b.dataset.worldChoice);
+        renderWorldChoices();
+    }));
+    if (start) start.disabled = !availableWorlds.some(w => String(w.id) === String(selectedWorldId));
+}
+
+function showWorldSelection() { showOnly("world-select"); renderWorldChoices(); }
+
+async function enterSelectedWorld() {
+    const button = document.getElementById("world-select-start");
+    if (button) { button.disabled = true; button.textContent = "در حال ورود به دنیا…"; }
+    try {
+        try { localStorage.setItem("fl93_world_id", String(selectedWorldId)); } catch {}
+        showOnly("loading");
+        await loadCountries();
+        await loadPlayer();
+        await loadArmyCatalog();
+        if (player?.country) showGame();
+        else {
+            await Promise.all(Object.keys(COUNTRY_IMAGE_EXT).map(cid => preloadImage(countryImageUrl(cid))));
+            showCountrySelection();
+        }
+    } catch (e) {
+        console.error(e); showToast("ورود به دنیا ناموفق بود. دوباره تلاش کن.", "error"); showWorldSelection();
+    } finally {
+        if (button) { button.disabled = false; button.textContent = "ورود به دنیای انتخاب‌شده ←"; }
+    }
+}
+
+document.getElementById("world-select-start")?.addEventListener("click", enterSelectedWorld);
+
 /* =========================================================
    Player / Countries
 ========================================================= */
@@ -215,7 +270,7 @@ async function loadPlayer() {
     if (!userId) return;
     try {
         player = await apiGet("/api/player");
-        if (player?.country) selectedCountry = player.country;
+        selectedCountry = player?.country || null;
     } catch (e) { console.error(e); }
 }
 
@@ -226,7 +281,7 @@ async function refreshPlayer() {
         const fresh = await apiGet("/api/player");
         if (fresh && !fresh.error) {
             player = fresh;
-            if (player?.country) selectedCountry = player.country;
+            selectedCountry = player?.country || null;
             updateHomeStats();
             // اگر کاربر در همین لحظه در صفحات مالی/رفاه باشد، اعداد سربرگ هم زنده بمانند.
             document.querySelectorAll(".sb-money").forEach(e => { e.textContent = formatMoney(player.money); });
@@ -636,6 +691,16 @@ document.getElementById("rk-help-btn")?.addEventListener("click", () => {
     const close = () => ov.remove();
     ov.addEventListener("click", e => { if (e.target === ov || e.target.closest(".rk-help-close")) close(); });
 });
+
+
+function openSectionHelp(title, body) {
+    const ov = document.createElement("div"); ov.className = "modal-overlay section-help-overlay";
+    ov.innerHTML = `<section class="modal-box section-help-box" role="dialog" aria-modal="true"><div class="ann-modal-head"><div><span class="ann-modal-kicker">راهنمای کوتاه</span><h2 class="modal-title">${escapeHtml(title)}</h2></div><button type="button" class="ann-modal-close" aria-label="بستن">×</button></div><p>${escapeHtml(body)}</p><button type="button" class="ann-publish-button section-help-close">متوجه شدم</button></section>`;
+    document.body.appendChild(ov); const close = () => ov.remove(); ov.querySelector(".ann-modal-close").onclick = close; ov.querySelector(".section-help-close").onclick = close; ov.addEventListener("click", e => { if (e.target === ov) close(); });
+}
+document.getElementById("infra-help-btn")?.addEventListener("click", () => openSectionHelp("🏗️ راهنمای زیرساخت", "در این بخش می‌توانی نیروگاه، تولید منابع، آموزش نیروی انسانی و ساختمان‌های نظامی را بسازی و ارتقا بدهی. هزینه و نیاز برق هر گزینه پیش از ساخت نمایش داده می‌شود."));
+document.getElementById("economy-help-btn")?.addEventListener("click", () => openSectionHelp("💰 راهنمای اقتصاد", "سرمایه‌گذاری‌های اقتصادی درآمد و توان تولید کشور را افزایش می‌دهند. دسته‌ها را انتخاب کن، هزینه و زمان ساخت را ببین و سپس ارتقا را انجام بده."));
+document.getElementById("diplomacy-help-btn")?.addEventListener("click", () => openSectionHelp("📜 راهنمای دیپلماسی", "در دیپلماسی می‌توانی برای کشورهای دیگر پیمان پیشنهاد کنی. پیمان عدم تجاوز از اعلان جنگ جلوگیری می‌کند و اتحاد ممکن است پیامدهای سیاسی و نظامی داشته باشد."));
 
 /* =========================================================
    Actions
@@ -1926,14 +1991,34 @@ function renderWarTargets() {
     });
 }
 
+async function askWarReason(target) {
+    return new Promise(resolve => {
+        const ov = document.createElement("div"); ov.className = "modal-overlay war-reason-overlay";
+        ov.innerHTML = `<section class="modal-box war-reason-dialog" role="dialog" aria-modal="true" aria-labelledby="war-reason-title">
+            <div class="ann-modal-head"><div><span class="ann-modal-kicker">درخواست رسمی</span><h2 class="modal-title" id="war-reason-title">اعلان جنگ به ${escapeHtml(COUNTRY_NAMES[target] || target)}</h2></div><button type="button" class="ann-modal-close" aria-label="بستن">×</button></div>
+            <p>دلیل اعلان جنگ شما به کشور انتخابی چیست؟ این دلیل برای بررسی به سازمان ملل ارسال می‌شود و پس از تأیید به بازیکنان نمایش داده خواهد شد.</p>
+            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید، هر دو کشور ۲۴ ساعت برای حل اختلاف از راه دیپلماسی فرصت دارند.</small>
+            <div class="ann-modal-actions"><button type="button" class="modal-cancel" data-war-reason-cancel>انصراف</button><button type="button" class="ann-publish-button" data-war-reason-submit>ارسال به سازمان ملل</button></div>
+        </section>`;
+        document.body.appendChild(ov); const input = ov.querySelector("#war-reason-input");
+        const close = value => { ov.remove(); resolve(value); };
+        ov.querySelector(".ann-modal-close").onclick = () => close(null);
+        ov.querySelector("[data-war-reason-cancel]").onclick = () => close(null);
+        ov.addEventListener("click", e => { if (e.target === ov) close(null); });
+        ov.querySelector("[data-war-reason-submit]").onclick = () => { const reason = input.value.trim(); if (!reason) { showToast("دلیل اعلان جنگ را بنویسید.", "error"); input.focus(); return; } close(reason); };
+        input.focus();
+    });
+}
+
 async function declareWar(target) {
-    if (!(await gameConfirm(`اعلام جنگ به ${COUNTRY_NAMES[target]}؟\nاین درخواست به سازمان ملل (ادمین) می‌رود.`, { title: "اعلام جنگ", ok: "اعلام جنگ", danger: true }))) return;
+    const reason = await askWarReason(target);
+    if (!reason) return;
     try {
-        const d = await apiPost("/api/war/declare", { target });
-        if (!d.success) { showToast(d.message || "امکان اعلام جنگ نیست."); return; }
-        showToast(d.message || "اعلام جنگ ارسال شد.");
+        const d = await apiPost("/api/war/declare", { target, reason });
+        if (!d.success) { showToast(d.message || "امکان اعلام جنگ نیست.", "error"); return; }
+        showToast(d.message || "اعلام جنگ برای بررسی ارسال شد.", "success");
         loadWarData();
-    } catch (e) { showToast("خطا."); }
+    } catch (e) { showToast("خطا.", "error"); }
 }
 
 async function loadWarData() {
@@ -1953,7 +2038,20 @@ async function loadWarData() {
                                  w.status === "battle" ? "آماده نبرد" : w.status;
                 div.innerHTML = `
                     <h4>${COUNTRY_NAMES[w.attacker]} → ${COUNTRY_NAMES[w.defender]}</h4>
-                    <p>${statusText}${w.penalty ? ` — جریمه اتحاد: ${formatMoney(w.penalty)}` : ""}</p>`;
+                    <p>${statusText}${w.penalty ? ` — جریمه اتحاد: ${formatMoney(w.penalty)}` : ""}</p>
+                    ${w.reason ? `<p class="war-reason-display"><b>دلیل:</b> ${escapeHtml(w.reason)}</p>` : ""}
+                    ${w.status === "negotiation" ? `<p class="war-peace-votes">رأی صلح: ${(w.peace_votes || []).map(cid => COUNTRY_NAMES[cid] || cid).join("، ") || "هنوز ثبت نشده"}</p>` : ""}`;
+                if (w.status === "negotiation" && [w.attacker, w.defender].includes(selectedCountry)) {
+                    const peace = document.createElement("button"); peace.className = "war-peace-button";
+                    peace.textContent = (w.peace_votes || []).includes(selectedCountry) ? "✓ رأی صلح ثبت شد" : "🕊️ صلح";
+                    peace.disabled = (w.peace_votes || []).includes(selectedCountry);
+                    peace.addEventListener("click", async () => {
+                        peace.disabled = true;
+                        try { const r = await apiPost("/api/war/peace", { war_id: w.id }); showToast(r.message || (r.success ? "رأی صلح ثبت شد." : "خطا"), r.success ? "success" : "error"); await loadWarData(); }
+                        catch { showToast("ارتباط با سرور برقرار نشد.", "error"); peace.disabled = false; }
+                    });
+                    div.appendChild(peace);
+                }
                 if (w.status === "battle" && w.attacker === selectedCountry) {
                     const btn = document.createElement("button");
                     btn.className = "infra-upgrade-button";
@@ -2262,6 +2360,7 @@ document.querySelectorAll(".nav-item").forEach(item => {
 const ADMIN_TELEGRAM_ID = 8290076602;
 let adminOverviewCache = null;
 let adminSelectedPlayerId = null;
+let adminSelectedPlayerDetailOpen = false;
 const adminCountryLabels = {germany:"آلمان",britain:"بریتانیا",ussr:"شوروی",usa:"آمریکا",france:"فرانسه",italy:"ایتالیا",china:"چین",japan:"ژاپن"};
 const isAdminAccount = Number(userId) === ADMIN_TELEGRAM_ID;
 const adminMenuButton = document.getElementById("open-admin-menu");
@@ -2340,12 +2439,20 @@ function adminPlayerMatches(player, q) {
 }
 async function loadAdminPanel() {
     if (!isAdminAccount) { showGamePage("home"); showToast("این بخش فقط برای مدیر اصلی است.", "error"); return; }
+    if (!adminAutoRefreshTimer) adminAutoRefreshTimer = setInterval(() => {
+        const panel = document.getElementById("admin");
+        if (panel && !panel.classList.contains("hidden") && !document.hidden) loadAdminPanel();
+    }, 30000);
     const error = document.getElementById("admin-access-error");
     error?.classList.add("hidden");
     const list = document.getElementById("admin-player-list");
     if (list && !adminOverviewCache) list.innerHTML = `<div class="admin-empty"><span class="admin-loader"></span>در حال دریافت اطلاعات بازی…</div>`;
     try {
-        const data = await apiGet("/api/admin/overview");
+        const [data, warsData, worldsData] = await Promise.all([
+            apiGet("/api/admin/overview"), apiGet("/api/admin/wars"), apiGet("/api/worlds")
+        ]);
+        adminWarsCache = warsData?.wars || [];
+        adminWorldsCache = worldsData?.worlds || [];
         if (!data?.success) {
             if (error) { error.textContent = data?.message || (data?.error === "forbidden" ? "دسترسی به پنل مدیریت رد شد." : "احراز هویت تلگرام تأیید نشد؛ بازی را از داخل تلگرام باز کن."); error.classList.remove("hidden"); }
             if (list) list.innerHTML = `<div class="admin-empty">اطلاعات مدیریت دریافت نشد.</div>`;
@@ -2358,6 +2465,81 @@ async function loadAdminPanel() {
         if (list) list.innerHTML = `<div class="admin-empty">خطا در دریافت اطلاعات.</div>`;
     }
 }
+function renderAdminWars() {
+    const root = document.getElementById("admin-war-list"); if (!root) return;
+    const pending = (adminWarsCache || []).filter(w => ["pending_admin", "negotiation", "battle", "peace", "rejected"].includes(w.status));
+    if (!pending.length) { root.innerHTML = `<div class="admin-empty">درخواست جنگی برای این دنیا ثبت نشده است.</div>`; return; }
+    root.innerHTML = pending.map(w => {
+        const status = w.status === "pending_admin" ? "در انتظار بررسی مدیر" : w.status === "negotiation" ? "مهلت دیپلماسی فعال" : w.status === "battle" ? "جنگ آغاز شده" : w.status === "peace" ? "با صلح خاتمه یافت" : "رد شده";
+        const end = w.negotiation_ends ? `پایان مذاکره: ${new Date(w.negotiation_ends).toLocaleString("fa-IR")}` : "";
+        const votes = (w.peace_votes || []).map(cid => COUNTRY_NAMES[cid] || cid).join("، ") || "هیچ‌کس";
+        return `<article class="admin-war-card"><div class="admin-war-card-head"><div><b>${escapeHtml(w.attacker_name || COUNTRY_NAMES[w.attacker] || w.attacker)} ← ${escapeHtml(w.defender_name || COUNTRY_NAMES[w.defender] || w.defender)}</b><small>${escapeHtml(status)} · ${escapeHtml(w.created_at ? new Date(w.created_at).toLocaleString("fa-IR") : "")}</small></div><span class="admin-war-status">${escapeHtml(w.status)}</span></div><details class="admin-war-detail"><summary>👁️ بازکردن جزئیات و دلیل اعلان جنگ</summary><div class="admin-war-reason"><b>دلیل اعلان جنگ</b><p>${escapeHtml(w.reason || "دلیلی ثبت نشده است.")}</p></div>${end ? `<small class="admin-war-meta">${escapeHtml(end)}</small>` : ""}${w.status === "negotiation" ? `<small class="admin-war-meta">رأی صلح: ${escapeHtml(votes)}</small>` : ""}</details>${w.status === "pending_admin" ? `<div class="admin-war-actions"><button type="button" data-war-review="approve" data-war-id="${escapeHtml(w.id)}">✅ تأیید و شروع مهلت ۲۴ ساعته</button><button type="button" data-war-review="reject" data-war-id="${escapeHtml(w.id)}">✕ رد درخواست</button></div>` : ""}</article>`;
+    }).join("");
+    root.querySelectorAll("[data-war-review]").forEach(button => button.addEventListener("click", async () => {
+        const action = button.dataset.warReview, warId = button.dataset.warId;
+        if (action === "approve" && !confirm("درخواست را تأیید می‌کنی؟ همهٔ کاربران این دنیا مطلع می‌شوند و مهلت دیپلماسی ۲۴ ساعته آغاز می‌شود.")) return;
+        button.disabled = true;
+        try {
+            const result = await apiPost("/api/admin/war/review", { war_id: warId, action });
+            showToast(result.message || (result.success ? "بررسی انجام شد." : "خطا"), result.success ? "success" : "error");
+            if (result.success) await loadAdminPanel(); else button.disabled = false;
+        } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); button.disabled = false; }
+    }));
+}
+
+async function switchAdminWorld(worldId) {
+    selectedWorldId = String(worldId);
+    try { localStorage.setItem("fl93_world_id", selectedWorldId); } catch {}
+    adminSelectedPlayerId = null; adminSelectedPlayerDetailOpen = false;
+    // مدیریت دنیا نباید حساب مدیر را به‌عنوان بازیکن به دنیای انتخاب‌شده اضافه کند.
+    player = null; selectedCountry = null;
+    await loadAdminPanel();
+    showGamePage("admin");
+}
+
+function renderAdminWorldSwitcher() {
+    const root = document.getElementById("admin-world-switcher"); if (!root) return;
+    const worlds = adminWorldsCache || [];
+    if (!worlds.length) { root.innerHTML = `<div class="admin-empty">هنوز دنیایی ثبت نشده است.</div>`; return; }
+    const current = worlds.find(w => String(w.id) === String(selectedWorldId));
+    root.innerHTML = `<div class="admin-world-switcher-head"><div><b>🌍 دنیاهای بازی</b><small>دنیای فعال: ${escapeHtml(current?.name || `دنیای ${selectedWorldId}`)}</small></div><span>${worlds.length} دنیا</span></div><div class="admin-world-switcher-list">${worlds.map(w => `<button type="button" class="admin-world-switch-chip ${String(w.id) === String(selectedWorldId) ? "active" : ""}" data-switch-world="${w.id}"><span>🌐 ${escapeHtml(w.name || `دنیای ${w.id}`)}</span><small>${formatNumber(w.players || 0)} بازیکن</small></button>`).join("")}</div>`;
+    root.querySelectorAll("[data-switch-world]").forEach(button => button.addEventListener("click", async () => {
+        if (String(button.dataset.switchWorld) === String(selectedWorldId)) return;
+        button.disabled = true;
+        try { await switchAdminWorld(button.dataset.switchWorld); }
+        catch { showToast("تغییر دنیا ناموفق بود.", "error"); }
+        finally { button.disabled = false; }
+    }));
+}
+
+function renderAdminWorlds() {
+    const root = document.getElementById("admin-world-list"); if (!root) return;
+    if (!adminWorldsCache?.length) { root.innerHTML = `<div class="admin-empty">هنوز دنیایی ثبت نشده است.</div>`; return; }
+    root.innerHTML = adminWorldsCache.map(w => `<article class="admin-world-card ${String(w.id) === String(selectedWorldId) ? "current" : ""}"><div><b>🌍 ${escapeHtml(w.name || `دنیای ${w.id}`)}</b><small>شناسه: ${w.id} · ${formatNumber(w.players || 0)} بازیکن · ${formatNumber(w.countries_taken || 0)} کشور گرفته‌شده</small><small>${w.created_at ? `ساخته‌شده: ${escapeHtml(new Date(w.created_at).toLocaleString("fa-IR"))}` : "دنیای اصلی"}</small></div><button type="button" data-enter-world="${w.id}">${String(w.id) === String(selectedWorldId) ? "دنیای فعلی" : "مدیریت این دنیا"}</button></article>`).join("");
+    root.querySelectorAll("[data-enter-world]").forEach(button => button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+            await switchAdminWorld(button.dataset.enterWorld);
+            document.querySelector('[data-admin-tab="players"]')?.click();
+        } catch { showToast("تغییر دنیا ناموفق بود.", "error"); }
+        finally { button.disabled = false; }
+    }));
+}
+
+document.getElementById("admin-create-world-form")?.addEventListener("submit", async event => {
+    event.preventDefault(); if (!isAdminAccount) return;
+    const input = document.getElementById("admin-new-world-name"); const name = input?.value?.trim() || "";
+    const submit = event.currentTarget.querySelector("[type=submit]"); if (submit) submit.disabled = true;
+    try {
+        const result = await apiPost("/api/admin/worlds/create", { name });
+        showToast(result.message || (result.success ? "دنیای جدید ساخته شد." : "ساخت دنیا ناموفق بود."), result.success ? "success" : "error");
+        if (result.success) { if (input) input.value = ""; await fetchAvailableWorlds(); await loadAdminPanel(); }
+    } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+    finally { if (submit) submit.disabled = false; }
+});
+document.getElementById("admin-wars-refresh")?.addEventListener("click", loadAdminPanel);
+document.getElementById("admin-player-detail-back")?.addEventListener("click", () => { adminSelectedPlayerDetailOpen = false; adminSelectedPlayerId = null; document.getElementById("admin-player-editor")?.classList.remove("admin-detail-fullscreen"); renderAdminOverview(); document.getElementById("admin-player-list")?.scrollIntoView({ behavior: "instant", block: "start" }); });
+
 function renderAdminOverview() {
     if (!adminOverviewCache) return;
     const data = adminOverviewCache;
@@ -2387,8 +2569,9 @@ function renderAdminOverview() {
         else list.innerHTML = filtered.map(p => {
             const name = adminPlayerName(p);
             const handle = p.telegram_username ? "@" + p.telegram_username : "نام کاربری ثبت نشده";
-            const stateTags = [p.vip ? "VIP" : "", p.is_eliminated ? "حذف‌شده" : "", adminPlayerIsActive(p) ? "فعال" : ""].filter(Boolean).join(" · ");
-            return `<div role="button" tabindex="0" class="admin-player-row ${Number(adminSelectedPlayerId) === Number(p.user_id) ? "selected" : ""} ${p.is_eliminated ? "eliminated" : ""}" data-admin-player="${p.user_id}"><span class="admin-player-flag">${escapeHtml(p.country_flag || "🌐")}</span><span class="admin-player-main"><b>${escapeHtml(name)}</b><small class="admin-player-handle">${escapeHtml(handle)}</small><small class="admin-player-id">آیدی تلگرام: <strong>${p.user_id}</strong> <button type="button" class="admin-copy-id" data-admin-copy-id="${p.user_id}" title="کپی آیدی">کپی</button></small><small>${escapeHtml(p.country_name || "بدون کشور")}${stateTags ? " · " + escapeHtml(stateTags) : ""}</small></span><span class="admin-player-metrics"><b>$${adminFormatNumber(p.money)}</b><small>نیرو ${adminFormatNumber(p.manpower)}</small><small>${escapeHtml(adminRelativeTime(p.last_seen_at))}</small></span><span class="admin-player-chevron">›</span></div>`;
+            const stateTags = [p.vip ? "VIP" : "", p.is_eliminated ? "حذف‌شده" : "", p.is_online ? "آنلاین" : `آخرین ورود ${adminRelativeTime(p.last_seen_at)}`].filter(Boolean).join(" · ");
+            const exactSeen = p.last_seen_at ? new Date(p.last_seen_at).toLocaleString("fa-IR") : "سابقهٔ ورود ثبت نشده";
+            return `<div role="button" tabindex="0" class="admin-player-row ${Number(adminSelectedPlayerId) === Number(p.user_id) ? "selected" : ""} ${p.is_eliminated ? "eliminated" : ""}" data-admin-player="${p.user_id}"><span class="admin-player-flag">${escapeHtml(p.country_flag || "🌐")}</span><span class="admin-player-main"><b>${escapeHtml(name)}</b><small class="admin-player-handle">${escapeHtml(handle)}</small><small class="admin-player-id">آیدی تلگرام: <strong>${p.user_id}</strong> <button type="button" class="admin-copy-id" data-admin-copy-id="${p.user_id}" title="کپی آیدی">کپی</button></small><small>${escapeHtml(p.country_name || "بدون کشور")}${stateTags ? " · " + escapeHtml(stateTags) : ""}</small><small class="admin-player-last-seen">آخرین فعالیت دقیق: ${escapeHtml(exactSeen)}</small></span><span class="admin-player-metrics"><b>$${adminFormatNumber(p.money)}</b><small>نیرو ${adminFormatNumber(p.manpower)}</small><small>${escapeHtml(adminRelativeTime(p.last_seen_at))}</small></span><span class="admin-player-chevron">›</span></div>`;
         }).join("");
     }
     const selected = playersList.find(p => Number(p.user_id) === Number(adminSelectedPlayerId));
@@ -2404,14 +2587,59 @@ function renderAdminOverview() {
         const actions = data.admin_audit || [];
         audit.innerHTML = actions.length ? actions.map(a => `<article class="admin-audit-row"><span class="admin-audit-icon">${a.target_user_id ? "👤" : "⚙️"}</span><div class="admin-audit-copy"><b>${escapeHtml(a.action || "عملیات مدیریت")}</b><p>${escapeHtml(a.detail || "")}</p><small>${a.target_user_id ? `آیدی بازیکن: ${a.target_user_id} · ` : ""}${escapeHtml(a.at ? new Date(a.at).toLocaleString("fa-IR") : "")}</small></div></article>`).join("") : `<div class="admin-empty">هنوز عملیات مدیریتی ثبت نشده است.</div>`;
     }
+    renderAdminWars();
+    renderAdminWorlds();
+    renderAdminWorldSwitcher();
+    const worldLabel = el("admin-current-world");
+    if (worldLabel) {
+        const current = (adminWorldsCache || []).find(w => String(w.id) === String(selectedWorldId));
+        worldLabel.textContent = current ? `${current.name} · ${current.players} بازیکن` : `دنیای ${selectedWorldId}`;
+    }
 }
 function renderAdminPlayerEditor(p) {
     const el = id => document.getElementById(id);
     el("admin-player-editor")?.classList.remove("hidden");
+    el("admin-player-editor")?.classList.toggle("admin-detail-fullscreen", adminSelectedPlayerDetailOpen);
     if (el("admin-editor-title")) el("admin-editor-title").textContent = `${p.country_flag || "🌐"} ${adminPlayerName(p)}`;
     if (el("admin-editor-subtitle")) el("admin-editor-subtitle").textContent = `${p.country_name || "بدون کشور"} · درآمد خالص روزانه: $${adminFormatNumber(p.daily_income)}`;
     const identity = el("admin-identity-card");
-    if (identity) identity.innerHTML = `<div class="admin-identity-main"><span class="admin-identity-avatar">${escapeHtml((adminPlayerName(p).trim()[0] || "👤"))}</span><div><b>${escapeHtml(adminPlayerName(p))}</b><small>${p.telegram_username ? "@" + escapeHtml(p.telegram_username) : "نام کاربری تلگرام ثبت نشده"}</small></div></div><div class="admin-identity-id"><span>آیدی عددی تلگرام</span><strong>${p.user_id}</strong><button type="button" class="admin-copy-id" data-admin-copy-id="${p.user_id}">کپی آیدی</button></div><div class="admin-identity-meta"><span>آخرین فعالیت: ${escapeHtml(adminRelativeTime(p.last_seen_at))}</span><span>زبان: ${escapeHtml(p.telegram_language_code || "نامشخص")}</span><span>وضعیت: ${p.is_eliminated ? "حذف‌شده" : (adminPlayerIsActive(p) ? "فعال" : "غیرفعال")}</span></div>`;
+    if (identity) identity.innerHTML = `<div class="admin-identity-main"><span class="admin-identity-avatar">${escapeHtml((adminPlayerName(p).trim()[0] || "👤"))}</span><div><b>${escapeHtml(adminPlayerName(p))}</b><small>${p.telegram_username ? "@" + escapeHtml(p.telegram_username) : "نام کاربری تلگرام ثبت نشده"}</small></div></div><div class="admin-identity-id"><span>آیدی عددی تلگرام</span><strong>${p.user_id}</strong><button type="button" class="admin-copy-id" data-admin-copy-id="${p.user_id}">کپی آیدی</button></div><div class="admin-identity-meta"><span>آخرین فعالیت: ${escapeHtml(adminRelativeTime(p.last_seen_at))}</span><span>ساعت دقیق: ${escapeHtml(p.last_seen_at ? new Date(p.last_seen_at).toLocaleString("fa-IR") : "ثبت نشده")}</span><span>زبان: ${escapeHtml(p.telegram_language_code || "نامشخص")}</span><span>شروع بازی: ${escapeHtml(p.started_at ? new Date(p.started_at).toLocaleString("fa-IR") : "هنوز شروع نکرده")}</span><span>آخرین به‌روزرسانی وضعیت بازی: ${escapeHtml(p.last_update ? new Date(p.last_update).toLocaleString("fa-IR") : "ثبت نشده")}</span><span>وضعیت: ${p.is_eliminated ? "حذف‌شده" : (p.is_online ? "آنلاین" : "آفلاین")}</span></div>`;
+    const extra = el("admin-player-extra-details");
+    if (extra) {
+        const levels = p.infra_levels || {};
+        const buildingRows = Object.entries(levels).filter(([, level]) => Number(level) > 0).map(([key, level]) => {
+            const item = (p.building_catalog || {})[key];
+            const name = item?.name || key;
+            const group = item?.group === "economy" ? "اقتصاد" : "زیرساخت";
+            return `<div class="admin-inventory-row"><span>${escapeHtml(name)} <small>${group}</small></span><b>سطح ${formatNumber(level)}</b></div>`;
+        }).join("");
+        const unitRows = Object.entries(p.army_units || p.units || {}).filter(([, amount]) => Number(amount) > 0).map(([key, amount]) => {
+            const unit = ARMY_UNITS[key];
+            return `<div class="admin-inventory-row"><span>${escapeHtml(unit?.name || key)} <small>یگان</small></span><b>${formatNumber(amount)}</b></div>`;
+        }).join("");
+        const resources = Object.entries(p.resources || {}).map(([key, amount]) => `<div class="admin-inventory-row"><span>${escapeHtml(RESOURCE_NAMES[key] || key)} <small>منبع</small></span><b>${formatNumber(amount)}</b></div>`).join("");
+        const infoRows = (rows, renderRow, empty) => rows?.length ? rows.map(renderRow).join("") : `<p class="admin-inventory-empty">${empty}</p>`;
+        const sites = p.owned_sites || [], straits = p.owned_straits || [], garrisons = p.garrisons || [];
+        const treaties = p.treaties || [], loans = p.loans || [], listings = p.market_listings || [], wars = p.wars || [];
+        const siteHtml = infoRows(sites, x => `<div class="admin-inventory-row"><span>${escapeHtml(x.name || x.id)} <small>${escapeHtml(x.type || "سکو / معدن")}</small></span><b>${formatNumber(x.production || 0)} / روز</b></div>`, "سکو یا معدنی در اختیار ندارد.");
+        const straitHtml = infoRows(straits, x => `<div class="admin-inventory-row"><span>${escapeHtml(x.name || x.id)} <small>تنگه</small></span><b>عوارض ${formatNumber(x.toll || 0)}</b></div>`, "تنگه‌ای در اختیار ندارد.");
+        const garrisonHtml = infoRows(garrisons, x => `<div class="admin-inventory-row"><span>${escapeHtml(x.name || x.id)} <small>پادگان موضع</small></span><b>${formatNumber(Object.values(x.units || {}).reduce((a, v) => a + Number(v || 0), 0))} یگان</b></div>`, "نیروی مستقر در سکو یا تنگه ندارد.");
+        const treatyHtml = infoRows(treaties, x => `<div class="admin-inventory-row"><span>${escapeHtml(TREATY_TYPE_NAMES[x.treaty_type] || x.treaty_type || "پیمان")}</span><b>${escapeHtml(x.with_country_name || COUNTRY_NAMES[x.with_country] || "—")}</b></div>`, "پیمان فعالی ندارد.");
+        const loanHtml = infoRows(loans, x => `<div class="admin-inventory-row"><span>${x.lender === p.country ? "وام‌دهنده" : "وام‌گیرنده"} <small>${escapeHtml(x.status || "نامشخص")}</small></span><b>$${adminFormatNumber(x.remaining ?? x.amount ?? 0)}</b></div>`, "وام مرتبطی ندارد.");
+        const marketHtml = infoRows(listings, x => `<div class="admin-inventory-row"><span>${x.side === "buy" ? "درخواست خرید" : "آگهی فروش"} <small>${escapeHtml(x.status || "نامشخص")}</small></span><b>${escapeHtml(RESOURCE_NAMES[x.resource] || x.resource || "کالا")} · ${formatNumber(x.amount || 0)}</b></div>`, "آگهی بازاری ثبت نکرده است.");
+        const warHtml = infoRows(wars, x => `<div class="admin-inventory-row"><span>${escapeHtml(COUNTRY_NAMES[x.attacker] || x.attacker || "—")} ← ${escapeHtml(COUNTRY_NAMES[x.defender] || x.defender || "—")} <small>${escapeHtml(x.status || "نامشخص")}</small></span><b>${escapeHtml((x.reason || "").slice(0, 45) || "بدون دلیل")}</b></div>`, "درخواست یا سابقهٔ جنگی ثبت نشده است.");
+        extra.innerHTML = `<div class="admin-editor-section-title"><b>ساختمان‌ها و ارتقاها</b><span>${Object.values(levels).filter(v => Number(v) > 0).length} مورد</span></div><div class="admin-inventory-grid">${buildingRows || `<p class="admin-inventory-empty">هنوز ساختمانی ساخته نشده است.</p>`}</div><div class="admin-editor-section-title"><b>یگان‌های ارتش</b><span>${Object.values(p.army_units || p.units || {}).reduce((a, v) => a + Number(v || 0), 0).toLocaleString("en-US")}</span></div><div class="admin-inventory-grid">${unitRows || `<p class="admin-inventory-empty">هنوز یگانی آموزش داده نشده است.</p>`}</div><div class="admin-editor-section-title"><b>موجودی منابع</b><span>وضعیت فعلی</span></div><div class="admin-inventory-grid">${resources || `<p class="admin-inventory-empty">منبعی ثبت نشده است.</p>`}</div><details class="admin-inventory-detail"><summary>🛢️ سکوها و معادن (${sites.length})</summary><div class="admin-inventory-grid">${siteHtml}</div></details><details class="admin-inventory-detail"><summary>⚓ تنگه‌ها (${straits.length})</summary><div class="admin-inventory-grid">${straitHtml}</div></details><details class="admin-inventory-detail"><summary>🪖 نیروهای مستقر (${garrisons.length})</summary><div class="admin-inventory-grid">${garrisonHtml}</div></details><details class="admin-inventory-detail"><summary>📜 پیمان‌های فعال (${treaties.length})</summary><div class="admin-inventory-grid">${treatyHtml}</div></details><details class="admin-inventory-detail"><summary>💳 وام‌ها (${loans.length})</summary><div class="admin-inventory-grid">${loanHtml}</div></details><details class="admin-inventory-detail"><summary>🌐 آگهی‌های بازار (${listings.length})</summary><div class="admin-inventory-grid">${marketHtml}</div></details><details class="admin-inventory-detail"><summary>⚔️ درخواست‌ها و سوابق جنگ (${wars.length})</summary><div class="admin-inventory-grid">${warHtml}</div></details>`;
+    }
+    // ویرایش سریع مدیر شامل منابع، تعداد یگان‌ها و سطح ساختمان‌هاست.
+    const adjustSelect = el("admin-adjust-field");
+    if (adjustSelect) {
+        const previous = adjustSelect.value || "money";
+        const base = [["money", "خزانه"], ["manpower", "نیروی انسانی"], ["food", "غذا"], ["steel", "آهن"], ["uranium", "اورانیوم"], ["oil", "نفت"]];
+        const units = Object.entries(p.army_catalog || {}).map(([key, unit]) => [`unit:${key}`, `🪖 یگان: ${unit.name || key}`]);
+        const buildings = Object.entries(p.building_catalog || {}).map(([key, item]) => [`building:${key}`, `🏗️ ${item.group === "economy" ? "اقتصاد" : "ساختمان"}: ${item.name || key}`]);
+        adjustSelect.innerHTML = [...base.map(x => `<option value="${x[0]}">${escapeHtml(x[1])}</option>`), ...units.map(x => `<option value="${x[0]}">${escapeHtml(x[1])}</option>`), ...buildings.map(x => `<option value="${x[0]}">${escapeHtml(x[1])}</option>`)].join("");
+        adjustSelect.value = [...adjustSelect.options].some(o => o.value === previous) ? previous : "money";
+    }
     for (const key of ["money", "manpower"]) if (el(`admin-edit-${key}`)) el(`admin-edit-${key}`).value = Number(p[key] || 0);
     for (const key of ["food", "steel", "uranium", "oil"]) if (el(`admin-edit-${key}`)) el(`admin-edit-${key}`).value = Number(p.resources?.[key] || 0);
     if (el("admin-edit-country")) el("admin-edit-country").value = p.country || "";
@@ -2460,11 +2688,11 @@ document.getElementById("admin-player-list")?.addEventListener("click", event =>
     const copy = event.target.closest("[data-admin-copy-id]");
     if (copy) { event.stopPropagation(); adminCopyId(copy.dataset.adminCopyId); return; }
     const row = event.target.closest("[data-admin-player]"); if (!row) return;
-    adminSelectedPlayerId = Number(row.dataset.adminPlayer); renderAdminOverview();
-    document.getElementById("admin-player-editor")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    adminSelectedPlayerId = Number(row.dataset.adminPlayer); adminSelectedPlayerDetailOpen = true; renderAdminOverview();
+    document.getElementById("admin-player-editor")?.scrollIntoView({ behavior: "instant", block: "start" });
 });
 document.getElementById("admin-player-list")?.addEventListener("keydown", event => {
-    if ((event.key === "Enter" || event.key === " ") && event.target.matches("[data-admin-player]")) { event.preventDefault(); adminSelectedPlayerId = Number(event.target.dataset.adminPlayer); renderAdminOverview(); }
+    if ((event.key === "Enter" || event.key === " ") && event.target.matches("[data-admin-player]")) { event.preventDefault(); adminSelectedPlayerId = Number(event.target.dataset.adminPlayer); adminSelectedPlayerDetailOpen = true; renderAdminOverview(); }
 });
 document.getElementById("admin-identity-card")?.addEventListener("click", event => { const copy=event.target.closest("[data-admin-copy-id]"); if(copy) adminCopyId(copy.dataset.adminCopyId); });
 document.querySelectorAll("[data-admin-save]").forEach(button => button.addEventListener("click", () => {
@@ -2553,6 +2781,7 @@ const gameHeaderForScroll = document.querySelector("#game .game-header");
 document.querySelectorAll("#game .game-page").forEach(page => {
     page.addEventListener("scroll", () => {
         if (!gameHeaderForScroll || gameShellForHeader?.classList.contains("booting")) return;
+        if (page.id === "admin") { gameHeaderForScroll.style.transform = "translate3d(0, 0, 0)"; return; }
         const travel = Math.min(Math.max(0, page.scrollTop || 0), gameHeaderForScroll.offsetHeight || 78);
         gameHeaderForScroll.style.transform = `translate3d(0, ${-travel}px, 0)`;
     }, { passive: true });
@@ -3544,7 +3773,7 @@ setInterval(() => {
 /* =========================================================
    Market — global trade
 ========================================================= */
-let marketCreateSide = "sell", marketFilter = "all", marketRows = [];
+let marketCreateSide = "sell", marketFilter = "all", marketRows = [], marketSanctions = [];
 
 function marketResourceText(k, n) { return `${RESOURCE_ICONS[k] || "📦"} ${formatNumber(n)} ${RESOURCE_NAMES[k] || k}`; }
 function marketModeLabel(m) { return m === "land" ? "🚚 زمینی" : m === "sea" ? "🚢 دریایی" : "✈️ هوایی"; }
@@ -3556,9 +3785,40 @@ async function loadMarketListings() {
     try {
         const d = await apiGet("/api/market", {country: selectedCountry || ""});
         marketRows = d.listings || [];
+        marketSanctions = d.sanctions || [];
         renderMarketListings();
+        renderMarketSanctions();
     } catch (e) { c.innerHTML = `<div class="diplomacy-item-empty">بازار در دسترس نیست.</div>`; }
 }
+
+function renderMarketSanctions() {
+    const target = document.getElementById("market-sanction-target");
+    const list = document.getElementById("market-sanctions-list");
+    if (target) {
+        const current = target.value;
+        target.innerHTML = `<option value="">کشور را انتخاب کن</option>` + Object.keys(COUNTRY_NAMES).filter(cid => cid !== selectedCountry).map(cid => `<option value="${cid}">${COUNTRY_NAMES[cid]}</option>`).join("");
+        if (current && [...target.options].some(o => o.value === current)) target.value = current;
+    }
+    if (!list) return;
+    if (!marketSanctions.length) { list.innerHTML = `<div class="diplomacy-item-empty">هنوز کشوری تحریم نشده است.</div>`; return; }
+    list.innerHTML = marketSanctions.map(s => {
+        const mine = s.by === selectedCountry;
+        return `<article class="market-sanction-row"><span>⛔ <b>${escapeHtml(COUNTRY_NAMES[s.by] || s.by)}</b>، <b>${escapeHtml(COUNTRY_NAMES[s.target] || s.target)}</b> را تحریم کرده است.</span>${mine ? `<button type="button" data-lift-sanction="${escapeHtml(s.target)}">رفع تحریم</button>` : ""}</article>`;
+    }).join("");
+    list.querySelectorAll("[data-lift-sanction]").forEach(b => b.onclick = () => submitMarketSanction(b.dataset.liftSanction, "lift"));
+}
+
+async function submitMarketSanction(target, action = "sanction") {
+    if (!target) { showToast("ابتدا کشور مقصد را انتخاب کن.", "error"); return; }
+    const other = COUNTRY_NAMES[target] || target;
+    if (action === "sanction" && !confirm(`کشور ${other} از خرید در بازار جهانی محروم شود؟`)) return;
+    try {
+        const result = await apiPost("/api/market/sanction", { target, action });
+        showToast(result.message || (result.success ? "انجام شد." : "عملیات ناموفق بود."), result.success ? "success" : "error");
+        if (result.success) await loadMarketListings();
+    } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+}
+document.getElementById("market-sanction-submit")?.addEventListener("click", () => submitMarketSanction(document.getElementById("market-sanction-target")?.value, "sanction"));
 
 function renderMarketListings() {
     const c = document.getElementById("market-listings"); if (!c) return;
@@ -3681,6 +3941,7 @@ document.querySelectorAll(".market-tab").forEach(tab => tab.addEventListener("cl
     document.getElementById(tab.dataset.marketTab)?.classList.remove("hidden");
     if (tab.dataset.marketTab === "market-list-panel") loadMarketListings();
     else if (tab.dataset.marketTab === "market-mine-panel") loadMyListings();
+    else if (tab.dataset.marketTab === "market-sanctions-panel") loadMarketListings();
     else if (tab.dataset.marketTab === "market-create-panel") { refreshPlayer().finally(validateMarketForm); }
 }));
 
@@ -4513,22 +4774,21 @@ let previewGlobeAbort = null;
 (async function init() {
     showOnly("loading");
     const t0 = Date.now();
-
-    await loadCountries();
-    await loadPlayer();
-    await loadArmyCatalog();
-
-    const el = Date.now() - t0;
-    if (el < 1000) await new Promise(r => setTimeout(r, 1000 - el));
-
-    if (player?.country) {
-        selectedCountry = player.country;
-        showGame();
-    } else {
-        // اول همه پرچم‌ها لود شوند، بعد صفحه انتخاب کشور
-        await Promise.all(Object.keys(COUNTRY_IMAGE_EXT).map(cid => preloadImage(countryImageUrl(cid))));
-        showCountrySelection();
+    try { await fetchAvailableWorlds(); }
+    catch (e) { console.error("World list:", e); }
+    const elapsed = Date.now() - t0;
+    if (elapsed < 550) await new Promise(r => setTimeout(r, 550 - elapsed));
+    const openAdmin = new URLSearchParams(window.location.search).get("open") === "admin";
+    if (openAdmin && isAdminAccount) {
+        // ورود مستقیم مدیر نباید او را ناخواسته به‌عنوان بازیکن به دنیایی اضافه کند.
+        await loadArmyCatalog();
+        showOnly("game");
+        document.getElementById("game")?.classList.remove("booting");
+        showGamePage("admin");
+        await loadAdminPanel();
+        return;
     }
+    showWorldSelection();
 })();
 
 
