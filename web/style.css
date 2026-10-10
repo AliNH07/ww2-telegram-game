@@ -2853,3 +2853,79 @@ input, textarea, button { -webkit-touch-callout:none; }
 #admin .admin-primary-btn{min-height:44px;border-radius:12px;background:linear-gradient(135deg,#edc66c,#bd8d2b);box-shadow:0 5px 14px rgba(0,0,0,.13);color:#17130b;font-size:11px;font-weight:900}#admin .admin-primary-btn:disabled{opacity:.5}#admin .admin-bulk-form{display:grid;gap:11px}#admin .admin-bulk-form label{display:flex;flex-direction:column;gap:6px}#admin .admin-bulk-form input,#admin .admin-bulk-form select{padding:10px 9px;width:100%}#admin .admin-economy-shortcuts{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:15px;padding:12px;border-radius:13px;border:1px solid rgba(149,169,200,.12);background:rgba(255,255,255,.02)}#admin .admin-economy-shortcuts h4{font-size:10px;color:#a8b7cb}#admin .admin-economy-shortcuts button{font:inherit;font-size:9px;color:#e9cd86;background:rgba(227,176,75,.08);border:1px solid rgba(227,176,75,.17);padding:8px;border-radius:9px}
 #admin .admin-message-preview{display:grid;gap:6px;padding:12px;border-radius:13px;border:1px solid rgba(149,169,200,.12);background:rgba(0,0,0,.18)}#admin .admin-message-preview>b{font-size:9px;color:#c5a45a}#admin .admin-message-preview strong{font-size:11px;color:#f0d998}#admin .admin-message-preview p{font-size:10px;color:#c0cad8;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere}#admin .admin-message-preview small{font-size:8px;color:#8394ab}#admin .admin-news-head{margin-top:20px;padding-top:14px;border-top:1px solid rgba(149,169,200,.1)}#admin .admin-audit-row{display:flex;gap:9px;padding:11px;border-radius:12px;border:1px solid rgba(149,169,200,.12);background:rgba(255,255,255,.02)}#admin .admin-audit-icon{width:32px;height:32px;flex:0 0 32px;display:grid;place-items:center;border-radius:10px;background:rgba(227,176,75,.07)}#admin .admin-audit-copy{min-width:0;flex:1}#admin .admin-audit-copy b{font-size:10px;color:#edf2fa}#admin .admin-audit-copy p{font-size:9px;color:#acb8c9;line-height:1.8;overflow-wrap:anywhere;margin-top:3px}#admin .admin-audit-copy small{display:block;font-size:8px;color:#788ba4;line-height:1.7;margin-top:4px;overflow-wrap:anywhere}
 @media(max-width:430px){#admin.admin-dashboard{padding-left:9px;padding-right:9px}#admin .admin-summary-grid-wide{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}#admin .admin-summary-card{min-height:82px;padding:10px}#admin .admin-summary-card strong{font-size:15px}#admin .admin-tabs{top:53px;gap:3px}#admin .admin-tab{font-size:9px;padding:7px 2px;min-height:39px}#admin .admin-player-row{gap:6px;padding:8px}#admin .admin-player-flag{width:31px;height:34px;flex-basis:31px}#admin .admin-player-metrics{min-width:60px;max-width:67px}#admin .admin-player-main>b{font-size:10px}#admin .admin-player-main small{font-size:8px}#admin .admin-quick-grid{grid-template-columns:1fr}#admin .admin-economy-shortcuts{align-items:flex-start;flex-direction:column}}
+
+/* =====================================================================
+   خانه — طراحی ساده و مدرن
+===================================================================== */
+#home .hm-hero {
+    position: relative; overflow: hidden; margin-bottom: 12px; padding: 20px 20px 22px;
+    border-radius: 26px; background: linear-gradient(150deg, #1b2233, #0d121c);
+    border: 1px solid rgba(var(--brand-rgb), .22); box-shadow: 0 14px 34px rgba(0,0,0,.28);
+}
+#home .hm-hero .home-card-photo { z-index: 0; background-position: center; }
+#home .hm-hero .home-card-photo.loaded { opacity: .55; }
+#home .hm-hero .home-card-photo::after {
+    background: linear-gradient(180deg, rgba(11,14,21,.45) 0%, rgba(11,14,21,.88) 100%);
+}
+#home .hm-hero-in { position: relative; z-index: 1; }
+#home .hm-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 22px; }
+#home .hm-country, #home .hm-season {
+    display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px;
+    border-radius: 999px; font-size: 12.5px; color: #f4f6f9;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+#home .hm-season { padding: 6px 13px; color: var(--brand); }
+#home .hm-money-label { font-size: 12px; color: rgba(255,255,255,.65); }
+#home .hm-money {
+    margin: 4px 0 10px; font-size: 38px; font-weight: 800; line-height: 1.15;
+    color: var(--brand); direction: ltr; text-align: right; letter-spacing: .3px;
+    text-shadow: 0 2px 14px rgba(0,0,0,.5);
+}
+#home .hm-income { font-size: 12.5px; color: rgba(255,255,255,.7); }
+#home .hm-income b { color: var(--green); font-weight: 700; direction: ltr; display: inline-block; margin-right: 4px; }
+
+#home .hm-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+#home .hm-stat {
+    min-width: 0; display: flex; flex-direction: column; gap: 5px; padding: 12px 11px;
+    border-radius: 18px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+}
+#home .hm-stat-label { font-size: 10.5px; color: #98a3b3; white-space: nowrap; }
+#home .hm-stat strong { font-size: 17px; font-weight: 800; color: #f4f6f9; line-height: 1.3; overflow-wrap: anywhere; }
+#home .hm-stat small { font-size: 9.5px; color: #6f7b8c; line-height: 1.5; }
+
+#home .hm-season-line {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    margin: 0 4px 18px; font-size: 11px; color: #8a96a7;
+}
+#home .hm-season-line #home-season-hint { color: var(--brand); opacity: .9; }
+
+#home .hm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+#home .hm-card {
+    position: relative; min-height: 0; overflow: visible; box-shadow: none;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+    padding: 14px; text-align: right; border-radius: 20px;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    transition: background .18s ease, border-color .18s ease, transform .15s ease;
+}
+#home .hm-card:hover { transform: none; box-shadow: none; border-color: rgba(var(--brand-rgb), .4); }
+#home .hm-card:active { transform: scale(.97); background: rgba(var(--brand-rgb), .1); }
+#home .hm-ico {
+    width: 42px; height: 42px; display: grid; place-items: center; margin-bottom: 8px;
+    font-size: 21px; border-radius: 14px;
+    background: rgba(var(--brand-rgb), .12); border: 1px solid rgba(var(--brand-rgb), .2);
+}
+#home .hm-card strong { font-size: 14px; font-weight: 700; color: #f4f6f9; }
+#home .hm-card small { font-size: 10.5px; color: #8a96a7; line-height: 1.6; }
+
+#home .hm-grid-mini { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+#home .hm-mini { align-items: center; text-align: center; padding: 11px 4px; gap: 5px; border-radius: 16px; }
+#home .hm-mini .hm-ico { width: 34px; height: 34px; margin: 0; font-size: 17px; border-radius: 11px; }
+#home .hm-mini strong { font-size: 11px; font-weight: 600; }
+#home .hm-mini small { display: none; }
+
+@media (max-width: 380px) {
+    #home .hm-money { font-size: 32px; }
+    #home .hm-stat strong { font-size: 15px; }
+    #home .hm-stat-label { font-size: 9.5px; }
+}
