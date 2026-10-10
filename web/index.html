@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261010worldfix1">
+<link rel="stylesheet" href="/style.css?v=20261010warfix2">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -368,6 +368,7 @@
     <!-- ==================== ارتش ==================== -->
     <main id="army" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🛡️</span>ارتش</span><span class="sb-money">$0</span></div>
+        <div id="army-war-status" class="war-state-banner hidden" role="status" aria-live="polite"></div>
         <div class="army-summary-card">
             <div class="army-summary-label">🛡️ قدرت کل ارتش</div>
             <div class="army-summary-power" id="army-total-power">0</div>
@@ -425,6 +426,7 @@
     <!-- ==================== جنگ ==================== -->
     <main id="war" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">⚔️</span>جنگ</span><span class="sb-money">$0</span></div>
+        <div id="war-war-status" class="war-state-banner hidden" role="status" aria-live="polite"></div>
         <div class="war-tabs">
             <button class="war-tab active" data-war-tab="war-forces-panel">نیروها</button>
             <button class="war-tab" data-war-tab="war-targets-panel">اعلان جنگ</button>
@@ -437,7 +439,7 @@
 
         <div id="war-targets-panel" class="war-panel hidden">
             <div class="war-intro"><h3>اعلان جنگ</h3>
-                <p>با انتخاب کشور، پنجرهٔ ثبت دلیل باز می‌شود و درخواست به سازمان ملل برای بررسی می‌رود. پس از تأیید، دو کشور ۲۴ ساعت فرصت دارند با رأی دوطرفهٔ «صلح» از جنگ جلوگیری کنند.</p></div>
+                <p>با انتخاب کشور، پنجرهٔ ثبت دلیل باز می‌شود و درخواست به سازمان ملل برای بررسی می‌رود. پس از تأیید، دو کشور در حالت آزمایشی ۳۰ ثانیه فرصت دارند با رأی دوطرفهٔ «صلح» از جنگ جلوگیری کنند.</p></div>
             <input id="war-search" class="war-search" type="search" placeholder="جستجوی کشور...">
             <div id="war-target-list" class="war-target-list"></div>
             <div class="wf-section"><span>جنگ‌های جاری</span></div>
@@ -755,7 +757,7 @@
             <div class="admin-economy-shortcuts"><h4>دسترسی سریع</h4><button type="button" id="admin-jump-players">انتخاب یک بازیکن برای ویرایش جزئیات ←</button></div>
         </section>
         <section id="admin-panel-wars" class="admin-panel hidden">
-            <div class="admin-section-head"><div><span class="admin-section-kicker">UNITED NATIONS REVIEW</span><h3>بررسی درخواست‌های اعلان جنگ</h3><p>با بازکردن هر درخواست، دلیل کامل دیده می‌شود. با تأیید، اعلان برای کاربران همان دنیا فرستاده می‌شود و ۲۴ ساعت فرصت مذاکره آغاز می‌شود.</p></div><button type="button" id="admin-wars-refresh" class="admin-refresh-btn" aria-label="تازه‌سازی درخواست‌های جنگ">⟳</button></div>
+            <div class="admin-section-head"><div><span class="admin-section-kicker">UNITED NATIONS REVIEW</span><h3>بررسی درخواست‌های اعلان جنگ</h3><p>با بازکردن هر درخواست، دلیل کامل دیده می‌شود. با تأیید، اعلان برای کاربران همان دنیا فرستاده می‌شود و مهلت آزمایشی ۳۰ ثانیه‌ای آغاز می‌شود.</p></div><button type="button" id="admin-wars-refresh" class="admin-refresh-btn" aria-label="تازه‌سازی درخواست‌های جنگ">⟳</button></div>
             <div id="admin-war-list" class="admin-war-list"><div class="admin-empty">در حال دریافت درخواست‌ها…</div></div>
         </section>
         <section id="admin-panel-worlds" class="admin-panel hidden">
@@ -833,6 +835,6 @@
 
 </section>
 
-<script src="/app.js?v=20261010worldfix1"></script>
+<script src="/app.js?v=20261010warfix2"></script>
 </body>
 </html>
