@@ -662,7 +662,7 @@ def welfare_penalty_now(player):
 def welfare_bonus(player):
     return max(0.0, welfare_gross(player) - welfare_penalty_now(player))
 
-def compute_rates(player):
+def compute_rates(player, _occ=True):
     power_capacity = get_power_total(player)
     power_consumption = get_power_used(player)
     manpower_production = BASE_MANPOWER_PRODUCTION
@@ -717,10 +717,17 @@ def compute_rates(player):
             income += s["income"]
             strait_income += s["income"]
 
-    for target_country, occupier in occupied_countries.items():
-        if occupier == country:
-            income += 500_000
-            occupation_income += 500_000
+    # کشور اشغال‌شده: ۳۰٪ درآمد روزانه و ۳۰٪ تولید نیروی انسانی آن به اشغالگر می‌رسد.
+    if _occ:
+        for target_country, occupier in occupied_countries.items():
+            if occupier != country: continue
+            _, dp = get_player_by_country(target_country)
+            if not dp: continue
+            dr = compute_rates(dp, _occ=False)
+            share = int(max(0, dr["base_income"] + dr["economy_income"]) * 0.30)
+            income += share
+            occupation_income += share
+            manpower_production += int(dr["manpower_production"] * 0.30)
 
     # پاداش رفاه روی درآمد کل روزانه اعمال می‌شود تا در خزانه و آمار روزانه دیده شود.
     income_before_welfare = income
@@ -768,6 +775,28 @@ def compute_rates(player):
             "manpower_production": manpower_production,
             "resource_production": resource_production,
             "resource_consumption": resource_consumption}
+
+def occupy_country(attacker_cid, defender_cid, resolve_wars=True):
+    """سقوط پایتخت: کشور اشغال می‌شود و تمام تنگه/سکو/معدن‌هایش به اشغالگر می‌رسد."""
+    occupied_countries[defender_cid] = attacker_cid
+    for k, owner in list(map_holdings.items()):
+        if owner == defender_cid: map_holdings[k] = attacker_cid
+    for k, owner in list(strait_holdings.items()):
+        if owner == defender_cid:
+            strait_holdings[k] = attacker_cid
+            reset_strait_policy(k)
+    for k in list(site_forces):
+        if site_owner(k) != site_forces[k].get("owner"): del site_forces[k]
+    _, dfd = get_player_by_country(defender_cid)
+    if dfd: dfd["is_eliminated"] = True
+    for t in list(transits):
+        if t.get("owner") == defender_cid and t in transits: transits.remove(t)
+    if resolve_wars:
+        for w in list(active_wars.values()):
+            if {w.get("attacker"), w.get("defender")} == {attacker_cid, defender_cid}:
+                w["resolved"] = True
+    push_news("اشغال کشور", f"{cname(attacker_cid)} با سقوط پایتخت، کشور {cname(defender_cid)} را اشغال کرد.")
+    push_war("occupy", f"پایتخت {cname(defender_cid)} سقوط کرد و کل کشور به اشغال {cname(attacker_cid)} درآمد؛ تمام تنگه‌ها، سکوها و معادن آن به {cname(attacker_cid)} رسید.", [attacker_cid, defender_cid])
 
 def accrue_player(player):
     if not player.get("started_at") or player.get("is_eliminated"): return
@@ -2424,6 +2453,7 @@ def resolve_ground_arrival_battle(t):
                   f"و {units_count(survivors):,} باقی ماند؛ مدافع {defender_before-defender_after:,} یگان از دست داد "
                   f"و {defender_after:,} نیروی زمینی باقی دارد. قدرت حمله {int(atk)} در برابر دفاع {int(dfn)}.")
         winner = "attacker"
+        occupy_country(cid, target)
     else:
         defender_before = units_count(defender_ground)
         force_before = units_count(force)
@@ -2600,7 +2630,7 @@ def _start_route_battle(a, b, now, position):
     sea_battle = has_naval_units(a.get("units")) and has_naval_units(b.get("units"))
     front = "naval" if sea_battle else "land"
     for t in (a, b):
-        resume = {k: t.get(k) for k in ("from", "to", "from_ll", "to_ll", "start", "arrive", "kind", "dst_free", "origin", "passage", "route_final_dst", "route_remaining_straits")}
+        resume = {k: t.get(k) for k in ("from", "to", "from_ll", "to_ll", "start", "arrive", "kind", "dst_free", "origin", "passage", "route_final_dst", "route_remaining_straits", "full_path", "leg")}
         t["route_battle"] = {"id": bid, "front": front, "started_at": start, "ends_at": end, "position": list(position), "resume": resume}
         t["from"] = "mid"; t["to"] = "mid"; t["from_ll"] = list(position); t["to_ll"] = list(position)
         t["start"] = start; t["arrive"] = end
