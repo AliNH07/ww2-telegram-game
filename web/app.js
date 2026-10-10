@@ -4362,7 +4362,8 @@ function updateMapRoutes() {
     mapRoutesSvg.selectAll(".map-route").each(function (d) {
         const f = Math.max(0, Math.min(1, (now - Date.parse(d.start)) / Math.max(1, Date.parse(d.arrive) - Date.parse(d.start))));
         const line = d3.select(this).select(".map-route-line");
-        line.attr("d", pathGen({ type: "LineString", coordinates: [d.from_ll, d.to_ll] }) || "");
+        const poly = (Array.isArray(d.path) && d.path.length > 2 && !d.battle) ? d.path : [d.from_ll, d.to_ll];
+        line.attr("d", pathGen({ type: "LineString", coordinates: poly }) || "");
         if (d.pathOffset && mapProjection) {
             const pa = mapProjection(d.from_ll), pb = mapProjection(d.to_ll);
             if (pa && pb && Number.isFinite(pa[0]) && Number.isFinite(pb[0])) {
@@ -4372,7 +4373,9 @@ function updateMapRoutes() {
         } else line.attr("transform", null);
         const pos = d.battle && Array.isArray(d.battle_ll) && d.battle_ll.length === 2
             ? d.battle_ll
-            : d3.geoInterpolate(d.from_ll, d.to_ll)(f);
+            : (poly.length > 2 && d.path[d.leg] && d.path[d.leg + 1]
+                ? d3.geoInterpolate(d.path[d.leg], d.path[d.leg + 1])(f)
+                : d3.geoInterpolate(d.from_ll, d.to_ll)(f));
         const p = viewCos(pos[0], pos[1], rot) > 0.02 ? mapProjection(pos) : null;
         const head = d3.select(this).select(".map-route-head");
         if (p) head.attr("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)})`).style("display", "");
@@ -4403,9 +4406,30 @@ async function loadMapSites() {
     if (!Array.isArray(mapSites)) mapSites = [];
 }
 
+const MAP_CAPITALS = {
+    germany: [13.40, 52.52], britain: [-0.13, 51.51], ussr: [37.62, 55.75], usa: [-77.04, 38.90],
+    france: [2.35, 48.86], italy: [12.50, 41.90], china: [116.40, 39.90], japan: [139.69, 35.69]
+};
+const MAP_PORTS = {
+    germany: [8.15, 53.53], britain: [-1.10, 50.80], ussr: [30.20, 59.93], usa: [-76.30, 36.90],
+    france: [-4.49, 48.39], italy: [14.27, 40.85], china: [121.50, 31.23], japan: [139.65, 35.45]
+};
 function renderMapSites() {
     if (!mapSitesSvg) return;
     mapSitesSvg.selectAll("*").remove();
+    const marks = [];
+    Object.keys(MAP_CAPITALS).forEach(c => {
+        marks.push({ c, kind: "capital", lon: MAP_CAPITALS[c][0], lat: MAP_CAPITALS[c][1] });
+        marks.push({ c, kind: "port", lon: MAP_PORTS[c][0], lat: MAP_PORTS[c][1] });
+    });
+    const mg = mapSitesSvg.selectAll(".map-mark").data(marks).enter().append("g")
+        .attr("class", d => "map-mark map-mark-" + d.kind).style("display", "none")
+        .style("pointer-events", "none");
+    mg.each(function (d) {
+        const s = d3.select(this);
+        if (d.kind === "capital") s.append("path").attr("d", "M0,-3.2L0.9,-1L3.2,-1L1.4,0.5L2,2.8L0,1.5L-2,2.8L-1.4,0.5L-3.2,-1L-0.9,-1Z").attr("fill", "#ffd54a").attr("stroke", "#222").attr("stroke-width", 0.4);
+        else s.append("text").attr("text-anchor", "middle").attr("dominant-baseline", "central").attr("font-size", 4.6).text("⚓");
+    });
     const g = mapSitesSvg.selectAll(".map-site").data(mapSites).enter().append("g")
         .attr("class", d => `map-site map-site-${d.kind === "strait" ? "strait" : d.type}` +
             (!d.owner ? " site-free" : d.owner === selectedCountry ? " site-mine" : " site-other"))
@@ -4434,6 +4458,12 @@ function updateMapSitePositions() {
     // با دورشدن کوچک می‌شوند تا روی کشورهای کوچک نیفتند؛ با نزدیک‌شدن کمی بزرگ‌تر
     const kBig = Math.max(0.32, Math.min(1.5, 0.6 * Math.pow(zoom, 0.6)));   // نفت و تنگه
     const kSmall = kBig * 0.8;                                                // معدن و غذا
+    const kMark = Math.max(0.5, Math.min(1.1, 0.7 * Math.pow(zoom, 0.5)));
+    mapSitesSvg.selectAll(".map-mark").each(function (d) {
+        const p = viewCos(d.lon, d.lat, rot) > 0.02 ? mapProjection([d.lon, d.lat]) : null;
+        if (p) { this.setAttribute("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)}) scale(${kMark.toFixed(2)})`); this.style.display = ""; }
+        else this.style.display = "none";
+    });
     mapSitesSvg.selectAll(".map-site").each(function (d) {
         const k = ((d.kind === "strait" || d.type === "oil") ? kBig : kSmall).toFixed(2);
         const p = viewCos(d.lon, d.lat, rot) > 0.02 ? mapProjection([d.lon, d.lat]) : null;
