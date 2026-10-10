@@ -856,7 +856,56 @@ def create_player(user_id):
             "manpower": STARTING_MANPOWER, "infra_levels": {},
             "units": {uid_: 0 for uid_ in ARMY_UNITS}, "resources": dict(STARTING_RESOURCES),
             "map_holdings": {}, "strait_holdings": {}, "announcements": {}, "land_trade_open": True,
-            "is_eliminated": False, "started_at": None, "last_update": None}
+            "is_eliminated": False, "started_at": None, "last_update": None,
+            "telegram_first_name": "", "telegram_last_name": "", "telegram_username": "",
+            "telegram_language_code": "", "last_seen_at": None}
+
+# تاریخچهٔ محدود عملیات مدیریتی برای عیب‌یابی و پیگیری تغییرات
+admin_audit = []
+
+def log_admin_action(action, target_uid=None, detail=""):
+    row = {"at": utcnow().isoformat(), "action": str(action)[:100],
+           "target_user_id": int(target_uid) if target_uid is not None else None,
+           "detail": str(detail)[:500], "admin_id": ADMIN_ID}
+    admin_audit.append(row)
+    if len(admin_audit) > 250:
+        del admin_audit[:-250]
+
+def remember_telegram_user(user):
+    """Persist Telegram display name/username from a verified WebApp user or /start."""
+    if not user:
+        return None
+    if isinstance(user, dict):
+        getv = lambda key: user.get(key)
+    else:
+        getv = lambda key: getattr(user, key, None)
+    try:
+        uid = int(getv("id"))
+    except (TypeError, ValueError):
+        return None
+    created = uid not in players
+    if created:
+        players[uid] = create_player(uid)
+    p = players[uid]
+    changed = created
+    for field, incoming in (
+        ("telegram_first_name", getv("first_name")),
+        ("telegram_last_name", getv("last_name")),
+        ("telegram_username", getv("username")),
+        ("telegram_language_code", getv("language_code")),
+    ):
+        value = str(incoming or "").strip()[:128]
+        if p.get(field, "") != value:
+            p[field] = value
+            changed = True
+    now = utcnow()
+    last_seen = parse_dt(p.get("last_seen_at")) if p.get("last_seen_at") else None
+    if not last_seen or (now - last_seen).total_seconds() >= 300:
+        p["last_seen_at"] = now.isoformat()
+        changed = True
+    if changed:
+        save_state()
+    return uid
 
 def get_player_by_country(country_id):
     for uid_, p in players.items():
@@ -899,7 +948,7 @@ def save_state():
                  "news_feed": news_feed[-200:],
                  "straits_data": STRAITS_DATA,
                  "transits": transits, "site_forces": site_forces, "war_events": war_events[-300:], "war_history": war_history[-300:],
-                 "loans": loans}
+                 "loans": loans, "admin_audit": admin_audit[-250:]}
         tmp = STATE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False)
@@ -911,7 +960,7 @@ def load_state():
     global diplomacy_proposals, active_treaties, map_holdings, strait_holdings
     global occupied_countries, war_declarations, active_wars, war_reports
     global announcements, unions, private_messages, pm_read, market_listings, news_feed
-    global site_forces, war_events, war_history, loans, transits
+    global site_forces, war_events, war_history, loans, transits, admin_audit
     if not os.path.exists(STATE_FILE):
         logging.info("No state, fresh start."); return
     try:
@@ -943,6 +992,7 @@ def load_state():
         war_history = state.get("war_history", [])
         transits = state.get("transits", [])
         loans = state.get("loans", {})
+        admin_audit = state.get("admin_audit", [])[-250:]
         logging.info("State loaded: %d players", len(players))
     except Exception as e:
         logging.error("load_state failed: %s", e)
@@ -975,7 +1025,7 @@ def get_auth_user_id(request):
     if init_data:
         user = verify_init_data(init_data)
         if user and user.get("id"):
-            return int(user["id"])
+            return remember_telegram_user(user)
     if not AUTH_REQUIRED:
         uid = request.query.get("user_id")
         if uid:
@@ -1034,8 +1084,7 @@ bot.session.middleware(GameEntryButtonMiddleware())
 @dp.message(Command("start"))
 async def start_command(message: types.Message):
     user_id = message.from_user.id
-    if user_id not in players:
-        players[user_id] = create_player(user_id); save_state()
+    remember_telegram_user(message.from_user)
     kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="🌍 ورود به بازی", web_app=WebAppInfo(url=WEB_APP_URL))]])
     if players[user_id]["country"]:
@@ -3364,7 +3413,7 @@ def _strict_telegram_uid(request):
     init_data = request.headers.get("X-Telegram-Init-Data", "")
     user = verify_init_data(init_data)
     try:
-        return int(user["id"]) if user and user.get("id") else None
+        return remember_telegram_user(user) if user and user.get("id") else None
     except (TypeError, ValueError, KeyError):
         return None
 
@@ -3386,6 +3435,13 @@ def _admin_player_row(uid, p):
         "user_id": int(uid), "country": cid,
         "country_name": COUNTRIES.get(cid, {}).get("name", "بدون کشور"),
         "country_flag": COUNTRIES.get(cid, {}).get("flag", "🌐"),
+        "telegram_first_name": str(p.get("telegram_first_name", "") or ""),
+        "telegram_last_name": str(p.get("telegram_last_name", "") or ""),
+        "telegram_name": " ".join(x for x in [str(p.get("telegram_first_name", "") or "").strip(), str(p.get("telegram_last_name", "") or "").strip()] if x),
+        "telegram_username": str(p.get("telegram_username", "") or ""),
+        "telegram_language_code": str(p.get("telegram_language_code", "") or ""),
+        "last_seen_at": p.get("last_seen_at"),
+        "started_at": p.get("started_at"),
         "money": int(p.get("money", 0) or 0), "manpower": int(p.get("manpower", 0) or 0),
         "resources": {k: int((p.get("resources") or {}).get(k, 0) or 0) for k in RESOURCE_NAMES},
         "daily_income": int(round(rates.get("net_income", 0) or 0)),
@@ -3412,8 +3468,21 @@ async def admin_overview(request):
     for item in list(reversed(news_feed[-15:])):
         recent.append({"title": str(item.get("title", "خبر")), "text": str(item.get("text", "")),
                        "at": item.get("at", ""), "category": item.get("category", "general")})
+    now = utcnow()
+    active_cutoff = now - timedelta(minutes=15)
+    active_count = 0
+    for row in rows:
+        seen = parse_dt(row.get("last_seen_at")) if row.get("last_seen_at") else None
+        if seen and seen >= active_cutoff:
+            active_count += 1
     return web.json_response({"success": True, "players": rows, "countries_taken": taken,
-                              "total_money": total_money, "recent_news": recent})
+                              "total_money": total_money,
+                              "total_daily_income": sum(int(r.get("daily_income", 0) or 0) for r in rows),
+                              "vip_count": sum(1 for r in rows if r.get("vip")),
+                              "eliminated_count": sum(1 for r in rows if r.get("is_eliminated")),
+                              "countryless_count": sum(1 for r in rows if not r.get("country")),
+                              "active_count": active_count,
+                              "recent_news": recent, "admin_audit": list(reversed(admin_audit[-60:]))})
 
 
 async def admin_update_player(request):
@@ -3451,10 +3520,101 @@ async def admin_update_player(request):
         p[field] = value
     else:
         return web.json_response({"success": False, "message": "این نوع تغییر مجاز نیست."}, status=400)
+    log_admin_action("ویرایش بازیکن", target_uid, f"field={field}; value={value}")
     save_state()
     logging.info("ADMIN %s updated player=%s field=%s", ADMIN_ID, target_uid, field)
     return web.json_response({"success": True, "message": "تغییرات بازیکن ذخیره شد.", "player": _admin_player_row(target_uid, p)})
 
+
+async def admin_player_adjust(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    try:
+        target_uid = int(data.get("user_id")); amount = int(data.get("amount"))
+    except (TypeError, ValueError):
+        return web.json_response({"success": False, "message": "شناسه و مقدار معتبر وارد کن."}, status=400)
+    field = str(data.get("field", ""))
+    operation = str(data.get("operation", "add"))
+    if field not in {"money", "manpower", "food", "steel", "uranium", "oil"}:
+        return web.json_response({"success": False, "message": "منبع انتخاب‌شده معتبر نیست."}, status=400)
+    if amount <= 0 or amount > 1_000_000_000_000_000 or operation not in {"add", "subtract"}:
+        return web.json_response({"success": False, "message": "مقدار یا نوع عملیات معتبر نیست."}, status=400)
+    p = players.get(target_uid)
+    if not p:
+        return web.json_response({"success": False, "message": "بازیکن پیدا نشد."}, status=404)
+    if field == "money":
+        accrue_player(p)
+        current = int(p.get("money", 0) or 0)
+        next_value = current + amount if operation == "add" else current - amount
+        if next_value < 0: return web.json_response({"success": False, "message": "خزانه برای این کسر کافی نیست."}, status=409)
+        p["money"] = next_value
+    elif field == "manpower":
+        current = int(p.get("manpower", 0) or 0)
+        next_value = current + amount if operation == "add" else current - amount
+        if next_value < 0: return web.json_response({"success": False, "message": "نیروی انسانی برای این کسر کافی نیست."}, status=409)
+        p["manpower"] = next_value
+    else:
+        ensure_player_fields(p)
+        resources = p.setdefault("resources", {})
+        current = int(resources.get(field, 0) or 0)
+        next_value = current + amount if operation == "add" else current - amount
+        if next_value < 0: return web.json_response({"success": False, "message": "موجودی منبع برای این کسر کافی نیست."}, status=409)
+        resources[field] = next_value
+    log_admin_action("تغییر سریع موجودی", target_uid, f"{field} {operation} {amount}; new={next_value}")
+    save_state()
+    return web.json_response({"success": True, "message": "موجودی با موفقیت به‌روزرسانی شد.", "player": _admin_player_row(target_uid, p)})
+
+async def admin_player_message(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    try: target_uid = int(data.get("user_id"))
+    except (TypeError, ValueError): return web.json_response({"success": False, "message": "شناسهٔ بازیکن نامعتبر است."}, status=400)
+    message_text = str(data.get("text", "")).strip()[:1200]
+    if not message_text: return web.json_response({"success": False, "message": "متن پیام را بنویس."}, status=400)
+    if target_uid not in players: return web.json_response({"success": False, "message": "بازیکن پیدا نشد."}, status=404)
+    p = players[target_uid]
+    display_name = " ".join(x for x in [str(p.get("telegram_first_name", "") or "").strip(), str(p.get("telegram_last_name", "") or "").strip()] if x)
+    try:
+        await bot.send_message(chat_id=target_uid, text=f"✉️ پیام مدیریت FRONT-LINE 1993\n\n{message_text}")
+    except Exception as exc:
+        log_admin_action("ارسال پیام ناموفق", target_uid, str(exc))
+        save_state()
+        return web.json_response({"success": False, "message": "ارسال پیام ناموفق بود؛ ممکن است کاربر ربات را مسدود کرده باشد."}, status=502)
+    log_admin_action("ارسال پیام مستقیم", target_uid, message_text[:300])
+    save_state()
+    return web.json_response({"success": True, "message": f"پیام برای {display_name or target_uid} ارسال شد."})
+
+async def admin_bulk_adjust(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    field = str(data.get("field", "")); operation = str(data.get("operation", "add"))
+    scope = str(data.get("scope", "all")); target_country = str(data.get("country", ""))
+    try: amount = int(data.get("amount"))
+    except (TypeError, ValueError): return web.json_response({"success": False, "message": "مقدار عددی معتبر وارد کن."}, status=400)
+    if field not in {"money", "manpower", "food", "steel", "uranium", "oil"} or operation not in {"add", "subtract"}:
+        return web.json_response({"success": False, "message": "نوع عملیات یا منبع معتبر نیست."}, status=400)
+    if amount <= 0 or amount > 1_000_000_000_000:
+        return web.json_response({"success": False, "message": "مقدار باید مثبت و کمتر از سقف مجاز باشد."}, status=400)
+    if scope == "country" and target_country not in COUNTRIES:
+        return web.json_response({"success": False, "message": "کشور انتخاب‌شده معتبر نیست."}, status=400)
+    targets = [(uid, p) for uid, p in players.items() if scope == "all" or p.get("country") == target_country]
+    changed = skipped = 0
+    for uid, p in targets:
+        if field == "money":
+            accrue_player(p)
+        bucket = p.setdefault("resources", {}) if field in RESOURCE_NAMES else p
+        key = field if field in RESOURCE_NAMES else field
+        current = int(bucket.get(key, 0) or 0)
+        value = current + amount if operation == "add" else current - amount
+        if value < 0:
+            skipped += 1; continue
+        bucket[key] = value; changed += 1
+    log_admin_action("تغییر گروهی موجودی", None, f"scope={scope}:{target_country}; field={field}; operation={operation}; amount={amount}; changed={changed}; skipped={skipped}")
+    save_state()
+    return web.json_response({"success": True, "message": "تغییر گروهی انجام شد.", "changed": changed, "skipped": skipped})
 
 async def admin_broadcast(request):
     denied = _admin_denied(request)
@@ -3465,6 +3625,7 @@ async def admin_broadcast(request):
     if not title or not body:
         return web.json_response({"success": False, "message": "عنوان و متن خبر الزامی است."}, status=400)
     push_news(title, body, "info")
+    log_admin_action("ارسال خبر عمومی", None, f"{title}: {body[:250]}")
     save_state()
     sent = failed = 0
     for uid in list(players.keys()):
@@ -3527,7 +3688,8 @@ async def create_web_app():
         ("/api/loans/propose", propose_loan), ("/api/loans/respond", respond_loan),
         ("/api/loans/cancel", cancel_loan), ("/api/loans/repay", repay_loan),
         ("/api/border/settings", set_border_settings), ("/api/admin/player/update", admin_update_player),
-        ("/api/admin/broadcast", admin_broadcast)]:
+        ("/api/admin/player/adjust", admin_player_adjust), ("/api/admin/player/message", admin_player_message),
+        ("/api/admin/bulk-adjust", admin_bulk_adjust), ("/api/admin/broadcast", admin_broadcast)]:
         app.router.add_post(path, h)
 
     app.router.add_route("OPTIONS", "/{tail:.*}", lambda r: web.Response())
