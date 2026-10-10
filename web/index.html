@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261010warlogistics6">
+<link rel="stylesheet" href="/style.css?v=20261010season31">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -88,6 +88,14 @@
     </div>
 </section>
 
+<section id="registration-closed" class="screen world-select-screen hidden">
+    <div class="world-select-shell">
+        <div class="world-select-heading"><span class="world-select-kicker">FRONT-LINE · REGISTRATION</span><h1>ثبت‌نام بسته است</h1>
+            <p id="registration-closed-message">فرمانده هنوز ثبت‌نام این دنیا را باز نکرده است یا بازی در جریان است. ورود به کشور جدید فقط پس از بازگشایی ثبت‌نام امکان‌پذیر است.</p></div>
+        <button type="button" id="registration-back-worlds" class="registration-back-button">بازگشت به انتخاب دنیا</button>
+    </div>
+</section>
+
 <!-- ==================== بازی ==================== -->
 <section id="game" class="screen hidden">
 
@@ -107,6 +115,8 @@
         </div>
     </header>
 
+    <div id="season-gate-banner" class="season-gate-banner hidden" role="status" aria-live="polite"></div>
+
     <div id="game-menu-panel" class="game-menu-panel hidden" role="menu" aria-label="منوی بازی">
         <button type="button" class="game-menu-item" data-menu-page="home">🏠 <span>خانه</span></button>
         <button type="button" class="game-menu-item" data-menu-page="map">🗺️ <span>نقشه</span></button>
@@ -124,13 +134,15 @@
         <!-- ==================== راهنمای شروع ==================== -->
     <div id="guide-modal" class="guide-modal hidden" role="dialog" aria-modal="true" aria-label="راهنمای بازی">
         <div class="guide-box">
-            <h2>شروع درست بازی</h2>
-            <p class="guide-sub">چهار قدم کوتاه تا یک کشور قوی</p>
+            <h2>راهنمای فصل ۳۱روزه</h2>
+            <p class="guide-sub">از شروع فرمانده تا تعیین برنده</p>
             <ol class="guide-steps">
-                <li><span>🏗️</span><div><b>همه‌چیز از زیرساخت شروع می‌شود</b><small>هر بخش بازی به زیرساخت نیاز دارد، پس اول سراغ آن برو.</small></div></li>
-                <li><span>⚡</span><div><b>اول از همه برق</b><small>هر ساخت‌وساز برق می‌خواهد؛ قبل از بقیه، برق کافی تأمین کن.</small></div></li>
-                <li><span>💰</span><div><b>بعد اقتصاد و ارتش</b><small>درآمد بساز، سپس یگان آموزش بده.</small></div></li>
-                <li><span>⚔️</span><div><b>در آخر جنگ و دیپلماسی</b><small>وقتی آماده شدی وارد میدان شو.</small></div></li>
+                <li><span>🚩</span><div><b>پیش از شروع فصل آماده شو</b><small>دنیا و کشور را انتخاب کن. تا وقتی فرمانده از پنل مدیریت «شروع فصل» را نزده، فقط پیام خصوصی با بازیکنان دیگر فعال است.</small></div></li>
+                <li><span>⚡</span><div><b>زیرساخت و برق را مدیریت کن</b><small>نیاز برق هر ساختمان را پیش از ساخت ببین؛ ظرفیت نیروگاه باید پاسخ‌گوی مصرف ساختمان‌ها باشد.</small></div></li>
+                <li><span>💰</span><div><b>اقتصاد، منابع و ارتش را متعادل کن</b><small>درآمد را افزایش بده، غذا و نفت را زیر نظر بگیر و قبل از آموزش یگان به هزینه، نیروی انسانی، منابع و ظرفیت نگهداری توجه کن.</small></div></li>
+                <li><span>🗺️</span><div><b>از نقشه برای گسترش قلمرو استفاده کن</b><small>برای حمله به کشور یا دارایی‌های متعلق به آن، ابتدا باید اعلان جنگ تأیید شود؛ سپس نیروها را از بخش جنگ روی نقشه اعزام کن.</small></div></li>
+                <li><span>🌦️</span><div><b>اثر فصل‌ها را در برنامه‌ات حساب کن</b><small>بهار: هیچ تغییر فصلی ندارد. تابستان: درآمد روزانه ۵٪ کمتر. پاییز: درآمد ۱۵٪ کمتر و مصرف غذا/نفت ۲۵٪ بیشتر. زمستان: درآمد ۳۰٪ کمتر، مصرف غذا/نفت ۵۰٪ بیشتر و تولید منابع و نیروی انسانی ۲۵٪ کمتر. اثر فصل جاری همیشه زیر هدر نمایش داده می‌شود.</small></div></li>
+                <li><span>🏆</span><div><b>روز ۳۱ بازی تمام می‌شود</b><small>در پایان ۳۱ روز، عملیات بسته و برنده بر اساس بالاترین امتیاز رتبه‌بندی کلی تعیین می‌شود. اقتصاد ۳۵٪، قدرت نظامی ۳۰٪، قلمرو ۲۰٪ و توسعه ۱۵٪ امتیاز نهایی را می‌سازند.</small></div></li>
             </ol>
             <button type="button" id="guide-close" class="guide-btn">متوجه شدم</button>
             <p class="guide-foot">هر وقت خواستی: منوی ☰ ← راهنمای بازی</p>
@@ -196,13 +208,6 @@
                     <span class="action-icon"><img src="/images/stickers/war.jpg" alt=""></span>
                     <h3>جنگ</h3>
                 <p>نبرد و اعزام نیرو</p>
-                </span>
-            </button>
-            <button class="action-card action-diplomacy hm-card" data-section="diplomacy">
-                <span class="action-overlay">
-                    <span class="action-icon"><img src="/images/stickers/diplomacy.jpg" alt=""></span>
-                    <h3>دیپلماسی</h3>
-                <p>پیمان‌ها</p>
                 </span>
             </button>
             <button class="action-card action-economy hm-card" data-section="economy">
@@ -437,8 +442,8 @@
 
         <div id="war-targets-panel" class="war-panel hidden">
             <div class="war-intro"><h3>اعلان جنگ</h3>
-                <p>با انتخاب کشور، پنجرهٔ ثبت دلیل باز می‌شود و درخواست به سازمان ملل برای بررسی می‌رود. پس از تأیید، دو کشور در حالت آزمایشی ۳۰ ثانیه فرصت دارند با رأی دوطرفهٔ «صلح» از جنگ جلوگیری کنند؛ نبردهای مستقیم بین ۳۰ تا ۶۰ ثانیه طول می‌کشند.</p></div>
-            <div class="wf-section war-current-top"><span>جنگ‌های جاری</span><small>صلح و وضعیت نبرد</small></div>
+                <p>دلیل اعلان جنگ را بنویس و درخواست را برای بررسی مدیر بفرست. پس از تأیید، جنگ فوراً آغاز می‌شود. برای حمله به کشور اصلی یا مستعمره‌ها و دارایی‌های متعلق به کشور هدف، نیروها را از بخش نیروها روی نقشه اعزام کن؛ نتیجه با رسیدن نیروها و نبرد در محل محاسبه می‌شود.</p></div>
+            <div class="wf-section war-current-top"><span>جنگ‌های جاری</span><small>وضعیت اعلان جنگ و حرکت نیروها</small></div>
             <div id="war-active-list" class="war-active-list-top"></div>
             <input id="war-search" class="war-search" type="search" placeholder="جستجوی کشور...">
             <div id="war-target-list" class="war-target-list"></div>
@@ -464,36 +469,6 @@
         </div>
 
         <div id="war-sat-panel" class="war-panel hidden"><div id="war-sat-root"></div></div>
-    </main>
-
-    <!-- ==================== دیپلماسی ==================== -->
-    <main id="diplomacy" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">📜</span>دیپلماسی</span><button class="section-help-button" id="diplomacy-help-btn" aria-label="راهنمای دیپلماسی" title="راهنما">؟</button><span class="sb-money">$0</span></div>
-
-        <div class="diplomacy-form">
-            <label class="diplomacy-label">کشور مقصد</label>
-            <select id="diplomacy-target" class="diplomacy-select"></select>
-
-            <label class="diplomacy-label">نوع پیمان</label>
-            <select id="diplomacy-type" class="diplomacy-select">
-                <option value="alliance">پیمان اتحاد</option>
-                <option value="non_aggression">پیمان عدم تجاوز</option>
-            </select>
-
-            <label class="diplomacy-label">مدت پیمان (روز)</label>
-            <input id="diplomacy-duration" class="diplomacy-input" type="number" value="10" min="1" max="30">
-
-            <button id="diplomacy-propose-button" class="diplomacy-submit">ارسال پیشنهاد</button>
-        </div>
-
-        <div class="diplomacy-list-title">پیشنهادهای دریافتی</div>
-        <div id="diplomacy-received" class="diplomacy-list"></div>
-
-        <div class="diplomacy-list-title">پیمان‌های فعال</div>
-        <div id="diplomacy-treaties" class="diplomacy-list"></div>
-
-        <div class="diplomacy-list-title">پیشنهادهای ارسال‌شده</div>
-        <div id="diplomacy-sent" class="diplomacy-list"></div>
     </main>
 
     <!-- ==================== نقشه ==================== -->
@@ -570,7 +545,6 @@
             <div id="news-filter-tabs" class="news-filter-tabs" role="tablist" aria-label="دسته‌بندی اخبار">
                 <button class="news-filter active" data-news-filter="all">همه</button>
                 <button class="news-filter" data-news-filter="military">نظامی</button>
-                <button class="news-filter" data-news-filter="diplomacy">دیپلماسی</button>
                 <button class="news-filter" data-news-filter="economy">اقتصاد</button>
                 <button class="news-filter" data-news-filter="trade">تجارت</button>
                 <button class="news-filter" data-news-filter="territory">قلمرو</button>
@@ -755,7 +729,7 @@
             <div class="admin-economy-shortcuts"><h4>دسترسی سریع</h4><button type="button" id="admin-jump-players">انتخاب یک بازیکن برای ویرایش جزئیات ←</button></div>
         </section>
         <section id="admin-panel-wars" class="admin-panel hidden">
-            <div class="admin-section-head"><div><span class="admin-section-kicker">UNITED NATIONS REVIEW</span><h3>بررسی درخواست‌های اعلان جنگ</h3><p>با بازکردن هر درخواست، دلیل کامل دیده می‌شود. با تأیید، اعلان برای کاربران همان دنیا فرستاده می‌شود و ۲۴ ساعت فرصت مذاکره آغاز می‌شود.</p></div><button type="button" id="admin-wars-refresh" class="admin-refresh-btn" aria-label="تازه‌سازی درخواست‌های جنگ">⟳</button></div>
+            <div class="admin-section-head"><div><span class="admin-section-kicker">UNITED NATIONS REVIEW</span><h3>بررسی درخواست‌های اعلان جنگ</h3><p>با بازکردن هر درخواست، دلیل کامل دیده می‌شود. با تأیید، جنگ بلافاصله آغاز و به بازیکنان همان دنیا اطلاع داده می‌شود.</p></div><button type="button" id="admin-wars-refresh" class="admin-refresh-btn" aria-label="تازه‌سازی درخواست‌های جنگ">⟳</button></div>
             <div id="admin-war-list" class="admin-war-list"><div class="admin-empty">در حال دریافت درخواست‌ها…</div></div>
         </section>
         <section id="admin-panel-worlds" class="admin-panel hidden">
