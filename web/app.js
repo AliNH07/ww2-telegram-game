@@ -25,9 +25,6 @@ let availableWorlds = [];
 let adminWarsCache = [];
 let adminWorldsCache = [];
 let adminAutoRefreshTimer = null;
-let activeWarTargets = [];
-let warStatusPollTimer = null;
-let warStatusRefreshTimer = null;
 
 let player = null;
 let countries = {};
@@ -178,7 +175,6 @@ function showGamePage(id) {
     if (t) { t.classList.remove("hidden"); t.scrollTop = 0; }
     const header = document.querySelector("#game .game-header");
     if (header) header.style.transform = "translate3d(0, 0, 0)";
-    if (id === "army" || id === "war") refreshWarStatusBanners();
 }
 
 function formatMoney(v) { return "$" + Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
@@ -363,17 +359,10 @@ function startStatsPolling() {
         refreshNotificationBadge();
         refreshHeaderRank();
     }, 30000);
-    if (warStatusRefreshTimer) clearInterval(warStatusRefreshTimer);
-    warStatusRefreshTimer = setInterval(() => {
-        const warVisible = !document.getElementById("war")?.classList.contains("hidden");
-        const armyVisible = !document.getElementById("army")?.classList.contains("hidden");
-        if (warVisible || armyVisible) refreshWarStatusBanners();
-    }, 5000);
 }
 function stopStatsPolling() {
     if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
     if (fastPlayerInterval) { clearInterval(fastPlayerInterval); fastPlayerInterval = null; }
-    if (warStatusRefreshTimer) { clearInterval(warStatusRefreshTimer); warStatusRefreshTimer = null; }
 }
 
 async function loadCountries() {
@@ -1629,7 +1618,7 @@ let currentWarTab = "war-forces-panel";
 
 const sumVals = o => Object.values(o || {}).reduce((a, b) => a + b, 0);
 const unitName = id => ARMY_UNITS[id]?.name || id;
-function siteIcon(s) { return s.kind === "strait" ? "⚓" : s.kind === "country" ? "🏴" : (RESOURCE_ICONS[s.type] || "📍"); }
+function siteIcon(s) { return s.kind === "strait" || s.kind === "port" ? "⚓" : s.kind === "front" ? "🪖" : (RESOURCE_ICONS[s.type] || "📍"); }
 function unitChips(units) {
     return Object.entries(units || {}).filter(([, n]) => n > 0)
         .map(([k, n]) => `<span class="wf-chip">${unitName(k)} <b>${formatNumber(n)}</b></span>`).join("");
@@ -1644,13 +1633,10 @@ function timeAgo(iso) {
 function timeLeft(iso) {
     const ms = new Date(iso).getTime() - Date.now();
     if (ms <= 0) return "منقضی شد";
-    const seconds = Math.ceil(ms / 1000);
-    if (seconds < 60) return `${formatNumber(seconds)} ثانیه مانده`;
-    const m = Math.floor(seconds / 60), h = Math.floor(m / 60);
+    const m = Math.floor(ms / 60000), h = Math.floor(m / 60);
     return h > 0 ? `${formatNumber(h)} ساعت و ${formatNumber(m % 60)} دقیقه مانده` : `${formatNumber(m)} دقیقه مانده`;
 }
 function siteLabel(id) {
-    if (typeof id === "string" && id.startsWith("country:")) return `پایتخت ${COUNTRY_NAMES[id.slice(8)] || id.slice(8)}`;
     return (typeof mapSites !== "undefined" ? mapSites.find(s => s.id === id) : null)?.name
         || warSites.find(s => s.id === id)?.name || warForces.sites.find(s => s.id === id)?.name || id;
 }
@@ -1669,14 +1655,8 @@ function showWarTab(id) {
     document.querySelectorAll(".war-tab").forEach(t => t.classList.toggle("active", t.dataset.warTab === id));
     document.querySelectorAll(".war-panel").forEach(p => p.classList.toggle("hidden", p.id !== id));
     clearInterval(satTimer); satTimer = null;
-    clearInterval(warStatusPollTimer); warStatusPollTimer = null;
     if (id === "war-forces-panel") loadForces();
-    else if (id === "war-targets-panel") {
-        renderWarTargets(); loadWarData();
-        warStatusPollTimer = setInterval(() => {
-            if (currentWarTab === "war-targets-panel" && !document.getElementById("war")?.classList.contains("hidden")) loadWarData();
-        }, 1000);
-    }
+    else if (id === "war-targets-panel") { renderWarTargets(); loadWarData(); }
     else if (id === "war-news-panel" || id === "war-history-panel") loadWarLog();
     else if (id === "war-sat-panel") {
         renderSatTab();
@@ -1707,40 +1687,22 @@ async function openWarPage(opts = {}) {
 }
 function openDispatchTo(siteId) { openWarPage({ dispatchTo: siteId }); }
 
-/* ---------- وضعیت جنگ دو کشور ---------- */
-function applyWarStatusData(data) {
-    if (!data) return;
-    const active = selectedCountry ? (data.active || []).filter(w => w.status === "battle" && !w.resolved && [w.attacker, w.defender].includes(selectedCountry)) : [];
-    activeWarTargets = active.map(w => ({ ...w, target: w.attacker === selectedCountry ? w.defender : w.attacker }));
-    const html = active.length ? active.map(w => {
-        const enemy = w.attacker === selectedCountry ? w.defender : w.attacker;
-        return `<span>🔴 در جنگ با ${escapeHtml(COUNTRY_NAMES[enemy] || enemy)}</span>`;
-    }).join("") : "";
-    ["army-war-status", "war-war-status"].forEach(id => {
-        const banner = document.getElementById(id); if (!banner) return;
-        banner.innerHTML = html; banner.classList.toggle("hidden", !html);
-    });
-}
-async function refreshWarStatusBanners() {
-    try { applyWarStatusData(await apiGet("/api/wars")); } catch (e) { /* status banner is non-blocking */ }
-}
-
 /* ---------- نیروها ---------- */
 async function loadForces() {
     try {
-        const [f, s, w] = await Promise.all([apiGet("/api/war/forces"), apiGet("/api/map-sites"), apiGet("/api/wars")]);
+        const [f, s] = await Promise.all([apiGet("/api/war/forces"), apiGet("/api/map-sites")]);
         if (f && f.home) { warForces = f; if (f.now) transitSkew = Date.parse(f.now) - Date.now(); }
-        const mapSites = Array.isArray(s) ? s : [];
-        const countryCapitals = (f?.sites || []).filter(site => site?.kind === "country");
-        const mapSiteIds = new Set(mapSites.map(site => site.id));
-        warSites = [...mapSites, ...countryCapitals.filter(site => !mapSiteIds.has(site.id))];
-        applyWarStatusData(w);
+        warSites = Array.isArray(s) ? s : [];
         if (player?.satellite_built) await loadScanState();
     } catch (e) { console.error(e); }
     renderForcesTab();
 }
 function poolOf(loc) { return loc === "home" ? warForces.home : (warForces.sites.find(s => s.id === loc)?.units || {}); }
-function locName(loc) { return loc === "home" ? "خانه" : siteLabel(loc); }
+function locName(loc) {
+    if (loc === "home") return "خانه";
+    if (typeof loc === "string" && loc.startsWith("country:")) return `بندر ${COUNTRY_NAMES[loc.split(":")[1]] || loc.split(":")[1]}`;
+    return siteLabel(loc);
+}
 const wfStat = (n, label) => `<div class="wf-stat"><b>${formatNumber(n)}</b><span>${label}</span></div>`;
 
 function locCardHtml(l) {
@@ -1748,11 +1710,12 @@ function locCardHtml(l) {
     const isHome = l.kind === "home";
     const ico = isHome ? flagInline(selectedCountry) : siteIcon(l);
     const title = isHome ? `خانه · ${COUNTRY_NAMES[selectedCountry] || ""}` : l.name;
-    const sub = isHome ? "خانه" : (l.kind === "strait" ? "تنگه" : l.kind === "country" ? "پایتخت اشغال‌شده" : "سکو / معدن");
+    const sub = isHome ? "خانه" : (l.kind === "strait" ? "تنگه" : l.kind === "front" ? "جبههٔ زمینی" : l.kind === "port" ? "بندر دریایی" : "سکو / معدن");
+    const locPower = Number(l.power ?? Object.entries(l.units || {}).reduce((sum, [k,n]) => sum + Number(n || 0) * Number(ARMY_UNITS[k]?.attack || 0), 0));
     return `<div class="wf-loc">
         <div class="wf-loc-top" data-toggle="${l.id}">
             <span class="wf-ico">${ico}</span>
-            <div class="wf-loc-name"><b>${title}</b><small>${sub}</small></div>
+            <div class="wf-loc-name"><b>${title}</b><small>${sub} · قدرت ${formatNumber(locPower)}</small></div>
             <div class="wf-loc-count"><b>${formatNumber(total)}</b> یگان <i>⌃</i></div>
         </div>
     </div>`;
@@ -1769,7 +1732,7 @@ function openLocSheet(id) {
     const total = sumVals(l.units);
     const ico = isHome ? flagInline(selectedCountry) : siteIcon(l);
     const title = isHome ? `خانه · ${COUNTRY_NAMES[selectedCountry] || ""}` : l.name;
-    const sub = isHome ? "خانه" : (l.kind === "strait" ? "تنگه" : l.kind === "country" ? "پایتخت اشغال‌شده" : "سکو / معدن");
+    const sub = isHome ? "خانه" : (l.kind === "strait" ? "تنگه" : l.kind === "front" ? "جبههٔ زمینی" : l.kind === "port" ? "بندر دریایی" : "سکو / معدن");
     const rows = Object.entries(l.units || {}).filter(([, n]) => n > 0)
         .map(([k, n]) => `<div class="is-row"><span>${unitName(k)}</span><b>${formatNumber(n)}</b></div>`).join("")
         || `<div class="gs-none">بدون نیرو</div>`;
@@ -1837,17 +1800,19 @@ function dispatchRuleErrors(units, zone) {
 
 function dispatchErrorsFor(from, to, picked) {
     if (!to || to === "home") return [];
-    const countryTarget = typeof to === "string" && to.startsWith("country:");
-    const dst = warSites.find(s => s.id === to);
-    const errs = [];
-    if (!countryTarget) {
-        const combined = { ...picked };
-        if (dst?.owner === selectedCountry) Object.entries(poolOf(to)).forEach(([k, v]) => combined[k] = (combined[k] || 0) + v);
-        errs.push(...dispatchRuleErrors(combined, dst?.zone || (dst?.kind === "strait" ? "sea" : "land")));
+    if (typeof to === "string" && to.startsWith("country:")) {
+        const errs = dispatchRuleErrors(picked, "sea");
+        const ground = (picked.infantry || 0) + (picked.tank || 0);
+        if (ground > 0 && !(picked.transport_ship > 0)) errs.push("برای انتقال پیاده‌نظام یا تانک تا بندر دشمن، ناو ترابری لازم است.");
+        if (!Object.keys(picked).some(k => (picked[k] || 0) > 0 && ARMY_UNITS[k]?.group === "naval")) errs.push("برای این مسیر دریایی باید ناو انتخاب کنی.");
+        return errs;
     }
-    if (from && from !== "home" && !(typeof from === "string" && from.startsWith("country:"))) {
-        const fromSite = warSites.find(s => s.id === from);
-        const zs = fromSite?.zone || (fromSite?.kind === "strait" ? "sea" : "land");
+    const dst = warSites.find(s => s.id === to);
+    const combined = { ...picked };
+    if (dst?.owner === selectedCountry) Object.entries(poolOf(to)).forEach(([k, v]) => combined[k] = (combined[k] || 0) + v);
+    const errs = dispatchRuleErrors(combined, dst?.zone || (dst?.kind === "strait" ? "sea" : "land"));
+    if (from && from !== "home") {
+        const zs = warSites.find(s => s.id === from)?.zone || (warSites.find(s => s.id === from)?.kind === "strait" ? "sea" : "land");
         const before = poolOf(from), after = {};
         Object.keys(before).forEach(k => after[k] = before[k] - (picked[k] || 0));
         if (!dispatchRuleErrors(before, zs).length && dispatchRuleErrors(after, zs).length)
@@ -1861,11 +1826,9 @@ function updateDpSummary() {
     if (!sum || !go) return;
     const { to } = dispatchSel, total = sumVals(dispatchSel.units);
     const dst = warSites.find(s => s.id === to);
-    const countryTarget = typeof to === "string" && to.startsWith("country:");
-    const targetCountry = countryTarget ? to.slice(8) : null;
     let kind;
     if (to === "home") kind = "🏠 بازگشت به خانه";
-    else if (countryTarget) kind = `⚔️ اعزام به کشور ${COUNTRY_NAMES[targetCountry] || targetCountry}؛ نیروهای دو طرف در صورت برخورد در مسیر می‌جنگند`;
+    else if (typeof to === "string" && to.startsWith("country:")) kind = `⚓ مسیر دریایی تا بندر ${COUNTRY_NAMES[to.split(":")[1]] || to.split(":")[1]}؛ کشتی‌ها در بندر می‌مانند و فقط نیروی زمینی با ترابری وارد کشور می‌شود`;
     else if (!dst?.owner) kind = "🚩 موضع بی‌صاحب است؛ اشغال می‌شود";
     else if (dst.owner === selectedCountry) kind = "🛡️ موضع خودی؛ نیروها تقویت می‌شوند";
     else {
@@ -1874,7 +1837,7 @@ function updateDpSummary() {
         if (sc?.owner) kind += ` · قدرت دفاعی اسکن‌شده: ${formatNumber(sc.power)}`;
     }
     const atk = Object.entries(dispatchSel.units).reduce((a, [k, n]) => a + n * (ARMY_UNITS[k]?.attack || 0), 0);
-    const hostile = !countryTarget && dst?.owner && dst.owner !== selectedCountry;
+    const hostile = dst?.owner && dst.owner !== selectedCountry;
     const picked = Object.fromEntries(Object.entries(dispatchSel.units).filter(([, v]) => v > 0));
     const errs = total > 0 ? dispatchErrorsFor(dispatchSel.from, to, picked) : [];
     sum.innerHTML = `<div>${kind}</div><div>${formatNumber(total)} یگان انتخاب شده${hostile ? ` · قدرت حمله ${formatNumber(atk)}` : ""}</div>`
@@ -1889,7 +1852,7 @@ function renderForcesTab() {
     const siteN = warForces.sites.reduce((a, s) => a + sumVals(s.units), 0);
     const locs = [{ id: "home", kind: "home", name: "خانه", units: warForces.home }, ...warForces.sites];
     const shown = locs.filter(l => forcesFilter === "all" || l.kind === forcesFilter);
-    const chips = [["all", "همه"], ["home", "خانه"], ["resource", "سکوها و معادن"], ["strait", "تنگه‌ها"]];
+    const chips = [["all", "همهٔ مواضع"], ["home", "خانه"], ["resource", "سکوها و معادن"], ["strait", "تنگه‌ها"], ["port", "بندرهای من"], ["front", "جبهه‌های من"]];
     root.innerHTML = `
         <div class="wf-stats">${wfStat(homeN, "در خانه")}${wfStat(siteN, `در ${formatNumber(warForces.sites.length)} موضع`)}${wfStat(homeN + siteN, "کل نیروها")}</div>
         ${transitsHtml()}
@@ -1933,8 +1896,9 @@ function transitsHtml() {
     if (!list.length) return "";
     return `<div class="wf-section"><span>در راه</span><small>${formatNumber(list.length)} گروه</small></div>` + list.map(t => {
         const total = sumVals(t.units);
-        return `<div class="wf-transit">
-            <div class="wf-tr-top"><b>${t.from_name} ← ${t.to_name}</b><small>${t.kind === "back" ? "در حال بازگشت" : "در حال حرکت"} · ${formatNumber(total)} یگان</small></div>
+        return `<div class="wf-transit ${t.battle ? "wf-transit-live" : ""}">
+            ${t.battle ? `<div class="war-live-strip">⚔️ درگیری زنده — نتیجه تا پایان نبرد اعلام می‌شود</div>` : ""}
+            <div class="wf-tr-top"><b>${t.from_name} ← ${t.to_name}</b><small>${t.battle ? "در حال نبرد" : (t.kind === "back" ? "در حال بازگشت" : "در حال حرکت")} · ${formatNumber(total)} یگان</small></div>
             <div class="wf-tr-bar"><i data-tr-bar="${t.id}"></i></div>
             <div class="wf-tr-bottom"><span>⏱ <b data-tr-eta="${t.id}" dir="ltr">—</b></span>
                 ${t.kind === "go" ? `<button class="wf-tr-cancel" data-recall="${t.id}">بازگرداندن</button>` : ""}</div>
@@ -1947,11 +1911,12 @@ function tickTransits() {
     let done = false;
     list.forEach(t => {
         const st = Date.parse(t.start), ar = Date.parse(t.arrive);
-        const left = ar - now, pct = Math.max(0, Math.min(100, ((now - st) / Math.max(1, ar - st)) * 100));
+        const etaAr = Date.parse(t.eta_arrive || t.arrive);
+        const left = etaAr - now, pct = Math.max(0, Math.min(100, ((now - st) / Math.max(1, ar - st)) * 100));
         const e = document.querySelector(`[data-tr-eta="${t.id}"]`), bar = document.querySelector(`[data-tr-bar="${t.id}"]`);
         if (e) e.textContent = left > 0 ? fmtEta(left) : "رسید";
         if (bar) bar.style.width = pct + "%";
-        if (left <= -1500) done = true;
+        if (ar - now <= -1500) done = true;
     });
     if (done) { clearInterval(transitTimer); transitTimer = null; setTimeout(loadForces, 600); }
 }
@@ -2015,10 +1980,7 @@ function openPlaceSheet(mode) {
     } else {
         const list = [];
         if (dispatchSel.from !== "home") list.push(placeRow("home", "🏠", "خانه", "بازگشت نیروها"));
-        activeWarTargets.forEach(w => {
-            const target = w.target;
-            list.push(placeRow(`country:${target}`, "⚔️", `پایتخت ${COUNTRY_NAMES[target] || target}`, "کشور مقابل در جنگ فعال · اعزام مستقیم ارتش"));
-        });
+        (window.__activeWarTargets || []).forEach(cid => list.push(placeRow(`country:${cid}`, "⚓", `بندر ${COUNTRY_NAMES[cid] || cid}`, "مسیر دریایی جنگ · ناو ترابری برای نیروهای زمینی لازم است")));
         const order = s => !s.owner ? 0 : (s.owner !== selectedCountry ? 1 : 2);
         warSites.filter(s => s.id !== dispatchSel.from).sort((a, b) => order(a) - order(b)).forEach(s => {
             let st = "بی‌صاحب";
@@ -2036,7 +1998,7 @@ function openPlaceSheet(mode) {
     ov.id = "infra-sheet"; ov.className = "modal-overlay";
     ov.innerHTML = `<div class="ic-sheet">
         <div class="is-head"><div class="is-titles"><div class="is-name">${mode === "from" ? "از کجا؟" : "به کجا؟"}</div>
-            <div class="is-sub">${mode === "from" ? "جایی که نیرو داری" : "کشورهای در جنگ، سکوها، معادن و تنگه‌ها"}</div></div>
+            <div class="is-sub">${mode === "from" ? "جایی که نیرو داری" : "سکوها، معادن و تنگه‌ها"}</div></div>
             <button class="is-close" aria-label="بستن">✕</button></div>
         <input class="ps-search" type="search" placeholder="جستجو...">
         <div class="ps-list">${rows}</div></div>`;
@@ -2060,12 +2022,9 @@ async function sendDispatch() {
     const picked = Object.fromEntries(Object.entries(dispatchSel.units).filter(([, v]) => v > 0));
     if (!Object.keys(picked).length) return;
     const dst = warSites.find(s => s.id === to);
-    const countryTarget = typeof to === "string" && to.startsWith("country:");
-    if (countryTarget) {
-        const target = to.slice(8);
-        if (!(await gameConfirm(`نیروهای شما به پایتخت ${COUNTRY_NAMES[target] || target} اعزام می‌شوند. اگر ارتش طرف مقابل هم در راه باشد، دو نیرو در مسیر با هم می‌جنگند. ادامه می‌دهی؟`, { title: "اعزام به جبههٔ کشور", danger: true }))) return;
-    } else if (dst?.owner && dst.owner !== selectedCountry &&
-        !(await gameConfirm(`در «${dst.name}» به ${COUNTRY_NAMES[dst.owner] || dst.owner} حمله می‌شود. ادامه؟`, { title: "حمله", danger: true }))) return;
+    const countryTarget = typeof to === "string" && to.startsWith("country:") ? to.split(":")[1] : null;
+    if ((countryTarget && !(await gameConfirm(`نیروها از مسیر دریا به بندر ${COUNTRY_NAMES[countryTarget] || countryTarget} می‌روند. برای انتقال پیاده‌نظام و تانک، ناو ترابری مصرف/اعزام می‌شود. ادامه؟`, { title: "اعزام به بندر دشمن", danger: true }))) || (dst?.owner && dst.owner !== selectedCountry &&
+        !(await gameConfirm(`در «${dst.name}» به ${COUNTRY_NAMES[dst.owner] || dst.owner} حمله می‌شود. ادامه؟`, { title: "حمله", danger: true })))) return;
     const btn = document.getElementById("dp-go"); if (btn) btn.disabled = true;
     try {
         const d = await apiPost("/api/war/dispatch", { from, to, units: picked });
@@ -2113,7 +2072,7 @@ async function askWarReason(target) {
         ov.innerHTML = `<section class="modal-box war-reason-dialog" role="dialog" aria-modal="true" aria-labelledby="war-reason-title">
             <div class="ann-modal-head"><div><span class="ann-modal-kicker">درخواست رسمی</span><h2 class="modal-title" id="war-reason-title">اعلان جنگ به ${escapeHtml(COUNTRY_NAMES[target] || target)}</h2></div><button type="button" class="ann-modal-close" aria-label="بستن">×</button></div>
             <p>دلیل اعلان جنگ شما به کشور انتخابی چیست؟ این دلیل برای بررسی به سازمان ملل ارسال می‌شود و پس از تأیید به بازیکنان نمایش داده خواهد شد.</p>
-            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید، هر دو کشور ۳۰ ثانیه برای حل اختلاف از راه دیپلماسی فرصت دارند.</small>
+            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید، هر دو کشور ۲۴ ساعت برای حل اختلاف از راه دیپلماسی فرصت دارند.</small>
             <div class="ann-modal-actions"><button type="button" class="modal-cancel" data-war-reason-cancel>انصراف</button><button type="button" class="ann-publish-button" data-war-reason-submit>ارسال به سازمان ملل</button></div>
         </section>`;
         document.body.appendChild(ov); const input = ov.querySelector("#war-reason-input");
@@ -2140,8 +2099,8 @@ async function declareWar(target) {
 async function loadWarData() {
     try {
         const d = await apiGet("/api/wars");
-        applyWarStatusData(d);
 
+        window.__activeWarTargets = [...new Set([...(d.active || [])].filter(w => w.status === "battle" && [w.attacker, w.defender].includes(selectedCountry)).map(w => w.attacker === selectedCountry ? w.defender : w.attacker))];
         const act = document.getElementById("war-active-list");
         if (act) {
             act.innerHTML = "";
@@ -2151,24 +2110,32 @@ async function loadWarData() {
                 const div = document.createElement("div");
                 div.className = "war-active-card";
                 let statusText = w.status === "pending_admin" ? "در انتظار تأیید سازمان ملل" :
-                                 w.status === "negotiation" ? `در حال مذاکره${w.negotiation_ends ? ` · ${timeLeft(w.negotiation_ends)}` : ""}` :
-                                 w.status === "battle" ? "جنگ آغاز شده؛ نیروها را به پایتخت کشور مقابل اعزام کنید" : w.status;
-                const canPeace = w.status === "negotiation" && [w.attacker, w.defender].includes(selectedCountry);
-                const hasVoted = (w.peace_votes || []).includes(selectedCountry);
-                const peaceHtml = canPeace ? `<button type="button" class="war-peace-button war-peace-button-top" data-peace-war="${escapeHtml(w.id)}" ${hasVoted ? "disabled" : ""}>${hasVoted ? "✓ رأی صلح ثبت شد" : "🕊️ صلح"}</button>` : "";
+                                 w.status === "negotiation" ? "در حال مذاکره (۳۰ ثانیه‌ای)" :
+                                 w.status === "battle" ? "🔴 در جنگ" : w.status;
                 div.innerHTML = `
+                    <div class="war-live-strip">${w.status === "battle" ? "🔴 در جنگ — حرکت نیروها و برخورد مسیر فعال است" : w.status === "negotiation" ? "🕊️ مهلت صلح فعال است" : "وضعیت جنگ"}</div>
                     <h4>${COUNTRY_NAMES[w.attacker]} → ${COUNTRY_NAMES[w.defender]}</h4>
-                    ${peaceHtml}
                     <p>${statusText}${w.penalty ? ` — جریمه اتحاد: ${formatMoney(w.penalty)}` : ""}</p>
                     ${w.reason ? `<p class="war-reason-display"><b>دلیل:</b> ${escapeHtml(w.reason)}</p>` : ""}
-                    ${w.status === "negotiation" ? `<p class="war-peace-votes">رأی صلح: ${(w.peace_votes || []).map(cid => COUNTRY_NAMES[cid] || cid).join("، ") || "هنوز ثبت نشده"}</p>` : ""}
-                    ${w.status === "battle" ? `<p class="war-dispatch-hint">برای حمله، وارد «نیروها» شوید ← «اعزام نیرو» ← «پایتخت ${escapeHtml(COUNTRY_NAMES[w.attacker === selectedCountry ? w.defender : w.attacker])}».</p>` : ""}`;
-                const peace = div.querySelector("[data-peace-war]");
-                if (peace) peace.addEventListener("click", async () => {
-                    peace.disabled = true;
-                    try { const r = await apiPost("/api/war/peace", { war_id: w.id }); showToast(r.message || (r.success ? "رأی صلح ثبت شد." : "خطا"), r.success ? "success" : "error"); await loadWarData(); }
-                    catch { showToast("ارتباط با سرور برقرار نشد.", "error"); peace.disabled = false; }
-                });
+                    ${w.status === "negotiation" ? `<p class="war-peace-votes">رأی صلح: ${(w.peace_votes || []).map(cid => COUNTRY_NAMES[cid] || cid).join("، ") || "هنوز ثبت نشده"}</p>` : ""}`;
+                if (w.status === "negotiation" && [w.attacker, w.defender].includes(selectedCountry)) {
+                    const peace = document.createElement("button"); peace.className = "war-peace-button war-peace-button-top";
+                    peace.textContent = (w.peace_votes || []).includes(selectedCountry) ? "✓ رأی صلح ثبت شد" : "🕊️ صلح";
+                    peace.disabled = (w.peace_votes || []).includes(selectedCountry);
+                    peace.addEventListener("click", async () => {
+                        peace.disabled = true;
+                        try { const r = await apiPost("/api/war/peace", { war_id: w.id }); showToast(r.message || (r.success ? "رأی صلح ثبت شد." : "خطا"), r.success ? "success" : "error"); await loadWarData(); }
+                        catch { showToast("ارتباط با سرور برقرار نشد.", "error"); peace.disabled = false; }
+                    });
+                    div.insertBefore(peace, div.firstChild);
+                }
+                if (w.status === "battle" && w.attacker === selectedCountry) {
+                    const btn = document.createElement("button");
+                    btn.className = "infra-upgrade-button";
+                    btn.textContent = "ارسال نیروها و اجرای نبرد";
+                    btn.addEventListener("click", () => openBattleModal(w.id));
+                    div.appendChild(btn);
+                }
                 act.appendChild(div);
             });
         }
@@ -2212,7 +2179,7 @@ async function loadWarLog() {
     renderWarNews(); renderWarHistory();
 }
 
-const WAR_EVENT_ICONS = { declare: "⚔️", battle: "💥", occupy: "🚩", capture: "🚩", repel: "🛡️", release: "🏳️", send: "🧭", return: "🏠", turnback: "↩️" };
+const WAR_EVENT_ICONS = { declare: "⚔️", occupy: "🚩", capture: "🚩", repel: "🛡️", release: "🏳️", send: "🧭", return: "🏠", turnback: "↩️" };
 
 function renderWarNews() {
     const box = document.getElementById("war-news-list");
@@ -2577,11 +2544,11 @@ function renderAdminWars() {
         const status = w.status === "pending_admin" ? "در انتظار بررسی مدیر" : w.status === "negotiation" ? "مهلت دیپلماسی فعال" : w.status === "battle" ? "جنگ آغاز شده" : w.status === "peace" ? "با صلح خاتمه یافت" : "رد شده";
         const end = w.negotiation_ends ? `پایان مذاکره: ${new Date(w.negotiation_ends).toLocaleString("fa-IR")}` : "";
         const votes = (w.peace_votes || []).map(cid => COUNTRY_NAMES[cid] || cid).join("، ") || "هیچ‌کس";
-        return `<article class="admin-war-card"><div class="admin-war-card-head"><div><b>${escapeHtml(w.attacker_name || COUNTRY_NAMES[w.attacker] || w.attacker)} ← ${escapeHtml(w.defender_name || COUNTRY_NAMES[w.defender] || w.defender)}</b><small>${escapeHtml(status)} · ${escapeHtml(w.created_at ? new Date(w.created_at).toLocaleString("fa-IR") : "")}</small></div><span class="admin-war-status">${escapeHtml(w.status)}</span></div><details class="admin-war-detail"><summary>👁️ بازکردن جزئیات و دلیل اعلان جنگ</summary><div class="admin-war-reason"><b>دلیل اعلان جنگ</b><p>${escapeHtml(w.reason || "دلیلی ثبت نشده است.")}</p></div>${end ? `<small class="admin-war-meta">${escapeHtml(end)}</small>` : ""}${w.status === "negotiation" ? `<small class="admin-war-meta">رأی صلح: ${escapeHtml(votes)}</small>` : ""}</details>${w.status === "pending_admin" ? `<div class="admin-war-actions"><button type="button" data-war-review="approve" data-war-id="${escapeHtml(w.id)}">✅ تأیید و شروع مهلت ۳۰ ثانیه‌ای</button><button type="button" data-war-review="reject" data-war-id="${escapeHtml(w.id)}">✕ رد درخواست</button></div>` : ""}</article>`;
+        return `<article class="admin-war-card"><div class="admin-war-card-head"><div><b>${escapeHtml(w.attacker_name || COUNTRY_NAMES[w.attacker] || w.attacker)} ← ${escapeHtml(w.defender_name || COUNTRY_NAMES[w.defender] || w.defender)}</b><small>${escapeHtml(status)} · ${escapeHtml(w.created_at ? new Date(w.created_at).toLocaleString("fa-IR") : "")}</small></div><span class="admin-war-status">${escapeHtml(w.status)}</span></div><details class="admin-war-detail"><summary>👁️ بازکردن جزئیات و دلیل اعلان جنگ</summary><div class="admin-war-reason"><b>دلیل اعلان جنگ</b><p>${escapeHtml(w.reason || "دلیلی ثبت نشده است.")}</p></div>${end ? `<small class="admin-war-meta">${escapeHtml(end)}</small>` : ""}${w.status === "negotiation" ? `<small class="admin-war-meta">رأی صلح: ${escapeHtml(votes)}</small>` : ""}</details>${w.status === "pending_admin" ? `<div class="admin-war-actions"><button type="button" data-war-review="approve" data-war-id="${escapeHtml(w.id)}">✅ تأیید و شروع مهلت ۲۴ ساعته</button><button type="button" data-war-review="reject" data-war-id="${escapeHtml(w.id)}">✕ رد درخواست</button></div>` : ""}</article>`;
     }).join("");
     root.querySelectorAll("[data-war-review]").forEach(button => button.addEventListener("click", async () => {
         const action = button.dataset.warReview, warId = button.dataset.warId;
-        if (action === "approve" && !confirm("درخواست را تأیید می‌کنی؟ همهٔ کاربران این دنیا مطلع می‌شوند و مهلت دیپلماسی ۳۰ ثانیه‌ای آغاز می‌شود.")) return;
+        if (action === "approve" && !confirm("درخواست را تأیید می‌کنی؟ همهٔ کاربران این دنیا مطلع می‌شوند و مهلت دیپلماسی ۲۴ ساعته آغاز می‌شود.")) return;
         button.disabled = true;
         try {
             const result = await apiPost("/api/admin/war/review", { war_id: warId, action });
@@ -4356,6 +4323,20 @@ async function loadMapRoutes() {
         const d = await apiGet("/api/map/transits");
         mapTransits = Array.isArray(d?.transits) ? d.transits : [];
         if (d?.now) mapRouteSkew = Date.parse(d.now) - Date.now();
+        mapTransits.forEach(t => { t.pathOffset = 0; });
+        const km = (a, b) => (!a || !b) ? Infinity : d3.geoDistance(a, b) * 6371;
+        for (let i = 0; i < mapTransits.length; i++) {
+            const a = mapTransits[i];
+            for (let k = i + 1; k < mapTransits.length; k++) {
+                const b = mapTransits[k];
+                if (a.country === b.country) continue;
+                const reversed = km(a.from_ll, b.to_ll) < 160 && km(a.to_ll, b.from_ll) < 160;
+                if (!reversed) continue;
+                if (a.country === selectedCountry) { a.pathOffset = -3; b.pathOffset = 3; }
+                else if (b.country === selectedCountry) { a.pathOffset = 3; b.pathOffset = -3; }
+                else { a.pathOffset = -3; b.pathOffset = 3; }
+            }
+        }
     } catch (e) { mapTransits = []; }
     renderMapRoutes();
 }
@@ -4364,7 +4345,7 @@ function renderMapRoutes() {
     mapRoutesSvg.selectAll("*").remove();
     if (!mapRoutesVisible) return;
     const g = mapRoutesSvg.selectAll(".map-route").data(mapTransits, d => d.id).enter().append("g").attr("class", "map-route");
-    g.append("path").attr("class", d => "map-route-line" + (d.country === selectedCountry ? " mine" : ""));
+    g.append("path").attr("class", d => "map-route-line" + (d.country === selectedCountry ? " mine" : "") + (d.battle ? " route-battle" : ""));
     g.each(function (d) {
         const s = d3.select(this).append("g").attr("class", "map-route-head")
             .on("click", e => { e.stopPropagation(); showToast(`${COUNTRY_NAMES[d.country] || d.country}: ${d.from_name} ← ${d.to_name}`.replace("←", "➜")); });
@@ -4380,8 +4361,18 @@ function updateMapRoutes() {
     const now = Date.now() + mapRouteSkew;
     mapRoutesSvg.selectAll(".map-route").each(function (d) {
         const f = Math.max(0, Math.min(1, (now - Date.parse(d.start)) / Math.max(1, Date.parse(d.arrive) - Date.parse(d.start))));
-        d3.select(this).select(".map-route-line").attr("d", pathGen({ type: "LineString", coordinates: [d.from_ll, d.to_ll] }) || "");
-        const pos = d3.geoInterpolate(d.from_ll, d.to_ll)(f);
+        const line = d3.select(this).select(".map-route-line");
+        line.attr("d", pathGen({ type: "LineString", coordinates: [d.from_ll, d.to_ll] }) || "");
+        if (d.pathOffset && mapProjection) {
+            const pa = mapProjection(d.from_ll), pb = mapProjection(d.to_ll);
+            if (pa && pb && Number.isFinite(pa[0]) && Number.isFinite(pb[0])) {
+                const dx = pb[0] - pa[0], dy = pb[1] - pa[1], len = Math.max(1, Math.hypot(dx, dy));
+                line.attr("transform", `translate(${(-dy / len * d.pathOffset).toFixed(2)},${(dx / len * d.pathOffset).toFixed(2)})`);
+            } else line.attr("transform", null);
+        } else line.attr("transform", null);
+        const pos = d.battle && Array.isArray(d.battle_ll) && d.battle_ll.length === 2
+            ? d.battle_ll
+            : d3.geoInterpolate(d.from_ll, d.to_ll)(f);
         const p = viewCos(pos[0], pos[1], rot) > 0.02 ? mapProjection(pos) : null;
         const head = d3.select(this).select(".map-route-head");
         if (p) head.attr("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)})`).style("display", "");
@@ -4390,7 +4381,7 @@ function updateMapRoutes() {
 }
 setInterval(() => {
     if (mapInitialized && !document.getElementById("map")?.classList.contains("hidden")) { loadMapRoutes(); }
-}, 10000);
+}, 1000);
 setInterval(() => {
     if (mapInitialized && mapTransits.length && !document.getElementById("map")?.classList.contains("hidden")) updateMapRoutes();
 }, 1000);
@@ -5173,3 +5164,11 @@ document.getElementById("map-help-btn")?.addEventListener("click", () => {
     ov.addEventListener("click", e => { if (e.target === ov || e.target.closest(".gs-x")) ov.remove(); });
     document.body.appendChild(ov);
 });
+
+setInterval(() => {
+    const warPage = document.getElementById("war");
+    if (warPage && !warPage.classList.contains("hidden")) {
+        if (currentWarTab === "war-targets-panel") loadWarData();
+        if (currentWarTab === "war-forces-panel") loadForces();
+    }
+}, 2500);
