@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261010opt7">
+<link rel="stylesheet" href="/style.css?v=20261010worldfix1">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -25,13 +25,13 @@
     <div class="world-select-shell">
         <div class="world-select-heading"><span class="world-select-kicker">FRONT-LINE · WORLDS</span><h1>انتخاب دنیا</h1><p>پیش از انتخاب کشور، دنیایی را که می‌خواهی در آن بازی کنی انتخاب کن. بازیکنان و اطلاعات هر دنیا جدا هستند.</p></div>
         <div id="world-select-list" class="world-select-list"><div class="world-empty">در حال دریافت دنیاها…</div></div>
-        <button id="world-select-start" class="world-select-start" type="button" disabled>ورود به دنیای انتخاب‌شده ←</button>
     </div>
 </section>
 
 <!-- ==================== انتخاب کشور ==================== -->
 <section id="country" class="screen country-screen hidden">
     <div class="country-header">
+        <button type="button" id="country-change-world" class="country-world-back">← برگشت به انتخاب دنیا</button>
         <h1>انتخاب کشور</h1>
         <p>کشور خود را برای آغاز بازی انتخاب کنید</p>
     </div>
@@ -112,7 +112,6 @@
         <button type="button" class="game-menu-item" data-menu-page="map">🗺️ <span>نقشه</span></button>
         <button type="button" class="game-menu-item" data-menu-page="communications">💬 <span>ارتباطات و اخبار</span></button>
         <button type="button" id="open-guide-menu" class="game-menu-item" role="menuitem">📖 <span>راهنمای بازی</span></button>
-        <button type="button" id="open-admin-menu" class="game-menu-item game-menu-admin hidden" role="menuitem">🛡️ <span>پنل مدیریت</span><small>مدیر اصلی</small></button>
     </div>
 
     <!-- نوار «در حال ورود به داشبورد» زیر هدر -->
@@ -834,6 +833,6 @@
 
 </section>
 
-<script src="/app.js?v=20261010opt7"></script>
+<script src="/app.js?v=20261010worldfix1"></script>
 </body>
 </html>
