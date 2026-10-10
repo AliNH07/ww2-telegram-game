@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://ww2-telegram-game.onrender.com")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+ADMIN_ID = 8290076602  # مدیر اصلی پنل مدیریت؛ شناسهٔ تأییدشدهٔ تلگرام
 AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "0") == "1"
 DATA_DIR = os.getenv("DATA_DIR", "data")
 STATE_FILE = os.path.join(DATA_DIR, "state.json")
@@ -3358,6 +3358,125 @@ async def debug_auth(request):
                               "verified": user is not None, "user": user,
                               "bot_token_set": bool(BOT_TOKEN), "players_count": len(players)})
 
+
+def _strict_telegram_uid(request):
+    """Admin APIs only accept a valid Telegram WebApp initData signature."""
+    init_data = request.headers.get("X-Telegram-Init-Data", "")
+    user = verify_init_data(init_data)
+    try:
+        return int(user["id"]) if user and user.get("id") else None
+    except (TypeError, ValueError, KeyError):
+        return None
+
+
+def _admin_denied(request):
+    uid = _strict_telegram_uid(request)
+    if uid is None:
+        return web.json_response({"success": False, "error": "telegram_auth_required", "message": "از داخل تلگرام وارد شوید."}, status=401)
+    if uid != ADMIN_ID:
+        return web.json_response({"success": False, "error": "forbidden", "message": "دسترسی به پنل مدیریت ندارید."}, status=403)
+    return None
+
+
+def _admin_player_row(uid, p):
+    ensure_player_fields(p)
+    rates = compute_rates(p)
+    cid = p.get("country")
+    return {
+        "user_id": int(uid), "country": cid,
+        "country_name": COUNTRIES.get(cid, {}).get("name", "بدون کشور"),
+        "country_flag": COUNTRIES.get(cid, {}).get("flag", "🌐"),
+        "money": int(p.get("money", 0) or 0), "manpower": int(p.get("manpower", 0) or 0),
+        "resources": {k: int((p.get("resources") or {}).get(k, 0) or 0) for k in RESOURCE_NAMES},
+        "daily_income": int(round(rates.get("net_income", 0) or 0)),
+        "army": int(p.get("army", 0) or 0), "vip": bool(p.get("vip")),
+        "is_eliminated": bool(p.get("is_eliminated")), "started": bool(p.get("started_at")),
+    }
+
+
+async def admin_overview(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    rows = []
+    for uid, p in players.items():
+        try:
+            accrue_player(p)
+            rows.append(_admin_player_row(uid, p))
+        except Exception as exc:
+            logging.warning("admin overview player %s: %s", uid, exc)
+    rows.sort(key=lambda item: (item.get("country") is None, item.get("country_name", ""), item["user_id"]))
+    taken = len({r["country"] for r in rows if r.get("country")})
+    total_money = sum(r["money"] for r in rows)
+    if rows: save_state()
+    recent = []
+    for item in list(reversed(news_feed[-15:])):
+        recent.append({"title": str(item.get("title", "خبر")), "text": str(item.get("text", "")),
+                       "at": item.get("at", ""), "category": item.get("category", "general")})
+    return web.json_response({"success": True, "players": rows, "countries_taken": taken,
+                              "total_money": total_money, "recent_news": recent})
+
+
+async def admin_update_player(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    try: target_uid = int(data.get("user_id"))
+    except (TypeError, ValueError): return web.json_response({"success": False, "message": "شناسهٔ بازیکن نامعتبر است."}, status=400)
+    p = players.get(target_uid)
+    if not p: return web.json_response({"success": False, "message": "بازیکن پیدا نشد."}, status=404)
+    field = str(data.get("field", ""))
+    allowed_numeric = {"money", "manpower", "food", "steel", "uranium", "oil"}
+    if field in allowed_numeric:
+        try: value = int(data.get("value"))
+        except (TypeError, ValueError): return web.json_response({"success": False, "message": "مقدار عددی معتبر وارد کن."}, status=400)
+        if value < 0 or value > 1_000_000_000_000_000:
+            return web.json_response({"success": False, "message": "مقدار باید بین صفر و سقف مجاز باشد."}, status=400)
+        accrue_player(p)
+        if field == "money": p["money"] = value
+        elif field == "manpower": p["manpower"] = value
+        else:
+            ensure_player_fields(p)
+            p.setdefault("resources", {})[field] = value
+    elif field == "country":
+        value = str(data.get("value") or "").strip() or None
+        if value and value not in COUNTRIES:
+            return web.json_response({"success": False, "message": "کشور انتخاب‌شده معتبر نیست."}, status=400)
+        if value and any(int(other_uid) != target_uid and other.get("country") == value for other_uid, other in players.items()):
+            return web.json_response({"success": False, "message": "این کشور در اختیار بازیکن دیگری است."}, status=409)
+        p["country"] = value
+        if value and not p.get("started_at"): p["started_at"] = utcnow().isoformat()
+    elif field in ("vip", "is_eliminated"):
+        value = data.get("value")
+        if not isinstance(value, bool): return web.json_response({"success": False, "message": "وضعیت ارسالی نامعتبر است."}, status=400)
+        p[field] = value
+    else:
+        return web.json_response({"success": False, "message": "این نوع تغییر مجاز نیست."}, status=400)
+    save_state()
+    logging.info("ADMIN %s updated player=%s field=%s", ADMIN_ID, target_uid, field)
+    return web.json_response({"success": True, "message": "تغییرات بازیکن ذخیره شد.", "player": _admin_player_row(target_uid, p)})
+
+
+async def admin_broadcast(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    title = str(data.get("title", "")).strip()[:100]
+    body = str(data.get("text", "")).strip()[:1200]
+    if not title or not body:
+        return web.json_response({"success": False, "message": "عنوان و متن خبر الزامی است."}, status=400)
+    push_news(title, body, "info")
+    save_state()
+    sent = failed = 0
+    for uid in list(players.keys()):
+        try:
+            await bot.send_message(chat_id=int(uid), text=f"📣 {title}\n\n{body}")
+            sent += 1
+        except Exception as exc:
+            failed += 1
+            logging.warning("admin broadcast failed for %s: %s", uid, exc)
+        await asyncio.sleep(0.035)
+    return web.json_response({"success": True, "message": "خبر در بازی ثبت شد.", "sent": sent, "failed": failed})
+
 # =========================================================
 # Web Server
 # =========================================================
@@ -3384,7 +3503,7 @@ async def create_web_app():
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
         ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
-        ("/api/debug-auth", debug_auth), ("/health", health)]:
+        ("/api/debug-auth", debug_auth), ("/api/admin/overview", admin_overview), ("/health", health)]:
         app.router.add_get(path, h)
 
     for path, h in [
@@ -3407,7 +3526,8 @@ async def create_web_app():
         ("/api/market/accept", accept_listing), ("/api/strait/settings", set_strait_settings),
         ("/api/loans/propose", propose_loan), ("/api/loans/respond", respond_loan),
         ("/api/loans/cancel", cancel_loan), ("/api/loans/repay", repay_loan),
-        ("/api/border/settings", set_border_settings)]:
+        ("/api/border/settings", set_border_settings), ("/api/admin/player/update", admin_update_player),
+        ("/api/admin/broadcast", admin_broadcast)]:
         app.router.add_post(path, h)
 
     app.router.add_route("OPTIONS", "/{tail:.*}", lambda r: web.Response())
