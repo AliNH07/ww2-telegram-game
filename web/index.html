@@ -20,6 +20,15 @@
     </div>
 </section>
 
+<!-- ==================== انتخاب دنیا ==================== -->
+<section id="world-select" class="screen world-select-screen hidden">
+    <div class="world-select-shell">
+        <div class="world-select-heading"><span class="world-select-kicker">FRONT-LINE · WORLDS</span><h1>انتخاب دنیا</h1><p>پیش از انتخاب کشور، دنیایی را که می‌خواهی در آن بازی کنی انتخاب کن. بازیکنان و اطلاعات هر دنیا جدا هستند.</p></div>
+        <div id="world-select-list" class="world-select-list"><div class="world-empty">در حال دریافت دنیاها…</div></div>
+        <button id="world-select-start" class="world-select-start" type="button" disabled>ورود به دنیای انتخاب‌شده ←</button>
+    </div>
+</section>
+
 <!-- ==================== انتخاب کشور ==================== -->
 <section id="country" class="screen country-screen hidden">
     <div class="country-header">
@@ -259,8 +268,7 @@
 
     <!-- ==================== وام (فقط ظاهر) ==================== -->
     <main id="loan" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">💰</span>وام</span><span class="sb-money">$0</span></div>
-        <div class="ln-head"><button class="ln-help" id="ln-help" aria-label="راهنما">?</button><h2>وام 💰</h2></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">💰</span>وام</span><button class="section-help-button ln-help" id="ln-help" aria-label="راهنمای وام" title="راهنما">؟</button><span class="sb-money">$0</span></div>
         <div class="ln-tabs" id="ln-tabs">
             <button class="ln-tab active" data-tab="mine">وام‌های من</button>
             <button class="ln-tab" data-tab="offer">وام دهید</button>
@@ -285,10 +293,7 @@
 
     <!-- ==================== زیرساخت ==================== -->
     <main id="infrastructure" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🏗️</span>زیرساخت</span><span class="sb-money">$0</span></div>
-        <div class="infra-title-row">
-            <div class="page-title"><h1>زیرساخت</h1></div>
-        </div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🏗️</span>زیرساخت</span><button class="section-help-button" id="infra-help-btn" aria-label="راهنمای زیرساخت" title="راهنما">؟</button><span class="sb-money">$0</span></div>
         <div class="resource-bar"></div>
 
         <div class="infra-tabs">
@@ -347,8 +352,7 @@
 
     <!-- ==================== اقتصاد ==================== -->
     <main id="economy" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">💰</span>اقتصاد</span><span class="sb-money">$0</span></div>
-        <div class="page-title"><span>سرمایه‌گذاری</span><h1>اقتصاد</h1></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">💰</span>اقتصاد</span><button class="section-help-button" id="economy-help-btn" aria-label="راهنمای اقتصاد" title="راهنما">؟</button><span class="sb-money">$0</span></div>
         <div class="economy-filter-wrap">
             <div class="economy-filter-heading"><span>سرمایه‌گذاری</span><small>دسته را انتخاب کن یا همهٔ گزینه‌ها را ببین</small></div>
             <div id="economy-filters" class="economy-filters" role="tablist" aria-label="دسته‌بندی سرمایه‌گذاری">
@@ -434,7 +438,7 @@
 
         <div id="war-targets-panel" class="war-panel hidden">
             <div class="war-intro"><h3>اعلان جنگ</h3>
-                <p>تسخیر هر کشور اعلان جنگی می‌خواهد که ۲۴ ساعت از آن گذشته باشد؛ نبرد روی نقشه (تنگه‌ها، سکوها و معادن) به اعلان نیاز ندارد. با طرف پیمان عدم تجاوز نمی‌شود وارد جنگ شد.</p></div>
+                <p>با انتخاب کشور، پنجرهٔ ثبت دلیل باز می‌شود و درخواست به سازمان ملل برای بررسی می‌رود. پس از تأیید، دو کشور ۲۴ ساعت فرصت دارند با رأی دوطرفهٔ «صلح» از جنگ جلوگیری کنند.</p></div>
             <input id="war-search" class="war-search" type="search" placeholder="جستجوی کشور...">
             <div id="war-target-list" class="war-target-list"></div>
             <div class="wf-section"><span>جنگ‌های جاری</span></div>
@@ -465,8 +469,7 @@
 
     <!-- ==================== دیپلماسی ==================== -->
     <main id="diplomacy" class="game-page hidden">
-        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">📜</span>دیپلماسی</span><span class="sb-money">$0</span></div>
-        <div class="page-title"><span>روابط خارجی</span><h1>دیپلماسی</h1></div>
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">📜</span>دیپلماسی</span><button class="section-help-button" id="diplomacy-help-btn" aria-label="راهنمای دیپلماسی" title="راهنما">؟</button><span class="sb-money">$0</span></div>
 
         <div class="diplomacy-form">
             <label class="diplomacy-label">کشور مقصد</label>
@@ -629,6 +632,7 @@
             <button class="market-tab active" data-market-tab="market-list-panel">کالاها</button>
             <button class="market-tab" data-market-tab="market-create-panel">مبادله</button>
             <button class="market-tab" data-market-tab="market-mine-panel">معاملات من</button>
+            <button class="market-tab" data-market-tab="market-sanctions-panel">تحریم‌ها</button>
         </div>
         <div id="market-list-panel" class="market-panel">
             <div class="market-filter"><button class="mk-filter active" data-side="all">همه کالاها</button><button class="mk-filter" data-side="sell">فروشندگان</button><button class="mk-filter" data-side="buy">خریداران</button></div>
@@ -658,6 +662,16 @@
             </div>
         </div>
         <div id="market-mine-panel" class="market-panel hidden"><div id="market-mine"></div></div>
+        <div id="market-sanctions-panel" class="market-panel hidden">
+            <section class="market-sanctions-box">
+                <h3>⛔ تحریم بازار جهانی</h3>
+                <p>کشوری را انتخاب کن تا نتواند هیچ خریدی از بازار جهانی انجام دهد. اینجا مشخص است چه کشوری، کدام کشور را تحریم کرده است.</p>
+                <label for="market-sanction-target">کشور مورد تحریم</label>
+                <select id="market-sanction-target" class="diplomacy-select"></select>
+                <button id="market-sanction-submit" class="diplomacy-submit" type="button">ثبت تحریم</button>
+                <div id="market-sanctions-list" class="market-sanctions-list"><div class="diplomacy-item-empty">در حال دریافت تحریم‌ها…</div></div>
+            </section>
+        </div>
     </main>
 
     <!-- ==================== اشتراک ==================== -->
@@ -673,13 +687,14 @@
     <main id="admin" class="game-page hidden admin-dashboard">
         <div class="sub-back-bar admin-back-bar">
             <button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
-            <span class="sb-title"><span class="sb-icon">🛡️</span>مرکز مدیریت</span>
+            <span class="sb-title"><span class="sb-icon">🛡️</span>مرکز مدیریت <small id="admin-current-world" class="admin-current-world">دنیای ۱</small></span>
             <button id="admin-refresh" class="admin-refresh-btn" type="button" aria-label="تازه‌سازی" title="تازه‌سازی اطلاعات">⟳</button>
         </div>
         <section class="admin-hero">
             <div class="admin-hero-icon">🛡️</div>
             <div class="admin-hero-copy"><span class="admin-eyebrow">FRONT-LINE · CONTROL CENTER</span><h2>همه‌چیز تحت کنترل توست</h2><p>مدیریت بازیکنان، اقتصاد و اطلاعیه‌ها از یک صفحهٔ منظم.</p><div class="admin-session-line"><span class="admin-online-dot"></span> مدیر اصلی <b>8290076602</b></div></div>
         </section>
+        <section id="admin-world-switcher" class="admin-world-switcher" aria-label="انتخاب دنیای مدیریت"><div class="admin-empty">در حال دریافت دنیاها…</div></section>
         <div id="admin-access-error" class="admin-alert hidden" role="alert"></div>
         <section class="admin-summary-grid admin-summary-grid-wide" aria-label="خلاصه بازی">
             <article class="admin-summary-card"><span>👥 بازیکنان</span><strong id="admin-total-players">—</strong><small>کل حساب‌ها</small></article>
@@ -692,6 +707,8 @@
         <div class="admin-tabs" role="tablist" aria-label="بخش‌های مدیریت">
             <button class="admin-tab active" type="button" data-admin-tab="players">👥 بازیکنان</button>
             <button class="admin-tab" type="button" data-admin-tab="economy">💰 اقتصاد</button>
+            <button class="admin-tab" type="button" data-admin-tab="wars">⚖️ بررسی جنگ‌ها</button>
+            <button class="admin-tab" type="button" data-admin-tab="worlds">🌍 دنیاها</button>
             <button class="admin-tab" type="button" data-admin-tab="broadcast">📣 پیام‌ها</button>
             <button class="admin-tab" type="button" data-admin-tab="activity">🧾 گزارش عملیات</button>
         </div>
@@ -701,8 +718,10 @@
             <div class="admin-filter-row"><label>نمایش <select id="admin-player-filter"><option value="all">همهٔ بازیکنان</option><option value="countryless">بدون کشور</option><option value="vip">VIP</option><option value="eliminated">حذف‌شده از بازی</option><option value="active">فعال در ۱۵ دقیقهٔ اخیر</option></select></label><span id="admin-filter-result" class="admin-filter-result"></span></div>
             <div class="admin-player-list-wrap"><div id="admin-player-list" class="admin-player-list"><div class="admin-empty">برای دریافت اطلاعات، تازه‌سازی را بزن.</div></div></div>
             <section id="admin-player-editor" class="admin-editor hidden">
+                <button type="button" id="admin-player-detail-back" class="admin-player-detail-back">← بازگشت به فهرست بازیکنان</button>
                 <div class="admin-editor-head"><div><span class="admin-eyebrow">PLAYER PROFILE</span><h3 id="admin-editor-title">پروفایل بازیکن</h3><p id="admin-editor-subtitle"></p></div><span class="admin-editor-badge">انتخاب‌شده</span></div>
                 <div id="admin-identity-card" class="admin-identity-card"></div>
+                <div id="admin-player-extra-details" class="admin-player-extra-details"></div>
                 <div class="admin-editor-section-title"><b>موجودی و کشور</b><span>ثبت مقدار نهایی</span></div>
                 <div class="admin-edit-grid">
                     <label>خزانه ($)<div class="admin-edit-control"><input id="admin-edit-money" type="number" min="0" step="1" inputmode="numeric"><button type="button" data-admin-save="money">ثبت</button></div></label>
@@ -715,7 +734,7 @@
                 </div>
                 <div class="admin-quick-adjust">
                     <div class="admin-editor-section-title"><b>افزایش یا کسر سریع</b><span>به‌جای جایگزینی موجودی</span></div>
-                    <div class="admin-quick-grid"><label>منبع<select id="admin-adjust-field"><option value="money">خزانه</option><option value="manpower">نیروی انسانی</option><option value="food">غذا</option><option value="steel">آهن</option><option value="uranium">اورانیوم</option><option value="oil">نفت</option></select></label><label>مقدار<input id="admin-adjust-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="مثلاً 100000"></label></div>
+                    <div class="admin-quick-grid"><label>منبع<select id="admin-adjust-field"><option value="money">خزانه</option><option value="manpower">نیروی انسانی</option><option value="food">غذا</option><option value="steel">آهن</option><option value="uranium">اورانیوم</option><option value="oil">نفت</option></select></label><label>مقدار (منبع/تعداد/سطح)<input id="admin-adjust-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="مثلاً 100000 یا یک سطح"></label></div>
                     <div class="admin-quick-actions"><button type="button" id="admin-adjust-add" class="admin-quick-add">＋ افزودن به موجودی</button><button type="button" id="admin-adjust-subtract" class="admin-quick-subtract">− کسر از موجودی</button></div>
                 </div>
                 <div class="admin-toggle-actions"><button type="button" id="admin-toggle-vip" data-admin-toggle="vip">تغییر وضعیت VIP</button><button type="button" id="admin-toggle-eliminated" data-admin-toggle="is_eliminated">حذف / بازگرداندن بازیکن</button></div>
@@ -735,6 +754,15 @@
                 <p class="admin-editor-note">بازیکنانی که موجودی کافی برای کسر نداشته باشند از عملیات کسر عبور داده می‌شوند و در گزارش تعدادشان نمایش داده می‌شود. قبل از اجرا، دامنه و مقدار را دوباره بررسی کن.</p>
             </form>
             <div class="admin-economy-shortcuts"><h4>دسترسی سریع</h4><button type="button" id="admin-jump-players">انتخاب یک بازیکن برای ویرایش جزئیات ←</button></div>
+        </section>
+        <section id="admin-panel-wars" class="admin-panel hidden">
+            <div class="admin-section-head"><div><span class="admin-section-kicker">UNITED NATIONS REVIEW</span><h3>بررسی درخواست‌های اعلان جنگ</h3><p>با بازکردن هر درخواست، دلیل کامل دیده می‌شود. با تأیید، اعلان برای کاربران همان دنیا فرستاده می‌شود و ۲۴ ساعت فرصت مذاکره آغاز می‌شود.</p></div><button type="button" id="admin-wars-refresh" class="admin-refresh-btn" aria-label="تازه‌سازی درخواست‌های جنگ">⟳</button></div>
+            <div id="admin-war-list" class="admin-war-list"><div class="admin-empty">در حال دریافت درخواست‌ها…</div></div>
+        </section>
+        <section id="admin-panel-worlds" class="admin-panel hidden">
+            <div class="admin-section-head"><div><span class="admin-section-kicker">WORLD MANAGEMENT</span><h3>مرکز مدیریت دنیاها</h3><p>هر دنیا بازیکنان، کشورها، جنگ‌ها، بازار و منابع مستقل خودش را دارد. برای ساخت دنیای بعدی، نام آن را وارد کن.</p></div></div>
+            <form id="admin-create-world-form" class="admin-world-create"><label for="admin-new-world-name">نام دنیا (اختیاری)</label><input id="admin-new-world-name" maxlength="50" placeholder="مثلاً دنیای ۲"><button type="submit" class="admin-primary-btn">＋ ساخت دنیای جدید</button></form>
+            <div id="admin-world-list" class="admin-world-list"><div class="admin-empty">در حال دریافت دنیاها…</div></div>
         </section>
         <section id="admin-panel-broadcast" class="admin-panel hidden">
             <div class="admin-section-head"><div><span class="admin-section-kicker">MESSAGES & NEWS</span><h3>خبر عمومی و اعلان</h3><p>خبر در بخش اخبار بازی ثبت می‌شود و به کاربران تلگرام هم ارسال خواهد شد.</p></div></div>
