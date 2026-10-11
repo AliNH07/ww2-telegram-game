@@ -175,6 +175,8 @@ function showGamePage(id) {
     if (player?.country) updateSeasonGateBanner();
     const header = document.querySelector("#game .game-header");
     if (header) header.style.transform = "translate3d(0, 0, 0)";
+    const sb = document.getElementById("season-gate-banner");
+    if (sb) sb.style.transform = "translate3d(0, 0, 0)";
 }
 
 function formatMoney(v) { return "$" + Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
@@ -725,17 +727,30 @@ function updateSeasonGateBanner() {
     if (gameRoot) gameRoot.classList.toggle("season-locked", !started || finished);
     if (started && !finished) {
         banner.classList.add("hidden");
+        gameRoot?.style.setProperty("--banner-h", "0px");
         return;
     }
     if (finished) {
         const winner = player.game_winner_name || "مشخص نشده";
         banner.textContent = `بازی پس از ۳۱ روز به پایان رسید. برندهٔ نهایی: ${winner}. تمام عملیات بازی بسته شده‌اند و پیام خصوصی همچنان فعال است.`;
         banner.classList.remove("hidden", "is-waiting"); banner.classList.add("is-finished");
+        measureSeasonBanner();
         return;
     }
     banner.textContent = "فصل هنوز شروع نشده است. منتظر فرمانده بمان؛ با زدن دکمهٔ «شروع فصل» در پنل مدیریت، روز اول برای همهٔ بازیکنان هم‌زمان آغاز می‌شود. تا آن زمان فقط پیام خصوصی بین کشورها فعال است.";
     banner.classList.remove("hidden", "is-finished"); banner.classList.add("is-waiting");
+    measureSeasonBanner();
 }
+function measureSeasonBanner() {
+    const banner = document.getElementById("season-gate-banner");
+    const gameRoot = document.getElementById("game");
+    if (!banner || !gameRoot) return;
+    requestAnimationFrame(() => {
+        const h = banner.classList.contains("hidden") ? 0 : banner.offsetHeight + 6;
+        gameRoot.style.setProperty("--banner-h", h + "px");
+    });
+}
+window.addEventListener("resize", measureSeasonBanner);
 
 // بازدید و ناوبری همیشه آزاد است؛ فقط اجرای عملیات تغییر‌دهنده قفل می‌شود.
 // سرور نیز تمام درخواست‌های POST غیرمجاز قبل از شروع و پس از پایان را رد می‌کند.
@@ -748,7 +763,9 @@ document.addEventListener("click", event => {
         "#union-create-confirm", "#union-invite-submit", "#union-leave", "#union-chat-send",
         ".union-create-launch", "[data-union-request]", "[data-invite-accept]", "[data-invite-reject]",
         "[data-join-response]", "[data-kick-member]", "#sat-launch",
-        "#war-declare-submit", "#pm-send-attachment"
+        "#war-declare-submit", "#pm-send-attachment",
+        "#infra-sheet .modal-ok", "#tr-ok", ".eco-invest-button", "#dp-go", ".market-confirm", ".market-action",
+        ".wf-tr-cancel", "#sat-launch", ".sat-scan", "[data-war-reason-submit]"
     ].join(",")) || Boolean(target.closest(
         ".infra-build-actions, .infra-confirm-actions, .eco-invest-actions, .ln-actions, .market-trade-actions"
     )) || Boolean(target.matches("[data-act], [data-action='build'], [data-action='upgrade']"));
@@ -2880,6 +2897,8 @@ document.querySelectorAll("#game .game-page").forEach(page => {
         if (page.id === "admin") { gameHeaderForScroll.style.transform = "translate3d(0, 0, 0)"; return; }
         const travel = Math.min(Math.max(0, page.scrollTop || 0), gameHeaderForScroll.offsetHeight || 78);
         gameHeaderForScroll.style.transform = `translate3d(0, ${-travel}px, 0)`;
+        const sb = document.getElementById("season-gate-banner");
+        if (sb) sb.style.transform = `translate3d(0, ${-travel}px, 0)`;
     }, { passive: true });
 });
 
@@ -3283,6 +3302,8 @@ function escapeHtml(s) {
    Unions — فهرست عمومی و چت تمام‌صفحه
 ========================================================= */
 function unionErrorText(error) {
+    if (error && typeof error === "object" && error.message) return error.message;
+    if (error && typeof error === "object") error = error.error;
     return ({
         already_member: "شما عضو یک اتحادیه هستید.", in_other: "این کشور عضو اتحادیهٔ دیگری است.",
         not_leader: "فقط مالک اتحادیه می‌تواند این کار را انجام دهد.", no_union: "اتحادیه پیدا نشد.",
@@ -3334,7 +3355,7 @@ function openUnionCreateModal() {
         submit.disabled = true; submit.textContent = "در حال ساخت…";
         try {
             const r = await apiPost("/api/union/create", { name });
-            if (!r.success) { showToast(unionErrorText(r.error), "error"); submit.disabled = false; submit.textContent = "ساخت اتحادیه"; return; }
+            if (!r.success) { showToast(unionErrorText(r), "error"); submit.disabled = false; submit.textContent = "ساخت اتحادیه"; return; }
             close();
             showToast("اتحادیه ساخته شد.", "success");
             await loadUnion();
@@ -3425,7 +3446,7 @@ function renderUnionBrowser(d) {
     c.querySelectorAll("[data-union-request]").forEach(b => b.onclick = async () => {
         b.disabled = true;
         const r = await apiPost("/api/union/request", { union_id: b.dataset.unionRequest });
-        if (!r.success) showToast(unionErrorText(r.error), "error");
+        if (!r.success) showToast(unionErrorText(r), "error");
         else showToast("درخواست عضویت برای مالک اتحادیه فرستاده شد.", "success");
         await loadUnion();
     });
@@ -3435,7 +3456,7 @@ function renderUnionBrowser(d) {
 
 async function respondInvite(uId, accept) {
     const r = await apiPost("/api/union/respond", { union_id: uId, accept });
-    if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+    if (!r.success) { showToast(unionErrorText(r), "error"); return; }
     showToast(accept ? "عضویت در اتحادیه انجام شد." : "دعوت رد شد.", "success");
     await loadUnion();
     if (accept) await openUnionChat(uId);
@@ -3517,7 +3538,7 @@ async function sendUnionChatMessage() {
     if (!text || !unionChatId) return;
     input.value = "";
     const r = await apiPost("/api/union/message", { text });
-    if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+    if (!r.success) { showToast(unionErrorText(r), "error"); return; }
     await refreshUnionChat();
 }
 document.getElementById("union-chat-send")?.addEventListener("click", sendUnionChatMessage);
@@ -3577,7 +3598,7 @@ async function openUnionMembers() {
             const target = ov.querySelector("#union-invite-target").value;
             if (!target) return;
             const r = await apiPost("/api/union/invite", { union_id: u.id, target });
-            if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+            if (!r.success) { showToast(unionErrorText(r), "error"); return; }
             showToast(`دعوت ${COUNTRY_NAMES[target]} ارسال شد.`, "success");
             ov.remove(); await openUnionMembers();
         };
@@ -3585,13 +3606,13 @@ async function openUnionMembers() {
             const target = b.dataset.kickMember;
             if (!(await gameConfirm(`کشور ${COUNTRY_NAMES[target]} از اتحادیه اخراج شود؟`, { title: "اخراج عضو", ok: "اخراج", danger: true }))) return;
             const r = await apiPost("/api/union/kick", { union_id: u.id, target });
-            if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+            if (!r.success) { showToast(unionErrorText(r), "error"); return; }
             showToast("عضو از اتحادیه اخراج شد.", "success"); ov.remove(); await refreshUnionChat(); await openUnionMembers();
         });
         ov.querySelectorAll("[data-join-response]").forEach(b => b.onclick = async () => {
             const target = b.dataset.joinResponse, accept = b.dataset.accept === "true";
             const r = await apiPost("/api/union/request/respond", { union_id: u.id, target, accept });
-            if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+            if (!r.success) { showToast(unionErrorText(r), "error"); return; }
             showToast(accept ? `${COUNTRY_NAMES[target]} به اتحادیه پیوست.` : "درخواست رد شد.", "success");
             ov.remove(); await refreshUnionChat(); await openUnionMembers();
         });
@@ -3600,7 +3621,7 @@ async function openUnionMembers() {
         const message = isLeader ? "با خروج مالک، اتحادیه منحل می‌شود. ادامه می‌دهید؟" : "از اتحادیه خارج می‌شوید؟";
         if (!(await gameConfirm(message, { title: "خروج از اتحادیه", ok: "خروج", danger: true }))) return;
         const r = await apiPost("/api/union/leave", {});
-        if (!r.success) { showToast(unionErrorText(r.error), "error"); return; }
+        if (!r.success) { showToast(unionErrorText(r), "error"); return; }
         ov.remove(); document.getElementById("union-conversation").classList.add("hidden");
         unionChatId = null; unionChatSignature = "";
         showToast(isLeader ? "اتحادیه منحل شد." : "از اتحادیه خارج شدید.", "success");
