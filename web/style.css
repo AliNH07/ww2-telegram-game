@@ -2728,12 +2728,6 @@ button.action-denied .action-error-inline{color:#ffe5e5}
 .admin-world-card .admin-world-status{color:#e4cb8f}
 @media(max-width:430px){.admin-world-actions{width:100%;min-width:0}.admin-world-card{align-items:stretch}.season-gate-banner{font-size:10px}}
 
-#game.season-locked .hm-grid .action-card,#game.season-locked .bottom-nav .nav-item:not([data-page="communications"]){opacity:.42;filter:grayscale(.72)}
-#game.season-locked .hm-grid .action-card{cursor:not-allowed}
-
-/* در انتظار شروع یا پس از پایان دور، رابط ارتباطات فقط پیام خصوصی را نشان می‌دهد. */
-#game.season-locked .comm-tabs .comm-tab:not([data-tab="comm-contacts"]){display:none!important}
-#game.season-locked #comm-announcements,#game.season-locked #comm-unions,#game.season-locked #comm-news{display:none!important}
 
 /* مدیریت جدید: نمای اول خلوت و دنیاها در صفحه مستقل */
 #admin .admin-back-bar{display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:11;background:#0b1421;padding:12px 8px;border-bottom:1px solid #283448}
@@ -2762,30 +2756,16 @@ button.action-denied .action-error-inline{color:#ffe5e5}
 #admin #admin-panel-complaints h4{font-size:13px;margin:12px 0;color:#f5d994}
 @media(min-width:650px){#admin .admin-global-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
-/* 2026-10-11: نمایش بدون محدودیت صفحات پیش از شروع فصل */
-#game.season-locked .hm-grid .action-card,
-#game.season-locked .bottom-nav .nav-item:not([data-page="communications"]){opacity:1!important;filter:none!important;cursor:pointer!important}
-#game.season-locked .comm-tabs .comm-tab:not([data-tab="comm-contacts"]),
-#game.season-locked #comm-announcements,
-#game.season-locked #comm-unions,
-#game.season-locked #comm-news{display:revert}
-#game.season-locked .comm-panel.hidden{display:none!important}
-/* پنجره راهنما در گوشی کوتاه نیز قابل اسکرول و بستن است */
-@media(max-height:700px){#guide-modal{align-items:flex-start}
-/* اصلاح نهایی انتخاب و وضعیت فصل ـ 2026-10-11 */
-#game.season-locked .comm-tabs .comm-tab:not([data-tab="comm-contacts"]){display:flex!important}
-#game.season-locked #comm-announcements:not(.hidden),
-#game.season-locked #comm-unions:not(.hidden),
-#game.season-locked #comm-news:not(.hidden){display:block!important}
-#game.season-locked .comm-panel.hidden{display:none!important}
+/* 2026-10-11: همهٔ صفحات پیش از شروع فصل قابل مشاهده‌اند؛ فقط عملیات (در JS/سرور) قفل است. */
+.comm-panel.hidden{display:none!important}
 #home .hm-season-line{display:none!important}
-#game.season-locked .hm-grid .action-card,#game.season-locked .bottom-nav .nav-item{opacity:1!important;filter:none!important;cursor:pointer!important}
+/* پنجره راهنما در گوشی کوتاه نیز قابل اسکرول و بستن است */
+@media(max-height:700px){#guide-modal{align-items:flex-start}}
 
-
-/* ===== بنر وضعیت فصل: زیر هدر، در همهٔ صفحات ===== */
-#game > #season-gate-banner{position:absolute;top:78px;right:12px;left:12px;margin:0;z-index:19;box-sizing:border-box;will-change:transform}
-#game > #season-gate-banner.hidden{display:none!important}
-#game:not(.booting) .game-page:not(#admin){padding-top:calc(94px + var(--banner-h,0px))!important}
+/* ===== بنر وضعیت فصل: فقط در خانه، اول صفحه، همراه اسکرول ===== */
+#home > #season-gate-banner{position:static;margin:0 0 10px;box-sizing:border-box}
+#season-gate-banner.hidden{display:none!important}
+#game:not(.booting) .game-page:not(#admin){padding-top:94px!important}
 body.admin-direct #season-gate-banner{display:none!important}
 
 /* ===== پنجرهٔ راهنما ===== */
@@ -2795,3 +2775,9 @@ body.admin-direct #season-gate-banner{display:none!important}
 #guide-modal .guide-box{display:flex;flex-direction:column;width:100%;max-width:380px;max-height:100%;margin:0;overflow:hidden;padding:18px 16px 12px}
 #guide-modal .guide-box>h2,#guide-modal .guide-box>.guide-sub,#guide-modal .guide-box>.guide-btn,#guide-modal .guide-box>.guide-foot{flex:none}
 #guide-modal .guide-steps{flex:1 1 auto;min-height:0;overflow-y:auto;margin-bottom:12px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+
+
+/* ===== تب‌های ارتباطات: بدون فاصله‌ی ناجور، چهار تب هم‌اندازه ===== */
+.comm-tabs{display:flex;gap:0;padding:3px;margin-bottom:12px;align-items:stretch}
+.comm-tabs .comm-tab{flex:1 1 0;min-width:0;margin:0;padding:8px 2px;display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;font-size:11px}
+.comm-tabs .comm-tab .pm-badge{margin:0}
