@@ -2780,3 +2780,14 @@ button.action-denied .action-error-inline{color:#ffe5e5}
 #guide-modal{top:0;bottom:0;min-height:0;height:100dvh;overflow-y:auto;overscroll-behavior:contain;align-items:safe center;padding:16px 14px calc(20px + env(safe-area-inset-bottom))}
 #guide-modal .guide-box{margin:auto;max-height:calc(100dvh - 36px);overflow-y:auto;overscroll-behavior:contain;flex-shrink:0}
 @media(max-height:700px){#guide-modal{align-items:flex-start}#guide-modal .guide-box{margin:auto;max-height:none}}
+
+/* اصلاح نهایی انتخاب و وضعیت فصل ـ 2026-10-11 */
+#game.season-locked .comm-tabs .comm-tab:not([data-tab="comm-contacts"]){display:flex!important}
+#game.season-locked #comm-announcements:not(.hidden),
+#game.season-locked #comm-unions:not(.hidden),
+#game.season-locked #comm-news:not(.hidden){display:block!important}
+#game.season-locked .comm-panel.hidden{display:none!important}
+#game:not(.booting) #home #season-gate-banner:not(.hidden){position:sticky!important;top:0!important;left:auto!important;right:auto!important;margin:0 0 12px!important;z-index:12;max-height:unset!important;overflow:visible!important}
+#game:not(.booting):has(#season-gate-banner:not(.hidden)) .game-page:not(.hidden){padding-top:16px!important}
+#home .hm-season-line{display:none!important}
+#game.season-locked .hm-grid .action-card,#game.season-locked .bottom-nav .nav-item{opacity:1!important;filter:none!important;cursor:pointer!important}
