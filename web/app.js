@@ -172,6 +172,7 @@ function showGamePage(id) {
     document.querySelectorAll(".game-page").forEach(p => p.classList.add("hidden"));
     const t = document.getElementById(id);
     if (t) { t.classList.remove("hidden"); t.scrollTop = 0; }
+    if (player?.country) updateSeasonGateBanner();
     const header = document.querySelector("#game .game-header");
     if (header) header.style.transform = "translate3d(0, 0, 0)";
 }
@@ -389,7 +390,7 @@ function startStatsPolling() {
     statsInterval = setInterval(() => {
         refreshNotificationBadge();
         refreshHeaderRank();
-    }, 30000);
+    }, 10000);
 }
 function stopStatsPolling() {
     if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
@@ -739,28 +740,23 @@ function updateSeasonGateBanner() {
     banner.classList.remove("hidden", "is-finished"); banner.classList.add("is-waiting");
 }
 
-// پیش از شروع فصل و پس از پایان روز ۳۱، تمام عملیات بازی جز پیام خصوصی قفل می‌شوند.
+// بازدید و ناوبری همیشه آزاد است؛ فقط اجرای عملیات تغییر‌دهنده قفل می‌شود.
+// سرور نیز تمام درخواست‌های POST غیرمجاز قبل از شروع و پس از پایان را رد می‌کند.
 document.addEventListener("click", event => {
-    if (!player?.country) return;
-    if (player.game_started && !player.game_finished) return;
+    if (!player?.country || (player.game_started && !player.game_finished)) return;
     const target = event.target?.closest?.("button, a, [role=button]");
-    if (!target) return;
-    const canOpenAdmin = isAdminAccount && (
-        target.matches('[data-page="admin"]') || target.id === "game-menu-button" ||
-        Boolean(target.closest("#admin"))
-    );
-    if (canOpenAdmin) return;
-    const opensCommunications = target.matches('[data-page="communications"], [data-menu-page="communications"]');
-    const opensPrivateMessages = target.matches('[data-tab="comm-contacts"]');
-    const closesGuide = target.matches("#guide-close");
-    const isPrivateMessageControl = Boolean(
-        target.closest("#pm-conversation") ||
-        (target.closest("#comm-contacts") && target.closest(".pm-subtabs, #pm-inbox, #contact-list, #contact-search-wrap"))
-    );
-    if (opensCommunications || opensPrivateMessages || isPrivateMessageControl || closesGuide) return;
+    if (!target || target.closest("#admin") || target.closest("#guide-modal")) return;
+    const mutating = target.matches([
+        "#ann-submit", "#ln-submit", "#mk-submit", "#market-sanction-submit",
+        "#union-create-confirm", "#union-invite-submit", "#sat-launch",
+        "#war-declare-submit", "#pm-send-attachment"
+    ].join(",")) || Boolean(target.closest(
+        ".infra-build-actions, .infra-confirm-actions, .eco-invest-actions, .ln-actions, .market-trade-actions"
+    )) || Boolean(target.matches("[data-act], [data-action='build'], [data-action='upgrade']"));
+    if (!mutating) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    showToast(player.game_finished ? "بازی تمام شده است؛ فقط پیام خصوصی فعال مانده." : "بعد از شروع فصل امکان‌پذیر است.", "error");
+    showToast(player.game_finished ? "فصل پایان یافته؛ عملیات غیرفعال است." : "فصل هنوز آغاز نشده؛ فعلاً فقط مشاهده و پیام خصوصی مجاز است.", "error");
 }, true);
 
 const RK_TABS = [
@@ -2362,6 +2358,9 @@ document.querySelectorAll(".nav-item").forEach(item => {
 ========================================================= */
 const ADMIN_TELEGRAM_ID = 8290076602;
 let adminOverviewCache = null;
+let adminCurrentDetailWorld = null;
+let adminPanelLoading = false;
+let adminPrivateMessagesCache = [];
 let adminSelectedPlayerId = null;
 let adminSelectedPlayerDetailOpen = false;
 const adminCountryLabels = {germany:"آلمان",britain:"بریتانیا",ussr:"شوروی",usa:"آمریکا",france:"فرانسه",italy:"ایتالیا",china:"چین",japan:"ژاپن"};
@@ -2400,12 +2399,10 @@ gameMenuPanel?.addEventListener("click", async (event) => {
     showGamePage(page);
     if (page === "map") setTimeout(() => initWorldMap(), 30);
     else if (page === "communications") {
-        if (player && (!player.game_started || player.game_finished)) {
-            // انتظار شروع/پس از پایان: فقط بخش پیام خصوصی را باز می‌کنیم.
-            document.querySelector('.comm-tab[data-tab="comm-contacts"]')?.click();
-        } else {
-            resetNewsFilter(); loadAnnouncements(); loadUnion(); loadNews();
-        }
+        resetNewsFilter();
+        loadAnnouncements().catch(console.error);
+        loadUnion().catch(console.error);
+        loadNews().catch(console.error);
     }
     else if (page === "home") updateHomeStats();
 });
@@ -2446,28 +2443,36 @@ async function loadAdminPanel() {
     if (!adminAutoRefreshTimer) adminAutoRefreshTimer = setInterval(() => {
         const panel = document.getElementById("admin");
         if (panel && !panel.classList.contains("hidden") && !document.hidden) loadAdminPanel();
-    }, 30000);
+    }, 10000);
+    if (adminPanelLoading) return;
+    adminPanelLoading = true;
+    const requestWorldId = String(selectedWorldId);
     const error = document.getElementById("admin-access-error");
     error?.classList.add("hidden");
     const list = document.getElementById("admin-player-list");
     if (list && !adminOverviewCache) list.innerHTML = `<div class="admin-empty"><span class="admin-loader"></span>در حال دریافت اطلاعات بازی…</div>`;
     try {
-        const [data, warsData, worldsData] = await Promise.all([
-            apiGet("/api/admin/overview"), apiGet("/api/admin/wars"), apiGet("/api/worlds")
+        const [data, warsData, globalData, communicationsData] = await Promise.all([
+            apiGet("/api/admin/overview"), apiGet("/api/admin/wars"), apiGet("/api/admin/global"), apiGet("/api/admin/communications")
         ]);
+        if (requestWorldId !== String(selectedWorldId)) return;
         adminWarsCache = warsData?.wars || [];
-        adminWorldsCache = worldsData?.worlds || [];
+        adminWorldsCache = globalData?.worlds || [];
+        adminPrivateMessagesCache = communicationsData?.messages || [];
+        renderAdminGlobal();
+        renderAdminCommunications();
         if (!data?.success) {
             if (error) { error.textContent = data?.message || (data?.error === "forbidden" ? "دسترسی به پنل مدیریت رد شد." : "احراز هویت تلگرام تأیید نشد؛ بازی را از داخل تلگرام باز کن."); error.classList.remove("hidden"); }
             if (list) list.innerHTML = `<div class="admin-empty">اطلاعات مدیریت دریافت نشد.</div>`;
             return;
         }
         adminOverviewCache = data;
-        renderAdminOverview();
+        if (adminCurrentDetailWorld !== null && !document.querySelector("#admin input:focus, #admin textarea:focus, #admin select:focus") && !adminSelectedPlayerDetailOpen) renderAdminOverview();
+        document.getElementById("admin-last-refresh").textContent = "آخرین بروزرسانی: " + new Date().toLocaleTimeString("fa-IR") + " · هر ۱۰ ثانیه";
     } catch (e) {
         if (error) { error.textContent = "ارتباط با سرور برقرار نشد. دوباره تلاش کن."; error.classList.remove("hidden"); }
-        if (list) list.innerHTML = `<div class="admin-empty">خطا در دریافت اطلاعات.</div>`;
-    }
+        if (list && !adminOverviewCache) list.innerHTML = `<div class="admin-empty">خطا در دریافت اطلاعات.</div>`;
+    } finally { adminPanelLoading = false; }
 }
 function renderAdminWars() {
     const root = document.getElementById("admin-war-list"); if (!root) return;
@@ -2492,14 +2497,66 @@ function renderAdminWars() {
 
 async function switchAdminWorld(worldId) {
     selectedWorldId = String(worldId);
-    try { localStorage.setItem("fl93_world_id", selectedWorldId); } catch {}
     adminSelectedPlayerId = null; adminSelectedPlayerDetailOpen = false;
     // مدیریت دنیا نباید حساب مدیر را به‌عنوان بازیکن به دنیای انتخاب‌شده اضافه کند.
     player = null; selectedCountry = null;
+    adminCurrentDetailWorld = String(worldId);
+    adminOverviewCache = null;
+    renderAdminNavigation();
     await loadAdminPanel();
     showGamePage("admin");
 }
 
+function renderAdminNavigation() {
+    const inside = adminCurrentDetailWorld !== null;
+    document.getElementById("admin-world-detail")?.classList.toggle("hidden", !inside);
+    document.getElementById("admin-global")?.classList.toggle("hidden", inside);
+    document.getElementById("admin-current-world")?.classList.toggle("hidden", !inside);
+    if (inside) {
+        const w = adminWorldsCache.find(x => String(x.id) === String(adminCurrentDetailWorld));
+        document.getElementById("admin-world-detail-title").textContent = "🌍 " + (w?.name || `دنیای ${adminCurrentDetailWorld}`);
+    }
+}
+function renderAdminGlobal() {
+    const data = adminWorldsCache || [];
+    const stats = document.getElementById("admin-global-stats");
+    const total = key => data.reduce((a,w) => a + Number(w[key] || 0), 0);
+    if (stats) stats.innerHTML = [["🌍 دنیاها", data.length], ["👥 بازیکنان", total("total_players")], ["🏳️ کشورهای اشغال‌شده", total("countries_taken")], ["🟢 بازیکنان فعال", total("active_players")], ["⚔️ جنگ‌های در انتظار", total("pending_wars")], ["📨 پیام‌های خصوصی", total("private_message_count")]].map(([label,value]) => `<div class="admin-global-stat"><span>${label}</span><strong>${adminFormatNumber(value)}</strong></div>`).join("");
+    const list = document.getElementById("admin-world-picker");
+    if (list && !list.classList.contains("hidden")) renderAdminWorldPicker();
+    renderAdminNavigation();
+}
+function renderAdminWorldPicker() {
+    const root = document.getElementById("admin-world-picker"); if (!root) return;
+    root.innerHTML = (adminWorldsCache || []).map(w => `<button type="button" class="admin-pick-world" data-pick-world="${Number(w.id)}"><span>🌐 <b>${escapeHtml(w.name || `دنیای ${w.id}`)}</b><small>${w.game_finished ? "پایان‌یافته" : w.game_started ? `روز ${w.day} از ۳۱` : "شروع نشده"} · ${adminFormatNumber(w.total_players)} بازیکن · ${adminFormatNumber(w.countries_taken)} کشور</small></span><span>←</span></button>`).join("") || '<div class="admin-empty">دنیایی ثبت نشده است.</div>';
+}
+function renderAdminCommunications() {
+    const root = document.getElementById("admin-pm-list"); if (!root) return;
+    const messages = adminPrivateMessagesCache || [];
+    const flagged = messages.filter(m => /شکایت|اعتراض|سازمان ملل|گزارش تخلف|complaint|report/i.test(m.text || ""));
+    const renderItem = m => `<article class="admin-news-row"><div><b>${escapeHtml(COUNTRY_NAMES[m.from] || m.from || "نامشخص")} ← ${escapeHtml(COUNTRY_NAMES[m.to] || m.to || "نامشخص")}</b><p>${escapeHtml(m.text || "")}</p><small>${escapeHtml(m.at ? new Date(m.at).toLocaleString("fa-IR") : "")}</small></div></article>`;
+    root.innerHTML = `<h4>📋 پیام‌های دارای نشانه شکایت (${flagged.length})</h4>${flagged.length ? flagged.map(renderItem).join("") : '<div class="admin-empty">شکایتی از متن پیام‌ها شناسایی نشد.</div>'}<h4 style="margin-top:20px">💬 پیام‌های خصوصی اخیر (${messages.length})</h4>${messages.length ? messages.map(renderItem).join("") : '<div class="admin-empty">پیامی در این دنیا ثبت نشده است.</div>'}`;
+}
+document.getElementById("admin-show-worlds")?.addEventListener("click", e => {
+    const list = document.getElementById("admin-world-picker");
+    const opened = list.classList.toggle("hidden") === false;
+    e.currentTarget.setAttribute("aria-expanded", String(opened));
+    if (opened) renderAdminWorldPicker();
+});
+document.getElementById("admin-world-picker")?.addEventListener("click", async e => {
+    const btn = e.target.closest("[data-pick-world]"); if (!btn) return;
+    await switchAdminWorld(btn.dataset.pickWorld);
+    document.querySelector('[data-admin-tab="players"]')?.click();
+});
+document.getElementById("admin-back-worlds")?.addEventListener("click", () => {
+    adminCurrentDetailWorld = null;
+    adminSelectedPlayerId = null;
+    adminSelectedPlayerDetailOpen = false;
+    renderAdminNavigation();
+    document.getElementById("admin-world-picker")?.classList.remove("hidden");
+    renderAdminWorldPicker();
+    document.getElementById("admin")?.scrollTo(0,0);
+});
 function renderAdminWorldSwitcher() {
     const root = document.getElementById("admin-world-switcher"); if (!root) return;
     const worlds = adminWorldsCache || [];
@@ -4874,6 +4931,7 @@ let previewGlobeAbort = null;
         showOnly("game");
         document.getElementById("game")?.classList.remove("booting");
         showGamePage("admin");
+        renderAdminNavigation();
         await loadAdminPanel();
         return;
     }
@@ -4884,28 +4942,8 @@ let previewGlobeAbort = null;
         }
         await enterSelectedWorld();
     } else {
-        // Upgrade migration: if an older version already has this player's country in its saved world,
-        // preserve that session and record the new per-user marker instead of showing worlds again.
-        let restoredExistingPlayer = false;
-        let hadLegacyWorld = false;
-        try { hadLegacyWorld = !!localStorage.getItem("fl93_world_id"); } catch {}
-        if (hadLegacyWorld && userId) {
-            try {
-                await loadCountries();
-                await loadPlayer();
-                restoredExistingPlayer = !!player?.country;
-            } catch (e) { console.warn("Could not migrate saved world selection:", e); }
-        }
-        if (restoredExistingPlayer) {
-            try {
-                localStorage.setItem(worldIdKey(), String(selectedWorldId));
-                localStorage.setItem(worldChoiceKey(), "1");
-            } catch {}
-            await loadArmyCatalog();
-            await showGame();
-        } else {
-            showWorldSelection();
-        }
+        // حتی اگر کلید قدیمی محلی موجود باشد، ورود نخست با انتخاب دنیا شروع می‌شود.
+        await showWorldSelection();
     }
 })();
 
