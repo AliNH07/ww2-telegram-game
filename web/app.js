@@ -45,6 +45,7 @@ const COUNTRY_IMAGE_EXT = { germany: "jpg", britain: "jfif", ussr: "jfif", usa: 
     france: "jfif", italy: "jfif", china: "jfif", japan: "jfif" };
 const COUNTRY_FLAGS = { germany: "🇩🇪", britain: "🇬🇧", ussr: "☭", usa: "🇺🇸",
     france: "🇫🇷", italy: "🇮🇹", china: "🇨🇳", japan: "🇯🇵" };
+const TREATY_TYPE_NAMES = { alliance: "پیمان اتحاد", non_aggression: "پیمان عدم تجاوز" };
 const COUNTRY_NAMES = { germany: "آلمان", britain: "بریتانیا", ussr: "شوروی", usa: "آمریکا",
     france: "فرانسه", italy: "ایتالیا", china: "چین", japan: "ژاپن" };
 const COUNTRY_IDS = { germany: 276, britain: 826, ussr: 643, usa: 840,
@@ -175,8 +176,6 @@ function showGamePage(id) {
     if (player?.country) updateSeasonGateBanner();
     const header = document.querySelector("#game .game-header");
     if (header) header.style.transform = "translate3d(0, 0, 0)";
-    const sb = document.getElementById("season-gate-banner");
-    if (sb) sb.style.transform = "translate3d(0, 0, 0)";
 }
 
 function formatMoney(v) { return "$" + Math.round(Number(v ?? 0)).toLocaleString("en-US"); }
@@ -763,7 +762,7 @@ document.addEventListener("click", event => {
         "#union-create-confirm", "#union-invite-submit", "#union-leave", "#union-chat-send",
         ".union-create-launch", "[data-union-request]", "[data-invite-accept]", "[data-invite-reject]",
         "[data-join-response]", "[data-kick-member]", "#sat-launch",
-        "#war-declare-submit", "#pm-send-attachment",
+        "#war-declare-submit", "#pm-send-attachment", "#diplomacy-propose-button", ".diplomacy-item [data-accept]", ".diplomacy-item [data-reject]",
         "#infra-sheet .modal-ok", "#tr-ok", ".eco-invest-button", "#dp-go", ".market-confirm", ".market-action",
         ".wf-tr-cancel", "#sat-launch", ".sat-scan", "[data-war-reason-submit]"
     ].join(",")) || Boolean(target.closest(
@@ -860,6 +859,7 @@ document.querySelectorAll(".action-card").forEach(card => {
         if (s === "infrastructure") openInfrastructureMenu();
         else if (s === "army") openArmyPage();
         else if (s === "war") openWarPage();
+        else if (s === "diplomacy") openDiplomacyPage();
         else if (s === "economy") openEconomyPage();
         else if (s === "market") { showGamePage("market"); loadMarketListings(); }
         else if (s === "ranking") { showGamePage("ranking"); loadRankings(); }
@@ -2348,6 +2348,99 @@ async function renderSatTab() {
 
 
 /* =========================================================
+   Diplomacy
+========================================================= */
+function openDiplomacyPage() {
+    showGamePage("diplomacy");
+    const sel = document.getElementById("diplomacy-target");
+    sel.innerHTML = "";
+    Object.keys(COUNTRY_NAMES).forEach(cid => {
+        if (cid === selectedCountry) return;
+        const o = document.createElement("option");
+        o.value = cid; o.textContent = COUNTRY_NAMES[cid];
+        sel.appendChild(o);
+    });
+    loadDiplomacyStatus();
+}
+
+document.getElementById("diplomacy-propose-button").addEventListener("click", async () => {
+    if (!userId) return;
+    const target = document.getElementById("diplomacy-target").value;
+    const type = document.getElementById("diplomacy-type").value;
+    const dur = document.getElementById("diplomacy-duration").value;
+    try {
+        const d = await apiPost("/api/propose-treaty", { target, type, duration_days: Number(dur) });
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        showToast(d.message, "success"); loadDiplomacyStatus();
+    } catch (e) { showToast("خطا."); }
+});
+
+async function loadDiplomacyStatus() {
+    if (!userId) return;
+    try {
+        const d = await apiGet("/api/diplomacy");
+        renderReceivedProposals(d.received || []);
+        renderTreatyList(d.treaties || []);
+        renderSentProposals(d.sent || []);
+    } catch (e) { console.error(e); }
+}
+
+function renderReceivedProposals(list) {
+    const c = document.getElementById("diplomacy-received");
+    c.innerHTML = "";
+    if (!list.length) {
+        c.innerHTML = `<div class="diplomacy-item-empty">پیشنهاد دریافتی نیست.</div>`; return;
+    }
+    list.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "diplomacy-item";
+        div.innerHTML = `
+            <span>${TREATY_TYPE_NAMES[p.treaty_type]} از ${flagInline(p.from_country, true)} ${COUNTRY_NAMES[p.from_country]} — ${p.duration_days} روز</span>
+            <span>
+                <button class="message-button" data-accept="${p.id}" style="background:rgba(74,222,128,.15);color:#4ade80;border-color:rgba(74,222,128,.3);">قبول</button>
+                <button class="message-button" data-reject="${p.id}">رد</button>
+            </span>`;
+        c.appendChild(div);
+    });
+    c.querySelectorAll("[data-accept]").forEach(b => b.onclick = () => respondTreaty(b.dataset.accept, true));
+    c.querySelectorAll("[data-reject]").forEach(b => b.onclick = () => respondTreaty(b.dataset.reject, false));
+}
+
+async function respondTreaty(pid, accept) {
+    try {
+        const d = await apiPost("/api/respond-treaty", { proposal_id: pid, accept });
+        if (!d.success) { showToast(d.message || "خطا", "error"); return; }
+        showToast(accept ? "پذیرفته شد." : "رد شد.", "success");
+        loadDiplomacyStatus();
+    } catch (e) { showToast("خطا."); }
+}
+
+function renderTreatyList(list) {
+    const c = document.getElementById("diplomacy-treaties");
+    c.innerHTML = "";
+    if (!list.length) { c.innerHTML = `<div class="diplomacy-item-empty">پیمانی نیست.</div>`; return; }
+    list.forEach(t => {
+        const other = t.country_a === selectedCountry ? t.country_b : t.country_a;
+        const div = document.createElement("div");
+        div.className = "diplomacy-item";
+        div.innerHTML = `<span>${TREATY_TYPE_NAMES[t.treaty_type]} با ${flagInline(other, true)} ${COUNTRY_NAMES[other] || other}</span>`;
+        c.appendChild(div);
+    });
+}
+
+function renderSentProposals(list) {
+    const c = document.getElementById("diplomacy-sent");
+    c.innerHTML = "";
+    if (!list.length) { c.innerHTML = `<div class="diplomacy-item-empty">پیشنهاد ارسالی نیست.</div>`; return; }
+    list.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "diplomacy-item";
+        div.innerHTML = `<span>${TREATY_TYPE_NAMES[p.treaty_type]} به ${flagInline(p.to_country, true)} ${COUNTRY_NAMES[p.to_country]}</span><span>در انتظار</span>`;
+        c.appendChild(div);
+    });
+}
+
+/* =========================================================
    Bottom Nav
 ========================================================= */
 document.querySelectorAll(".nav-item").forEach(item => {
@@ -2897,8 +2990,6 @@ document.querySelectorAll("#game .game-page").forEach(page => {
         if (page.id === "admin") { gameHeaderForScroll.style.transform = "translate3d(0, 0, 0)"; return; }
         const travel = Math.min(Math.max(0, page.scrollTop || 0), gameHeaderForScroll.offsetHeight || 78);
         gameHeaderForScroll.style.transform = `translate3d(0, ${-travel}px, 0)`;
-        const sb = document.getElementById("season-gate-banner");
-        if (sb) sb.style.transform = `translate3d(0, ${-travel}px, 0)`;
     }, { passive: true });
 });
 
@@ -3636,6 +3727,7 @@ function inferNewsCategory(item) {
     if (item.category) return item.category;
     const source = `${item.title || ""} ${item.text || ""}`;
     if (source.includes("اتحادیه")) return "union";
+    if (["پیمان", "عدم تجاوز", "دیپلماسی", "مذاکره"].some(x => source.includes(x))) return "diplomacy";
     if (["جنگ", "نبرد", "دفاع", "حمله", "اشغال", "تلفات", "نیرو", "ارتش", "پیروزی", "شکست"].some(x => source.includes(x))) return "military";
     if (["بیانیه"].some(x => source.includes(x))) return "general";
     if (["معامله", "تجارت", "بازار", "مرز زمینی", "حمل‌ونقل", "حمل و نقل"].some(x => source.includes(x))) return "trade";
@@ -3656,7 +3748,7 @@ function renderNewsList() {
     list.forEach(item => {
         const div = document.createElement("article");
         div.className = `news-item news-category-${inferNewsCategory(item)}`;
-        const categoryNames = { military: "نظامی", economy: "اقتصاد", trade: "تجارت", territory: "قلمرو", union: "اتحادیه", general: "عمومی" };
+        const categoryNames = { military: "نظامی", diplomacy: "دیپلماسی", economy: "اقتصاد", trade: "تجارت", territory: "قلمرو", union: "اتحادیه", general: "عمومی" };
         div.innerHTML = `<div class="news-item-top"><h3>${escapeHtml(item.title || "خبر")}</h3><span class="news-category-label">${categoryNames[inferNewsCategory(item)] || "عمومی"}</span></div>
             <p>${escapeHtml(item.text || "")}</p>${item.at ? `<time>${escapeHtml(formatNewsTime(item.at))}</time>` : ""}`;
         c.appendChild(div);
@@ -4953,8 +5045,13 @@ let previewGlobeAbort = null;
         await loadAdminPanel();
         return;
     }
-    // در هر ورود عادی، بازیکن باید آگاهانه دنیا را انتخاب کند.
-    // انتخاب قبلی فقط برای نمایش/پیش‌انتخاب است، نه ورود خودکار.
+    // دنیا و کشور فقط بار اول پرسیده می‌شوند. اگر سرور بگوید این بازیکن قبلاً در یک دنیا کشور گرفته،
+    // یا دنیایی را قبلاً انتخاب کرده، مستقیم وارد همان دنیا (و کشور ذخیره‌شده) می‌شویم.
+    const mine = availableWorlds.filter(w => w.mine);
+    let auto = null;
+    if (mine.length) auto = mine.find(w => String(w.id) === String(selectedWorldId)) || mine[0];
+    else if (hasSavedWorldChoice()) auto = availableWorlds.find(w => String(w.id) === String(selectedWorldId));
+    if (auto) { selectedWorldId = String(auto.id); await enterSelectedWorld(); return; }
     await showWorldSelection();
 })();
 
