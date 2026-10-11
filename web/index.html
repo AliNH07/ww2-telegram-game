@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1993</title>
-<link rel="stylesheet" href="/style.css?v=20261011ban1">
+<link rel="stylesheet" href="/style.css?v=20261011ban3">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -117,7 +117,6 @@
 
 
 
-    <div id="season-gate-banner" class="season-gate-banner hidden" role="status" aria-live="polite"></div>
 
     <div id="game-menu-panel" class="game-menu-panel hidden" role="menu" aria-label="منوی بازی">
         <button type="button" class="game-menu-item" data-menu-page="home">🏠 <span>خانه</span></button>
@@ -153,6 +152,8 @@
 
     <!-- ==================== خانه ==================== -->
     <main id="home" class="game-page">
+        <!-- پیام وضعیت فصل: فقط در خانه و همراه اسکرول -->
+        <div id="season-gate-banner" class="season-gate-banner hidden" role="status" aria-live="polite"></div>
 
         <!-- هیرو: کشور و خزانه -->
         <section class="hm-hero">
@@ -210,6 +211,13 @@
                     <span class="action-icon"><img src="/images/stickers/war.jpg" alt=""></span>
                     <h3>جنگ</h3>
                 <p>نبرد و اعزام نیرو</p>
+                </span>
+            </button>
+            <button class="action-card action-diplomacy hm-card" data-section="diplomacy">
+                <span class="action-overlay">
+                    <span class="action-icon"><img src="/images/stickers/diplomacy.jpg" alt=""></span>
+                    <h3>دیپلماسی</h3>
+                <p>پیمان‌ها</p>
                 </span>
             </button>
             <button class="action-card action-economy hm-card" data-section="economy">
@@ -473,6 +481,37 @@
         <div id="war-sat-panel" class="war-panel hidden"><div id="war-sat-root"></div></div>
     </main>
 
+    <!-- ==================== دیپلماسی ==================== -->
+    <main id="diplomacy" class="game-page hidden">
+        <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">📜</span>دیپلماسی</span><span class="sb-money">$0</span></div>
+        <div class="page-title"><span>روابط خارجی</span><h1>دیپلماسی</h1></div>
+
+        <div class="diplomacy-form">
+            <label class="diplomacy-label">کشور مقصد</label>
+            <select id="diplomacy-target" class="diplomacy-select"></select>
+
+            <label class="diplomacy-label">نوع پیمان</label>
+            <select id="diplomacy-type" class="diplomacy-select">
+                <option value="alliance">پیمان اتحاد</option>
+                <option value="non_aggression">پیمان عدم تجاوز</option>
+            </select>
+
+            <label class="diplomacy-label">مدت پیمان (روز)</label>
+            <input id="diplomacy-duration" class="diplomacy-input" type="number" value="10" min="1" max="30">
+
+            <button id="diplomacy-propose-button" class="diplomacy-submit">ارسال پیشنهاد</button>
+        </div>
+
+        <div class="diplomacy-list-title">پیشنهادهای دریافتی</div>
+        <div id="diplomacy-received" class="diplomacy-list"></div>
+
+        <div class="diplomacy-list-title">پیمان‌های فعال</div>
+        <div id="diplomacy-treaties" class="diplomacy-list"></div>
+
+        <div class="diplomacy-list-title">پیشنهادهای ارسال‌شده</div>
+        <div id="diplomacy-sent" class="diplomacy-list"></div>
+    </main>
+
     <!-- ==================== نقشه ==================== -->
     <main id="map" class="game-page hidden">
         <div class="map-top-bar">
@@ -550,6 +589,7 @@
                 <button class="news-filter" data-news-filter="economy">اقتصاد</button>
                 <button class="news-filter" data-news-filter="trade">تجارت</button>
                 <button class="news-filter" data-news-filter="territory">قلمرو</button>
+                <button class="news-filter" data-news-filter="diplomacy">دیپلماسی</button>
                 <button class="news-filter" data-news-filter="union">اتحادیه</button>
                 <button class="news-filter" data-news-filter="general">عمومی</button>
             </div>
@@ -816,6 +856,6 @@
 
 </section>
 
-<script src="/app.js?v=20261011ban1"></script>
+<script src="/app.js?v=20261011ban3"></script>
 </body>
 </html>
