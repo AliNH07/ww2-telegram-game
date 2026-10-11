@@ -724,10 +724,7 @@ function updateSeasonGateBanner() {
     const gameRoot = document.getElementById("game");
     if (gameRoot) gameRoot.classList.toggle("season-locked", !started || finished);
     if (started && !finished) {
-        const effects = player.season_effects || {};
-        const fmt = (v) => `${Number(v) > 0 ? "+" : ""}${Number(v || 0)}٪`;
-        banner.textContent = `روز ${player.day || 1} از ۳۱ · فصل ${player.season} | اثر فصل: درآمد روزانه ${fmt(effects.income_pct)}؛ مصرف غذا و نفت ${fmt(effects.food_oil_consumption_pct)}؛ تولید منابع ${fmt(effects.resource_production_pct)}؛ تولید نیروی انسانی ${fmt(effects.manpower_production_pct)}.`;
-        banner.classList.remove("hidden", "is-waiting", "is-finished");
+        banner.classList.add("hidden");
         return;
     }
     if (finished) {
@@ -747,8 +744,10 @@ document.addEventListener("click", event => {
     const target = event.target?.closest?.("button, a, [role=button]");
     if (!target || target.closest("#admin") || target.closest("#guide-modal")) return;
     const mutating = target.matches([
-        "#ann-submit", "#ln-submit", "#mk-submit", "#market-sanction-submit",
-        "#union-create-confirm", "#union-invite-submit", "#sat-launch",
+        "#ann-submit", "#ann-publish-confirm", "#ln-submit", "#mk-submit", "#market-sanction-submit",
+        "#union-create-confirm", "#union-invite-submit", "#union-leave", "#union-chat-send",
+        ".union-create-launch", "[data-union-request]", "[data-invite-accept]", "[data-invite-reject]",
+        "[data-join-response]", "[data-kick-member]", "#sat-launch",
         "#war-declare-submit", "#pm-send-attachment"
     ].join(",")) || Boolean(target.closest(
         ".infra-build-actions, .infra-confirm-actions, .eco-invest-actions, .ln-actions, .market-trade-actions"
@@ -2343,11 +2342,9 @@ document.querySelectorAll(".nav-item").forEach(item => {
         if (page === "home") { updateHomeStats(); refreshNotificationBadge(); }
         else if (page === "map") setTimeout(() => initWorldMap(), 30);
         else if (page === "communications") {
-            if (player && (!player.game_started || player.game_finished)) {
-                document.querySelector('.comm-tab[data-tab="comm-contacts"]')?.click();
-            } else {
-                resetNewsFilter(); loadAnnouncements(); loadUnion(); loadNews(); refreshNotificationBadge();
-            }
+            resetNewsFilter();
+            Promise.allSettled([loadAnnouncements(), loadUnion(), loadNews()]).catch(console.error);
+            refreshNotificationBadge();
         }
         else if (page === "market") { loadMarketListings(); loadMyListings(); }
     });
@@ -4935,16 +4932,9 @@ let previewGlobeAbort = null;
         await loadAdminPanel();
         return;
     }
-    if (hasSavedWorldChoice()) {
-        if (!availableWorlds.some(w => String(w.id) === String(selectedWorldId))) {
-            selectedWorldId = String(availableWorlds[0]?.id || "1");
-            try { localStorage.setItem("fl93_world_id", selectedWorldId); localStorage.setItem(worldIdKey(), selectedWorldId); } catch {}
-        }
-        await enterSelectedWorld();
-    } else {
-        // حتی اگر کلید قدیمی محلی موجود باشد، ورود نخست با انتخاب دنیا شروع می‌شود.
-        await showWorldSelection();
-    }
+    // در هر ورود عادی، بازیکن باید آگاهانه دنیا را انتخاب کند.
+    // انتخاب قبلی فقط برای نمایش/پیش‌انتخاب است، نه ورود خودکار.
+    await showWorldSelection();
 })();
 
 
