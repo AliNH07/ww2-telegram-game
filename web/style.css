@@ -2770,24 +2770,28 @@ button.action-denied .action-error-inline{color:#ffe5e5}
 #game.season-locked #comm-unions,
 #game.season-locked #comm-news{display:revert}
 #game.season-locked .comm-panel.hidden{display:none!important}
-/* بنر زیر هدر ثابت است و فضای محتوای اسکرول‌پذیر را می‌گیرد */
-#game:not(.booting):not(:has(#admin:not(.hidden))) #season-gate-banner:not(.hidden){
- position:absolute;top:78px;right:12px;left:12px;margin:0;z-index:19;
- max-height:86px;overflow-y:auto;box-sizing:border-box;
-}
-#game:not(.booting):has(#season-gate-banner:not(.hidden)) .game-page:not(.hidden){padding-top:180px!important}
 /* پنجره راهنما در گوشی کوتاه نیز قابل اسکرول و بستن است */
-#guide-modal{top:0;bottom:0;min-height:0;height:100dvh;overflow-y:auto;overscroll-behavior:contain;align-items:safe center;padding:16px 14px calc(20px + env(safe-area-inset-bottom))}
-#guide-modal .guide-box{margin:auto;max-height:calc(100dvh - 36px);overflow-y:auto;overscroll-behavior:contain;flex-shrink:0}
-@media(max-height:700px){#guide-modal{align-items:flex-start}#guide-modal .guide-box{margin:auto;max-height:none}}
-
+@media(max-height:700px){#guide-modal{align-items:flex-start}
 /* اصلاح نهایی انتخاب و وضعیت فصل ـ 2026-10-11 */
 #game.season-locked .comm-tabs .comm-tab:not([data-tab="comm-contacts"]){display:flex!important}
 #game.season-locked #comm-announcements:not(.hidden),
 #game.season-locked #comm-unions:not(.hidden),
 #game.season-locked #comm-news:not(.hidden){display:block!important}
 #game.season-locked .comm-panel.hidden{display:none!important}
-#game:not(.booting) #home #season-gate-banner:not(.hidden){position:sticky!important;top:0!important;left:auto!important;right:auto!important;margin:0 0 12px!important;z-index:12;max-height:unset!important;overflow:visible!important}
-#game:not(.booting):has(#season-gate-banner:not(.hidden)) .game-page:not(.hidden){padding-top:16px!important}
 #home .hm-season-line{display:none!important}
 #game.season-locked .hm-grid .action-card,#game.season-locked .bottom-nav .nav-item{opacity:1!important;filter:none!important;cursor:pointer!important}
+
+
+/* ===== بنر وضعیت فصل: زیر هدر، در همهٔ صفحات ===== */
+#game > #season-gate-banner{position:absolute;top:78px;right:12px;left:12px;margin:0;z-index:19;box-sizing:border-box;will-change:transform}
+#game > #season-gate-banner.hidden{display:none!important}
+#game:not(.booting) .game-page:not(#admin){padding-top:calc(94px + var(--banner-h,0px))!important}
+body.admin-direct #season-gate-banner{display:none!important}
+
+/* ===== پنجرهٔ راهنما ===== */
+#guide-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;height:auto;min-height:0;overflow:hidden;box-sizing:border-box;
+ padding:calc(env(safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px) + 14px) 14px calc(env(safe-area-inset-bottom,0px) + var(--tg-content-safe-area-inset-bottom,0px) + 14px)}
+#guide-modal.hidden{display:none!important}
+#guide-modal .guide-box{display:flex;flex-direction:column;width:100%;max-width:380px;max-height:100%;margin:0;overflow:hidden;padding:18px 16px 12px}
+#guide-modal .guide-box>h2,#guide-modal .guide-box>.guide-sub,#guide-modal .guide-box>.guide-btn,#guide-modal .guide-box>.guide-foot{flex:none}
+#guide-modal .guide-steps{flex:1 1 auto;min-height:0;overflow-y:auto;margin-bottom:12px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
