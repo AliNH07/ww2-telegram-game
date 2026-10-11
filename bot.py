@@ -1408,6 +1408,61 @@ async def get_worlds(request):
         return web.json_response({"success": True, "worlds": result})
 
 
+async def admin_global(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    # Aggregate saved per-world state; never combine countries from different worlds.
+    async with WORLD_SWITCH_LOCK:
+        _persist_active_world_memory()
+        now = utcnow()
+        result = []
+        for wid, meta in sorted(worlds_registry.items(), key=lambda x: int(x[0])):
+            state = world_states.get(str(wid), {}) or {}
+            rows = list((state.get("players") or {}).values())
+            rows = [x for x in rows if isinstance(x, dict)]
+            start = parse_dt(meta.get("game_started_at"))
+            end = start + timedelta(days=GAME_TOTAL_DAYS) if start else None
+            elapsed = max(0, (now - start).total_seconds()/86400) if start else 0
+            country_set = {p.get("country") for p in rows if p.get("country") and not p.get("is_eliminated")}
+            country_set |= set((state.get("occupied_countries") or {}).keys())
+            pm = state.get("private_messages") or {}
+            # Each PM is mirrored to both participants; count only one copy.
+            message_keys = set()
+            for contacts in pm.values():
+                if not isinstance(contacts, dict): continue
+                for msgs in contacts.values():
+                    for m in msgs if isinstance(msgs, list) else []:
+                        if isinstance(m, dict): message_keys.add((m.get("from"), m.get("to"), m.get("text"), m.get("at")))
+            result.append({"id": int(wid), "name": meta.get("name", f"دنیای {wid}"),
+                "created_at": meta.get("created_at"), "players": len(country_set),
+                "total_players": len(rows), "countries_taken": len(country_set),
+                "active_players": sum(1 for r in rows if (t := parse_dt(r.get("last_seen_at"))) and (now-t).total_seconds() <= 900),
+                "pending_wars": sum(1 for w in (state.get("war_declarations") or {}).values() if isinstance(w, dict) and w.get("status") == "pending_admin"),
+                "private_message_count": len(message_keys),
+                "registration_open": bool(meta.get("registration_open", not bool(start))),
+                "game_started_at": start.isoformat() if start else None,
+                "game_ends_at": end.isoformat() if end else None,
+                "game_started": bool(start), "game_finished": bool(meta.get("game_finished") or (end and now >= end)),
+                "day": min(GAME_TOTAL_DAYS, int(elapsed)+1) if start else 0,
+                "season": _season_for_elapsed_days(min(elapsed, GAME_TOTAL_DAYS))[0] if start else "در انتظار شروع",
+                "winner": meta.get("winner")})
+        return web.json_response({"success": True, "worlds": result})
+
+async def admin_communications(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    messages = {}
+    for contacts in private_messages.values():
+        if not isinstance(contacts, dict): continue
+        for thread in contacts.values():
+            if not isinstance(thread, list): continue
+            for m in thread:
+                if not isinstance(m, dict): continue
+                key = (m.get("from"), m.get("to"), m.get("text"), m.get("at"))
+                messages[key] = {"from": m.get("from"), "to": m.get("to"), "text": m.get("text", ""), "at": m.get("at")}
+    recent = sorted(messages.values(), key=lambda m: m.get("at") or "", reverse=True)[:150]
+    return web.json_response({"success": True, "messages": recent})
+
 async def admin_start_world(request):
     denied = _admin_denied(request)
     if denied: return denied
@@ -4699,6 +4754,7 @@ async def create_web_app():
     app.router.add_static("/fonts/", path=os.path.join(WEB_DIR, "fonts"), name="fonts")
 
     app.router.add_get("/api/worlds", get_worlds)
+    app.router.add_get("/api/admin/global", admin_global)
     for path, h in [
         ("/api/player", get_player), ("/api/countries", get_countries),
         ("/api/army-units", get_army_units),
@@ -4708,7 +4764,7 @@ async def create_web_app():
         ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
         ("/api/debug-auth", debug_auth), ("/api/admin/overview", admin_overview),
-        ("/api/admin/wars", admin_wars), ("/health", health)]:
+        ("/api/admin/wars", admin_wars), ("/api/admin/communications", admin_communications), ("/health", health)]:
         app.router.add_get(path, h if path == "/health" else world_scoped(h))
 
     for path, h in [
