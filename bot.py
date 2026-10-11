@@ -1,4 +1,4 @@
-import os, json, hmac, hashlib, uuid, logging, asyncio, random, math, copy
+import os, json, hmac, hashlib, uuid, logging, asyncio, random, math, copy, time, contextlib, contextvars
 from datetime import datetime, timezone, timedelta
 from urllib.parse import parse_qsl
 
@@ -16,6 +16,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://ww2-telegram-game.onrender.com")
 ADMIN_ID = 8290076602  # مدیر اصلی پنل مدیریت؛ شناسهٔ تأییدشدهٔ تلگرام
 AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "0") == "1"
+DEV_AUTH = os.getenv("DEV_AUTH", "0") == "1"  # فقط برای توسعهٔ محلی بدون تلگرام؛ در تولید خاموش بماند
 DATA_DIR = os.getenv("DATA_DIR", "data")
 STATE_FILE = os.path.join(DATA_DIR, "state.json")
 
@@ -1232,6 +1233,82 @@ world_states = {}
 active_world_id = "1"
 WORLD_SWITCH_LOCK = asyncio.Lock()
 
+# پیام‌های تلگرام هرگز نباید زیر WORLD_SWITCH_LOCK ارسال شوند. زیر قفل فقط در صف می‌روند
+# و پس از آزاد شدن قفل ارسال می‌شوند.
+_TG_OUTBOX = contextvars.ContextVar("tg_outbox", default=None)
+_AFTER_LOCK = contextvars.ContextVar("after_lock", default=None)
+_BG_TASKS = set()
+
+
+async def _flush_tg_outbox(items, delay=0.02):
+    """ارسال واقعی پیام‌ها (بدون نگه داشتن قفل). خروجی: (موفق, ناموفق)."""
+    sent = failed = 0
+    for chat_id, text, markup in items:
+        try:
+            await bot.send_message(chat_id=chat_id, text=text, reply_markup=markup)
+            sent += 1
+        except Exception as exc:
+            failed += 1
+            logging.warning("telegram send failed for %s: %s", chat_id, exc)
+        await asyncio.sleep(delay)
+    return sent, failed
+
+
+def _spawn_tg_flush(items, delay=0.02):
+    if not items:
+        return
+    try:
+        task = asyncio.get_running_loop().create_task(_flush_tg_outbox(list(items), delay))
+    except RuntimeError:
+        return
+    _BG_TASKS.add(task)
+    task.add_done_callback(_BG_TASKS.discard)
+
+
+@contextlib.contextmanager
+def _tg_outbox_scope():
+    """بیرون از قفل باز شود: پیام‌های صف‌شده بعد از خروج (و رها شدن قفل) فرستاده می‌شوند."""
+    box = []
+    token = _TG_OUTBOX.set(box)
+    try:
+        yield box
+    finally:
+        _TG_OUTBOX.reset(token)
+        _spawn_tg_flush(box)
+
+
+async def _tg_dispatch(items):
+    box = _TG_OUTBOX.get()
+    if box is not None:
+        box.extend(items)
+    else:
+        await _flush_tg_outbox(items)
+
+
+async def _tg_send(chat_id, text, reply_markup=None):
+    await _tg_dispatch([(chat_id, text, reply_markup)])
+
+
+def _after_lock(fn):
+    """ثبت کاری که بعد از آزاد شدن قفل اجرا شود و می‌تواند پاسخ را جایگزین کند."""
+    hooks = _AFTER_LOCK.get()
+    if hooks is None:
+        raise RuntimeError("_after_lock outside world_scoped")
+    hooks.append(fn)
+
+
+@contextlib.asynccontextmanager
+async def _in_world(wid):
+    async with WORLD_SWITCH_LOCK:
+        previous = str(active_world_id)
+        _persist_active_world_memory()
+        try:
+            _activate_world(wid)
+            yield
+        finally:
+            _persist_active_world_memory()
+            _activate_world(previous if previous in worlds_registry else "1")
+
 
 def _fresh_world_state():
     return {
@@ -1358,31 +1435,42 @@ def world_scoped(handler):
         wid = str(request.query.get("world_id", "1"))
         if wid not in worlds_registry:
             return web.json_response({"success": False, "error": "world_not_found", "message": "این دنیا وجود ندارد."}, status=404)
-        async with WORLD_SWITCH_LOCK:
-            previous = str(active_world_id)
-            _persist_active_world_memory()
-            _activate_world(wid)
-            try:
-                finalize_world_if_due()
-                path = request.path
-                exempt_before_start = {"/api/select-country", "/api/pm/send"}
-                is_admin_path = path.startswith("/api/admin/")
-                if request.method == "POST" and not is_admin_path and path not in exempt_before_start:
-                    meta = _world_meta()
-                    started = bool(meta.get("game_started_at"))
-                    finished = bool(meta.get("game_finished"))
-                    if not started:
-                        return web.json_response({"success": False, "error": "game_not_started",
-                            "message": "بعد از شروع فصل امکان‌پذیر است."}, status=403)
-                    if finished:
-                        return web.json_response({"success": False, "error": "game_finished",
-                            "message": "بازی پس از ۳۱ روز تمام شده است؛ انجام این کار دیگر امکان‌پذیر نیست."}, status=403)
-                result = await handler(request)
-                save_state()
-                return result
-            finally:
-                _persist_active_world_memory()
-                _activate_world(previous if previous in worlds_registry else "1")
+        hooks = []
+        hooks_token = _AFTER_LOCK.set(hooks)
+        try:
+            with _tg_outbox_scope():
+                async with WORLD_SWITCH_LOCK:
+                    previous = str(active_world_id)
+                    _persist_active_world_memory()
+                    _activate_world(wid)
+                    try:
+                        finalize_world_if_due()
+                        path = request.path
+                        exempt_before_start = {"/api/select-country", "/api/pm/send"}
+                        is_admin_path = path.startswith("/api/admin/")
+                        result = None
+                        if request.method == "POST" and not is_admin_path and path not in exempt_before_start:
+                            meta = _world_meta()
+                            started = bool(meta.get("game_started_at"))
+                            finished = bool(meta.get("game_finished"))
+                            if not started:
+                                result = web.json_response({"success": False, "error": "game_not_started",
+                                    "message": "بعد از شروع فصل امکان‌پذیر است."}, status=403)
+                            elif finished:
+                                result = web.json_response({"success": False, "error": "game_finished",
+                                    "message": "بازی پس از ۳۱ روز تمام شده است؛ انجام این کار دیگر امکان‌پذیر نیست."}, status=403)
+                        if result is None:
+                            result = await handler(request)
+                            save_state()
+                    finally:
+                        _persist_active_world_memory()
+                        _activate_world(previous if previous in worlds_registry else "1")
+        finally:
+            _AFTER_LOCK.reset(hooks_token)
+        # قفل رها شده است؛ کارهای شبکه‌ای وابسته به پاسخ اینجا انجام می‌شوند.
+        for fn in hooks:
+            result = await fn(result)
+        return result
     _wrapped.__name__ = getattr(handler, "__name__", "world_scoped_handler")
     return _wrapped
 
@@ -1558,6 +1646,9 @@ def verify_init_data(init_data: str):
         secret = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
         computed = hmac.new(secret, dcs.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(computed, rh): return None
+        try: auth_date = int(parsed.get("auth_date") or 0)
+        except (TypeError, ValueError): return None
+        if not auth_date or time.time() - auth_date > 24 * 3600: return None
         u = parsed.get("user")
         if u: return json.loads(u)
         return None
@@ -1570,7 +1661,7 @@ def get_auth_user_id(request):
         user = verify_init_data(init_data)
         if user and user.get("id"):
             return remember_telegram_user(user)
-    if not AUTH_REQUIRED:
+    if DEV_AUTH:
         uid = request.query.get("user_id")
         if uid:
             try: return int(uid)
@@ -1642,7 +1733,7 @@ async def start_command(message: types.Message):
 
 async def notify_admin(text, keyboard=None):
     if ADMIN_ID:
-        try: await bot.send_message(ADMIN_ID, text, reply_markup=keyboard)
+        try: await _tg_send(ADMIN_ID, text, reply_markup=keyboard)
         except Exception as e: logging.warning("admin notify: %s", e)
 
 @dp.callback_query(F.data.startswith("treaty:"))
@@ -1673,44 +1764,45 @@ async def war_cb(cb: types.CallbackQuery):
     if cb.from_user.id != ADMIN_ID:
         await cb.answer("دسترسی ندارید."); return
     response = None
-    async with WORLD_SWITCH_LOCK:
-        previous = str(active_world_id)
-        _persist_active_world_memory()
-        try:
-            for wid in sorted(worlds_registry, key=lambda x: int(x)):
-                _activate_world(wid)
-                w = war_declarations.get(war_id)
-                if w is None:
-                    continue
-                if w.get("status") != "pending_admin":
-                    response = ("درخواست قبلاً بررسی شده یا منقضی است.", True)
-                    break
-                if action == "approve":
-                    w["status"] = "battle"
-                    w["approved_at"] = utcnow().isoformat()
-                    w["negotiation_ends"] = None
-                    active_wars[war_id] = w
-                    message = f"اعلان جنگ {COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} تأیید شد و جنگ اکنون آغاز شده است. دلیل: {w.get('reason', 'ثبت نشده')}"
-                    push_news("آغاز جنگ", message, "warning")
-                    push_war("war_started", message, [w["attacker"], w["defender"]])
-                    await notify_world_players(message)
-                    response = ("✅ درخواست تأیید شد و جنگ آغاز شد.", False)
-                elif action == "reject":
-                    w["status"] = "rejected"
-                    message = f"درخواست اعلان جنگ {COUNTRIES[w['attacker']]['name']} علیه {COUNTRIES[w['defender']]['name']} رد شد."
-                    push_news("درخواست جنگ رد شد", message)
-                    await notify_world_players(message)
-                    response = ("❌ درخواست رد شد.", False)
-                else:
-                    response = ("عملیات نامعتبر است.", True)
-                save_state()
-                break
-            if response is None:
-                response = ("درخواست جنگ در هیچ‌کدام از دنیاها پیدا نشد.", True)
-        finally:
+    with _tg_outbox_scope():
+        async with WORLD_SWITCH_LOCK:
+            previous = str(active_world_id)
             _persist_active_world_memory()
-            _activate_world(previous if previous in worlds_registry else "1")
-            save_state()
+            try:
+                for wid in sorted(worlds_registry, key=lambda x: int(x)):
+                    _activate_world(wid)
+                    w = war_declarations.get(war_id)
+                    if w is None:
+                        continue
+                    if w.get("status") != "pending_admin":
+                        response = ("درخواست قبلاً بررسی شده یا منقضی است.", True)
+                        break
+                    if action == "approve":
+                        w["status"] = "battle"
+                        w["approved_at"] = utcnow().isoformat()
+                        w["negotiation_ends"] = None
+                        active_wars[war_id] = w
+                        message = f"اعلان جنگ {COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} تأیید شد و جنگ اکنون آغاز شده است. دلیل: {w.get('reason', 'ثبت نشده')}"
+                        push_news("آغاز جنگ", message, "warning")
+                        push_war("war_started", message, [w["attacker"], w["defender"]])
+                        await notify_world_players(message)
+                        response = ("✅ درخواست تأیید شد و جنگ آغاز شد.", False)
+                    elif action == "reject":
+                        w["status"] = "rejected"
+                        message = f"درخواست اعلان جنگ {COUNTRIES[w['attacker']]['name']} علیه {COUNTRIES[w['defender']]['name']} رد شد."
+                        push_news("درخواست جنگ رد شد", message)
+                        await notify_world_players(message)
+                        response = ("❌ درخواست رد شد.", False)
+                    else:
+                        response = ("عملیات نامعتبر است.", True)
+                    save_state()
+                    break
+                if response is None:
+                    response = ("درخواست جنگ در هیچ‌کدام از دنیاها پیدا نشد.", True)
+            finally:
+                _persist_active_world_memory()
+                _activate_world(previous if previous in worlds_registry else "1")
+                save_state()
     text, alert = response
     try:
         await cb.message.edit_text(text)
@@ -1889,14 +1981,10 @@ async def get_army_units(request):
 # =========================================================
 async def notify_world_players(message):
     """Broadcast an in-game world event to each Telegram user registered in this world."""
-    for target_uid, target_player in list(players.items()):
-        if not target_player.get("country") or target_player.get("is_eliminated"):
-            continue
-        try:
-            await bot.send_message(chat_id=int(target_uid), text=str(message)[:3500])
-        except Exception as exc:
-            logging.debug("world broadcast failed for %s: %s", target_uid, exc)
-        await asyncio.sleep(0.02)
+    text = str(message)[:3500]
+    items = [(int(uid), text, None) for uid, p in list(players.items())
+             if p.get("country") and not p.get("is_eliminated")]
+    await _tg_dispatch(items)
 
 
 # =========================================================
@@ -1966,7 +2054,7 @@ async def propose_treaty(request):
         InlineKeyboardButton(text="✅ قبول", callback_data=f"treaty:accept:{active_world_id}:{pid}"),
         InlineKeyboardButton(text="❌ رد", callback_data=f"treaty:reject:{active_world_id}:{pid}")]])
     try:
-        await bot.send_message(tuid,
+        await _tg_send(tuid,
             f"📜 پیشنهاد {TREATY_TYPE_NAMES[ttype]}\nاز {COUNTRIES[fc]['name']} به مدت {dur} روز",
             reply_markup=kb)
     except Exception as e: logging.warning("treaty msg: %s", e)
@@ -3121,7 +3209,7 @@ def process_transits():
 async def transit_loop():
     while True:
         await asyncio.sleep(1)
-        try: await _run_ticks_for_all_worlds(include_transits=True)
+        try: await _run_transits_for_all_worlds()
         except Exception as e: logging.error("transit tick: %s", e)
 
 async def dispatch_forces(request):
@@ -3447,7 +3535,7 @@ async def _broadcast_announcement_notification(cid, author_uid=None):
             return
         async with semaphore:
             try:
-                await bot.send_message(int(uid), text)
+                await _tg_send(int(uid), text)
             except Exception as e:
                 logging.warning("announcement notification failed for %s: %s", uid, e)
     recipients = [uid for uid in players.keys() if author_uid is None or str(uid) != str(author_uid)]
@@ -4326,7 +4414,7 @@ def _loan_check(lender_cid, borrower_cid, amount, hours, ignore_pending_id=None)
 def _lname(cid): return f"{COUNTRIES[cid]['flag']} {COUNTRIES[cid]['name']}" if cid in COUNTRIES else "—"
 
 async def notify_user(uid, text):
-    try: await bot.send_message(uid, text)
+    try: await _tg_send(uid, text)
     except Exception as e: logging.warning("notify_user %s: %s", uid, e)
 
 def _credit_lender(l, amount):
@@ -4494,13 +4582,30 @@ async def repay_loan(request):
 async def vip_command(message: types.Message):
     if not ADMIN_ID or message.from_user.id != ADMIN_ID: return
     parts = (message.text or "").split()
-    if len(parts) < 2: await message.answer("/vip <user_id> [on|off]"); return
+    if len(parts) < 2: await message.answer("/vip <user_id> [on|off] [world_id]"); return
     try: tid = int(parts[1])
     except ValueError: await message.answer("user_id نامعتبر"); return
-    on = not (len(parts) > 2 and parts[2].lower() == "off")
-    if tid not in players: await message.answer("بازیکن پیدا نشد"); return
-    players[tid]["vip"] = on; save_state()
-    await message.answer(f"VIP {'فعال' if on else 'غیرفعال'} شد برای {tid}")
+    on, wid = True, "1"
+    for tok in parts[2:]:
+        if tok.lower() == "off": on = False
+        elif tok.lower() == "on": on = True
+        elif tok.isdigit(): wid = str(int(tok))
+        else: await message.answer("/vip <user_id> [on|off] [world_id]"); return
+    if wid not in worlds_registry: await message.answer("دنیا پیدا نشد"); return
+    found = False
+    async with WORLD_SWITCH_LOCK:
+        previous = str(active_world_id)
+        _persist_active_world_memory()
+        try:
+            if _activate_world(wid) and tid in players:
+                players[tid]["vip"] = on
+                save_state()
+                found = True
+        finally:
+            _persist_active_world_memory()
+            _activate_world(previous if previous in worlds_registry else "1")
+    if not found: await message.answer("بازیکن پیدا نشد"); return
+    await message.answer(f"VIP {'فعال' if on else 'غیرفعال'} شد برای {tid} (دنیا {wid})")
 
 # =========================================================
 # Stats (آمار کشور: رفاه و امنیت)
@@ -4584,14 +4689,6 @@ async def get_stats(request):
 
 async def health(request):
     return web.json_response({"status": "ok", "players": len(players)})
-
-async def debug_auth(request):
-    init_data = request.headers.get("X-Telegram-Init-Data") or request.query.get("init_data") or ""
-    user = verify_init_data(init_data)
-    return web.json_response({"auth_required": AUTH_REQUIRED, "got_init_data": bool(init_data),
-                              "verified": user is not None, "user": user,
-                              "bot_token_set": bool(BOT_TOKEN), "players_count": len(players)})
-
 
 def _strict_telegram_uid(request):
     """Admin APIs only accept a valid Telegram WebApp signature without creating a player in the selected world."""
@@ -4818,15 +4915,24 @@ async def admin_player_message(request):
     if target_uid not in players: return web.json_response({"success": False, "message": "بازیکن پیدا نشد."}, status=404)
     p = players[target_uid]
     display_name = " ".join(x for x in [str(p.get("telegram_first_name", "") or "").strip(), str(p.get("telegram_last_name", "") or "").strip()] if x)
-    try:
-        await bot.send_message(chat_id=target_uid, text=f"✉️ پیام مدیریت FRONT-LINE 1993\n\n{message_text}")
-    except Exception as exc:
-        log_admin_action("ارسال پیام ناموفق", target_uid, str(exc))
-        save_state()
-        return web.json_response({"success": False, "message": "ارسال پیام ناموفق بود؛ ممکن است کاربر ربات را مسدود کرده باشد."}, status=502)
-    log_admin_action("ارسال پیام مستقیم", target_uid, message_text[:300])
-    save_state()
-    return web.json_response({"success": True, "message": f"پیام برای {display_name or target_uid} ارسال شد."})
+    out_text = f"✉️ پیام مدیریت FRONT-LINE 1993\n\n{message_text}"
+    world_key = str(request.query.get("world_id", "1"))
+    ok_response = web.json_response({"success": True, "message": f"پیام برای {display_name or target_uid} ارسال شد."})
+    async def _deliver(resp):
+        # ارسال تلگرام بعد از رها شدن قفل؛ لاگ در دنیای درست با قفل کوتاه ثبت می‌شود.
+        try:
+            await bot.send_message(chat_id=target_uid, text=out_text)
+        except Exception as exc:
+            async with _in_world(world_key):
+                log_admin_action("ارسال پیام ناموفق", target_uid, str(exc))
+                save_state()
+            return web.json_response({"success": False, "message": "ارسال پیام ناموفق بود؛ ممکن است کاربر ربات را مسدود کرده باشد."}, status=502)
+        async with _in_world(world_key):
+            log_admin_action("ارسال پیام مستقیم", target_uid, message_text[:300])
+            save_state()
+        return resp
+    _after_lock(_deliver)
+    return ok_response
 
 async def admin_bulk_adjust(request):
     denied = _admin_denied(request)
@@ -4869,16 +4975,13 @@ async def admin_broadcast(request):
     push_news(title, body, "info")
     log_admin_action("ارسال خبر عمومی", None, f"{title}: {body[:250]}")
     save_state()
-    sent = failed = 0
-    for uid in list(players.keys()):
-        try:
-            await bot.send_message(chat_id=int(uid), text=f"📣 {title}\n\n{body}")
-            sent += 1
-        except Exception as exc:
-            failed += 1
-            logging.warning("admin broadcast failed for %s: %s", uid, exc)
-        await asyncio.sleep(0.035)
-    return web.json_response({"success": True, "message": "خبر در بازی ثبت شد.", "sent": sent, "failed": failed})
+    recipients = [int(uid) for uid in list(players.keys())]
+    text = f"📣 {title}\n\n{body}"
+    async def _send_all(resp):
+        sent, failed = await _flush_tg_outbox([(u, text, None) for u in recipients], delay=0.035)
+        return web.json_response({"success": True, "message": "خبر در بازی ثبت شد.", "sent": sent, "failed": failed})
+    _after_lock(_send_all)
+    return web.json_response({"success": True, "message": "خبر در بازی ثبت شد.", "sent": 0, "failed": 0})
 
 # =========================================================
 # Web Server
@@ -4908,7 +5011,7 @@ async def create_web_app():
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
         ("/api/diplomacy", get_diplomacy), ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
-        ("/api/debug-auth", debug_auth), ("/api/admin/overview", admin_overview),
+        ("/api/admin/overview", admin_overview),
         ("/api/admin/wars", admin_wars), ("/api/admin/communications", admin_communications), ("/health", health)]:
         app.router.add_get(path, h if path == "/health" else world_scoped(h))
 
@@ -4974,31 +5077,64 @@ async def _announce_season_transition_if_needed():
     await notify_world_players(message)
 
 
-async def _run_ticks_for_all_worlds(include_transits=False):
+async def _run_ticks_for_all_worlds():
+    """تیک ۳۰ ثانیه‌ای: جنگ، فصل، رفاه و وام. قفل فقط مدت محاسبه نگه داشته می‌شود."""
+    with _tg_outbox_scope():
+        async with WORLD_SWITCH_LOCK:
+            previous = str(active_world_id)
+            _persist_active_world_memory()
+            for wid in sorted(worlds_registry.keys(), key=lambda x: int(x)):
+                _activate_world(wid)
+                try:
+                    finalize_world_if_due()
+                    await check_wars_tick()
+                    await _announce_season_transition_if_needed()
+                    welfare_tick()
+                    loan_tick()
+                except Exception as exc:
+                    logging.error("world tick (%s): %s", wid, exc)
+                finally:
+                    _persist_active_world_memory()
+            _activate_world(previous if previous in worlds_registry else "1")
+            save_state()
+
+
+def _worlds_with_transits():
+    result = []
+    for wid in sorted(worlds_registry.keys(), key=lambda x: int(x)):
+        ts = transits if str(wid) == str(active_world_id) else (world_states.get(str(wid)) or {}).get("transits")
+        if ts:
+            result.append(wid)
+    return result
+
+
+async def _run_transits_for_all_worlds():
+    """تیک ۱ ثانیه‌ای: فقط حرکت و نبرد؛ دنیای بدون transit کاملاً رد می‌شود."""
+    if not _worlds_with_transits():
+        return
     async with WORLD_SWITCH_LOCK:
+        wids = _worlds_with_transits()
+        if not wids:
+            return
         previous = str(active_world_id)
         _persist_active_world_memory()
-        for wid in sorted(worlds_registry.keys(), key=lambda x: int(x)):
-            _activate_world(wid)
-            try:
-                finalize_world_if_due()
-                await check_wars_tick()
-                await _announce_season_transition_if_needed()
-                welfare_tick()
-                loan_tick()
-                if include_transits: process_transits()
-            except Exception as exc:
-                logging.error("world tick (%s): %s", wid, exc)
-            finally:
-                _persist_active_world_memory()
-        _activate_world(previous if previous in worlds_registry else "1")
-        save_state()
+        try:
+            for wid in wids:
+                _activate_world(wid)
+                try:
+                    process_transits()
+                except Exception as exc:
+                    logging.error("transit tick (%s): %s", wid, exc)
+                finally:
+                    _persist_active_world_memory()
+        finally:
+            _activate_world(previous if previous in worlds_registry else "1")
 
 
 async def war_tick_loop():
     while True:
         await asyncio.sleep(30)
-        try: await _run_ticks_for_all_worlds(include_transits=False)
+        try: await _run_ticks_for_all_worlds()
         except Exception as e: logging.error("war/world tick: %s", e)
 
 dp.message.register(vip_command, Command("vip"))
