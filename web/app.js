@@ -3,9 +3,9 @@ if (tg) {
     tg.ready();
     tg.expand();
     try {
-        tg.setHeaderColor('#0b0e15');
-        tg.setBackgroundColor('#0b0e15');
-        tg.setBottomBarColor('#0b0e15');
+        tg.setHeaderColor('#0A0612');
+        tg.setBackgroundColor('#0A0612');
+        tg.setBottomBarColor('#150C26');
     } catch (e) {}
 }
 
