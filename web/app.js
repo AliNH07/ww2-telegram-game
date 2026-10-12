@@ -89,8 +89,11 @@ async function apiGet(path, params = {}) {
     try {
         const r = await fetch(url, { headers, signal: controller.signal });
         const text = await r.text();
-        try { return JSON.parse(text); }
+        let parsed;
+        try { parsed = JSON.parse(text); }
         catch { return { error: "invalid_json", raw: text }; }
+        if (path === "/api/player") handleActivityNotices(parsed);
+        return parsed;
     } finally { clearTimeout(to); }
 }
 
@@ -127,6 +130,10 @@ async function apiPost(path, body = {}, params = {}) {
                     actionButton.appendChild(note);
                 }
             }
+        }
+        if (result?.success) {
+            if (result.completion_message) enqueueActivityToast(result.completion_message, null);
+            handleActivityNotices(result.player);
         }
         return result;
     } finally { clearTimeout(to); }
@@ -179,7 +186,7 @@ function formatNumber(v) { return Math.round(Number(v ?? 0)).toLocaleString("en-
 
 
 let toastTimer = null;
-function showToast(msg, kind) {
+function showToast(msg, kind, ms) {
     if (/^خطا[.!…]*$/.test(String(msg || "").trim()) && lastActionErrorMessage && Date.now() - lastActionErrorAt < 8000) {
         msg = lastActionErrorMessage;
         kind = "error";
@@ -196,8 +203,59 @@ function showToast(msg, kind) {
     void el.offsetWidth;
     el.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
+    toastTimer = setTimeout(() => el.classList.remove("show"), ms || 3500);
 }
+
+/* =========================================================
+   اعلان پایان فعالیت (ساخت، ارتقا، آموزش یگان، ماهواره، حمل کالا و ...)
+   - کار فوری: سرور در پاسخ همان درخواست completion_message می‌فرستد و بلافاصله نمایش داده می‌شود.
+   - کار زمان‌دار: سرور در لحظهٔ پایان، اعلان را در player.activity_notices ثبت می‌کند. تا وقتی
+     نمایش آن به سرور تأیید نشده (ack) در حساب بازیکن می‌ماند؛ پس اگر بازی بسته بوده، در ورود بعدی
+     دقیقاً یک بار نشان داده می‌شود و سپس حذف می‌گردد.
+   - اعلان‌ها پشت‌سرهم (صف) نمایش داده می‌شوند تا هیچ‌کدام زیر دیگری گم نشود.
+========================================================= */
+const ACTIVITY_TOAST_MS = 4200;
+const shownActivityNoticeIds = new Set();   // جلوگیری از نمایش دوباره در همین نشست (پولینگ هر ۲.۵ ثانیه)
+const pendingActivityAcks = new Set();      // شناسه‌هایی که نمایششان دیده شده ولی هنوز به سرور تأیید نشده
+const activityToastQueue = [];
+let activityToastBusy = false, activityAckInFlight = false;
+
+function enqueueActivityToast(text, noticeId) {
+    if (!text) return;
+    activityToastQueue.push({ text: String(text), id: noticeId || null });
+    pumpActivityToasts();
+}
+function pumpActivityToasts() {
+    // وقتی برنامه در پس‌زمینه است نمایش نمی‌دهیم تا بازیکن اعلان را از دست ندهد؛ با بازگشت ادامه می‌یابد.
+    if (activityToastBusy || document.hidden) return;
+    const item = activityToastQueue.shift();
+    if (!item) return;
+    activityToastBusy = true;
+    showToast(item.text, "success", ACTIVITY_TOAST_MS);
+    if (item.id) { pendingActivityAcks.add(item.id); flushActivityAcks(); }
+    setTimeout(() => { activityToastBusy = false; pumpActivityToasts(); }, ACTIVITY_TOAST_MS + 250);
+}
+async function flushActivityAcks() {
+    if (activityAckInFlight || !pendingActivityAcks.size) return;
+    activityAckInFlight = true;
+    const ids = Array.from(pendingActivityAcks);
+    try {
+        const r = await apiPost("/api/activity-notices/ack", { ids });
+        if (r && r.success) ids.forEach(id => pendingActivityAcks.delete(id));
+    } catch (e) { /* در نوبت بعدی دوباره تلاش می‌شود */ }
+    finally { activityAckInFlight = false; }
+}
+function handleActivityNotices(p) {
+    if (!p || !Array.isArray(p.activity_notices)) return;
+    if (userId && p.user_id != null && String(p.user_id) !== String(userId)) return;
+    for (const n of p.activity_notices) {
+        if (!n || !n.id || shownActivityNoticeIds.has(n.id)) continue;
+        shownActivityNoticeIds.add(n.id);
+        enqueueActivityToast(n.text, n.id);
+    }
+    if (pendingActivityAcks.size) flushActivityAcks();   // تأییدهای ناموفق قبلی
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pumpActivityToasts(); });
 
 
 async function loadArmyCatalog() {
@@ -1340,7 +1398,6 @@ function openInfraSheet(iid) {
                 return;
             }
             player = d.player; updateHomeStats(); closeInfraSheet();
-            showToast(built ? `✅ ${item.name} به سطح ${lvlAfter} ارتقا یافت.` : `✅ ${item.name} ساخته شد.`, "success");
             const activeTab = document.querySelector(".infra-tab.active")?.dataset.infraTab || "power";
             renderInfraTab(activeTab);
         } catch (e) {
@@ -2437,7 +2494,7 @@ async function renderSatTab() {
         try {
             const d = await apiPost(path, body);
             if (!d.success) { showToast(d.message || "خطا"); return; }
-            showToast(d.message);
+            if (!d.completion_message) showToast(d.message);
             if (d.player) { player = d.player; updateHomeStats(); }
             renderSatTab();
         } catch (e) { showToast("خطا."); }
@@ -5202,7 +5259,7 @@ async function renderSiteScan(site) {
             try {
                 const d = await apiPost("/api/satellite/scan-site", { site_id: site.id });
                 if (!d.success) { showToast(d.message || "خطا"); return; }
-                showToast(d.message);
+                if (!d.completion_message) showToast(d.message);
                 if (d.player) { player = d.player; updateHomeStats(); }
                 renderSiteScan(site);
             } catch (e) { showToast("خطا."); }
