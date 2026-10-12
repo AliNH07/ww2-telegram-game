@@ -2721,9 +2721,6 @@ def _great_circle_km(a, b):
     h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
     return 6371.0 * 2 * math.asin(min(1.0, math.sqrt(max(0.0, h))))
 
-# Temporary test mode requested: naval units reach a strait instantly.
-STRAIT_PASSAGE_RADIUS_KM = 280.0
-
 def has_naval_units(units):
     return any(n > 0 and ARMY_UNITS.get(k, {}).get("group") == "naval" for k, n in (units or {}).items())
 
@@ -2750,31 +2747,6 @@ def _country_route_straits_fallback(src_country, dst_country, traveler):
             candidates.append((blocked, not bool(route), len(route), route))
     candidates.sort(key=lambda row: (row[0], row[1], row[2]))
     return candidates[0][3] if candidates else []
-
-def straits_on_route(cid, src, dst):
-    """Approximate straits crossed by a sea force along its great-circle route, ordered by progress."""
-    if not cid or not src or not dst or src == dst or dst in STRAITS_DATA:
-        return []
-    a, b = loc_coords(cid, src), loc_coords(cid, dst)
-    if not a or not b: return []
-    distance = _great_circle_km(a, b)
-    if distance < 150: return []
-    steps = max(24, min(360, int(math.ceil(distance / 85.0))))
-    path = [(i / steps, geo_interp(a, b, i / steps)) for i in range(1, steps)]
-    hits = []
-    for sid, info in STRAITS_DATA.items():
-        if sid == src: continue
-        point = (info["lon"], info["lat"])
-        best_dist, best_f = float("inf"), 0.0
-        for f, coord in path:
-            d = _great_circle_km(coord, point)
-            if d < best_dist:
-                best_dist, best_f = d, f
-        if 0.025 < best_f < 0.975 and best_dist <= STRAIT_PASSAGE_RADIUS_KM:
-            hits.append((best_f, sid))
-    hits.sort(key=lambda item: item[0])
-    # The geodesic approximation can place two close straits on one route; retain each only once.
-    return list(dict.fromkeys(sid for _, sid in hits))
 
 def loc_label(loc):
     if loc == "home": return "خانه"
@@ -4133,7 +4105,6 @@ SEA_ROUTE_HINTS = {
     frozenset(("usa", "britain")): [["panama", "gibraltar"], []],
     frozenset(("usa", "ussr")): [["panama", "gibraltar"], ["panama", "suez"], []],
 }
-TRADE_MODE_FACTOR = {"land": 0.65, "sea": 1.0, "air": 2.75}
 TRADE_COST_PER_1000KM_PER_1000_UNITS = {"land": 900, "sea": 1500, "air": 4200}
 
 
