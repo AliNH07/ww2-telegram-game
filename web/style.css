@@ -2959,3 +2959,15 @@ body #market .market-action.sell {
 .mk-tr-badge.hidden { display: none; }
 .mk-ship .mk-ship-route { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 8px 0 2px; font-size: 13.5px; font-weight: 700; }
 .mk-ship .mk-ship-route i { font-style: normal; color: var(--brand); }
+
+/* تفکیک هزینه حمل و عوارض تنگه‌ها */
+.market-route-detail .mk-bd-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-bottom:1px dashed rgba(255,255,255,.08)}
+.market-route-detail .mk-bd-row b{color:#62ddb4;white-space:nowrap}
+.market-route-detail .mk-bd-row.total{border-bottom:0;margin-top:4px;padding-top:9px;border-top:1px solid rgba(160,112,224,.4);font-weight:900;color:#fff}
+.market-route-detail .mk-bd-row.total b{color:#C9A2F5;font-size:15px}
+.market-route-detail .mk-bd-note{font-size:12px;color:#A99FBC;padding-top:4px}
+
+/* راهنمای شرایط اعزام */
+.dp-rules-bar { display: flex; justify-content: flex-end; margin-top: 12px; }
+.dp-help-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(174,123,231,.5); background: rgba(160,112,224,.14); color: #D9C2F5; font-size: 16px; font-weight: 900; cursor: pointer; }
+.dp-rules-bar + .dp-rules { margin-top: 8px; }
