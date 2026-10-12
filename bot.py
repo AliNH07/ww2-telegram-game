@@ -2422,9 +2422,14 @@ async def get_forces(request):
         g = dict(site_forces.get(sid, {}).get("units", {})) if sid.startswith(("port:", "front:")) else dict(garrison(sid))
         clean = {k: int(n) for k, n in g.items() if int(n or 0) > 0}
         sites.append({**meta, "owner": cid, "units": clean, "power": int(units_power(clean, p))})
+    def _trip_ends(t):
+        # در سفر دریایی چندمرحله‌ای، مبدأ و مقصد نهایی نمایش داده می‌شود نه گذرگاه میانی («مسیر دریایی»).
+        if t.get("kind") == "go" and t.get("passage") and t.get("route_final_dst"):
+            return loc_label(t.get("origin") or t["from"]), loc_label(t["route_final_dst"])
+        return ("میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"])), loc_label(t["to"])
     mine = [{"id": t["id"], "from": t["from"], "to": t["to"],
-             "from_name": "⚔️ نبرد در مسیر" if (t.get("route_battle") or t.get("arrival_battle")) else ("میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"])),
-             "to_name": "درگیری" if (t.get("route_battle") or t.get("arrival_battle")) else loc_label(t["to"]), "kind": t["kind"], "units": t["units"],
+             "from_name": "⚔️ نبرد در مسیر" if (t.get("route_battle") or t.get("arrival_battle")) else _trip_ends(t)[0],
+             "to_name": "درگیری" if (t.get("route_battle") or t.get("arrival_battle")) else _trip_ends(t)[1], "kind": t["kind"], "units": t["units"],
              "start": (t.get("route_battle") or t.get("arrival_battle") or {}).get("started_at", t["start"]),
              "arrive": (t.get("route_battle") or t.get("arrival_battle") or {}).get("ends_at", t["arrive"]),
              "eta_arrive": ((t["arrive"] if (t.get("route_battle") or t.get("arrival_battle")) else
@@ -4166,21 +4171,54 @@ def _infra_ready(country, infra_id):
     return bool(p and get_infra_level(p, infra_id) > 0)
 
 
+def _trade_sea_plan(a, b, traveler):
+    """مسیر واقعی دریایی کشتی تجاری از بندر a تا بندر b؛ اگر یکی از تنگه‌های مسیر برای traveler بسته باشد، حمل دریایی ممکن نیست."""
+    geo = _sea_geometry(a, "home", f"country:{b}", b)
+    if not geo: return None
+    if any(strait_policy(sid, traveler).get("closed", False) for sid in geo["straits"]):
+        return None
+    geo = dict(geo)
+    geo["seconds"] = sea_travel_seconds(geo["km"])
+    return geo
+
+
 def _route_candidates(a, b, traveler_cid=None):
     key = frozenset((a, b))
     out = []
     if key in LAND_NEIGHBORS and _land_open(a) and _land_open(b):
-        out.append({"mode":"land", "straits":[]})
-    # دریایی: هر دو طرف باید بندر داشته باشند.
+        out.append({"mode": "land", "straits": []})
+    # دریایی: هر دو طرف باید بندر داشته باشند؛ مسیر و تنگه‌ها از مسیر واقعی دریایی به‌دست می‌آیند.
     if _infra_ready(a, "naval_port") and _infra_ready(b, "naval_port"):
-        traveler = traveler_cid or b
-        for route in SEA_ROUTE_HINTS.get(key, [[]]):
-            if all(not strait_policy(s, traveler).get("closed", False) for s in route):
-                out.append({"mode":"sea", "straits":route})
+        plan = _trade_sea_plan(a, b, traveler_cid or b)
+        if plan: out.append({"mode": "sea", "straits": plan["straits"], "plan": plan})
     # هوایی: هر دو طرف فرودگاه داشته باشند.
     if _infra_ready(a, "air_airport") and _infra_ready(b, "air_airport"):
-        out.append({"mode":"air", "straits":[]})
+        out.append({"mode": "air", "straits": []})
     return out
+
+
+def _price_route(a, b, amount, traveler, r):
+    """هزینهٔ تفکیک‌شدهٔ یک مسیر: کرایه حمل (بر اساس طول واقعی مسیر) + عوارض فقط تنگه‌هایی که در مسیر هستند."""
+    mode = r["mode"]; plan = r.get("plan")
+    if mode == "sea" and plan:
+        km = float(plan["km"]); seconds = plan["seconds"]; straits = list(plan["straits"])
+    else:
+        km = max(100.0, _trade_distance_km(a, b)); seconds = travel_seconds_for_km(km); straits = []
+    km = max(100.0, km)
+    freight = int(round((max(1, amount) / 1000.0) * (km / 1000.0) * TRADE_COST_PER_1000KM_PER_1000_UNITS[mode]))
+    items = []
+    for sid in straits:
+        if sid not in STRAITS_DATA: continue
+        pol = strait_policy(sid, traveler)
+        items.append({"id": sid, "name": STRAITS_DATA[sid]["name"], "cost": max(0, int(pol.get("toll", 0) or 0)),
+                      "owner": strait_holdings.get(sid)})
+    toll = sum(i["cost"] for i in items)
+    return {"mode": mode, "straits": [i["id"] for i in items],
+            "distance_km": int(round(km)),
+            "straight_km": int(round(max(100.0, _trade_distance_km(a, b)))),
+            "travel_seconds": int(round(seconds)),
+            "freight_cost": freight, "toll": toll, "strait_costs": items,
+            "transport_cost": freight + toll}
 
 
 def _route_quote(a, b, amount, preferred_mode=None):
@@ -4189,22 +4227,12 @@ def _route_quote(a, b, amount, preferred_mode=None):
     routes = _route_candidates(a, b, traveler_cid=b)
     if not routes:
         return None, "هیچ مسیر قابل استفاده‌ای بین دو کشور وجود ندارد."
-    distance = max(100.0, _trade_distance_km(a, b))
-    quotes = []
-    for r in routes:
-        mode = r["mode"]
-        base = (max(1, amount) / 1000.0) * (distance / 1000.0) * TRADE_COST_PER_1000KM_PER_1000_UNITS[mode]
-        tolls = {s: strait_policy(s, b) for s in r["straits"] if s in STRAITS_DATA}
-        toll = sum(max(0, int(v.get("toll", 0))) for v in tolls.values())
-        cost = int(round(base + toll))
-        quotes.append({**r, "distance_km": int(round(distance)), "travel_seconds": _trade_travel_seconds(a, b, mode, distance), "transport_cost": cost, "toll": toll,
-                       "strait_costs":[{"id":s,"name":STRAITS_DATA[s]["name"],"cost":int(tolls.get(s, {}).get("toll",0)),
-                                         "owner":strait_holdings.get(s)} for s in r["straits"]]})
+    quotes = [_price_route(a, b, amount, b, r) for r in routes]
     if preferred_mode:
         same = [q for q in quotes if q["mode"] == preferred_mode]
         if not same: return None, "این نوع حمل برای این معامله ممکن نیست."
         return min(same, key=lambda x: x["transport_cost"]), None
-    # ارزان‌ترین مسیر مجاز انتخاب می‌شود؛ اگر تنگه بسته باشد، مسیر دیگر خودکار انتخاب می‌شود.
+    # ارزان‌ترین مسیر مجاز انتخاب می‌شود.
     return min(quotes, key=lambda x: x["transport_cost"]), None
 
 
@@ -4213,14 +4241,8 @@ def _route_options(a, b, amount, traveler_cid=None):
     traveler = traveler_cid or b
     routes = _route_candidates(a, b, traveler_cid=traveler)
     if not routes: return [], "هیچ مسیر قابل استفاده‌ای بین دو کشور وجود ندارد."
-    distance = max(100.0, _trade_distance_km(a, b)); out=[]
-    for r in routes:
-        mode=r["mode"]; base=(max(1,amount)/1000.0)*(distance/1000.0)*TRADE_COST_PER_1000KM_PER_1000_UNITS[mode]
-        tolls = {s: strait_policy(s, traveler) for s in r["straits"] if s in STRAITS_DATA}
-        toll=sum(max(0,int(v.get("toll",0))) for v in tolls.values())
-        out.append({**r,"distance_km":int(round(distance)),"travel_seconds":_trade_travel_seconds(a, b, mode, distance),"transport_cost":int(round(base+toll)),"toll":toll,
-                    "strait_costs":[{"id":s,"name":STRAITS_DATA[s]["name"],"cost":int(tolls.get(s,{}).get("toll",0)),"owner":strait_holdings.get(s)} for s in r["straits"]]})
-    return out, None
+    return [_price_route(a, b, amount, traveler, r) for r in routes], None
+
 
 def _listing_view(l):
     side = l.get("side", "sell")
@@ -4415,6 +4437,11 @@ async def accept_listing(request):
 
     route, route_err = _route_quote(seller_cid, buyer_cid, amount, data.get("mode"))
     if route_err: return web.json_response({"success":False,"error":"no_route","message":route_err}, status=400)
+    try: expected_total = int(data.get("expected_total")) if data.get("expected_total") is not None else None
+    except (TypeError, ValueError): expected_total = None
+    if expected_total is not None and expected_total != route["transport_cost"]:
+        return web.json_response({"success":False,"error":"price_changed",
+            "message":f"هزینه حمل و عوارض تغییر کرده است (اکنون {route['transport_cost']:,}$). لطفاً دوباره بررسی و تأیید کنید."}, status=409)
     if not goods_escrowed and seller["resources"].get(resource, 0) < amount:
         return web.json_response({"success":False,"error":"seller_no_res","message":f"فروشنده فقط {seller['resources'].get(resource,0):,} واحد {RESOURCE_NAMES[resource]} دارد."}, status=400)
 
@@ -4451,7 +4478,7 @@ async def accept_listing(request):
         if owner:
             _, sp = get_player_by_country(owner)
             if sp: sp["money"] = sp.get("money", 0) + s["cost"]
-    push_news("معامله بازار جهانی", f"{COUNTRIES[buyer_cid]['name']} {amount:,} {RESOURCE_NAMES[resource]} را از {COUNTRIES[seller_cid]['name']} خرید؛ مسیر {route['mode']}، هزینه حمل {route['transport_cost']:,}$ و زمان حمل حدود {fmt_duration_fa(travel_s)}.")
+    push_news("معامله بازار جهانی", f"{COUNTRIES[buyer_cid]['name']} {amount:,} {RESOURCE_NAMES[resource]} را از {COUNTRIES[seller_cid]['name']} خرید؛ مسیر {route['mode']}، هزینه حمل {route['transport_cost']:,}$ (کرایه {route.get('freight_cost',0):,}$ + عوارض {route.get('toll',0):,}$) و زمان حمل حدود {fmt_duration_fa(travel_s)}.")
     save_state()
     return web.json_response({"success":True,"route":route,"transport_cost":route["transport_cost"],
                               "eta_seconds": travel_s, "eta_text": fmt_duration_fa(travel_s)})
