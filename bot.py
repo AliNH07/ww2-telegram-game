@@ -989,10 +989,26 @@ def occupy_colony(attacker_cid, colony_cid, previous_occupier):
     return True
 
 
+def process_deliveries(player):
+    """کالاهای تجاری که زمان حملشان تمام شده به موجودی خریدار اضافه می‌شود."""
+    pend = player.get("pending_deliveries")
+    if not pend: return
+    now = utcnow(); keep = []
+    for d in pend:
+        ar = parse_dt(d.get("arrive"))
+        if ar and ar > now:
+            keep.append(d); continue
+        res = d.get("resource")
+        if res in RESOURCE_NAMES:
+            player.setdefault("resources", {})
+            player["resources"][res] = player["resources"].get(res, 0) + int(d.get("amount", 0) or 0)
+    player["pending_deliveries"] = keep
+
 def accrue_player(player):
     """درآمد و منابع را با ساعت مشترک دنیا و با نرخ درستِ هر فصل محاسبه می‌کند."""
     if player.get("is_eliminated") or not player.get("country"):
         return
+    process_deliveries(player)
     meta = _world_meta()
     started = parse_dt(meta.get("game_started_at"))
     if not started:
@@ -2419,10 +2435,27 @@ async def get_forces(request):
                               "transits": mine, "now": utcnow().isoformat()})
 
 # ---------------- زمان سفر نیروها ----------------
-TRAVEL_MIN_SECONDS = 10
-TRAVEL_MAX_SECONDS = 60
+# قانون یکسان زمان حرکت برای همهٔ جابه‌جایی‌های نقشه (نیرو، ناو، ناوگان تجاری، حمل کالا):
+# نزدیک‌ترین مقصد ۱ دقیقه، دورترین مقصد (نصف محیط زمین) ۳ ساعت، و بقیه به‌صورت خطی بر اساس فاصله.
+TRAVEL_MIN_SECONDS = 60
+TRAVEL_MAX_SECONDS = 3 * 3600
 TRAVEL_MIN_MINUTES = TRAVEL_MIN_SECONDS / 60
 TRAVEL_MAX_MINUTES = TRAVEL_MAX_SECONDS / 60
+TRAVEL_MAX_KM = 20015.0  # دورترین فاصلهٔ ممکن روی کره
+
+def travel_seconds_for_km(km):
+    try: km = float(km)
+    except (TypeError, ValueError): return float(TRAVEL_MIN_SECONDS)
+    if km != km: return float(TRAVEL_MIN_SECONDS)
+    ratio = min(1.0, max(0.0, km / TRAVEL_MAX_KM))
+    return TRAVEL_MIN_SECONDS + (TRAVEL_MAX_SECONDS - TRAVEL_MIN_SECONDS) * ratio
+
+def fmt_duration_fa(seconds):
+    secs = max(0, int(math.ceil(seconds)))
+    h, m = secs // 3600, (secs % 3600) // 60
+    if h and m: return f"{h} ساعت و {m} دقیقه"
+    if h: return f"{h} ساعت"
+    return f"{max(1, m)} دقیقه"
 
 COUNTRY_PORT_COORDS = {
     "germany": (8.15, 53.53), "britain": (-1.10, 50.80), "ussr": (30.20, 59.93),
@@ -2499,7 +2532,170 @@ def geo_interp(a, b, f):
     z = A * math.sin(lat1) + B * math.sin(lat2)
     return (math.degrees(math.atan2(y, x)), math.degrees(math.atan2(z, math.hypot(x, y))))
 
+# ---------------- مسیر واقعی دریایی ----------------
+# زمان حرکت دریایی بر اساس طول مسیر قابل پیمایش در دریا (گذرگاه‌ها و تنگه‌ها) حساب می‌شود، نه خط مستقیم.
+_SEA_CACHE = {}
+
+def _sea_node_xy(n):
+    if n in NAVAL_WAYPOINTS: return tuple(NAVAL_WAYPOINTS[n])
+    i = STRAITS_DATA.get(n)
+    return (i["lon"], i["lat"]) if i else None
+
+def _sea_graph():
+    g = _SEA_CACHE.get("g")
+    if g: return g
+    nodes = sorted(set(NAVAL_WAYPOINTS) | set(STRAITS_DATA))
+    xy = {n: _sea_node_xy(n) for n in nodes}
+    adj = {n: {} for n in nodes}
+    def link(a, b):
+        if a == b or a not in xy or b not in xy: return
+        d = _great_circle_km(xy[a], xy[b]); adj[a][b] = d; adj[b][a] = d
+    for lane in COUNTRY_SEA_LANES.values():
+        lane = [x for x in lane if x in xy]
+        for a, b in zip(lane, lane[1:]): link(a, b)
+    # گره‌هایی که در هیچ مسیر تعریف‌شده‌ای نیستند به دو گرهٔ دریایی نزدیک وصل می‌شوند.
+    linked = [n for n in nodes if adj[n]]
+    for n in nodes:
+        if adj[n] or not linked: continue
+        for m in sorted(linked, key=lambda m: _great_circle_km(xy[n], xy[m]))[:2]: link(n, m)
+        linked.append(n)
+    # اگر شبکه چند تکه بود، نزدیک‌ترین گره‌ها بین تکه‌ها وصل می‌شوند تا همهٔ نقاط قابل دسترسی باشند.
+    def components():
+        seen, comps = set(), []
+        for n in nodes:
+            if n in seen: continue
+            comp, stack = [], [n]; seen.add(n)
+            while stack:
+                x = stack.pop(); comp.append(x)
+                for y in adj[x]:
+                    if y not in seen: seen.add(y); stack.append(y)
+            comps.append(comp)
+        return comps
+    for _ in range(len(nodes)):
+        comps = components()
+        if len(comps) <= 1: break
+        base = set(comps[0]); rest = [x for c in comps[1:] for x in c]
+        a, b = min(((x, y) for x in base for y in rest), key=lambda r: _great_circle_km(xy[r[0]], xy[r[1]]))
+        link(a, b)
+    N = len(nodes); idx = {n: i for i, n in enumerate(nodes)}; INF = float("inf")
+    dist = [[INF] * N for _ in range(N)]; nxt = [[None] * N for _ in range(N)]
+    for n in nodes:
+        i = idx[n]; dist[i][i] = 0.0; nxt[i][i] = i
+        for m, d in adj[n].items(): dist[i][idx[m]] = d; nxt[i][idx[m]] = idx[m]
+    for k in range(N):
+        for i in range(N):
+            dik = dist[i][k]
+            if dik == INF: continue
+            for j in range(N):
+                nd = dik + dist[k][j]
+                if nd < dist[i][j]: dist[i][j] = nd; nxt[i][j] = nxt[i][k]
+    ref = max((d for row in dist for d in row if d != INF), default=1.0)
+    g = {"nodes": nodes, "xy": xy, "idx": idx, "dist": dist, "nxt": nxt, "ref": max(1.0, ref)}
+    _SEA_CACHE["g"] = g
+    return g
+
+def _sea_ref_km():
+    """طولانی‌ترین مأموریت دریایی ممکن (بندر هر کشور تا بندر کشورها، سکوهای دریایی و تنگه‌ها) = مرجع ۳ ساعت."""
+    ref = _SEA_CACHE.get("ref")
+    if ref: return ref
+    best = 1.0
+    ports = list(COUNTRY_PORT_COORDS)
+    for i, a in enumerate(ports):
+        for b_ in ports[i + 1:]:
+            geo = _sea_geometry(a, "home", f"country:{b_}", b_)
+            if geo: best = max(best, geo["km"])
+        targets = [sid for sid, m in MAP_RESOURCES.items() if m.get("zone") == "sea"] + list(STRAITS_DATA)
+        for sid in targets:
+            geo = _sea_geometry(a, "home", sid)
+            if geo: best = max(best, geo["km"])
+    _SEA_CACHE["ref"] = best
+    return best
+
+def sea_travel_seconds(km):
+    """۱ دقیقه برای کوتاه‌ترین مسیر دریایی و ۳ ساعت برای طولانی‌ترین مسیر دریایی بازی؛ بقیه خطی."""
+    ratio = min(1.0, max(0.0, float(km) / _sea_ref_km()))
+    return TRAVEL_MIN_SECONDS + (TRAVEL_MAX_SECONDS - TRAVEL_MIN_SECONDS) * ratio
+
+def sea_seconds_per_km():
+    return (TRAVEL_MAX_SECONDS - TRAVEL_MIN_SECONDS) / _sea_ref_km()
+
+def sea_route_between(a_xy, b_xy, skip=()):
+    """کوتاه‌ترین مسیر دریایی بین دو نقطه؛ لیست شناسهٔ گذرگاه‌ها/تنگه‌هایی که باید از آن‌ها گذشت."""
+    g = _sea_graph(); nodes, xy = g["nodes"], g["xy"]
+    if not a_xy or not b_xy or _great_circle_km(a_xy, b_xy) < 150: return []
+    near = lambda p: sorted(range(len(nodes)), key=lambda i: _great_circle_km(p, xy[nodes[i]]))[:3]
+    best = None
+    for i in near(a_xy):
+        for j in near(b_xy):
+            d = _great_circle_km(a_xy, xy[nodes[i]]) + g["dist"][i][j] + _great_circle_km(xy[nodes[j]], b_xy)
+            if best is None or d < best[0]: best = (d, i, j)
+    if not best: return []
+    path, i, j = [best[1]], best[1], best[2]
+    while i != j:
+        i = g["nxt"][i][j]
+        if i is None: return []
+        path.append(i)
+    return [nodes[k] for k in path if nodes[k] not in skip]
+
+def _sea_loc_xy(cid, loc):
+    """نقطهٔ دریایی یک موضع: خانه برای ناوها بندر کشور است."""
+    if loc == "home": return COUNTRY_PORT_COORDS.get(cid) or loc_coords(cid, loc)
+    return loc_coords(cid, loc)
+
+def _sea_geometry(cid, src, dst, target_country=None):
+    """مسیر واقعی دریایی و طول آن (کیلومتر)، بدون محاسبهٔ زمان."""
+    if target_country is None and isinstance(dst, str) and dst.startswith("country:"):
+        target_country = dst.split(":", 1)[1]
+    a = _sea_loc_xy(cid, src)
+    b = (COUNTRY_PORT_COORDS.get(target_country) or loc_coords(cid, dst)) if target_country else _sea_loc_xy(cid, dst)
+    if not a or not b: return None
+    if target_country:
+        nodes = list(_country_route_straits(cid, target_country, cid) or [])
+        if nodes and src != "home":
+            cands = [(i, _great_circle_km(a, _sea_node_xy(n))) for i, n in enumerate(nodes) if _sea_node_xy(n)]
+            if cands:
+                ni = min(cands, key=lambda r: r[1])[0]
+                nodes = nodes[ni + (1 if nodes[ni] == src else 0):]
+        if not nodes: nodes = sea_route_between(a, b, skip={src, dst})
+    else:
+        nodes = sea_route_between(a, b, skip={src, dst})
+    clean = []
+    for n in nodes:
+        if n in (src, dst) or not _sea_node_xy(n): continue
+        if clean and clean[-1] == n: continue
+        clean.append(n)
+    points = [list(a)] + [list(_sea_node_xy(n)) for n in clean] + [list(b)]
+    legs = [_great_circle_km(points[i], points[i + 1]) for i in range(len(points) - 1)]
+    km = sum(legs)
+    return {"nodes": clean, "points": points, "leg_km": legs, "km": km,
+            "straits": [n for n in clean if n in STRAITS_DATA]}
+
+def plan_sea_voyage(cid, src, dst, target_country=None):
+    """مسیر واقعی دریایی، طول آن (کیلومتر) و زمان حرکت را برمی‌گرداند؛ همهٔ مأموریت‌های دریایی از همین‌جا زمان می‌گیرند."""
+    geo = _sea_geometry(cid, src, dst, target_country)
+    if not geo: return None
+    geo["seconds"] = sea_travel_seconds(geo["km"])
+    return geo
+
+def _leg_share(cid, current, next_dst, remaining, final_dst):
+    """سهم مرحلهٔ بعدی از کل مسیر باقی‌مانده (بر اساس طول)."""
+    seq = [current, next_dst] + list(remaining or []) + ([final_dst] if final_dst else [])
+    pts = [_sea_loc_xy(cid, x) for x in seq]
+    if any(p is None for p in pts): return 1.0 / (len(remaining or []) + 1)
+    segs = [_great_circle_km(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+    total = sum(segs)
+    return (segs[0] / total) if total > 1e-6 else 1.0 / len(segs)
+
+def _remaining_sea_km(cid, from_xy, next_dst, remaining, final_dst):
+    seq = [next_dst] + list(remaining or []) + ([final_dst] if final_dst else [])
+    pts = [from_xy] + [_sea_loc_xy(cid, x) for x in seq]
+    if any(p is None for p in pts): return 0.0
+    return sum(_great_circle_km(pts[i], pts[i + 1]) for i in range(len(pts) - 1))
+
 def travel_minutes(cid, a, b, units=None):
+    if has_naval_units(units or {}):
+        plan = plan_sea_voyage(cid, a, b)
+        if plan: return plan["seconds"] / 60.0
     if a == "home" and has_naval_units(units or {}):
         ca = COUNTRY_PORT_COORDS.get(cid, TRADE_COUNTRY_COORDS.get(cid))
     else:
@@ -2510,7 +2706,7 @@ def travel_minutes(cid, a, b, units=None):
         cb = loc_coords(cid, b)
     if not ca or not cb: return TRAVEL_MIN_MINUTES
     km = _great_circle_km(ca, cb)
-    seconds = TRAVEL_MIN_SECONDS + (TRAVEL_MAX_SECONDS - TRAVEL_MIN_SECONDS) * min(1.0, max(0.0, km / 10000.0))
+    seconds = travel_seconds_for_km(km)
     return max(TRAVEL_MIN_MINUTES, min(TRAVEL_MAX_MINUTES, seconds / 60.0))
 
 def _great_circle_km(a, b):
@@ -2651,10 +2847,11 @@ def _continue_strait_passage(t, units):
     total_end = parse_dt(t.get("route_total_arrive"))
     if total_end and total_end > utcnow():
         remaining_seconds = max(1.0, (total_end - utcnow()).total_seconds())
-        minutes = (remaining_seconds / max(1, len(remaining) + 1)) / 60.0
+        minutes = (remaining_seconds * _leg_share(cid, current, next_dst, remaining, final_dst)) / 60.0
     else:
-        minutes = travel_minutes(cid, current, next_dst, units)
-        total_end = utcnow() + timedelta(minutes=minutes * (len(remaining) + 1))
+        km_left = _remaining_sea_km(cid, _sea_loc_xy(cid, current), next_dst, remaining, final_dst)
+        minutes = max(1.0 / 60.0, km_left * sea_seconds_per_km() * _leg_share(cid, current, next_dst, remaining, final_dst) / 60.0)
+        total_end = utcnow() + timedelta(minutes=(km_left * sea_seconds_per_km()) / 60.0)
     next_owner = site_owner(next_dst) if next_dst != "home" else None
     start_transit(cid, current, next_dst, units, minutes, "go",
                   dst_free=(next_dst != "home" and not next_owner), origin=t.get("origin") or t.get("from"),
@@ -2672,7 +2869,7 @@ def _resolve_strait_passage(t, player):
     # a victor captures the strait and continues toward the original destination.
     if owner and owner != cid and policy["closed"]:
         if have_treaty(cid, owner, "non_aggression"):
-            start_transit(cid, sid, origin, units, travel_minutes(cid, sid, origin), "back", origin=origin)
+            start_transit(cid, sid, origin, units, travel_minutes(cid, sid, origin, units), "back", origin=origin)
             msg = f"عبور {cname(cid)} از {loc_label(sid)} به‌دلیل پیمان عدم تجاوز با {cname(owner)} متوقف شد؛ نیروها بازمی‌گردند."
             announce("turnback", "عبور از تنگه متوقف شد", msg, [cid, owner])
             notify_country(cid, "⛔ عبور از تنگه به‌دلیل پیمان عدم تجاوز ممکن نبود؛ نیروها بازمی‌گردند.")
@@ -2720,7 +2917,7 @@ def _resolve_strait_passage(t, player):
     if owner and owner != cid:
         toll = max(0, int(policy.get("toll", 0)))
         if toll and player.get("money", 0) < toll:
-            start_transit(cid, sid, origin, units, travel_minutes(cid, sid, origin), "back", origin=origin)
+            start_transit(cid, sid, origin, units, travel_minutes(cid, sid, origin, units), "back", origin=origin)
             msg = f"عبور {cname(cid)} از {loc_label(sid)} به‌دلیل کمبود خزانه برای عوارض {toll:,}$ متوقف شد؛ نیروها بازمی‌گردند."
             announce("turnback", "عبور از تنگه متوقف شد", msg, [cid, owner])
             notify_country(cid, f"⛔ خزانه برای عوارض {loc_label(sid)} کافی نبود؛ نیروها بازمی‌گردند.")
@@ -3124,7 +3321,17 @@ def _finish_route_battle(battle_id, now):
             winner["from"] = "mid"; winner["from_ll"] = list(pos); winner["to_ll"] = list(end_ll)
             winner["start"] = now.isoformat()
             distance = _great_circle_km(pos, end_ll)
-            seconds = TRAVEL_MIN_SECONDS + (TRAVEL_MAX_SECONDS - TRAVEL_MIN_SECONDS) * min(1.0, max(0.0, distance / 10000.0))
+            if has_naval_units(winner.get("units")):
+                rate = sea_seconds_per_km()
+                seconds = max(1.0, distance * rate)
+                if winner.get("route_final_dst"):
+                    rest_km = 0.0
+                    seq = list(winner.get("route_remaining_straits") or []) + [winner.get("route_final_dst")]
+                    pts = [tuple(end_ll)] + [_sea_loc_xy(winner_country, x) for x in seq]
+                    if all(pts): rest_km = sum(_great_circle_km(pts[i], pts[i + 1]) for i in range(len(pts) - 1))
+                    winner["route_total_arrive"] = (now + timedelta(seconds=seconds + rest_km * rate)).isoformat()
+            else:
+                seconds = travel_seconds_for_km(distance)
             winner["arrive"] = (now + timedelta(seconds=seconds)).isoformat()
     title = "نبرد دریایی در مسیر" if battle_front == "naval" else "نبرد در مسیر"
     final_target = winner.get("route_final_dst") or winner.get("to")
@@ -3268,19 +3475,9 @@ async def dispatch_forces(request):
         if not dispatch_rule_errors(pool, zs) and dispatch_rule_errors(after, zs):
             return _bad("با خروج این یگان‌ها، نیروهای باقی‌مانده در این موضع بدون پشتیبان (ناو ترابری / ناو هواپیمابر / سوخت‌رسان) می‌مانند.")
 
-    route_straits = []
-    if has_naval_units(units):
-        if target_country:
-            route_straits = _country_route_straits(cid, target_country, cid)
-            if src != "home" and route_straits:
-                src_xy = loc_coords(cid, src)
-                candidates = [(i, _great_circle_km(src_xy, loc_coords(cid, node)))
-                              for i, node in enumerate(route_straits) if src_xy and loc_coords(cid, node)]
-                if candidates:
-                    nearest_i, nearest_km = min(candidates, key=lambda row: row[1])
-                    route_straits = route_straits[nearest_i + (1 if route_straits[nearest_i] == src else 0):]
-        else:
-            route_straits = straits_on_route(cid, src, dst)
+    naval = has_naval_units(units)
+    plan = plan_sea_voyage(cid, src, dst, target_country) if naval else None
+    route_straits = list(plan["nodes"]) if plan else []
     toll_due = 0
     for sid in route_straits:
         if sid in NAVAL_WAYPOINTS: continue
@@ -3292,52 +3489,16 @@ async def dispatch_forces(request):
         return _bad(f"برای عوارض مسیر دریایی خزانه کافی نیست؛ عوارض موردنیاز {toll_due:,}$ و موجودی شما {p.get('money', 0):,}$ است.")
 
     for k, n in units.items(): pool[k] -= n
-    # Move to the next strait first when the selected naval route crosses one.
+    # ناوها از روی گذرگاه‌ها و تنگه‌های واقعی مسیر دریایی می‌روند؛ هر مرحله به نسبت طولش زمان می‌گیرد.
     first_target = route_straits[0] if route_straits else dst
     passage = bool(route_straits)
-    total_minutes = travel_minutes(cid, src, dst, units)
-    legs = len(route_straits) + 1 if passage else 1
-    minutes = total_minutes / legs
+    total_minutes = (plan["seconds"] / 60.0) if plan else travel_minutes(cid, src, dst, units)
+    if plan and passage and plan["km"] > 1e-6:
+        minutes = total_minutes * (plan["leg_km"][0] / plan["km"])
+    else:
+        minutes = total_minutes
     total_arrive = (utcnow() + timedelta(minutes=total_minutes)).isoformat()
-    full_path = None
-    naval = has_naval_units(units)
-    def _ll(loc):
-        return (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, loc)) if loc == "home" and naval else loc_coords(cid, loc))
-    if passage:
-        pts = [_ll(src)] + [loc_coords(cid, x) for x in route_straits] + [_ll(dst)]
-        if all(pts): full_path = pts
-    elif naval and dst != "home" and not target_country:
-        # برای سکوی نفت/معدنِ دریایی، خط مستقیم روی کره ممکن است از خشکی بگذرد.
-        # از گراف مسیرهای دریایی تعریف‌شده برای کشورها، مسیر تقریبی بین نزدیک‌ترین
-        # گذرگاه‌های دریایی مبدأ و مقصد را پیدا می‌کنیم.
-        import heapq
-        start_xy, end_xy = _ll(src), _ll(dst)
-        graph = {}
-        for lane in COUNTRY_SEA_LANES.values():
-            lane = [x for x in lane if x in NAVAL_WAYPOINTS]
-            for a, b in zip(lane, lane[1:]):
-                graph.setdefault(a, set()).add(b)
-                graph.setdefault(b, set()).add(a)
-        waypoints = list(NAVAL_WAYPOINTS)
-        if start_xy and end_xy and waypoints:
-            near_start = min(waypoints, key=lambda x: _great_circle_km(start_xy, NAVAL_WAYPOINTS[x]))
-            near_end = min(waypoints, key=lambda x: _great_circle_km(end_xy, NAVAL_WAYPOINTS[x]))
-            # کوتاه‌ترین مسیر وزنی روی شبکهٔ خطوط دریایی موجود
-            queue = [(0.0, near_start, [near_start])]
-            best = {near_start: 0.0}; sea_path = []
-            while queue:
-                cost, node, path_nodes = heapq.heappop(queue)
-                if cost != best.get(node): continue
-                if node == near_end:
-                    sea_path = path_nodes; break
-                for nxt in graph.get(node, ()):
-                    nc = cost + _great_circle_km(NAVAL_WAYPOINTS[node], NAVAL_WAYPOINTS[nxt])
-                    if nc < best.get(nxt, float('inf')):
-                        best[nxt] = nc
-                        heapq.heappush(queue, (nc, nxt, path_nodes + [nxt]))
-            if sea_path:
-                pts = [start_xy] + [NAVAL_WAYPOINTS[x] for x in sea_path] + [end_xy]
-                full_path = [list(x) for x in pts if x]
+    full_path = plan["points"] if (plan and passage) else None
     start_transit(cid, src, first_target, units, minutes, "go",
                   dst_free=(first_target != "home" and not site_owner(first_target)), origin=src,
                   passage=passage, route_final_dst=dst if passage else None,
@@ -3356,11 +3517,11 @@ async def dispatch_forces(request):
         process_transits()
     save_state()
     secs = max(0, int(math.ceil(total_minutes * 60)))
-    eta = f"{secs} ثانیه" if secs < 60 else "۱ دقیقه"
+    eta = fmt_duration_fa(secs)
     if minutes <= 0:
         msg = "نیروها رسیدند؛ وضعیت عبور و درگیری بررسی شد."
     else:
-        msg = f"نیروها به راه افتادند؛ زمان رسیدن آزمایشی: حدود {eta}."
+        msg = f"نیروها به راه افتادند؛ زمان رسیدن: حدود {eta}."
     return web.json_response({"success": True, "outcome": "sent", "message": msg,
                               "player": serialize_player(p)})
 
@@ -3980,6 +4141,14 @@ def _trade_distance_km(a, b):
     return r * 2 * asin(sqrt(max(0, min(1, x))))
 
 
+def _trade_travel_seconds(a, b, mode, distance):
+    """ناوهای تجاری از مسیر واقعی دریایی می‌روند؛ زمینی و هوایی بر اساس فاصلهٔ مستقیم."""
+    if mode == "sea":
+        plan = plan_sea_voyage(a, "home", f"country:{b}", b)
+        if plan: return int(round(plan["seconds"]))
+    return int(round(travel_seconds_for_km(distance)))
+
+
 def _land_open(cid):
     _, p = get_player_by_country(cid)
     return bool((p or {}).get("land_trade_open", True))
@@ -4027,7 +4196,7 @@ def _route_quote(a, b, amount, preferred_mode=None):
         tolls = {s: strait_policy(s, b) for s in r["straits"] if s in STRAITS_DATA}
         toll = sum(max(0, int(v.get("toll", 0))) for v in tolls.values())
         cost = int(round(base + toll))
-        quotes.append({**r, "distance_km": int(round(distance)), "transport_cost": cost, "toll": toll,
+        quotes.append({**r, "distance_km": int(round(distance)), "travel_seconds": _trade_travel_seconds(a, b, mode, distance), "transport_cost": cost, "toll": toll,
                        "strait_costs":[{"id":s,"name":STRAITS_DATA[s]["name"],"cost":int(tolls.get(s, {}).get("toll",0)),
                                          "owner":strait_holdings.get(s)} for s in r["straits"]]})
     if preferred_mode:
@@ -4048,7 +4217,7 @@ def _route_options(a, b, amount, traveler_cid=None):
         mode=r["mode"]; base=(max(1,amount)/1000.0)*(distance/1000.0)*TRADE_COST_PER_1000KM_PER_1000_UNITS[mode]
         tolls = {s: strait_policy(s, traveler) for s in r["straits"] if s in STRAITS_DATA}
         toll=sum(max(0,int(v.get("toll",0))) for v in tolls.values())
-        out.append({**r,"distance_km":int(round(distance)),"transport_cost":int(round(base+toll)),"toll":toll,
+        out.append({**r,"distance_km":int(round(distance)),"travel_seconds":_trade_travel_seconds(a, b, mode, distance),"transport_cost":int(round(base+toll)),"toll":toll,
                     "strait_costs":[{"id":s,"name":STRAITS_DATA[s]["name"],"cost":int(tolls.get(s,{}).get("toll",0)),"owner":strait_holdings.get(s)} for s in r["straits"]]})
     return out, None
 
@@ -4059,6 +4228,35 @@ def _listing_view(l):
                 "amount":l["sell_amount"], "price_resource":l["want_resource"], "price_amount":l["want_amount"]}
     return {**l, "side":"buy", "country":l["buyer"], "resource":l["buy_resource"],
             "amount":l["buy_amount"], "price_resource":l["offer_resource"], "price_amount":l["offer_amount"]}
+
+
+async def get_market_shipments(request):
+    """کالاهای در راه: ورودی‌ها (برای من) و خروجی‌ها (فروخته‌شده و در مسیر خریدار)، همراه ساعت سرور."""
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    p = players.get(uid)
+    cid = (p or {}).get("country")
+    out = []
+    changed = False
+    for pl in list(players.values()):
+        if not isinstance(pl, dict) or not pl.get("pending_deliveries"): continue
+        before = len(pl["pending_deliveries"])
+        process_deliveries(pl)  # رسیده‌ها همین‌جا به موجودی اضافه می‌شوند تا وضعیت با واقعیت یکی باشد
+        if len(pl["pending_deliveries"]) != before: changed = True
+    if changed: save_state()
+    if cid:
+        for pl in players.values():
+            if not isinstance(pl, dict): continue
+            owner = pl.get("country")
+            for d in pl.get("pending_deliveries") or []:
+                to_c = d.get("to") or owner
+                if to_c != cid and d.get("from") != cid: continue
+                out.append({"id": d.get("id"), "resource": d.get("resource"), "amount": int(d.get("amount", 0) or 0),
+                            "from": d.get("from"), "to": to_c, "mode": d.get("mode"), "straits": d.get("straits") or [],
+                            "start": d.get("start"), "arrive": d.get("arrive"),
+                            "direction": "in" if to_c == cid else "out"})
+    out.sort(key=lambda x: x.get("arrive") or "")
+    return web.json_response({"shipments": out, "now": utcnow().isoformat()})
 
 
 async def get_market(request):
@@ -4240,16 +4438,22 @@ async def accept_listing(request):
 
     if not goods_escrowed:
         seller["resources"][resource] = seller["resources"].get(resource, 0) - amount
-    buyer["resources"][resource] = buyer["resources"].get(resource, 0) + amount
+    # کالا فوراً نمی‌رسد؛ زمان حمل بر اساس فاصله (۱ دقیقه تا ۳ ساعت) محاسبه می‌شود.
+    travel_s = int(route.get("travel_seconds") or _trade_travel_seconds(seller_cid, buyer_cid, route.get("mode"), route.get("distance_km", 0)))
+    arrive_at = utcnow() + timedelta(seconds=travel_s)
+    buyer.setdefault("pending_deliveries", []).append({
+        "id": str(uuid.uuid4()), "resource": resource, "amount": amount, "from": seller_cid, "to": buyer_cid,
+        "mode": route.get("mode"), "straits": [s_.get("id") for s_ in route.get("strait_costs", [])], "start": utcnow().isoformat(), "arrive": arrive_at.isoformat()})
     l["status"] = "filled"; l["actor"] = actor_cid; l["route"] = route; l["filled_at"] = utcnow().isoformat()
     for s in route.get("strait_costs", []):
         owner = s.get("owner")
         if owner:
             _, sp = get_player_by_country(owner)
             if sp: sp["money"] = sp.get("money", 0) + s["cost"]
-    push_news("معامله بازار جهانی", f"{COUNTRIES[buyer_cid]['name']} {amount:,} {RESOURCE_NAMES[resource]} را از {COUNTRIES[seller_cid]['name']} خرید؛ مسیر {route['mode']} و هزینه حمل {route['transport_cost']:,}$.")
+    push_news("معامله بازار جهانی", f"{COUNTRIES[buyer_cid]['name']} {amount:,} {RESOURCE_NAMES[resource]} را از {COUNTRIES[seller_cid]['name']} خرید؛ مسیر {route['mode']}، هزینه حمل {route['transport_cost']:,}$ و زمان حمل حدود {fmt_duration_fa(travel_s)}.")
     save_state()
-    return web.json_response({"success":True,"route":route,"transport_cost":route["transport_cost"]})
+    return web.json_response({"success":True,"route":route,"transport_cost":route["transport_cost"],
+                              "eta_seconds": travel_s, "eta_text": fmt_duration_fa(travel_s)})
 
 
 async def set_strait_settings(request):
@@ -5040,7 +5244,7 @@ async def create_web_app():
         ("/api/army-units", get_army_units),
         ("/api/wars", get_wars), ("/api/map-sites", get_map_sites),
         ("/api/announcements", get_announcements), ("/api/announcements/status", get_announcement_status), ("/api/announcement", get_announcement_detail),
-        ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market),
+        ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market), ("/api/market/shipments", get_market_shipments),
         ("/api/diplomacy", get_diplomacy), ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
         ("/api/admin/overview", admin_overview),
