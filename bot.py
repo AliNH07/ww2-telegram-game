@@ -3300,12 +3300,44 @@ async def dispatch_forces(request):
     minutes = total_minutes / legs
     total_arrive = (utcnow() + timedelta(minutes=total_minutes)).isoformat()
     full_path = None
+    naval = has_naval_units(units)
+    def _ll(loc):
+        return (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, loc)) if loc == "home" and naval else loc_coords(cid, loc))
     if passage:
-        naval = has_naval_units(units)
-        def _ll(loc):
-            return (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, loc)) if loc == "home" and naval else loc_coords(cid, loc))
         pts = [_ll(src)] + [loc_coords(cid, x) for x in route_straits] + [_ll(dst)]
         if all(pts): full_path = pts
+    elif naval and dst != "home" and not target_country:
+        # برای سکوی نفت/معدنِ دریایی، خط مستقیم روی کره ممکن است از خشکی بگذرد.
+        # از گراف مسیرهای دریایی تعریف‌شده برای کشورها، مسیر تقریبی بین نزدیک‌ترین
+        # گذرگاه‌های دریایی مبدأ و مقصد را پیدا می‌کنیم.
+        import heapq
+        start_xy, end_xy = _ll(src), _ll(dst)
+        graph = {}
+        for lane in COUNTRY_SEA_LANES.values():
+            lane = [x for x in lane if x in NAVAL_WAYPOINTS]
+            for a, b in zip(lane, lane[1:]):
+                graph.setdefault(a, set()).add(b)
+                graph.setdefault(b, set()).add(a)
+        waypoints = list(NAVAL_WAYPOINTS)
+        if start_xy and end_xy and waypoints:
+            near_start = min(waypoints, key=lambda x: _great_circle_km(start_xy, NAVAL_WAYPOINTS[x]))
+            near_end = min(waypoints, key=lambda x: _great_circle_km(end_xy, NAVAL_WAYPOINTS[x]))
+            # کوتاه‌ترین مسیر وزنی روی شبکهٔ خطوط دریایی موجود
+            queue = [(0.0, near_start, [near_start])]
+            best = {near_start: 0.0}; sea_path = []
+            while queue:
+                cost, node, path_nodes = heapq.heappop(queue)
+                if cost != best.get(node): continue
+                if node == near_end:
+                    sea_path = path_nodes; break
+                for nxt in graph.get(node, ()):
+                    nc = cost + _great_circle_km(NAVAL_WAYPOINTS[node], NAVAL_WAYPOINTS[nxt])
+                    if nc < best.get(nxt, float('inf')):
+                        best[nxt] = nc
+                        heapq.heappush(queue, (nc, nxt, path_nodes + [nxt]))
+            if sea_path:
+                pts = [start_xy] + [NAVAL_WAYPOINTS[x] for x in sea_path] + [end_xy]
+                full_path = [list(x) for x in pts if x]
     start_transit(cid, src, first_target, units, minutes, "go",
                   dst_free=(first_target != "home" and not site_owner(first_target)), origin=src,
                   passage=passage, route_final_dst=dst if passage else None,
