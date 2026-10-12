@@ -378,10 +378,10 @@ ARMY_UNITS = {
         "attack": 20, "defense": 10},
     "tank": {"name": "تانک", "group": "land", "requires": ["land_barracks", "land_hq", "land_tank_factory"],
         "cost": 150_000, "manpower": 250, "resources": {"steel": 300, "food": 150}, "daily": {"food": 3, "oil": 4, "steel": 1},
-        "attack": 50, "defense": 25},
+        "attack": 50, "defense": 25, "build_seconds": 20 * 60},
     "ship": {"name": "ناو دریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
         "cost": 250_000, "manpower": 200, "resources": {"oil": 250, "food": 150}, "daily": {"food": 4, "oil": 10, "steel": 1},
-        "attack": 50, "defense": 60},
+        "attack": 50, "defense": 60, "build_seconds": 30 * 60},
     "submarine": {"name": "زیردریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
         "cost": 200_000, "manpower": 120, "resources": {"oil": 200, "steel": 150}, "daily": {"food": 2, "oil": 8, "steel": 1},
         "attack": 45, "defense": 25},
@@ -650,6 +650,7 @@ def ensure_player_fields(player):
     for k in list(lv_map):
         if k in INFRASTRUCTURE: lv_map[k] = min(lv_map[k], len(INFRASTRUCTURE[k]["levels"]))
         elif k not in ECONOMY: del lv_map[k]
+    player.setdefault("build_queue", [])  # فعالیت‌های زمان‌دار در حال انجام (ساخت یگان)
     player.setdefault("map_holdings", {})
     player.setdefault("strait_holdings", {})
     player.setdefault("announcements", {}); player.setdefault("land_trade_open", True)
@@ -1004,11 +1005,28 @@ def process_deliveries(player):
             player["resources"][res] = player["resources"].get(res, 0) + int(d.get("amount", 0) or 0)
     player["pending_deliveries"] = keep
 
+def process_build_queue(player):
+    """کارهای صف ساخت که زمانشان تمام شده تکمیل می‌شوند: یگان به موجودی اضافه و کار از صف حذف می‌شود."""
+    queue = player.get("build_queue")
+    if not queue: return
+    now = utcnow(); keep = []; done = False
+    for job in queue:
+        end = parse_dt(job.get("end"))
+        if end and end > now:
+            keep.append(job); continue
+        if job.get("kind") == "train" and job.get("unit_id") in ARMY_UNITS:
+            units = player.setdefault("units", {})
+            units[job["unit_id"]] = units.get(job["unit_id"], 0) + max(0, int(job.get("count", 0) or 0))
+            done = True
+    player["build_queue"] = keep
+    if done: recompute_army(player)
+
 def accrue_player(player):
     """درآمد و منابع را با ساعت مشترک دنیا و با نرخ درستِ هر فصل محاسبه می‌کند."""
     if player.get("is_eliminated") or not player.get("country"):
         return
     process_deliveries(player)
+    process_build_queue(player)
     meta = _world_meta()
     started = parse_dt(meta.get("game_started_at"))
     if not started:
@@ -1102,6 +1120,7 @@ def serialize_player(player):
     ensure_player_fields(player); accrue_player(player); recompute_army(player)
     rates = compute_rates(player)
     data = dict(player); data.update(get_game_time(player))
+    data["server_now"] = utcnow().isoformat()
     winner = data.get("game_winner") or {}
     data["game_winner_name"] = winner.get("name") if isinstance(winner, dict) else None
     data["game_winner_country"] = winner.get("country") if isinstance(winner, dict) else None
@@ -1963,6 +1982,9 @@ async def train_unit(request):
         return web.json_response({"success": False, "error": "no_infra",
                                   "message": "ابتدا بسازید: " + "، ".join(f"«{m}»" for m in missing)}, status=400)
     cap = get_group_capacity(p, group); used = get_group_units(p, group)
+    # یگان‌های در صف ساخت هم از ظرفیت رزرو می‌شوند
+    used += sum(max(0, int(j.get("count", 0) or 0)) for j in p.get("build_queue", [])
+                if j.get("kind") == "train" and ARMY_UNITS.get(j.get("unit_id"), {}).get("group") == group)
     store = {"land": "پادگان", "naval": "بندر", "air": "فرودگاه", "missile": "انبار موشک"}.get(group, "")
     if cap <= 0:
         return web.json_response({"success": False, "error": "no_storage",
@@ -1982,6 +2004,16 @@ async def train_unit(request):
                                       "message": f"{RESOURCE_NAMES[k]} کافی ندارید."}, status=400)
     p["money"] -= total_cost; p["manpower"] -= total_mp
     for k, a in unit["resources"].items(): p["resources"][k] -= a * count
+    build_s = int(unit.get("build_seconds") or 0)
+    if build_s > 0:
+        # یگان زمان‌دار: هزینه همین حالا کسر می‌شود، یگان بعد از پایان زمان به موجودی اضافه می‌شود.
+        now = utcnow()
+        p.setdefault("build_queue", []).append({
+            "id": str(uuid.uuid4()), "kind": "train", "unit_id": unit_id, "count": count,
+            "label": f"ساخت {count:,} {unit['name']}",
+            "start": now.isoformat(), "end": (now + timedelta(seconds=build_s)).isoformat()})
+        save_state()
+        return web.json_response({"success": True, "queued": True, "ready_in": build_s, "player": serialize_player(p)})
     p["units"][unit_id] = p["units"].get(unit_id, 0) + count
     recompute_army(p); save_state()
     return web.json_response({"success": True, "player": serialize_player(p)})
@@ -5326,6 +5358,8 @@ async def _run_ticks_for_all_worlds():
                     await _announce_season_transition_if_needed()
                     welfare_tick()
                     loan_tick()
+                    for _pl in list(players.values()):
+                        if isinstance(_pl, dict): process_build_queue(_pl)
                 except Exception as exc:
                     logging.error("world tick (%s): %s", wid, exc)
                 finally:
