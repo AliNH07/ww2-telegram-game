@@ -14,10 +14,6 @@ const initData = tg?.initData || "";
 const worldIdKey = () => `fl93_world_id_${userId || "guest"}`;
 let selectedWorldId = (() => { try { return String(localStorage.getItem(worldIdKey()) || localStorage.getItem("fl93_world_id") || "1"); } catch { return "1"; } })();
 const worldChoiceKey = () => `fl93_world_chosen_${userId || "guest"}`;
-function hasSavedWorldChoice() {
-    try { return localStorage.getItem(worldChoiceKey()) === "1"; }
-    catch { return false; }
-}
 let lastUserActionButton = null;
 let lastActionErrorMessage = "";
 let lastActionErrorAt = 0;
@@ -273,6 +269,7 @@ let enteringWorld = false;
 function renderWorldChoices() {
     const list = document.getElementById("world-select-list");
     if (!list) return;
+    if (!availableWorlds.length) { list.innerHTML = `<div class="world-empty">فعلاً دنیایی برای نمایش وجود ندارد.</div>`; return; }
     list.innerHTML = availableWorlds.map(w => {
         const status = w.game_finished ? `پایان‌یافته · برنده: ${escapeHtml(w.winner?.name || "—")}`
             : w.game_started ? `روز ${w.day} از ۳۱ · ${escapeHtml(w.season || "")}${w.registration_open ? " · ثبت‌نام باز" : " · ثبت‌نام بسته"}`
@@ -1714,13 +1711,6 @@ function unitChips(units) {
     return Object.entries(units || {}).filter(([, n]) => n > 0)
         .map(([k, n]) => `<span class="wf-chip">${unitName(k)} <b>${formatNumber(n)}</b></span>`).join("");
 }
-function timeAgo(iso) {
-    const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-    if (s < 60) return "لحظاتی پیش";
-    const m = Math.floor(s / 60); if (m < 60) return `${formatNumber(m)} دقیقه پیش`;
-    const h = Math.floor(m / 60); if (h < 24) return `${formatNumber(h)} ساعت پیش`;
-    return `${formatNumber(Math.floor(h / 24))} روز پیش`;
-}
 function timeLeft(iso) {
     const ms = new Date(iso).getTime() - Date.now();
     if (ms <= 0) return "منقضی شد";
@@ -2554,7 +2544,9 @@ function closeGuide() {
 function maybeShowGuide() {
     let seen = false;
     try { seen = localStorage.getItem(guideSeenKey()) === "1"; } catch (e) {}
-    if (!seen) openGuide();
+    if (seen) return;
+    openGuide();
+    try { localStorage.setItem(guideSeenKey(), "1"); } catch (e) {}
 }
 document.getElementById("guide-close")?.addEventListener("click", closeGuide);
 guideModal?.addEventListener("click", (event) => { if (event.target === guideModal) closeGuide(); });
@@ -5197,7 +5189,6 @@ function viewCos(lon, lat, rot) {
 /* =========================================================
    Preview Globe
 ========================================================= */
-let previewGlobeAbort = null;
 
 
 /* =========================================================
@@ -5227,13 +5218,13 @@ let previewGlobeAbort = null;
         await loadAdminPanel();
         return;
     }
-    // دنیا و کشور فقط بار اول پرسیده می‌شوند. اگر سرور بگوید این بازیکن قبلاً در یک دنیا کشور گرفته،
-    // یا دنیایی را قبلاً انتخاب کرده، مستقیم وارد همان دنیا (و کشور ذخیره‌شده) می‌شویم.
+    // اولین ورود (یا ورودی که انتخاب دنیا/کشور در آن کامل نشده) همیشه با صفحهٔ انتخاب دنیا شروع می‌شود.
+    // اگر سرور بگوید این بازیکن قبلاً در یک دنیا کشور گرفته، مستقیم وارد آخرین دنیا و کشور او می‌شویم.
     const mine = availableWorlds.filter(w => w.mine);
-    let auto = null;
-    if (mine.length) auto = mine.find(w => String(w.id) === String(selectedWorldId)) || mine[0];
-    else if (hasSavedWorldChoice()) auto = availableWorlds.find(w => String(w.id) === String(selectedWorldId));
-    if (auto) { selectedWorldId = String(auto.id); await enterSelectedWorld(); return; }
+    if (mine.length) {
+        const auto = mine.find(w => String(w.id) === String(selectedWorldId)) || mine[0];
+        selectedWorldId = String(auto.id); await enterSelectedWorld(); return;
+    }
     await showWorldSelection();
 })();
 
