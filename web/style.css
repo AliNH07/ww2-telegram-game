@@ -2562,9 +2562,10 @@ input, textarea, button { -webkit-touch-callout:none; }
     border: 1px solid rgba(var(--brand-rgb), .22); box-shadow: 0 14px 34px rgba(0,0,0,.28);
 }
 #home .hm-hero .home-card-photo { z-index: 0; background-position: center; }
-#home .hm-hero .home-card-photo.loaded { opacity: .55; }
+#home .hm-hero .home-card-photo.loaded { opacity: .92; }
 #home .hm-hero .home-card-photo::after {
-    background: linear-gradient(180deg, rgba(29,18,41,.45) 0%, rgba(29,18,41,.88) 100%);
+    /* عکس باید واضح بماند؛ فقط پایین برای خوانایی نوشته‌ها تیره می‌شود. */
+    background: linear-gradient(180deg, rgba(10,6,18,.04) 0%, rgba(10,6,18,.12) 32%, rgba(10,6,18,.48) 68%, rgba(10,6,18,.88) 100%);
 }
 #home .hm-hero-in { position: relative; z-index: 1; }
 #home .hm-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 22px; }
