@@ -2951,3 +2951,11 @@ body #market .market-action.sell {
 .dp-route span { color: var(--brand); font-size: 20px; }
 .dp-confirm-total { margin: 12px 0 8px; font-size: 13.5px; text-align: center; }
 .dp-confirm-box .is-rows { max-height: 32vh; overflow-y: auto; }
+
+/* کالاهای در راه */
+#market .market-tabs { overflow-x: auto; }
+#market .market-tab { flex: 1 0 auto; white-space: nowrap; }
+.mk-tr-badge { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 4px; border-radius: 9px; font-size: 11px; line-height: 18px; background: var(--brand); color: #261836; }
+.mk-tr-badge.hidden { display: none; }
+.mk-ship .mk-ship-route { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 8px 0 2px; font-size: 13.5px; font-weight: 700; }
+.mk-ship .mk-ship-route i { font-style: normal; color: var(--brand); }
