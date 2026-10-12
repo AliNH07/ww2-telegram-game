@@ -861,7 +861,7 @@ document.querySelectorAll(".action-card").forEach(card => {
         else if (s === "war") openWarPage();
         else if (s === "diplomacy") openDiplomacyPage();
         else if (s === "economy") openEconomyPage();
-        else if (s === "market") { showGamePage("market"); loadMarketListings(); }
+        else if (s === "market") { showGamePage("market"); loadMarketListings(); loadShipments(); }
         else if (s === "ranking") { showGamePage("ranking"); loadRankings(); }
         else if (s === "stats") { showGamePage("stats"); loadStats(); }
         else if (s === "welfare") { showGamePage("welfare"); loadWelfare(); }
@@ -4052,6 +4052,12 @@ let marketCreateSide = "sell", marketFilter = "all", marketRows = [], marketSanc
 
 function marketResourceText(k, n) { return `${RESOURCE_ICONS[k] || "📦"} ${formatNumber(n)} ${RESOURCE_NAMES[k] || k}`; }
 function marketModeLabel(m) { return m === "land" ? "🚚 زمینی" : m === "sea" ? "🚢 دریایی" : "✈️ هوایی"; }
+function fmtDurationFa(sec) {
+    const s = Math.max(0, Math.ceil(Number(sec) || 0)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    if (h && m) return `${formatNumber(h)} ساعت و ${formatNumber(m)} دقیقه`;
+    if (h) return `${formatNumber(h)} ساعت`;
+    return `${formatNumber(Math.max(1, m))} دقیقه`;
+}
 function marketModeCost(route) { return route ? formatMoney(route.transport_cost) : "—"; }
 
 async function loadMarketListings() {
@@ -4138,10 +4144,10 @@ async function openTradeModal(lid) {
     document.body.appendChild(ov); ov.querySelector(".is-close").onclick=()=>ov.remove(); ov.onclick=e=>{if(e.target===ov)ov.remove();};
     let chosen=best?.mode || null;
     const detail=ov.querySelector("#market-route-detail");
-    const paint=()=>{const q=routes.find(x=>x.mode===chosen); detail.innerHTML=q?`<b>هزینه حمل: ${formatMoney(q.transport_cost)}</b><br>${q.strait_costs?.length?`تنگه‌ها: ${q.strait_costs.map(x=>`${x.name} ${formatMoney(x.cost)}`).join("، ")}`:"بدون عوارض تنگه"}`:`هیچ مسیر فعالی نیست.`;};
+    const paint=()=>{const q=routes.find(x=>x.mode===chosen); detail.innerHTML=q?`<b>هزینه حمل: ${formatMoney(q.transport_cost)}</b><br>⏱ زمان حمل: ${fmtDurationFa(q.travel_seconds)}<br>${q.strait_costs?.length?`تنگه‌ها: ${q.strait_costs.map(x=>`${x.name} ${formatMoney(x.cost)}`).join("، ")}`:"بدون عوارض تنگه"}`:`هیچ مسیر فعالی نیست.`;};
     paint();
     ov.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{if(b.disabled)return;chosen=b.dataset.mode;ov.querySelectorAll("[data-mode]").forEach(x=>x.classList.toggle("selected",x===b));paint();});
-    ov.querySelector("#market-confirm-trade").onclick=async()=>{ if(!chosen)return; const d=await apiPost("/api/market/accept",{listing_id:lid,mode:chosen}); if(!d.success){showToast(d.message||"معامله انجام نشد");return;} ov.remove(); showToast(`معامله انجام شد · هزینه حمل ${formatMoney(d.transport_cost)}`); await refreshPlayer(); loadMarketListings(); loadMyListings(); };
+    ov.querySelector("#market-confirm-trade").onclick=async()=>{ if(!chosen)return; const d=await apiPost("/api/market/accept",{listing_id:lid,mode:chosen}); if(!d.success){showToast(d.message||"معامله انجام نشد");return;} ov.remove(); showToast(`معامله ثبت شد · هزینه حمل ${formatMoney(d.transport_cost)} · رسیدن کالا حدود ${d.eta_text || fmtDurationFa(d.eta_seconds)}`); await refreshPlayer(); loadMarketListings(); loadMyListings(); loadShipments(); };
 }
 
 function updateMarketCreateLabels() {
@@ -4209,6 +4215,100 @@ function clearMarketForm() {
     validateMarketForm();
 }
 
+
+/* ---------- کالاهای در راه ---------- */
+let marketShipments = [], shipSkew = 0, shipLoading = false, shipTimer = null, shipPollAt = 0, shipKnownIds = null;
+const marketPageOpen = () => !document.getElementById("market")?.classList.contains("hidden");
+
+async function loadShipments() {
+    if (shipLoading || !userId) return;
+    shipLoading = true;
+    try {
+        const d = await apiGet("/api/market/shipments");
+        if (!d || d.error) throw new Error("shipments");
+        if (d.now) shipSkew = Date.parse(d.now) - Date.now();
+        const list = d.shipments || [];
+        // کالایی که قبلاً در راه بود و حالا نیست یعنی رسیده؛ موجودی را به‌روز کن.
+        if (shipKnownIds) {
+            const arrived = [...shipKnownIds].filter(id => !list.some(s => s.id === id));
+            if (arrived.length) {
+                refreshPlayer().then(() => { try { updateHomeStats(); } catch (e) {} });
+                showToast("📦 محمولهٔ کالا رسید و به موجودی اضافه شد.", "success");
+            }
+        }
+        shipKnownIds = new Set(list.filter(s => s.direction === "in").map(s => s.id));
+        marketShipments = list;
+        renderShipments();
+    } catch (e) {
+        console.error(e);
+        const c = document.getElementById("market-transit");
+        if (c && !marketShipments.length) c.innerHTML = `<div class="diplomacy-item-empty">دریافت اطلاعات کالاهای در راه ممکن نشد.</div>`;
+    } finally { shipLoading = false; shipPollAt = Date.now(); }
+}
+
+function shipStatus(s, now) {
+    const st = Date.parse(s.start), ar = Date.parse(s.arrive);
+    if (now >= ar) return { label: "در حال تحویل", pct: 100, left: 0 };
+    return { label: s.direction === "in" ? "در راه به سمت شما" : "در راه به سمت خریدار",
+             pct: Math.max(0, Math.min(100, ((now - st) / Math.max(1, ar - st)) * 100)), left: ar - now };
+}
+
+function renderShipments() {
+    const badge = document.getElementById("market-transit-badge");
+    const incoming = marketShipments.filter(s => s.direction === "in").length;
+    if (badge) { badge.textContent = formatNumber(marketShipments.length); badge.classList.toggle("hidden", !marketShipments.length); }
+    const c = document.getElementById("market-transit"); if (!c) return;
+    if (!marketShipments.length) {
+        c.innerHTML = `<div class="diplomacy-item-empty">کالایی در راه نیست.<br><small>پس از هر خرید از بازار جهانی، محموله اینجا تا لحظهٔ رسیدن نمایش داده می‌شود.</small></div>`;
+        return;
+    }
+    const now = Date.now() + shipSkew;
+    const card = s => {
+        const st = shipStatus(s, now);
+        const strait = (s.straits || []).map(x => (typeof mapSites !== "undefined" ? mapSites.find(m => m.id === x)?.name : null) || x).join("، ");
+        return `<article class="market-card mk-ship side-${s.direction === "in" ? "sell" : "buy"}" data-ship="${escapeHtml(s.id)}">
+            <div class="market-card-head"><span class="mk-country">${marketModeLabel(s.mode)}</span><b class="mk-badge">${s.direction === "in" ? "دریافتی" : "ارسالی"}</b></div>
+            <div class="market-card-main"><div class="market-product"><span class="mk-ico">${RESOURCE_ICONS[s.resource] || "📦"}</span><div class="mk-prod-text"><strong>${escapeHtml(RESOURCE_NAMES[s.resource] || s.resource)}</strong><b>${formatNumber(s.amount)}</b><small>واحد</small></div></div></div>
+            <div class="mk-ship-route"><span>${flagInline(s.from, true)} ${escapeHtml(COUNTRY_NAMES[s.from] || s.from)}</span><i>←</i><span>${flagInline(s.to, true)} ${escapeHtml(COUNTRY_NAMES[s.to] || s.to)}</span></div>
+            <div class="wf-tr-bar"><i data-ship-bar="${escapeHtml(s.id)}" style="width:${st.pct.toFixed(1)}%"></i></div>
+            <div class="wf-tr-bottom"><span data-ship-status="${escapeHtml(s.id)}">${st.label}</span><span>⏱ <b data-ship-eta="${escapeHtml(s.id)}" dir="ltr">${st.left > 0 ? fmtEta(st.left) : "—"}</b></span></div>
+            ${strait ? `<div class="market-card-detail">عبور از: ${escapeHtml(strait)}</div>` : ""}
+        </article>`;
+    };
+    const part = (title, dir) => {
+        const rows = marketShipments.filter(s => s.direction === dir);
+        return rows.length ? `<div class="wf-section"><span>${title}</span><small>${formatNumber(rows.length)} محموله</small></div>${rows.map(card).join("")}` : "";
+    };
+    c.innerHTML = part("به سمت شما", "in") + part("فروخته‌شده و در مسیر خریدار", "out");
+    startShipTicker();
+}
+
+function tickShipments() {
+    const now = Date.now() + shipSkew;
+    let due = false;
+    marketShipments.forEach(s => {
+        const st = shipStatus(s, now);
+        const e = document.querySelector(`[data-ship-eta="${s.id}"]`), bar = document.querySelector(`[data-ship-bar="${s.id}"]`), lb = document.querySelector(`[data-ship-status="${s.id}"]`);
+        if (e) e.textContent = st.left > 0 ? fmtEta(st.left) : "—";
+        if (bar) bar.style.width = st.pct + "%";
+        if (lb) lb.textContent = st.label;
+        if (st.left <= 0) due = true;
+    });
+    if (due && !shipLoading && Date.now() - shipPollAt > 2500) loadShipments();
+}
+
+function startShipTicker() {
+    if (shipTimer) return;
+    shipTimer = setInterval(() => {
+        if (!userId) return;
+        if (marketShipments.length && marketPageOpen()) tickShipments();
+        // همگام‌سازی دوره‌ای با سرور (حتی خارج از بازار برای نشان تعداد و اعلان رسیدن)
+        const every = marketPageOpen() ? 8000 : 30000;
+        if (!shipLoading && Date.now() - shipPollAt > every && (marketPageOpen() || marketShipments.length)) loadShipments();
+    }, 1000);
+}
+startShipTicker();
+
 document.querySelectorAll(".market-tab").forEach(tab => tab.addEventListener("click", () => {
     document.querySelectorAll(".market-tab").forEach(t => t.classList.remove("active"));
     tab.classList.add("active");
@@ -4216,6 +4316,7 @@ document.querySelectorAll(".market-tab").forEach(tab => tab.addEventListener("cl
     document.getElementById(tab.dataset.marketTab)?.classList.remove("hidden");
     if (tab.dataset.marketTab === "market-list-panel") loadMarketListings();
     else if (tab.dataset.marketTab === "market-mine-panel") loadMyListings();
+    else if (tab.dataset.marketTab === "market-transit-panel") loadShipments();
     else if (tab.dataset.marketTab === "market-sanctions-panel") loadMarketListings();
     else if (tab.dataset.marketTab === "market-create-panel") { refreshPlayer().finally(validateMarketForm); }
 }));
