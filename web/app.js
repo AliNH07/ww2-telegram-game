@@ -2022,9 +2022,11 @@ function tickTransits() {
     const now = Date.now() + transitSkew;
     let done = false;
     list.forEach(t => {
-        const st = Date.parse(t.start), ar = Date.parse(t.arrive);
+        // نوار و شمارنده باید با هم باشند: هر دو از شروع کل سفر تا زمان رسیدن نهایی.
+        const ar = Date.parse(t.arrive);
         const etaAr = Date.parse(t.eta_arrive || t.arrive);
-        const left = etaAr - now, pct = Math.max(0, Math.min(100, ((now - st) / Math.max(1, ar - st)) * 100));
+        const st = Date.parse(t.battle ? t.start : (t.trip_start || t.start));
+        const left = etaAr - now, pct = Math.max(0, Math.min(100, ((now - st) / Math.max(1, etaAr - st)) * 100));
         const e = document.querySelector(`[data-tr-eta="${t.id}"]`), bar = document.querySelector(`[data-tr-bar="${t.id}"]`);
         if (e) e.textContent = left > 0 ? fmtEta(left) : "رسید";
         if (bar) bar.style.width = pct + "%";
