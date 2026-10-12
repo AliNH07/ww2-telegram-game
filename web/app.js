@@ -339,6 +339,7 @@ async function loadPlayer() {
     if (!userId) return;
     try {
         player = await apiGet("/api/player");
+        if (player) player._clientAt = Date.now();
         selectedCountry = player?.country || null;
     } catch (e) { console.error(e); }
 }
@@ -349,7 +350,7 @@ async function refreshPlayer() {
     try {
         const fresh = await apiGet("/api/player");
         if (fresh && !fresh.error) {
-            player = fresh;
+            player = fresh; player._clientAt = Date.now();
             selectedCountry = player?.country || null;
             const gameScreen = document.getElementById("game");
             const closedScreen = document.getElementById("registration-closed");
@@ -712,7 +713,40 @@ function updateHomeStats() {
     if (mm) mm.textContent = formatMoney(player.money);
     document.querySelectorAll(".sb-money").forEach(e => { e.textContent = formatMoney(player.money); });
     renderResourceBars();
+    renderHomeActivities();
 }
+
+/* ---------- فعالیت‌های در حال انجام (صفحهٔ خانه) ----------
+   هر کار صف ساخت (player.build_queue) یک ردیف دارد: نام، زمان باقی‌مانده و نوار پیشرفت.
+   زمان‌ها با ساعت سرور (player.server_now) همگام می‌شوند تا ساعت دستگاه اثری نداشته باشد. */
+let activitiesRefreshAt = 0;
+function fmtCountdown(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+    const p2 = n => String(n).padStart(2, "0");
+    return h ? `${h}:${p2(m)}:${p2(r)}` : `${p2(m)}:${p2(r)}`;
+}
+function renderHomeActivities() {
+    const box = document.getElementById("home-activities"), list = document.getElementById("home-activities-list");
+    if (!box || !list) return;
+    const offset = player?.server_now ? Date.parse(player.server_now) - (player._clientAt || Date.now()) : 0;
+    const now = Date.now() + (Number.isFinite(offset) ? offset : 0);
+    const jobs = (player?.build_queue || []).map(job => {
+        const start = Date.parse(job.start), end = Date.parse(job.end);
+        return { job, start, end, left: end - now };
+    }).filter(x => Number.isFinite(x.start) && Number.isFinite(x.end));
+    const active = jobs.filter(x => x.left > 0).sort((a, b) => a.end - b.end);
+    // کاری که زمانش تمام شده دیگر «در حال انجام» نیست؛ یک‌بار وضعیت از سرور تازه می‌شود تا نتیجه ثبت شود.
+    if (jobs.some(x => x.left <= 0) && Date.now() - activitiesRefreshAt > 3000) {
+        activitiesRefreshAt = Date.now(); refreshPlayer();
+    }
+    box.classList.toggle("hidden", !active.length);
+    list.innerHTML = active.map(x => {
+        const pct = Math.min(100, Math.max(0, ((now - x.start) / Math.max(1, x.end - x.start)) * 100));
+        return `<div class="hm-act-row"><div class="hm-act-head"><b>${escapeHtml(x.job.label || "فعالیت")}</b><span>${fmtCountdown(x.left)} مانده</span></div>
+            <div class="hm-act-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct.toFixed(1)}%"></i></div></div>`;
+    }).join("");
+}
+setInterval(renderHomeActivities, 1000);
 
 function updateSeasonGateBanner() {
     const banner = document.getElementById("season-gate-banner");
@@ -1437,6 +1471,10 @@ function getGroupUsed(group) {
     Object.entries(ARMY_UNITS).forEach(([uid_, u]) => {
         if (u.group === group) t += player?.units?.[uid_] ?? 0;
     });
+    // یگان‌های در صف ساخت هم ظرفیت را اشغال می‌کنند
+    (player?.build_queue || []).forEach(job => {
+        if (job.kind === "train" && ARMY_UNITS[job.unit_id]?.group === group) t += Number(job.count) || 0;
+    });
     return t;
 }
 
@@ -1597,7 +1635,8 @@ async function trainUnit(uid_, count) {
     try {
         const d = await apiPost("/api/train-unit", { unit_id: uid_, count });
         if (!d.success) { showToast(d.message || "خطا", "error"); return false; }
-        player = d.player;
+        player = d.player; if (player) player._clientAt = Date.now();
+        if (d.queued) showToast(`ساخت در صف قرار گرفت؛ حدود ${fmtDurationFa(d.ready_in)} دیگر آماده می‌شود.`, "success");
         updateHomeStats(); renderArmySummary(); renderBaseCards(); renderArmyTabsCounts(); renderArmyUnitsNew();
         return true;
     } catch (e) { showToast("خطا."); return false; }
@@ -1651,6 +1690,7 @@ function openTrainSheet(uid_) {
         rows.push(`<div class="is-row"><span>تعداد فعلی</span><b>${formatNumber(player.units?.[uid_] ?? 0)}</b></div>`);
         Object.entries(u.daily || {}).forEach(([k, d]) =>
             rows.push(`<div class="is-row"><span>🔁 مصرف روزانه · ${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}</span><b>${formatNumber(d * n)} <small>(هر عدد ${formatNumber(d)})</small></b></div>`));
+        if (u.build_seconds) rows.push(`<div class="is-row"><span>⏱ زمان ساخت</span><b>${fmtDurationFa(u.build_seconds)}</b></div>`);
         if (u.transport_capacity) rows.push(`<div class="is-row"><span>🚚 ظرفیت حمل (تانک/پیاده در دریا)</span><b>${formatNumber(u.transport_capacity)}</b></div>`);
         if (u.aircraft_capacity) rows.push(`<div class="is-row"><span>🛬 ظرفیت هواپیما در دریا</span><b>${formatNumber(u.aircraft_capacity)}</b></div>`);
         if (u.refuel_capacity) rows.push(`<div class="is-row"><span>⛽ ظرفیت سوخت‌رسانی در خشکی</span><b>${formatNumber(u.refuel_capacity)}</b></div>`);
