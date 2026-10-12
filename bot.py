@@ -4556,6 +4556,69 @@ async def set_strait_settings(request):
     if not isinstance(rules, dict): rules = info["country_rules"] = {}
 
     country_id = data.get("country_id")
+
+    # ---- پنل ساده: سه عمل بستن / عوارض / رایگان (عمومی یا اختصاصی یک کشور) ----
+    action = data.get("action")
+    if action in ("close", "toll", "free"):
+        owner_name, sname = COUNTRIES[cid]["name"], info["name"]
+        amount = 0
+        if action == "toll":
+            try: amount = int(data.get("toll"))
+            except (TypeError, ValueError): amount = 0
+            if amount <= 0:
+                return web.json_response({"success": False, "error": "invalid_toll",
+                                          "message": "مبلغ عوارض باید عدد صحیح و بزرگ‌تر از صفر باشد."}, status=400)
+
+        def _after(old_toll, old_closed):
+            if action == "close": return old_toll, True
+            if action == "free": return 0, False
+            return amount, False
+
+        def _reply(msg, changed):
+            return web.json_response({"success": True, "changed": changed, "message": msg,
+                                      "toll": int(info.get("toll", 0) or 0), "closed": bool(info.get("closed", False)),
+                                      "country_rules": rules})
+
+        if country_id:
+            if country_id not in COUNTRIES or country_id == cid:
+                return web.json_response({"success": False, "error": "invalid_country", "message": "کشور انتخاب‌شده معتبر نیست."}, status=400)
+            cn = COUNTRIES[country_id]["name"]
+            cur = strait_policy(sid, country_id)
+            new_toll, new_closed = _after(cur["toll"], cur["closed"])
+            if (new_toll, new_closed) == (cur["toll"], cur["closed"]):
+                return _reply("این وضعیت از قبل برای این کشور فعال است.", False)
+            rule = dict(rules.get(country_id) or {})
+            if action == "close": rule["closed"] = True
+            else: rule["toll"], rule["closed"] = new_toll, False
+            rules[country_id] = rule
+            if action == "close":
+                text = f"کشور {owner_name} تنگه {sname} را برای کشور {cn} بست."
+            elif action == "free":
+                text = f"کشور {owner_name} عبور کشور {cn} از تنگه {sname} را رایگان کرد."
+            elif cur["toll"] > 0 and not cur["closed"]:
+                text = f"کشور {owner_name} عوارض عبور کشور {cn} از تنگه {sname} را از {cur['toll']:,}$ به {amount:,}$ تغییر داد."
+            else:
+                text = f"کشور {owner_name} عوارض عبور کشور {cn} از تنگه {sname} را {amount:,}$ تعیین کرد."
+            push_news("قانون ویژهٔ تنگه", text)
+        else:
+            old_toll, old_closed = int(info.get("toll", 0) or 0), bool(info.get("closed", False))
+            new_toll, new_closed = _after(old_toll, old_closed)
+            if (new_toll, new_closed) == (old_toll, old_closed):
+                return _reply("این وضعیت از قبل فعال است.", False)
+            info["toll"], info["closed"] = new_toll, new_closed
+            if action == "close":
+                text = f"کشور {owner_name} تنگه {sname} را بست."
+            elif action == "free":
+                text = f"کشور {owner_name} عبور از تنگه {sname} را رایگان کرد."
+            elif old_toll > 0 and not old_closed:
+                text = f"کشور {owner_name} عوارض عبور از تنگه {sname} را از {old_toll:,}$ به {amount:,}$ تغییر داد."
+            else:
+                text = f"کشور {owner_name} عوارض عبور از تنگه {sname} را {amount:,}$ تعیین کرد."
+            push_news("تغییر وضعیت تنگه", text)
+        save_state()                      # پیام فقط پس از ثبت موفق تغییر ارسال می‌شود
+        _schedule_strait_broadcast(text)
+        return _reply(text, True)
+
     if data.get("clear_country_rule"):
         if country_id not in COUNTRIES:
             return web.json_response({"success":False,"error":"invalid_country","message":"کشور انتخاب‌شده معتبر نیست."}, status=400)
