@@ -2429,7 +2429,8 @@ async def get_forces(request):
              "arrive": (t.get("route_battle") or t.get("arrival_battle") or {}).get("ends_at", t["arrive"]),
              "eta_arrive": ((t["arrive"] if (t.get("route_battle") or t.get("arrival_battle")) else
                              (t.get("route_total_arrive") if parse_dt(t.get("route_total_arrive")) and parse_dt(t.get("route_total_arrive")) > utcnow() else t["arrive"]))),
-             "battle": bool(t.get("route_battle") or t.get("arrival_battle")), "from_ll": t.get("from_ll"), "to_ll": t.get("to_ll")}
+             "battle": bool(t.get("route_battle") or t.get("arrival_battle")), "from_ll": t.get("from_ll"), "to_ll": t.get("to_ll"),
+             "trip_start": t.get("trip_start") or t["start"]}
             for t in transits if t["owner"] == cid]
     return web.json_response({"home": {k: n for k, n in p["units"].items() if n > 0}, "sites": sites,
                               "transits": mine, "now": utcnow().isoformat()})
@@ -2794,14 +2795,14 @@ def _add_units(dest, sent):
 
 def start_transit(cid, src, dst, units, minutes, kind="go", dst_free=False, origin=None,
                   passage=False, route_final_dst=None, route_remaining_straits=None, route_total_arrive=None,
-                  full_path=None, leg=0):
+                  full_path=None, leg=0, trip_start=None):
     now = utcnow()
     t = {"id": str(uuid.uuid4()), "owner": cid, "from": src, "to": dst, "units": dict(units), "kind": kind,
          "dst_free": dst_free, "origin": origin or src, "passage": bool(passage),
          "route_final_dst": route_final_dst,
          "route_remaining_straits": list(route_remaining_straits or []),
          "from_ll": (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, src)) if src == "home" and has_naval_units(units) else loc_coords(cid, src)), "to_ll": (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, dst)) if dst == "home" and has_naval_units(units) else loc_coords(cid, dst)),
-         "route_total_arrive": route_total_arrive,
+         "route_total_arrive": route_total_arrive, "trip_start": trip_start or now.isoformat(),
          "full_path": [list(p) for p in full_path] if full_path else None, "leg": int(leg or 0),
          "start": now.isoformat(), "arrive": (now + timedelta(minutes=max(0.0, float(minutes)))).isoformat()}
     transits.append(t); return t
@@ -2857,7 +2858,7 @@ def _continue_strait_passage(t, units):
                   dst_free=(next_dst != "home" and not next_owner), origin=t.get("origin") or t.get("from"),
                   passage=passage, route_final_dst=final_dst if passage else None,
                   route_remaining_straits=remaining if passage else None, route_total_arrive=total_end.isoformat(),
-                  full_path=t.get("full_path"), leg=int(t.get("leg") or 0) + 1)
+                  full_path=t.get("full_path"), leg=int(t.get("leg") or 0) + 1, trip_start=t.get("trip_start") or t.get("start"))
 
 def _resolve_strait_passage(t, player):
     cid, units, sid = t["owner"], dict(t["units"]), t["to"]
