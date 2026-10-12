@@ -4498,8 +4498,8 @@ function updateMapRoutes() {
         } else line.attr("transform", null);
         const pos = d.battle && Array.isArray(d.battle_ll) && d.battle_ll.length === 2
             ? d.battle_ll
-            : (poly.length > 2 && d.path[d.leg] && d.path[d.leg + 1]
-                ? d3.geoInterpolate(d.from_ll, d.to_ll)(f)
+            : (poly.length > 2 && Array.isArray(d.path) && d.path[d.leg] && d.path[d.leg + 1]
+                ? d3.geoInterpolate(d.path[d.leg], d.path[d.leg + 1])(f)
                 : d3.geoInterpolate(d.from_ll, d.to_ll)(f));
         const p = viewCos(pos[0], pos[1], rot) > 0.02 ? mapProjection(pos) : null;
         const head = d3.select(this).select(".map-route-head");
