@@ -651,6 +651,7 @@ def ensure_player_fields(player):
         if k in INFRASTRUCTURE: lv_map[k] = min(lv_map[k], len(INFRASTRUCTURE[k]["levels"]))
         elif k not in ECONOMY: del lv_map[k]
     player.setdefault("build_queue", [])  # فعالیت‌های زمان‌دار در حال انجام (ساخت یگان)
+    player.setdefault("activity_notices", [])  # اعلان‌های پایان فعالیت که هنوز به بازیکن نمایش داده نشده‌اند
     player.setdefault("map_holdings", {})
     player.setdefault("strait_holdings", {})
     player.setdefault("announcements", {}); player.setdefault("land_trade_open", True)
@@ -990,6 +991,30 @@ def occupy_colony(attacker_cid, colony_cid, previous_occupier):
     return True
 
 
+# ---------------- اعلان پایان فعالیت ----------------
+# هر اعلان فقط در پروندهٔ همان بازیکنی ثبت می‌شود که فعالیت را انجام داده است. اعلان تا زمانی که
+# کلاینت نمایش آن را تأیید نکرده (POST /api/activity-notices/ack) در state ذخیره می‌ماند؛ پس اگر بازیکن
+# هنگام پایان کار بازی را بسته باشد، در ورود بعدی یک بار نمایش داده می‌شود و سپس حذف می‌گردد.
+ACTIVITY_NOTICE_LIMIT = 50
+
+
+def done_message(label):
+    """قالب یکسان پیام پایان کار: «✅ <نام فعالیت> با موفقیت تکمیل شد!»"""
+    return f"✅ {label} با موفقیت تکمیل شد!"
+
+
+def push_activity_notice(player, text, key=None):
+    """اعلان پایان کار را ثبت می‌کند. با key ثابت (شناسهٔ کار) هرگز دو بار ثبت نمی‌شود."""
+    notices = player.setdefault("activity_notices", [])
+    nid = str(key) if key else str(uuid.uuid4())
+    if any(isinstance(n, dict) and n.get("id") == nid for n in notices):
+        return None
+    notices.append({"id": nid, "text": text, "at": utcnow().isoformat()})
+    if len(notices) > ACTIVITY_NOTICE_LIMIT:
+        del notices[:-ACTIVITY_NOTICE_LIMIT]
+    return nid
+
+
 def process_deliveries(player):
     """کالاهای تجاری که زمان حملشان تمام شده به موجودی خریدار اضافه می‌شود."""
     pend = player.get("pending_deliveries")
@@ -1002,7 +1027,12 @@ def process_deliveries(player):
         res = d.get("resource")
         if res in RESOURCE_NAMES:
             player.setdefault("resources", {})
-            player["resources"][res] = player["resources"].get(res, 0) + int(d.get("amount", 0) or 0)
+            amount = int(d.get("amount", 0) or 0)
+            player["resources"][res] = player["resources"].get(res, 0) + amount
+            push_activity_notice(
+                player,
+                done_message(f"حمل {amount:,} {RESOURCE_NAMES[res]} از {cname(d.get('from'))}"),
+                key=("delivery:" + str(d["id"])) if d.get("id") else None)
     player["pending_deliveries"] = keep
 
 def process_build_queue(player):
@@ -1018,6 +1048,9 @@ def process_build_queue(player):
             units = player.setdefault("units", {})
             units[job["unit_id"]] = units.get(job["unit_id"], 0) + max(0, int(job.get("count", 0) or 0))
             done = True
+        # کار از صف خارج می‌شود و اعلان آن همین‌جا (دقیقاً در لحظهٔ پایان) فقط یک بار ثبت می‌شود.
+        push_activity_notice(player, done_message(job.get("label") or "فعالیت"),
+                             key=("job:" + str(job["id"])) if job.get("id") else None)
     player["build_queue"] = keep
     if done: recompute_army(player)
 
@@ -1481,7 +1514,7 @@ def world_scoped(handler):
                     try:
                         finalize_world_if_due()
                         path = request.path
-                        exempt_before_start = {"/api/select-country", "/api/pm/send"}
+                        exempt_before_start = {"/api/select-country", "/api/pm/send", "/api/activity-notices/ack"}
                         is_admin_path = path.startswith("/api/admin/")
                         result = None
                         if request.method == "POST" and not is_admin_path and path not in exempt_before_start:
@@ -1931,7 +1964,9 @@ async def upgrade_infra(request):
     for k, a in res_cost.items(): p["resources"][k] -= a
     p["infra_levels"][item_id] = lv + 1
     save_state()
-    return web.json_response({"success": True, "player": serialize_player(p)})
+    label = f"ساخت {item['name']}" if lv == 0 else f"ارتقای {item['name']} به سطح {lv + 1}"
+    return web.json_response({"success": True, "completion_message": done_message(label),
+                              "player": serialize_player(p)})
 
 async def upgrade_economy(request):
     uid = get_auth_user_id(request)
@@ -1956,7 +1991,9 @@ async def upgrade_economy(request):
                                   "message": "برق کافی ندارید. ابتدا نیروگاه بسازید."}, status=400)
     p["money"] -= cost; p["infra_levels"][item_id] = lv + 1
     save_state()
-    return web.json_response({"success": True, "player": serialize_player(p)})
+    label = f"ساخت {item['name']}" if lv == 0 else f"ارتقای {item['name']} به سطح {lv + 1}"
+    return web.json_response({"success": True, "completion_message": done_message(label),
+                              "player": serialize_player(p)})
 
 async def train_unit(request):
     uid = get_auth_user_id(request)
@@ -2016,7 +2053,8 @@ async def train_unit(request):
         return web.json_response({"success": True, "queued": True, "ready_in": build_s, "player": serialize_player(p)})
     p["units"][unit_id] = p["units"].get(unit_id, 0) + count
     recompute_army(p); save_state()
-    return web.json_response({"success": True, "player": serialize_player(p)})
+    return web.json_response({"success": True, "completion_message": done_message(f"ساخت {count:,} {unit['name']}"),
+                              "player": serialize_player(p)})
 
 async def get_army_units(request):
     return web.json_response({"units": ARMY_UNITS, "resources": RESOURCE_NAMES, "groups": GROUP_NAMES})
@@ -3630,7 +3668,8 @@ async def sat_launch(request):
     if p.get("money", 0) < SAT_LAUNCH_COST: return _bad("پول کافی نیست.")
     p["money"] -= SAT_LAUNCH_COST; p["scans"] = p.get("scans", 0) + SAT_SCANS
     save_state()
-    return web.json_response({"success": True, "message": f"ماهواره پرتاب شد. {SAT_SCANS} اسکن اضافه شد.", "player": serialize_player(p)})
+    return web.json_response({"success": True, "message": f"ماهواره پرتاب شد. {SAT_SCANS} اسکن اضافه شد.",
+                              "completion_message": done_message("پرتاب ماهواره"), "player": serialize_player(p)})
 
 async def sat_scan_site(request):
     uid = get_auth_user_id(request)
@@ -3647,7 +3686,8 @@ async def sat_scan_site(request):
     if p.get("scans", 0) < 1: return _bad("اسکن باقی نمانده. ماهواره را دوباره پرتاب کنید.")
     p["scans"] -= 1; sa[key] = (utcnow() + timedelta(hours=SCAN_HOURS)).isoformat()
     save_state()
-    return web.json_response({"success": True, "message": "اسکن انجام شد و ۲۴ ساعت زنده است.", "player": serialize_player(p)})
+    return web.json_response({"success": True, "message": "اسکن انجام شد و ۲۴ ساعت زنده است.",
+                              "completion_message": done_message(f"اسکن {site_meta(site_id)['name']}"), "player": serialize_player(p)})
 
 async def sat_scan_country(request):
     uid = get_auth_user_id(request)
@@ -3665,7 +3705,24 @@ async def sat_scan_country(request):
     p["scans"] -= 1; p["money"] -= COUNTRY_SCAN_COST
     sa[key] = (utcnow() + timedelta(hours=SCAN_HOURS)).isoformat()
     save_state()
-    return web.json_response({"success": True, "message": "اسکن کشور انجام شد و ۲۴ ساعت زنده است.", "player": serialize_player(p)})
+    return web.json_response({"success": True, "message": "اسکن کشور انجام شد و ۲۴ ساعت زنده است.",
+                              "completion_message": done_message(f"اسکن {cname(target)}"), "player": serialize_player(p)})
+
+# =========================================================
+# اعلان پایان فعالیت: تأیید نمایش
+# =========================================================
+async def ack_activity_notices(request):
+    """کلاینت پس از نمایش واقعی اعلان، شناسهٔ آن را می‌فرستد تا از پروندهٔ بازیکن حذف شود (نمایش یک‌باره)."""
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    data = await read_json(request)
+    ids = data.get("ids")
+    if not isinstance(ids, list): return _bad("invalid_ids")
+    wanted = {str(i) for i in ids[:100]}
+    p = _me(uid)
+    before = len(p["activity_notices"])
+    p["activity_notices"] = [n for n in p["activity_notices"] if not (isinstance(n, dict) and n.get("id") in wanted)]
+    return web.json_response({"success": True, "removed": before - len(p["activity_notices"])})
 
 # =========================================================
 # API Announcements
@@ -5289,6 +5346,7 @@ async def create_web_app():
         ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/recall", recall_forces),
         ("/api/satellite/launch", sat_launch), ("/api/satellite/scan-site", sat_scan_site),
         ("/api/satellite/scan-country", sat_scan_country),
+        ("/api/activity-notices/ack", ack_activity_notices),
         ("/api/announcements/create", create_announcement),
         ("/api/announcements/react", react_announcement),
         ("/api/announcements/comment", comment_announcement),
@@ -5359,7 +5417,10 @@ async def _run_ticks_for_all_worlds():
                     welfare_tick()
                     loan_tick()
                     for _pl in list(players.values()):
-                        if isinstance(_pl, dict): process_build_queue(_pl)
+                        if not isinstance(_pl, dict): continue
+                        # دقیقاً در لحظهٔ پایان زمان، حتی اگر بازیکن آفلاین باشد، اعلان ثبت می‌شود.
+                        if _pl.get("country") and not _pl.get("is_eliminated"): process_deliveries(_pl)
+                        process_build_queue(_pl)
                 except Exception as exc:
                     logging.error("world tick (%s): %s", wid, exc)
                 finally:
