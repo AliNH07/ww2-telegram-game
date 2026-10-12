@@ -2971,3 +2971,18 @@ body #market .market-action.sell {
 .dp-rules-bar { display: flex; justify-content: flex-end; margin-top: 12px; }
 .dp-help-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(174,123,231,.5); background: rgba(160,112,224,.14); color: #D9C2F5; font-size: 16px; font-weight: 900; cursor: pointer; }
 .dp-rules-bar + .dp-rules { margin-top: 8px; }
+
+/* ---------- فعالیت‌های در حال انجام (صفحهٔ خانه) ----------
+   پس‌زمینه: فایل /images/stickers/activity-bg.jpg (اگر نباشد، رنگ ساده با لایهٔ تیره دیده می‌شود) */
+#home .hm-activities { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 12px 14px; border-radius: 16px; overflow: hidden;
+    border: 1px solid rgba(174,123,231,.28); direction: rtl;
+    background: linear-gradient(rgba(14,8,26,.74), rgba(14,8,26,.74)), url("/images/stickers/activity-bg.jpg") center / cover no-repeat, #1c1230; }
+#home .hm-activities.hidden { display: none; }
+#home .hm-act-title { font-size: 12px; font-weight: 800; color: #C9A2F5; margin-bottom: 8px; }
+#home .hm-act-row + .hm-act-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08); }
+#home .hm-act-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: #F4F0FA; }
+#home .hm-act-head b { font-weight: 800; }
+#home .hm-act-head span { color: #62ddb4; font-variant-numeric: tabular-nums; white-space: nowrap; direction: ltr; }
+/* نوار پیشرفت از راست به چپ پر می‌شود */
+#home .hm-act-bar { position: relative; height: 10px; margin-top: 8px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; direction: rtl; }
+#home .hm-act-bar i { position: absolute; top: 0; bottom: 0; right: 0; left: auto; border-radius: 999px; background: linear-gradient(270deg, #A36CE1, #62ddb4); transition: width .9s linear; }
