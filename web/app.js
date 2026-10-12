@@ -1772,12 +1772,10 @@ async function openWarPage(opts = {}) {
     fillCountrySelects();
     if (!Object.keys(ARMY_UNITS).length) await loadArmyCatalog();
     await loadWarData(); // فهرست جنگ‌ها و مستعمره‌های دشمن قبل از اعزام آماده باشد.
-    dispatchOpen = !!opts.dispatchTo;
-    dispatchSel = { from: null, to: opts.dispatchTo || null, units: {} };
     expandedLoc = null; forcesFilter = "all";
     showWarTab("war-forces-panel");
 }
-function openDispatchTo(siteId) { openWarPage({ dispatchTo: siteId }); }
+function openDispatchTo(siteId) { openDispatch({ to: siteId }); }
 
 /* ---------- نیروها ---------- */
 async function loadForces() {
@@ -1843,35 +1841,54 @@ function openLocSheet(id) {
     ov.addEventListener("click", e => {
         if (e.target === ov || e.target.closest(".gs-x")) { closeLocSheet(); return; }
         const f = e.target.closest("[data-from]"), h = e.target.closest("[data-home]");
-        if (f) { dispatchOpen = true; dispatchSel = { from: f.dataset.from, to: null, units: {} }; }
-        else if (h) { dispatchOpen = true; dispatchSel = { from: h.dataset.home, to: "home", units: {} }; }
-        else return;
-        closeLocSheet(); renderForcesTab(); showGamePage("war");
+        if (f) { closeLocSheet(); openDispatch({ from: f.dataset.from }); }
+        else if (h) { closeLocSheet(); openDispatch({ from: h.dataset.home, to: "home" }); }
     });
     document.body.appendChild(ov);
 }
 
+function unitCondHint(k) {
+    const u = ARMY_UNITS[k] || {}, t = [];
+    if (u.group === "missile") t.push("موشک؛ به مواضع اعزام نمی‌شود");
+    else if (u.group === "naval") t.push("فقط دریا");
+    if (k === "transport_ship" && u.transport_capacity) t.push(`حمل ${formatNumber(u.transport_capacity)} پیاده‌نظام/تانک`);
+    if (k === "aircraft_carrier" && u.aircraft_capacity) t.push(`حمل ${formatNumber(u.aircraft_capacity)} هواپیما`);
+    if (k === "air_tanker" && u.refuel_capacity) t.push(`سوخت‌رسانی ${formatNumber(u.refuel_capacity)} هواپیما در خشکی`);
+    if (k === "infantry" || k === "tank") t.push("در دریا: ناو ترابری لازم است");
+    if (k === "fighter" || k === "bomber") t.push("دریا: ناو هواپیمابر · خشکی: سوخت‌رسان");
+    return t.join(" · ");
+}
+
 function dispatchPanelHtml() {
     const { from, to } = dispatchSel;
+    const box = (id, label, val, empty) => `<button type="button" class="dp-sq ${val ? "set" : ""}" id="${id}"><small>${label}</small><b>${val ? escapeHtml(locName(val)) : empty}</b></button>`;
     let h = `<div class="dp-panel"><div class="dp-squares">
-        <button class="dp-sq ${from ? "set" : ""}" id="dp-from"><small>از کجا</small><b>${from ? locName(from) : "انتخاب"}</b></button>
+        ${box("dp-from", "مبدا", from, "انتخاب مبدا")}
         <div class="dp-arrow">←</div>
-        <button class="dp-sq ${to ? "set" : ""}" id="dp-to"><small>به کجا</small><b>${to ? locName(to) : "انتخاب"}</b></button>
+        ${box("dp-to", "مقصد", to, "انتخاب مقصد")}
     </div>`;
-    if (from && to) {
-        h += `<div class="dp-units">` + Object.entries(poolOf(from)).filter(([, n]) => n > 0).map(([k, n]) => `
+    if (from) {
+        const rows = Object.entries(poolOf(from)).filter(([, n]) => n > 0);
+        h += `<div class="dp-sec">نیروهای موجود در ${escapeHtml(locName(from))}</div>`;
+        h += rows.length ? `<div class="dp-units">` + rows.map(([k, n]) => `
             <div class="dp-unit" data-u="${k}">
-                <span class="dp-un">${unitName(k)}<small>موجود ${formatNumber(n)}</small></span>
-                <div class="dp-qty"><button data-d="-1">−</button>
+                <span class="dp-un">${escapeHtml(unitName(k))}<small>موجود ${formatNumber(n)}</small>${unitCondHint(k) ? `<small class="dp-cond">${unitCondHint(k)}</small>` : ""}</span>
+                <div class="dp-qty"><button type="button" data-d="-1">−</button>
                     <input type="number" inputmode="numeric" min="0" max="${n}" value="${dispatchSel.units[k] || 0}">
-                    <button data-d="1">+</button><button class="dp-all">همه</button></div>
-            </div>`).join("") + `</div>
-            <div class="dp-summary" id="dp-summary"></div>
-            <button class="wf-send-btn dp-go" id="dp-go" disabled>ارسال نیرو</button>`;
+                    <button type="button" data-d="1">+</button><button type="button" class="dp-all">همه</button></div>
+            </div>`).join("") + `</div>` : `<div class="dp-hint">در این مبدا نیرویی وجود ندارد.</div>`;
     } else {
-        h += `<div class="dp-hint">اول مبدأ و مقصد را انتخاب کن.</div>`;
+        h += `<div class="dp-hint">مبدا را انتخاب کن تا نیروهای موجود نمایش داده شود.</div>`;
     }
-    return h + `</div>`;
+    h += `<div class="dp-rules"><b>شرایط لازم برای اعزام</b>
+        <ul><li>در دریا، پیاده‌نظام و تانک فقط همراه ناو ترابری حرکت می‌کنند.</li>
+        <li>در دریا، جنگنده و بمب‌افکن به ناو هواپیمابر نیاز دارند؛ بالگرد نیازی ندارد.</li>
+        <li>در خشکی، جنگنده و بمب‌افکن به هواپیمای سوخت‌رسان نیاز دارند.</li>
+        <li>ناوها به خشکی و موشک‌ها به هیچ موضعی اعزام نمی‌شوند.</li>
+        <li>برای تصرف معدن، پیاده‌نظام یا تانک همراه ناو ترابری لازم است.</li></ul></div>
+        <div class="dp-summary" id="dp-summary"></div>
+        <button type="button" class="wf-send-btn dp-go" id="dp-go" disabled>اعزام</button></div>`;
+    return h;
 }
 
 /* قوانین اعزام (آینهٔ قوانین سرور): دریا/خشکی، ناو ترابری، ناو هواپیمابر، سوخت‌رسان */
@@ -1916,28 +1933,32 @@ function dispatchErrorsFor(from, to, picked) {
     return errs;
 }
 
+function dispatchKindText() {
+    const { to } = dispatchSel;
+    const dst = warSites.find(s => s.id === to);
+    if (!to) return "مقصد را انتخاب کن.";
+    if (to === "home") return "🏠 بازگشت به خانه";
+    if (typeof to === "string" && to.startsWith("country:")) return `⚓ مسیر دریایی تا بندر ${COUNTRY_NAMES[to.split(":")[1]] || to.split(":")[1]}؛ کشتی‌ها در بندر می‌مانند و فقط نیروی زمینی با ترابری وارد کشور می‌شود`;
+    if (!dst?.owner) return "🚩 موضع بی‌صاحب است؛ اشغال می‌شود";
+    if (dst.owner === selectedCountry) return "🛡️ موضع خودی؛ نیروها تقویت می‌شوند";
+    let kind = `⚔️ حمله به ${COUNTRY_NAMES[dst.owner] || dst.owner}`;
+    const sc = scanState.sites?.[to];
+    if (sc?.owner) kind += ` · قدرت دفاعی اسکن‌شده: ${formatNumber(sc.power)}`;
+    return kind;
+}
+
 function updateDpSummary() {
     const sum = document.getElementById("dp-summary"), go = document.getElementById("dp-go");
     if (!sum || !go) return;
-    const { to } = dispatchSel, total = sumVals(dispatchSel.units);
+    const { from, to } = dispatchSel, total = sumVals(dispatchSel.units);
     const dst = warSites.find(s => s.id === to);
-    let kind;
-    if (to === "home") kind = "🏠 بازگشت به خانه";
-    else if (typeof to === "string" && to.startsWith("country:")) kind = `⚓ مسیر دریایی تا بندر ${COUNTRY_NAMES[to.split(":")[1]] || to.split(":")[1]}؛ کشتی‌ها در بندر می‌مانند و فقط نیروی زمینی با ترابری وارد کشور می‌شود`;
-    else if (!dst?.owner) kind = "🚩 موضع بی‌صاحب است؛ اشغال می‌شود";
-    else if (dst.owner === selectedCountry) kind = "🛡️ موضع خودی؛ نیروها تقویت می‌شوند";
-    else {
-        kind = `⚔️ حمله به ${COUNTRY_NAMES[dst.owner] || dst.owner} (بدون نیاز به اعلان جنگ)`;
-        const sc = scanState.sites?.[to];
-        if (sc?.owner) kind += ` · قدرت دفاعی اسکن‌شده: ${formatNumber(sc.power)}`;
-    }
     const atk = Object.entries(dispatchSel.units).reduce((a, [k, n]) => a + n * (ARMY_UNITS[k]?.attack || 0), 0);
     const hostile = dst?.owner && dst.owner !== selectedCountry;
     const picked = Object.fromEntries(Object.entries(dispatchSel.units).filter(([, v]) => v > 0));
-    const errs = total > 0 ? dispatchErrorsFor(dispatchSel.from, to, picked) : [];
-    sum.innerHTML = `<div>${kind}</div><div>${formatNumber(total)} یگان انتخاب شده${hostile ? ` · قدرت حمله ${formatNumber(atk)}` : ""}</div>`
-        + errs.map(e => `<div class="dp-error">⚠️ ${e}</div>`).join("");
-    go.disabled = total < 1 || errs.length > 0;
+    const errs = (total > 0 && to) ? dispatchErrorsFor(from, to, picked) : [];
+    sum.innerHTML = `<div>${dispatchKindText()}</div>` + (from ? `<div>${formatNumber(total)} یگان انتخاب شده${hostile ? ` · قدرت حمله ${formatNumber(atk)}` : ""}</div>` : "")
+        + errs.map(e => `<div class="dp-error">⚠️ ${escapeHtml(e)}</div>`).join("");
+    go.disabled = !from || !to || total < 1 || errs.length > 0;
 }
 
 function renderForcesTab() {
@@ -1956,10 +1977,7 @@ function renderForcesTab() {
         <div class="wf-chips">${chips.map(([k, l]) => `<button class="wf-fchip ${forcesFilter === k ? "active" : ""}" data-f="${k}">${l}</button>`).join("")}</div>
         <div>${shown.map(locCardHtml).join("")}</div>`;
 
-    root.querySelector("#wf-send-toggle").onclick = () => {
-        dispatchOpen = true;
-        renderForcesTab();
-    };
+    root.querySelector("#wf-send-toggle").onclick = () => openDispatch({});
     root.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { forcesFilter = b.dataset.f; renderForcesTab(); });
     root.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
         openLocSheet(b.dataset.toggle);
@@ -1974,7 +1992,6 @@ function renderForcesTab() {
         } catch (e) { showToast("خطا."); }
         loadForces();
     });
-    renderDispatchSheet();
     startTransitTicker();
 }
 
@@ -2025,9 +2042,33 @@ function startTransitTicker() {
     }, 1000);
 }
 
-function closeDispatchSheet() { document.getElementById("dp-sheet")?.remove(); }
+function closeDispatchSheet() { document.getElementById("dp-sheet")?.remove(); dispatchOpen = false; }
 
-// پنجرهٔ اعزام: از پایین تا وسط صفحه بالا می‌آید و همهٔ مراحل اعزام داخل آن است
+let dispatchLoading = false;
+// ورودی واحد برای هر دو روش: از روی نقشه ({to}) و از بخش جنگ ({})
+async function openDispatch(opts = {}) {
+    if (dispatchLoading || document.getElementById("dp-sheet")) return;
+    dispatchLoading = true;
+    try {
+        if (!Object.keys(ARMY_UNITS).length) await loadArmyCatalog();
+        const [f, sites] = await Promise.all([apiGet("/api/war/forces"), apiGet("/api/map-sites")]);
+        if (!f || !f.home) throw new Error("forces");
+        warForces = f; if (f.now) transitSkew = Date.parse(f.now) - Date.now();
+        warSites = Array.isArray(sites) ? sites : [];
+        if (player?.satellite_built) await loadScanState();
+        await loadWarData();
+    } catch (e) {
+        console.error(e); showToast("بارگذاری اطلاعات اعزام ناموفق بود.", "error");
+        dispatchLoading = false; return;
+    }
+    dispatchLoading = false;
+    dispatchSel = { from: opts.from || null, to: opts.to || null, units: {} };
+    if (dispatchSel.from && dispatchSel.from === dispatchSel.to) dispatchSel.to = null;
+    dispatchOpen = true;
+    renderDispatchSheet();
+}
+
+// پنجرهٔ اعزام: از پایین تا کمی مانده به بالای صفحه، روی همان صفحه‌ای که هستی
 function renderDispatchSheet() {
     let ov = document.getElementById("dp-sheet");
     if (!dispatchOpen) { ov?.remove(); return; }
@@ -2037,13 +2078,13 @@ function renderDispatchSheet() {
         ov.id = "dp-sheet"; ov.className = "gs-overlay gs-bottom";
         ov.addEventListener("click", e => {
             if (e.target === ov || e.target.closest(".gs-x")) {
-                dispatchOpen = false; dispatchSel = { from: null, to: null, units: {} }; closeDispatchSheet();
+                dispatchSel = { from: null, to: null, units: {} }; closeDispatchSheet();
             }
         });
         document.body.appendChild(ov);
     }
-    ov.innerHTML = `<div class="gs-sheet loc-sheet">
-        <div class="gs-sheet-head"><button type="button" class="gs-x" aria-label="بستن">✕</button><span>اعزام نیرو</span></div>
+    ov.innerHTML = `<div class="gs-sheet dp-tall">
+        <div class="gs-sheet-head"><button type="button" class="gs-x" aria-label="بستن">✕</button><span>🧭 اعزام نیرو</span></div>
         <div class="gs-sheet-list">${dispatchPanelHtml()}</div></div>`;
     ov.querySelector(".gs-sheet-list").scrollTop = prevScroll;
     ov.querySelector("#dp-from")?.addEventListener("click", () => openPlaceSheet("from"));
@@ -2056,12 +2097,12 @@ function renderDispatchSheet() {
         row.querySelector(".dp-all").onclick = () => set(max);
         inp.oninput = () => { dispatchSel.units[k] = clamp(inp.value); updateDpSummary(); };
     });
-    const go = ov.querySelector("#dp-go");
-    if (go) { go.onclick = sendDispatch; updateDpSummary(); }
+    ov.querySelector("#dp-go").onclick = sendDispatch;
+    updateDpSummary();
 }
 
 function placeRow(id, icon, name, sub) {
-    return `<button class="ps-row" data-id="${id}" data-q="${name}"><span class="ps-ic">${icon}</span><span class="ps-t"><b>${name}</b><small>${sub}</small></span></button>`;
+    return `<button type="button" class="ps-row" data-id="${escapeHtml(id)}" data-q="${escapeHtml(name)}"><span class="ps-ic">${icon}</span><span class="ps-t"><b>${escapeHtml(name)}</b><small>${escapeHtml(sub)}</small></span></button>`;
 }
 
 function openPlaceSheet(mode) {
@@ -2091,14 +2132,14 @@ function openPlaceSheet(mode) {
             }
             list.push(placeRow(s.id, siteIcon(s), s.name, st));
         });
-        rows = list.join("");
+        rows = list.join("") || `<div class="diplomacy-item-empty">مقصدی موجود نیست.</div>`;
     }
     const ov = document.createElement("div");
     ov.id = "infra-sheet"; ov.className = "modal-overlay";
     ov.innerHTML = `<div class="ic-sheet">
-        <div class="is-head"><div class="is-titles"><div class="is-name">${mode === "from" ? "از کجا؟" : "به کجا؟"}</div>
-            <div class="is-sub">${mode === "from" ? "جایی که نیرو داری" : "سکوها، معادن و تنگه‌ها"}</div></div>
-            <button class="is-close" aria-label="بستن">✕</button></div>
+        <div class="is-head"><div class="is-titles"><div class="is-name">${mode === "from" ? "مبدا کجاست؟" : "مقصد کجاست؟"}</div>
+            <div class="is-sub">${mode === "from" ? "جایی که نیرو داری" : "سکوها، معادن، تنگه‌ها و کشورها"}</div></div>
+            <button type="button" class="is-close" aria-label="بستن">✕</button></div>
         <input class="ps-search" type="search" placeholder="جستجو...">
         <div class="ps-list">${rows}</div></div>`;
     document.body.appendChild(ov);
@@ -2112,29 +2153,54 @@ function openPlaceSheet(mode) {
         const id = r.dataset.id;
         if (mode === "from") dispatchSel = { from: id, to: dispatchSel.to === id ? null : dispatchSel.to, units: {} };
         else dispatchSel.to = id;
-        closeInfraSheet(); renderForcesTab();
+        closeInfraSheet(); renderDispatchSheet();
+    });
+}
+
+// صفحهٔ تأیید نهایی: مبدا، مقصد و تعداد دقیق نیروها
+function showDispatchConfirm(picked) {
+    return new Promise(resolve => {
+        const { from, to } = dispatchSel, total = sumVals(picked);
+        const dst = warSites.find(s => s.id === to);
+        const hostile = (typeof to === "string" && to.startsWith("country:")) || (dst?.owner && dst.owner !== selectedCountry);
+        const rows = Object.entries(picked).map(([k, n]) => `<div class="is-row"><span>${escapeHtml(unitName(k))}</span><b>${formatNumber(n)}</b></div>`).join("");
+        const ov = document.createElement("div");
+        ov.className = "gs-overlay dp-confirm";
+        ov.innerHTML = `<div class="gs-dialog dp-confirm-box">
+            <div class="gs-dialog-title">تأیید اعزام نیرو</div>
+            <div class="dp-route"><b>${escapeHtml(locName(from))}</b><span>←</span><b>${escapeHtml(locName(to))}</b></div>
+            <div class="is-rows">${rows}</div>
+            <div class="dp-confirm-total">جمع: <b>${formatNumber(total)}</b> یگان اعزام می‌شود</div>
+            <div class="gs-dialog-msg ${hostile ? "dp-error" : ""}">${escapeHtml(dispatchKindText())}</div>
+            <div class="gs-dialog-actions">
+                <button type="button" class="gs-dbtn ${hostile ? "danger" : "ok"}" data-r="1">تأیید و اعزام</button>
+                <button type="button" class="gs-dbtn cancel" data-r="0">بازگشت</button></div></div>`;
+        const done = v => { ov.remove(); resolve(v); };
+        ov.addEventListener("click", e => {
+            const b = e.target.closest(".gs-dbtn");
+            if (b) done(b.dataset.r === "1"); else if (e.target === ov) done(false);
+        });
+        document.body.appendChild(ov);
     });
 }
 
 async function sendDispatch() {
     const { from, to } = dispatchSel;
+    if (!from || !to) { showToast("مبدا و مقصد را انتخاب کن.", "error"); return; }
     const picked = Object.fromEntries(Object.entries(dispatchSel.units).filter(([, v]) => v > 0));
-    if (!Object.keys(picked).length) return;
-    const dst = warSites.find(s => s.id === to);
-    const countryTarget = typeof to === "string" && to.startsWith("country:") ? to.split(":")[1] : null;
-    if ((countryTarget && !(await gameConfirm(`نیروها از مسیر دریا به بندر ${COUNTRY_NAMES[countryTarget] || countryTarget} می‌روند. برای انتقال پیاده‌نظام و تانک، ناو ترابری مصرف/اعزام می‌شود. ادامه؟`, { title: "اعزام به بندر دشمن", danger: true }))) || (dst?.owner && dst.owner !== selectedCountry &&
-        !(await gameConfirm(`در «${dst.name}» به ${COUNTRY_NAMES[dst.owner] || dst.owner} حمله می‌شود. ادامه؟`, { title: "حمله", danger: true })))) return;
+    if (!Object.keys(picked).length) { showToast("حداقل یک یگان انتخاب کن.", "error"); return; }
+    if (!(await showDispatchConfirm(picked))) return;
     const btn = document.getElementById("dp-go"); if (btn) btn.disabled = true;
     try {
         const d = await apiPost("/api/war/dispatch", { from, to, units: picked });
-        if (!d.success) { showToast(d.message || "خطا"); if (btn) btn.disabled = false; return; }
-        showToast(d.message);
+        if (!d || !d.success) { showToast(d?.message || "اعزام انجام نشد.", "error"); if (btn) btn.disabled = false; return; }
+        showToast(d.message, "success");
         if (d.player) { player = d.player; updateHomeStats(); }
-        dispatchOpen = false; dispatchSel = { from: null, to: null, units: {} };
+        dispatchSel = { from: null, to: null, units: {} };
         closeDispatchSheet();
         await loadForces();
         refreshMapSites();
-    } catch (e) { showToast("خطا."); }
+    } catch (e) { console.error(e); showToast("خطا در ارتباط با سرور.", "error"); if (btn) btn.disabled = false; }
 }
 
 /* ---------- اعلان جنگ ---------- */
@@ -4890,7 +4956,7 @@ function showSiteInfo(site) {
     }
 
     actionBtn.classList.remove("hidden");
-    actionBtn.textContent = "🪖 فرستادن نیرو";
+    actionBtn.textContent = "🧭 اعزام نیرو";
     actionBtn.onclick = () => openDispatchTo(site.id);
     if (site.kind === "strait" && site.owner === selectedCountry && controls) {
         controls.classList.remove("hidden");
