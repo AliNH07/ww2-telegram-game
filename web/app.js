@@ -1880,7 +1880,8 @@ function dispatchPanelHtml() {
     } else {
         h += `<div class="dp-hint">مبدا را انتخاب کن تا نیروهای موجود نمایش داده شود.</div>`;
     }
-    h += `<div class="dp-rules"><b>شرایط لازم برای اعزام</b>
+    h += `<div class="dp-rules-bar"><button type="button" class="dp-help-btn" id="dp-help-btn" aria-label="شرایط لازم برای اعزام" title="شرایط لازم برای اعزام">؟</button></div>
+        <div class="dp-rules hidden" id="dp-rules"><b>شرایط لازم برای اعزام</b>
         <ul><li>در دریا، پیاده‌نظام و تانک فقط همراه ناو ترابری حرکت می‌کنند.</li>
         <li>در دریا، جنگنده و بمب‌افکن به ناو هواپیمابر نیاز دارند؛ بالگرد نیازی ندارد.</li>
         <li>در خشکی، جنگنده و بمب‌افکن به هواپیمای سوخت‌رسان نیاز دارند.</li>
@@ -2100,6 +2101,7 @@ function renderDispatchSheet() {
         inp.oninput = () => { dispatchSel.units[k] = clamp(inp.value); updateDpSummary(); };
     });
     ov.querySelector("#dp-go").onclick = sendDispatch;
+    ov.querySelector("#dp-help-btn")?.addEventListener("click", () => ov.querySelector("#dp-rules")?.classList.toggle("hidden"));
     updateDpSummary();
 }
 
@@ -4146,10 +4148,21 @@ async function openTradeModal(lid) {
     document.body.appendChild(ov); ov.querySelector(".is-close").onclick=()=>ov.remove(); ov.onclick=e=>{if(e.target===ov)ov.remove();};
     let chosen=best?.mode || null;
     const detail=ov.querySelector("#market-route-detail");
-    const paint=()=>{const q=routes.find(x=>x.mode===chosen); detail.innerHTML=q?`<b>هزینه حمل: ${formatMoney(q.transport_cost)}</b><br>⏱ زمان حمل: ${fmtDurationFa(q.travel_seconds)}<br>${q.strait_costs?.length?`تنگه‌ها: ${q.strait_costs.map(x=>`${x.name} ${formatMoney(x.cost)}`).join("، ")}`:"بدون عوارض تنگه"}`:`هیچ مسیر فعالی نیست.`;};
+    const paint=()=>{
+        const q=routes.find(x=>x.mode===chosen);
+        if(!q){detail.innerHTML=`هیچ مسیر فعالی نیست.`;return;}
+        const icon=q.mode==="sea"?"🚢":q.mode==="land"?"🚚":"✈️";
+        const kmNote=q.mode==="sea"?` · مسیر دریایی ${formatNumber(q.distance_km)} کیلومتر`:` · ${formatNumber(q.distance_km)} کیلومتر`;
+        const straitRows=(q.strait_costs||[]).map(x=>`<div class="mk-bd-row"><span>⚓ عوارض ${escapeHtml(x.name)}</span><b>${x.cost?formatMoney(x.cost):"رایگان"}</b></div>`).join("");
+        detail.innerHTML=`<div class="mk-bd-row"><span>${icon} هزینه حمل${kmNote}</span><b>${formatMoney(q.freight_cost ?? (q.transport_cost-(q.toll||0)))}</b></div>
+            ${straitRows}
+            ${q.mode==="sea"&&!(q.strait_costs||[]).length?`<div class="mk-bd-note">این مسیر از هیچ تنگهٔ عوارضی عبور نمی‌کند.</div>`:""}
+            <div class="mk-bd-row total"><span>مجموع هزینه حمل و عوارض</span><b>${formatMoney(q.transport_cost)}</b></div>
+            <div class="mk-bd-note">⏱ زمان حمل: ${fmtDurationFa(q.travel_seconds)}</div>`;
+    };
     paint();
     ov.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{if(b.disabled)return;chosen=b.dataset.mode;ov.querySelectorAll("[data-mode]").forEach(x=>x.classList.toggle("selected",x===b));paint();});
-    ov.querySelector("#market-confirm-trade").onclick=async()=>{ if(!chosen)return; const d=await apiPost("/api/market/accept",{listing_id:lid,mode:chosen}); if(!d.success){showToast(d.message||"معامله انجام نشد");return;} ov.remove(); showToast(`معامله ثبت شد · هزینه حمل ${formatMoney(d.transport_cost)} · رسیدن کالا حدود ${d.eta_text || fmtDurationFa(d.eta_seconds)}`); await refreshPlayer(); loadMarketListings(); loadMyListings(); loadShipments(); };
+    ov.querySelector("#market-confirm-trade").onclick=async()=>{ if(!chosen)return; const q=routes.find(x=>x.mode===chosen); const d=await apiPost("/api/market/accept",{listing_id:lid,mode:chosen,expected_total:q?.transport_cost}); if(!d.success){showToast(d.message||"معامله انجام نشد"); if(d.error==="price_changed"){ov.remove(); await loadMarketListings();} return;} ov.remove(); showToast(`معامله ثبت شد · هزینه حمل ${formatMoney(d.transport_cost)} · رسیدن کالا حدود ${d.eta_text || fmtDurationFa(d.eta_seconds)}`); await refreshPlayer(); loadMarketListings(); loadMyListings(); loadShipments(); };
 }
 
 function updateMarketCreateLabels() {
