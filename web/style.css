@@ -2986,3 +2986,28 @@ body #market .market-action.sell {
 /* نوار پیشرفت از راست به چپ پر می‌شود */
 #home .hm-act-bar { position: relative; height: 10px; margin-top: 8px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; direction: rtl; }
 #home .hm-act-bar i { position: absolute; top: 0; bottom: 0; right: 0; left: auto; border-radius: 999px; background: linear-gradient(270deg, #A36CE1, #62ddb4); transition: width .9s linear; }
+
+/* ==================== پنل جمع‌وجور مدیریت تنگه ==================== */
+.map-info-strait-controls.sp{margin:10px 0 0;padding:10px;border-radius:16px;display:flex;flex-direction:column;gap:8px;background:linear-gradient(145deg,rgba(47,29,67,.96),rgba(30,17,46,.96))}
+.sp .sp-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sp .sp-head b{font-size:12px;font-weight:900;color:#E6D5F8}
+.sp .sp-state,.sp .sp-sub{font-size:10px;color:#B5AAC7}
+.sp .sp-state{padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);color:#DCCDF0;font-weight:700}
+.sp .sp-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.sp .sp-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:46px;padding:6px 4px;border-radius:12px;border:1px solid rgba(160,112,224,.2);background:rgba(160,112,224,.08);color:#D9C6F2;font:inherit;font-size:10.5px;font-weight:800;cursor:pointer;transition:transform .15s,background .15s,border-color .15s}
+.sp .sp-btn i{font-style:normal;font-size:16px;line-height:1}
+.sp .sp-btn:active{transform:scale(.96)}
+.sp .sp-btn[data-act="close"].active{background:rgba(237,108,101,.18);border-color:rgba(237,108,101,.55);color:#ffb4af}
+.sp .sp-btn[data-act="toll"].active{background:rgba(240,185,70,.16);border-color:rgba(240,185,70,.5);color:#ffd98a}
+.sp .sp-btn[data-act="free"].active{background:rgba(53,190,123,.16);border-color:rgba(53,190,123,.5);color:#9cebbc}
+.sp .sp-toll{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.sp .sp-toll.hidden,.sp .sp-country-box.hidden,.sp .sp-clear.hidden{display:none}
+.sp input[type=number],.sp .sp-select{width:100%;min-width:0;min-height:38px;border-radius:10px;border:1px solid rgba(160,177,204,.2);background:#200F33;color:#f4f7fb;padding:8px 10px;font:inherit;font-size:12px;outline:none}
+.sp input[type=number]:focus,.sp .sp-select:focus{border-color:rgba(160,112,224,.8);box-shadow:0 0 0 3px rgba(160,112,224,.1)}
+.sp .sp-ok{min-height:38px;padding:0 16px;border-radius:10px;border:1px solid rgba(160,112,224,.35);background:linear-gradient(135deg,rgba(160,112,224,.3),rgba(160,112,224,.14));color:#F0E3FF;font:inherit;font-size:11px;font-weight:800;cursor:pointer}
+.sp .sp-sep{height:1px;background:rgba(255,255,255,.07);margin:2px 0}
+.sp .sp-country-box{display:flex;flex-direction:column;gap:8px}
+.sp .sp-chips{display:flex;flex-wrap:wrap;gap:5px}
+.sp .sp-chip{padding:4px 9px;border-radius:20px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);color:#DCCDF0;font:inherit;font-size:11px;cursor:pointer}
+.sp .sp-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#B5AAC7}
+.sp .sp-clear{padding:5px 10px;border-radius:9px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#C7BFD4;font:inherit;font-size:10px;cursor:pointer}
