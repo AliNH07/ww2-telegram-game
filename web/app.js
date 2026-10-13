@@ -37,7 +37,7 @@ let unionChatId = null;
 let unionChatSignature = "";
 let unionDataCache = null;
 
-const COUNTRY_IMAGE_EXT = { germany: "jpg", britain: "jfif", ussr: "jfif", usa: "jfif",
+const COUNTRY_IMAGE_EXT = { germany: "png", britain: "jfif", ussr: "jfif", usa: "jfif",
     france: "jfif", italy: "jfif", china: "jfif", japan: "jfif" };
 const COUNTRY_FLAGS = { germany: "🇩🇪", britain: "🇬🇧", ussr: "☭", usa: "🇺🇸",
     france: "🇫🇷", italy: "🇮🇹", china: "🇨🇳", japan: "🇯🇵" };
