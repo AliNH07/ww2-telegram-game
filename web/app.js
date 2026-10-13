@@ -4767,7 +4767,18 @@ function updateMapRoutes() {
                 line.attr("transform", `translate(${(-dy / len * d.pathOffset).toFixed(2)},${(dx / len * d.pathOffset).toFixed(2)})`);
             } else line.attr("transform", null);
         } else line.attr("transform", null);
-        const pos = d.battle && Array.isArray(d.battle_ll) && d.battle_ll.length === 2
+        // مرحلهٔ ۵: بازگشت دریایی یک مسیر چندپاره است؛ جای کشتی بر اساس طول واقعی کل مسیر (نه فقط یک پاره) محاسبه می‌شود.
+        let wholePos = null;
+        if (d.whole_path && !d.battle && poly.length > 2) {
+            const segs = []; let tot = 0;
+            for (let i = 0; i < poly.length - 1; i++) { const l = d3.geoDistance(poly[i], poly[i + 1]); segs.push(l); tot += l; }
+            let rest = f * tot;
+            for (let i = 0; i < segs.length; i++) {
+                if (rest <= segs[i] || i === segs.length - 1) { wholePos = d3.geoInterpolate(poly[i], poly[i + 1])(segs[i] > 0 ? Math.min(1, rest / segs[i]) : 1); break; }
+                rest -= segs[i];
+            }
+        }
+        const pos = wholePos ? wholePos : d.battle && Array.isArray(d.battle_ll) && d.battle_ll.length === 2
             ? d.battle_ll
             : (poly.length > 2 && Array.isArray(d.path) && d.path[d.leg] && d.path[d.leg + 1]
                 ? d3.geoInterpolate(d.path[d.leg], d.path[d.leg + 1])(f)
