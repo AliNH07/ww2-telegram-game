@@ -3071,3 +3071,23 @@ body .ic-card { gap: 6px; padding: 9px 11px; border-radius: 14px; }
 #economy .eco-card-facts > span { padding: 5px 6px; }
 #economy .eco-card-facts b { margin-top: 1px; }
 #economy .eco-invest-button { padding: 8px 8px; border-radius: 9px; }
+
+
+/* ===== پرچم هدر قابل کلیک (رفتن به رتبه جهانی) ===== */
+.header-flag-box { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+/* ===== برچسب فصل (بهار، تابستان…) روی کارت اصلی: زمینهٔ سیاه کمرنگ تا واضح دیده شود ===== */
+body #home .hm-season {
+    background: rgba(0, 0, 0, .45);
+    border: 1px solid rgba(255, 255, 255, .22);
+    color: #FFFFFF;
+    font-weight: 700;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+}
+
+/* ===== کارت اقتصاد: فقط نام، سطح و قیمت؛ جزئیات در باکس بازشونده ===== */
+#economy .eco-investment-card.eco-compact { cursor: pointer; gap: 8px; padding: 10px 11px; transition: transform .15s ease, border-color .2s ease; }
+#economy .eco-investment-card.eco-compact:active { transform: scale(.98); }
+#economy .eco-investment-card.eco-compact:hover { border-color: rgba(160,112,224,.4); }
+#economy .eco-price { padding: 8px 6px; border-radius: 10px; text-align: center; font-size: 12px; font-weight: 800; color: #86e3a0; background: rgba(74,222,128,.07); border: 1px solid rgba(74,222,128,.14); direction: ltr; }
+#economy .eco-price.is-short { color: #ffaaa7; background: rgba(239,68,68,.1); border-color: rgba(248,113,113,.28); }
