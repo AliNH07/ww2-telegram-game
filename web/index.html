@@ -197,10 +197,16 @@
             <span id="home-season-hint"></span>
         </div>
 
-        <!-- فعالیت‌های در حال انجام (فقط وقتی کاری در صف باشد نمایش داده می‌شود) -->
-        <section id="home-activities" class="hm-activities hidden" aria-label="فعالیت‌های در حال انجام" aria-live="polite">
-            <div class="hm-act-title">⏳ در حال انجام</div>
+        <!-- صف فعالیت‌های خانه: فقط یک فعالیت هم‌زمان (فقط وقتی کاری در صف باشد نمایش داده می‌شود) -->
+        <section id="home-activities" class="hm-activities hidden" aria-label="صف فعالیت‌های خانه" aria-live="polite">
+            <div class="hm-act-title">⏳ صف فعالیت‌های خانه</div>
             <div id="home-activities-list"></div>
+        </section>
+
+        <!-- صف کارخانهٔ ارتش: مستقل از صف خانه؛ هر دو می‌توانند هم‌زمان دیده شوند -->
+        <section id="home-factory" class="hm-activities hm-factory hidden" aria-label="صف کارخانه ارتش" aria-live="polite">
+            <div class="hm-act-title">🏭 صف کارخانه ارتش</div>
+            <div id="home-factory-list"></div>
         </section>
 
         <!-- بخش‌های اصلی -->
@@ -439,6 +445,11 @@
                 <span class="army-tab-count" id="army-count-missile">0</span>
             </button>
         </div>
+
+        <section id="army-factory-queue" class="fq-section" aria-label="صف کارخانه" aria-live="polite">
+            <div id="army-factory-head" class="fq-head"></div>
+            <div id="army-factory-list"></div>
+        </section>
 
         <div id="army-units-new" class="unit-card-list-new"></div>
     </main>
