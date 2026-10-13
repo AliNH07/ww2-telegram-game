@@ -1543,25 +1543,42 @@ function renderEconomyList() {
     if (!c || !player?.economy) return;
     bindEconomyFilters();
     c.innerHTML = "";
-    c.classList.add("economy-list-grid");
+    c.classList.remove("economy-list-grid"); c.classList.add("infra-card-list");
     const entries = Object.entries(player.economy).filter(([iid]) => currentEconomyFilter === "all" || economyCategoryFor(iid) === currentEconomyFilter);
     if (!entries.length) {
         c.innerHTML = `<div class="economy-empty-state">در این دسته هنوز گزینه‌ای وجود ندارد.</div>`;
         return;
     }
     entries.forEach(([iid, item]) => {
-        const card = document.createElement("article");
-        card.className = "eco-investment-card eco-compact";
         const built = item.level > 0;
         const next = item.next;
-        const maxPips = Array.from({length:item.max_level || 0}, (_,i) => `<i class="${i < item.level ? "on" : ""}"></i>`).join("");
-        const cannotAfford = !!next && Number(player.money || 0) < Number(next.cost || 0);
-        // بیرون فقط نام، سطح و قیمت؛ اطلاعات کامل داخل باکسی که با کلیک باز می‌شود.
+        const pips = Array.from({ length: item.max_level || 0 }, (_, i) => `<i class="${i < item.level ? "on" : ""}"></i>`).join("");
+        const income = Number((built ? item.current?.income : next?.income) || 0);
+        const upkeep = Number((built ? item.upkeep : item.next_upkeep) || 0);
+        const short = !!next && Number(player.money || 0) < Number(next.cost || 0);
+        const busy = !!next && !!homeActiveJob();
+        let btnLabel = !next ? "حداکثر سطح" : built ? `ارتقا به سطح ${item.level + 1} — ${formatMoney(next.cost)}` : `سرمایه‌گذاری — ${formatMoney(next.cost)}`;
+        if (busy) btnLabel = "⏳ صف خانه مشغول است";
+        const card = document.createElement("div");
+        card.className = `ic-card ${built ? "ic-card--built" : ""} ${short ? "ic-card--short" : ""}`;
         card.innerHTML = `
-            <div class="eco-card-top"><span class="eco-card-icon">${item.icon || "💼"}</span><div class="eco-card-title"><h3>${escapeHtml(item.name || "سرمایه‌گذاری")}</h3><small>${built ? `سطح ${item.level} از ${item.max_level}` : "جدید"}</small></div></div>
-            <div class="eco-level-pips">${maxPips}</div>
-            <div class="eco-price ${cannotAfford ? "is-short" : ""}">${next ? `🪙 ${formatMoney(next.cost)}` : "حداکثر سطح"}</div>`;
-        card.addEventListener("click", () => openEconomySheet(iid));
+            <div class="ic-top">
+                <div class="ic-hex"><span>${item.icon || "💼"}</span></div>
+                <div class="ic-titles">
+                    <div class="ic-name">${escapeHtml(item.name || "سرمایه‌گذاری")}</div>
+                    <div class="ic-pips">${pips}</div>
+                </div>
+                <div class="ic-main"><b>${formatMoney(income)}</b><small>درآمد روزانه</small></div>
+            </div>
+            <div class="ic-chips">
+                <span class="ic-chip">💰 قیمت ${next ? formatMoney(next.cost) : "—"}</span>
+                <span class="ic-chip">📈 درآمد روزانه ${formatMoney(income)}</span>
+                <span class="ic-chip ic-chip--upkeep">🔧 هزینه روزانه ${formatMoney(upkeep)}</span>
+            </div>
+            <div class="ic-foot">
+                <button class="ic-btn ${short ? "ic-btn--short" : ""}" ${next ? "" : "disabled"}>${btnLabel}</button>
+            </div>`;
+        if (next) card.addEventListener("click", () => openEconomySheet(iid));
         c.appendChild(card);
     });
 }
@@ -1580,6 +1597,13 @@ function openEconomySheet(iid) {
     if (busyJob) rows.push(`<div class="is-row is-bad"><span>⏳ فعالیت در حال انجام</span><b>${escapeHtml(busyJob.label || "فعالیت")} <small>(${fmtCountdown(Date.parse(busyJob.end) - serverNowMs())} مانده)</small></b></div>`);
     rows.push(`<div class="is-row"><span>💵 درآمد روزانه</span><b>${next ? (built ? `از ${formatMoney(curInc)} به ${formatMoney(nextInc)}` : formatMoney(nextInc)) : formatMoney(curInc)}</b></div>`);
     if (next && built) rows.push(`<div class="is-row"><span>📈 افزایش درآمد</span><b>+${formatMoney(nextInc - curInc)} / روز</b></div>`);
+    if (next) {
+        const upNow = Number(item.upkeep || 0), upNext = Number(item.next_upkeep || 0);
+        rows.push(`<div class="is-row"><span>🔧 هزینهٔ روزانه</span><b>${built ? `از ${formatMoney(upNow)} به ${formatMoney(upNext)}` : formatMoney(upNext)}</b></div>`);
+        rows.push(`<div class="is-row"><span>💎 سود خالص روزانه</span><b>${formatMoney(nextInc - upNext)}${built ? ` <small>(الان ${formatMoney(curInc - upNow)})</small>` : ""}</b></div>`);
+    } else {
+        rows.push(`<div class="is-row"><span>🔧 هزینهٔ روزانه</span><b>${formatMoney(Number(item.upkeep || 0))}</b></div>`);
+    }
     if (next) rows.push(`<div class="is-row"><span>⏱️ زمان ساخت</span><b>${fmtDurationFa(next.time)}</b></div>`);
     rows.push(`<div class="is-row ${powerOk ? "" : "is-bad"}"><span>⚡ برق لازم</span><b>${formatNumber(item.power_required || 0)} واحد <small>(برق آزاد: ${formatNumber(freePower())})</small></b></div>`);
     rows.push(`<div class="is-row"><span>📊 سطح</span><b>${built ? `${item.level} از ${item.max_level}` : `۰ از ${item.max_level}`}</b></div>`);
