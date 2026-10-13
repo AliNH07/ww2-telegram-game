@@ -3091,3 +3091,8 @@ body #home .hm-season {
 #economy .eco-investment-card.eco-compact:hover { border-color: rgba(160,112,224,.4); }
 #economy .eco-price { padding: 8px 6px; border-radius: 10px; text-align: center; font-size: 12px; font-weight: 800; color: #86e3a0; background: rgba(74,222,128,.07); border: 1px solid rgba(74,222,128,.14); direction: ltr; }
 #economy .eco-price.is-short { color: #ffaaa7; background: rgba(239,68,68,.1); border-color: rgba(248,113,113,.28); }
+
+/* ---- تنظیمات صدا و لرزش در منوی بازی ---- */
+.game-menu-item.hidden{display:none!important}
+.fx-state{font-size:10px;font-weight:700;padding:2px 9px;border-radius:999px;background:rgba(160,112,224,.22);color:#D8C0F4}
+.fx-state.off{background:rgba(255,255,255,.07);color:#8f8aa0}
