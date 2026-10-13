@@ -135,37 +135,37 @@ INFRASTRUCTURE = {
         "power_required": 2,
         "name": "اردوگاه آموزشی", "group": "manpower", "icon": "👥",
         "desc": "پایگاه آموزش نیرو. هر سطح نیروی بیشتری تربیت می‌کند.",
-        "levels": [L(cost=220_000, production=200), L(cost=480_000, production=500), L(cost=1_050_000, production=1200), L(cost=2_000_000, production=2500), L(cost=3_600_000, production=5000)],
+        "levels": [L(cost=220_000, production=2000), L(cost=480_000, production=5000), L(cost=1_050_000, production=12000), L(cost=2_000_000, production=25000), L(cost=3_600_000, production=50000)],
     },
     "manpower_barracks_training": {
         "power_required": 3,
         "name": "پادگان آموزشی", "group": "manpower", "icon": "👥",
         "desc": "پادگان تخصصی آموزش سرباز.",
-        "levels": [L(cost=300_000, production=300), L(cost=650_000, production=700), L(cost=1_400_000, production=1600), L(cost=2_700_000, production=3400), L(cost=4_900_000, production=6800)],
+        "levels": [L(cost=300_000, production=3000), L(cost=650_000, production=7000), L(cost=1_400_000, production=16000), L(cost=2_700_000, production=34000), L(cost=4_900_000, production=68000)],
     },
     "manpower_volunteer": {
         "power_required": 2,
         "name": "پایگاه داوطلبان", "group": "manpower", "icon": "👥",
         "desc": "داوطلبان داوطلبانه ثبت‌نام می‌کنند.",
-        "levels": [L(cost=180_000, production=240), L(cost=430_000, production=560), L(cost=1_050_000, production=1300), L(cost=2_300_000, production=2800), L(cost=4_600_000, production=5500)],
+        "levels": [L(cost=180_000, production=2400), L(cost=430_000, production=5600), L(cost=1_050_000, production=13000), L(cost=2_300_000, production=28000), L(cost=4_600_000, production=55000)],
     },
     "manpower_medical": {
         "power_required": 3,
         "name": "مرکز پزشکی", "group": "manpower", "icon": "👥",
         "desc": "سلامت سربازان را تأمین می‌کند و تولید نیرو را بالا می‌برد.",
-        "levels": [L(cost=260_000, production=260), L(cost=560_000, production=620), L(cost=1_250_000, production=1400), L(cost=2_500_000, production=3000), L(cost=4_700_000, production=6000)],
+        "levels": [L(cost=260_000, production=2600), L(cost=560_000, production=6200), L(cost=1_250_000, production=14000), L(cost=2_500_000, production=30000), L(cost=4_700_000, production=60000)],
     },
     "manpower_mobilization": {
         "power_required": 4,
         "name": "مرکز بسیج", "group": "manpower", "icon": "👥",
         "desc": "در زمان جنگ نیروهای بیشتری جذب می‌کند.",
-        "levels": [L(cost=340_000, production=380), L(cost=720_000, production=900), L(cost=1_500_000, production=2000), L(cost=2_900_000, production=4200), L(cost=5_300_000, production=8500)],
+        "levels": [L(cost=340_000, production=3800), L(cost=720_000, production=9000), L(cost=1_500_000, production=20000), L(cost=2_900_000, production=42000), L(cost=5_300_000, production=85000)],
     },
     "manpower_academy": {
         "power_required": 5,
         "name": "آکادمی نظامی", "group": "manpower", "icon": "👥",
         "desc": "افسران کارآزموده پرورش می‌دهد.",
-        "levels": [L(cost=430_000, production=450), L(cost=900_000, production=1100), L(cost=1_800_000, production=2400), L(cost=3_400_000, production=5000), L(cost=6_000_000, production=10000)],
+        "levels": [L(cost=430_000, production=4500), L(cost=900_000, production=11000), L(cost=1_800_000, production=24000), L(cost=3_400_000, production=50000), L(cost=6_000_000, production=100000)],
     },
 
     # ==================== غذا (۳ آیتم) ====================
@@ -304,8 +304,13 @@ INFRASTRUCTURE = {
 
 UPKEEP_RATE = 0.005   # هزینهٔ نگهداری روزانه = ۰٫۵٪ مجموع پولِ خرج‌شده روی ساخت و ارتقا
 
+ECO_UPKEEP_RATE = 0.12   # هزینهٔ روزانهٔ سرمایه‌گذاری اقتصادی = ۱۲٪ درآمد روزانهٔ همان سطح (درآمد خالص همچنان مثبت است)
+
 def infra_upkeep(item, lv):
-    if lv <= 0 or item.get("group") == "eco": return 0
+    if lv <= 0: return 0
+    if item.get("group") == "eco":
+        levels = item["levels"]
+        return int(round(levels[min(lv, len(levels)) - 1]["income"] * ECO_UPKEEP_RATE / 100.0)) * 100
     levels = item["levels"]
     invested = sum(l["cost"] for l in levels[:min(lv, len(levels))])
     return int(round(invested * UPKEEP_RATE / 100.0)) * 100
@@ -830,7 +835,9 @@ def compute_rates(player, _occ=True, at_time=None):
 
     for item_id, item in ECONOMY.items():
         lv = get_infra_level(player, item_id)
-        if lv > 0: eco_income += item["levels"][lv - 1]["income"]
+        if lv > 0:
+            eco_income += item["levels"][min(lv, len(item["levels"])) - 1]["income"]
+            upkeep += infra_upkeep(item, lv)
     # درآمد ساختمان‌های اقتصادی ابتدا بدون پاداش رفاه جمع می‌شود.
     income += eco_income
     wb = welfare_bonus(player)
@@ -5550,6 +5557,12 @@ async def get_stats(request):
         if cost <= 0: continue
         upkeep_items.append({"id": bid, "name": item["name"], "icon": item.get("icon", "🏗️"),
                              "group": group_titles.get(item.get("group"), "زیرساخت"), "amount": cost})
+    for bid, item in ECONOMY.items():
+        lv = min(get_infra_level(p, bid), len(item["levels"]))
+        cost = infra_upkeep(item, lv)
+        if lv <= 0 or cost <= 0: continue
+        upkeep_items.append({"id": bid, "name": item["name"], "icon": item.get("icon", "💼"),
+                             "group": "اقتصاد", "amount": cost})
     upkeep_items.sort(key=lambda x: x["amount"], reverse=True)
     return web.json_response({
         "now": utcnow().isoformat(), "bonus": round(bonus, 1), "gross": round(gross, 1),
