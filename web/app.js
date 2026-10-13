@@ -264,17 +264,17 @@ async function loadArmyCatalog() {
     catch (e) { console.error("Army catalog:", e); }
 }
 
+const RESOURCE_SHORTAGE_WARN_DAYS = 10;   // اگر موجودی با روند فعلی تا این تعداد روز تمام شود، هشدار نمایش داده می‌شود
+
 function resourceEtaLabel(amount, dailyDeficit) {
-    if (amount <= 0) return "موجودی تمام شده است";
+    if (amount <= 0) return "همین حالا تمام شده است";
     if (!(dailyDeficit > 0)) return "";
-    let minutes = Math.max(0, Math.floor((amount / dailyDeficit) * 24 * 60));
-    const days = Math.floor(minutes / 1440); minutes -= days * 1440;
-    const hours = Math.floor(minutes / 60); minutes -= hours * 60;
-    const parts = [];
-    if (days) parts.push(`${formatNumber(days)} روز`);
-    if (hours) parts.push(`${formatNumber(hours)} ساعت`);
-    if (minutes || !parts.length) parts.push(`${formatNumber(minutes)} دقیقه`);
-    return `موجودی با این روند تا ${parts.join(" و ")} تمام می‌شود`;
+    const totalDays = amount / dailyDeficit;
+    if (totalDays < 1) {
+        const hours = Math.max(1, Math.floor(totalDays * 24));
+        return `${formatNumber(hours)} ساعت دیگر تمام می‌شود`;
+    }
+    return `${formatNumber(Math.floor(totalDays))} روز دیگر تمام می‌شود`;
 }
 
 function renderResourceBars() {
@@ -288,22 +288,22 @@ function renderResourceBars() {
             const net = rate - use;
             const chip = document.createElement("div");
             chip.className = "resource-chip";
-            const productionLine = `<div class="resource-chip-rate up"><span>تولید روزانه</span><b>▲ ${formatNumber(rate)}</b></div>`;
-            const consumptionLine = `<div class="resource-chip-rate down"><span>مصرف روزانه</span><b>▼ ${formatNumber(use)}</b></div>`;
-            let balanceLine = "";
-            if (net > 0) {
-                balanceLine = `<div class="resource-balance positive"><span>افزایش خالص</span><b>+${formatNumber(net)} / روز</b></div>`;
-            } else if (net < 0) {
-                const eta = resourceEtaLabel(amt, Math.abs(net));
-                balanceLine = `<div class="resource-balance negative"><strong>🔺 کمبود روزانه ${formatNumber(Math.abs(net))}</strong><small>${eta}</small></div>`;
-            } else {
-                balanceLine = `<div class="resource-balance neutral"><span>تولید و مصرف برابر است</span></div>`;
+            // فقط یک خط: تولید (سبز) اگر از مصرف بیشتر است، مصرف (قرمز) اگر از تولید بیشتر است.
+            let rateLine = "";
+            if (rate > use) {
+                rateLine = `<div class="resource-chip-rate up"><span>تولید روزانه</span><b>▲ ${formatNumber(rate)}</b></div>`;
+            } else if (use > rate) {
+                rateLine = `<div class="resource-chip-rate down"><span>مصرف روزانه</span><b>▼ ${formatNumber(use)}</b></div>`;
+            }
+            // هشدار فقط وقتی منبع کمبود دارد و حداکثر ۱۰ روز دیگر تمام می‌شود.
+            let warnLine = "";
+            if (net < 0 && (amt <= 0 || amt / Math.abs(net) <= RESOURCE_SHORTAGE_WARN_DAYS)) {
+                warnLine = `<div class="resource-warn">⚠️ کمبود: ${resourceEtaLabel(amt, Math.abs(net))}</div>`;
             }
             chip.innerHTML = `
-                <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span><span class="resource-chip-status ${net < 0 ? "is-shortage" : net > 0 ? "is-surplus" : "is-balanced"}">${net < 0 ? "کمبود" : net > 0 ? "مازاد" : "متعادل"}</span></div>
+                <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span></div>
                 <div class="resource-chip-value">${formatNumber(amt)}</div>
-                <div class="resource-rates-stack">${productionLine}${consumptionLine}</div>
-                ${balanceLine}`;
+                ${rateLine}${warnLine}`;
             bar.appendChild(chip);
         });
     });
