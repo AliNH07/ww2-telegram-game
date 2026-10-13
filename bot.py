@@ -5891,6 +5891,8 @@ async def create_web_app():
     app.router.add_get("/app.js", app_js)
     app.router.add_static("/images/", path=os.path.join(WEB_DIR, "images"), name="images")
     app.router.add_static("/fonts/", path=os.path.join(WEB_DIR, "fonts"), name="fonts")
+    os.makedirs(os.path.join(WEB_DIR, "sounds"), exist_ok=True)   # فایل‌های صوتی عملیات (مثلاً build.mp3)
+    app.router.add_static("/sounds/", path=os.path.join(WEB_DIR, "sounds"), name="sounds")
 
     app.router.add_get("/api/worlds", get_worlds)
     app.router.add_get("/api/admin/global", admin_global)
