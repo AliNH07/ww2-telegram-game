@@ -1515,9 +1515,9 @@ async function openEconomyPage() {
 }
 
 function economyCategoryFor(iid) {
-    if (["eco_agriculture", "eco_fishing"].includes(iid)) return "food";
-    if (["eco_textile", "eco_construction", "eco_mining", "eco_steel", "eco_electronics", "eco_oil", "eco_chemicals"].includes(iid)) return "industry";
-    if (["eco_trade"].includes(iid)) return "trade";
+    if (["eco_agriculture", "eco_fishing", "eco_dairy"].includes(iid)) return "food";
+    if (["eco_textile", "eco_construction", "eco_mining", "eco_steel", "eco_electronics", "eco_oil", "eco_chemicals", "eco_handicraft", "eco_pharma", "eco_auto", "eco_aerospace"].includes(iid)) return "industry";
+    if (["eco_trade", "eco_market", "eco_transport"].includes(iid)) return "trade";
     return "finance"; // گردشگری، خدمات و بانک
 }
 
