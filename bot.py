@@ -373,16 +373,48 @@ ECONOMY = {
     },
 }
 
+# =========================================================
+# زمان‌بندی فعالیت‌ها
+# =========================================================
+# فعالیت‌های خانه (ساخت، ارتقا، سرمایه‌گذاری): هر سطحی که زمان صریح ندارد، زمانش از هزینه‌اش
+# محاسبه می‌شود: دقیقه = ۸ + ۱۸ × (هزینه به میلیون)^۰٫۷، با کف ۵ و سقف ۲۴۰ دقیقه.
+# نمونه: ۰٫۲۵ میلیون ≈ ۱۴ دقیقه، ۱ میلیون ≈ ۲۶، ۳ میلیون ≈ ۴۷، ۷٫۵ میلیون ≈ ۸۲، ۳۲ میلیون ≈ ۲۰۴ دقیقه.
+HOME_TIME_BASE_MIN = 8
+HOME_TIME_PER_MIN = 18
+HOME_TIME_EXP = 0.7
+HOME_TIME_MIN_SEC = 5 * 60
+HOME_TIME_MAX_SEC = 240 * 60
+
+def auto_home_seconds(cost):
+    minutes = HOME_TIME_BASE_MIN + HOME_TIME_PER_MIN * ((max(0, cost) / 1_000_000.0) ** HOME_TIME_EXP)
+    return int(max(HOME_TIME_MIN_SEC, min(HOME_TIME_MAX_SEC, round(minutes) * 60)))
+
+def _apply_auto_times(catalog):
+    for item in catalog.values():
+        for lv in item["levels"]:
+            if not lv.get("time"):
+                lv["time"] = auto_home_seconds(lv.get("cost", 0))
+
+_apply_auto_times(INFRASTRUCTURE)
+_apply_auto_times(ECONOMY)
+
+# صف کارخانهٔ ارتش: برای هر دسته یک صف مستقل. ظرفیت = تعداد «سفارش» ثبت‌شده در صف (نه تعداد واحدها).
+FACTORY_QUEUE_LIMITS = {"land": 20, "naval": 16, "air": 20, "missile": 12}
+FACTORY_GROUP_NAMES = {"land": "نیروهای زمینی", "naval": "نیروهای دریایی", "air": "نیروهای هوایی", "missile": "موشک‌ها"}
+FACTORY_REQUEST_ID_KEEP = 60     # شناسهٔ آخرین درخواست‌های ثبت سفارش، برای جلوگیری از ثبت دوباره
+TG_OUTBOX_MAX_ATTEMPTS = 8       # بیشتر از این تعداد تلاش ناموفق (مثلاً ربات بلاک شده) رها می‌شود
+TG_DONE_KEEP = 100
+
 ARMY_UNITS = {
     "infantry": {"name": "پیاده‌نظام", "group": "land", "requires": ["land_barracks", "land_hq"],
         "cost": 50_000, "manpower": 300, "resources": {"food": 100}, "daily": {"food": 2},
         "attack": 20, "defense": 10},
     "tank": {"name": "تانک", "group": "land", "requires": ["land_barracks", "land_hq", "land_tank_factory"],
         "cost": 150_000, "manpower": 250, "resources": {"steel": 300, "food": 150}, "daily": {"food": 3, "oil": 4, "steel": 1},
-        "attack": 50, "defense": 25, "build_seconds": 20 * 60},
+        "attack": 50, "defense": 25},
     "ship": {"name": "ناو دریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
         "cost": 250_000, "manpower": 200, "resources": {"oil": 250, "food": 150}, "daily": {"food": 4, "oil": 10, "steel": 1},
-        "attack": 50, "defense": 60, "build_seconds": 30 * 60},
+        "attack": 50, "defense": 60},
     "submarine": {"name": "زیردریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
         "cost": 200_000, "manpower": 120, "resources": {"oil": 200, "steel": 150}, "daily": {"food": 2, "oil": 8, "steel": 1},
         "attack": 45, "defense": 25},
@@ -421,6 +453,27 @@ ARMY_UNITS = {
         "daily": {"food": 5, "oil": 20, "steel": 12},
         "attack": 250, "defense": 20},
 }
+
+# زمان ساخت «هر یک واحد» (ثانیه) ≈ ۱٫۲ ثانیه به ازای هر ۱٬۰۰۰ دلار هزینهٔ واحد؛ سفارشِ N تایی N برابر آن طول می‌کشد
+# و واحدها یکی‌یکی (به‌تدریج) تحویل می‌شوند. پس سفارش کوچک و سفارش بزرگ زمان یکسان ندارند.
+UNIT_BUILD_SECONDS = {
+    "infantry": 60,            # ۱ دقیقه
+    "tank": 3 * 60,
+    "ship": 5 * 60,
+    "submarine": 4 * 60,
+    "transport_ship": 216,     # ۳٫۶ دقیقه
+    "aircraft_carrier": 16 * 60,
+    "fighter": 4 * 60,
+    "bomber": 5 * 60,
+    "helicopter": 144,         # ۲٫۴ دقیقه
+    "air_tanker": 264,         # ۴٫۴ دقیقه
+    "cruise_missile": 8 * 60,
+    "ballistic_missile": 18 * 60,
+    "icbm": 50 * 60,
+}
+for _uid, _sec in UNIT_BUILD_SECONDS.items():
+    ARMY_UNITS[_uid]["build_seconds"] = _sec
+assert all(u.get("build_seconds", 0) > 0 for u in ARMY_UNITS.values()), "every army unit needs build_seconds"
 
 MAP_RESOURCES = {
     # همهٔ سکوها و معدن‌ها در دریا هستند (روی خشکی کشور فعال نمی‌افتند) — zone: sea
@@ -651,7 +704,11 @@ def ensure_player_fields(player):
     for k in list(lv_map):
         if k in INFRASTRUCTURE: lv_map[k] = min(lv_map[k], len(INFRASTRUCTURE[k]["levels"]))
         elif k not in ECONOMY: del lv_map[k]
-    player.setdefault("build_queue", [])  # فعالیت‌های زمان‌دار در حال انجام (ساخت یگان)
+    player.setdefault("build_queue", [])  # صف فعالیت‌های خانه (ساخت/ارتقا/سرمایه‌گذاری) — حداکثر یک فعالیت هم‌زمان
+    factory_queues(player)                # صف مستقل کارخانهٔ ارتش، یک صف برای هر دسته
+    player.setdefault("factory_request_ids", [])
+    player.setdefault("tg_outbox", [])    # اعلان‌های تلگرامیِ هنوز ارسال‌نشده (پایدار؛ فقط پس از ارسال موفق حذف می‌شود)
+    player.setdefault("tg_done", [])      # شناسهٔ اعلان‌های تلگرامیِ ارسال‌شده (ضد تکرار)
     player.setdefault("activity_notices", [])  # اعلان‌های پایان فعالیت که هنوز به بازیکن نمایش داده نشده‌اند
     player.setdefault("map_holdings", {})
     player.setdefault("strait_holdings", {})
@@ -1036,28 +1093,133 @@ def process_deliveries(player):
                 key=("delivery:" + str(d["id"])) if d.get("id") else None)
     player["pending_deliveries"] = keep
 
-def process_build_queue(player):
-    """کارهای صف ساخت که زمانشان تمام شده تکمیل می‌شوند: یگان به موجودی اضافه و کار از صف حذف می‌شود."""
+# ---------------------------------------------------------
+# صف فعالیت‌های خانه (یک فعالیت هم‌زمان) + اعلان تلگرام پایدار
+# ---------------------------------------------------------
+HOME_JOB_KINDS = ("infra", "economy")
+
+def home_active_job(player):
+    """فعالیتِ در حال انجام در صف خانه (اگر باشد). پیش از فراخوانی باید process_build_queue اجرا شده باشد."""
+    for job in player.get("build_queue") or []:
+        if isinstance(job, dict) and job.get("kind") in HOME_JOB_KINDS:
+            return job
+    return None
+
+def queue_telegram_notice(player, text, key):
+    """اعلان تلگرام را در پروندهٔ بازیکن ثبت می‌کند. با key ثابت (شناسهٔ فعالیت) هرگز دو بار ثبت نمی‌شود،
+    حتی اگر ارسالش پیش‌تر موفق شده باشد. ارسال واقعی را حلقهٔ activity_loop انجام می‌دهد."""
+    key = str(key) if key else str(uuid.uuid4())
+    box = player.setdefault("tg_outbox", [])
+    done = player.setdefault("tg_done", [])
+    if key in done or any(isinstance(e, dict) and e.get("id") == key for e in box):
+        return False
+    box.append({"id": key, "text": text, "at": utcnow().isoformat(), "attempts": 0})
+    return True
+
+def _migrate_legacy_jobs(player):
+    """کارهای «آموزش یگان» که در نسخهٔ قبلی داخل build_queue بودند به صف مستقل کارخانه منتقل می‌شوند."""
     queue = player.get("build_queue")
-    if not queue: return
-    now = utcnow(); keep = []; done = False
+    if not queue or not any(isinstance(j, dict) and j.get("kind") == "train" for j in queue):
+        return
+    keep = []
+    fq = factory_queues(player)
     for job in queue:
+        if not isinstance(job, dict) or job.get("kind") != "train":
+            keep.append(job); continue
+        unit = ARMY_UNITS.get(job.get("unit_id"))
+        if not unit:
+            continue
+        count = max(1, int(job.get("count", 1) or 1))
+        start = parse_dt(job.get("start")) or utcnow()
+        end = parse_dt(job.get("end")) or start
+        fq[unit["group"]].append({
+            "id": str(job.get("id") or uuid.uuid4()), "kind": "train", "group": unit["group"],
+            "unit_id": job["unit_id"], "count": count, "delivered": 0,
+            "unit_seconds": max(1.0, (end - start).total_seconds() / count),
+            "start": start.isoformat(), "queued_at": start.isoformat(),
+            "label": job.get("label") or f"ساخت {count:,} {unit['name']}"})
+    player["build_queue"] = keep
+
+def process_build_queue(player):
+    """فعالیت‌های خانه که زمانشان تمام شده، دقیقاً در لحظهٔ پایان تکمیل می‌شوند: سطح اعمال می‌شود، کار از صف
+    حذف می‌شود و اعلان (درون‌برنامه + تلگرام) فقط یک بار ثبت می‌گردد. خروجی: آیا چیزی تغییر کرد."""
+    _migrate_legacy_jobs(player)
+    queue = player.get("build_queue")
+    if not queue: return False
+    now = utcnow(); keep = []; changed = False
+    for job in queue:
+        if not isinstance(job, dict):
+            changed = True; continue
         end = parse_dt(job.get("end"))
         if end and end > now:
             keep.append(job); continue
-        if job.get("kind") == "train" and job.get("unit_id") in ARMY_UNITS:
-            units = player.setdefault("units", {})
-            units[job["unit_id"]] = units.get(job["unit_id"], 0) + max(0, int(job.get("count", 0) or 0))
-            done = True
-        if job.get("kind") == "infra" and job.get("item_id") in INFRASTRUCTURE:
+        kind = job.get("kind")
+        catalog = INFRASTRUCTURE if kind == "infra" else ECONOMY if kind == "economy" else None
+        if catalog is not None and job.get("item_id") in catalog:
             lv_now = player.setdefault("infra_levels", {}).get(job["item_id"], 0)
             player["infra_levels"][job["item_id"]] = max(lv_now, int(job.get("level", 0) or 0))
-            done = True
-        # کار از صف خارج می‌شود و اعلان آن همین‌جا (دقیقاً در لحظهٔ پایان) فقط یک بار ثبت می‌شود.
-        push_activity_notice(player, done_message(job.get("label") or "فعالیت"),
-                             key=("job:" + str(job["id"])) if job.get("id") else None)
+        text = done_message(job.get("label") or "فعالیت")
+        jid = str(job["id"]) if job.get("id") else None
+        push_activity_notice(player, text, key=("job:" + jid) if jid else None)
+        if kind in HOME_JOB_KINDS and not player.get("is_eliminated"):
+            queue_telegram_notice(player, text, ("job:" + jid) if jid else None)
+        changed = True
     player["build_queue"] = keep
-    if done: recompute_army(player)
+    if changed: recompute_army(player)
+    return changed
+
+# ---------------------------------------------------------
+# صف مستقل کارخانهٔ ارتش (برای تولید یگان پیام تلگرام ارسال نمی‌شود)
+# ---------------------------------------------------------
+def factory_queues(player):
+    fq = player.setdefault("factory_queues", {})
+    for g in FACTORY_QUEUE_LIMITS:
+        if not isinstance(fq.get(g), list): fq[g] = []
+    return fq
+
+def factory_order_seconds(order):
+    return max(1.0, float(order.get("unit_seconds") or 1.0)) * max(0, int(order.get("count", 0) or 0))
+
+def queued_units_in_group(player, group):
+    """واحدهای هنوز تحویل‌نشدهٔ صف کارخانه؛ این‌ها از ظرفیت نگهداری رزرو می‌شوند."""
+    total = 0
+    for o in factory_queues(player).get(group, []):
+        total += max(0, int(o.get("count", 0) or 0) - int(o.get("delivered", 0) or 0))
+    return total
+
+def process_factory_queues(player, now=None):
+    """واحدها طبق زمان هر واحد یکی‌یکی تحویل می‌شوند (نه فوری). سفارشِ بعدیِ همان دسته دقیقاً از لحظهٔ پایان
+    سفارش قبلی شروع می‌شود، حتی اگر بازیکن آفلاین باشد. خروجی: آیا چیزی تغییر کرد."""
+    now = now or utcnow(); changed = False
+    for group, q in factory_queues(player).items():
+        prev_end = None
+        while q:
+            o = q[0]
+            unit_id = o.get("unit_id")
+            if unit_id not in ARMY_UNITS or int(o.get("count", 0) or 0) <= 0:
+                q.pop(0); changed = True; continue
+            count = int(o["count"]); us = max(1.0, float(o.get("unit_seconds") or 1.0))
+            start = parse_dt(o.get("start"))
+            if start is None:
+                start = prev_end or now
+                o["start"] = start.isoformat(); changed = True
+            finish = start + timedelta(seconds=us * count)
+            done = count if now >= finish else max(0, min(count, int((now - start).total_seconds() // us)))
+            delta = done - int(o.get("delivered", 0) or 0)
+            if delta > 0:
+                units = player.setdefault("units", {})
+                units[unit_id] = units.get(unit_id, 0) + delta
+                o["delivered"] = done; changed = True
+            if done >= count:
+                q.pop(0)
+                # فقط اعلان درون‌برنامه (بدون تلگرام): پایان تولید ارتش در رابط و صف کارخانه دیده می‌شود.
+                push_activity_notice(player, done_message(o.get("label") or "تولید یگان"),
+                                     key=("order:" + str(o["id"])) if o.get("id") else None)
+                prev_end = finish; changed = True
+                continue
+            break
+    if changed: recompute_army(player)
+    return changed
 
 def accrue_player(player):
     """درآمد و منابع را با ساعت مشترک دنیا و با نرخ درستِ هر فصل محاسبه می‌کند."""
@@ -1065,6 +1227,7 @@ def accrue_player(player):
         return
     process_deliveries(player)
     process_build_queue(player)
+    process_factory_queues(player)
     meta = _world_meta()
     started = parse_dt(meta.get("game_started_at"))
     if not started:
@@ -1158,6 +1321,9 @@ def serialize_player(player):
     ensure_player_fields(player); accrue_player(player); recompute_army(player)
     rates = compute_rates(player)
     data = dict(player); data.update(get_game_time(player))
+    for private in ("tg_outbox", "tg_done", "factory_request_ids"):
+        data.pop(private, None)
+    data["factory_queue_limits"] = dict(FACTORY_QUEUE_LIMITS)
     data["server_now"] = utcnow().isoformat()
     winner = data.get("game_winner") or {}
     data["game_winner_name"] = winner.get("name") if isinstance(winner, dict) else None
@@ -2031,6 +2197,27 @@ async def select_country(request):
 # =========================================================
 # API Infra / Economy / Army
 # =========================================================
+HOME_BUSY_MESSAGE = "در بخش خانه هم‌زمان فقط یک فعالیت ممکن است؛ تا پایان فعالیت فعلی نمی‌توانید فعالیت دیگری شروع کنید."
+
+def home_busy_response(job):
+    left = 0
+    end = parse_dt(job.get("end")) if job else None
+    if end: left = max(0, int((end - utcnow()).total_seconds()))
+    return web.json_response({"success": False, "error": "home_busy", "message": HOME_BUSY_MESSAGE,
+                              "busy_with": job.get("label") if job else None, "ready_in": left}, status=409)
+
+def start_home_job(p, kind, item_id, item, lv, cost, res_cost, levels):
+    """هزینه را کسر می‌کند و فعالیت زمان‌دار را در صف خانه ثبت می‌کند. فعالیت خانه همیشه زمان مشخص دارد."""
+    label = f"ساخت {item['name']}" if lv == 0 else f"ارتقای {item['name']} به سطح {lv + 1}"
+    build_s = int(levels[lv].get("time") or 0) or auto_home_seconds(cost)
+    now = utcnow()
+    p["money"] -= cost
+    for k, a in res_cost.items(): p["resources"][k] -= a
+    p.setdefault("build_queue", []).append({
+        "id": str(uuid.uuid4()), "kind": kind, "item_id": item_id, "level": lv + 1, "label": label,
+        "start": now.isoformat(), "end": (now + timedelta(seconds=build_s)).isoformat()})
+    return build_s
+
 async def upgrade_infra(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
@@ -2041,15 +2228,11 @@ async def upgrade_infra(request):
     p = players[uid]
     if not p.get("country") or p.get("is_eliminated"):
         return web.json_response({"success": False, "error": "invalid_state"}, status=400)
-    accrue_player(p)
+    accrue_player(p); ensure_player_fields(p)
+    busy = home_active_job(p)
+    if busy:   # صف خانه: فقط یک فعالیت هم‌زمان
+        return home_busy_response(busy)
     item = INFRASTRUCTURE[item_id]; lv = get_infra_level(p, item_id); levels = item["levels"]
-    if lv >= len(levels):
-        return web.json_response({"success": False, "error": "max_level"}, status=400)
-    process_build_queue(p)
-    if any(j.get("kind") == "infra" and j.get("item_id") == item_id for j in p.get("build_queue", [])):
-        return web.json_response({"success": False, "error": "in_progress",
-                                  "message": "ساخت یا ارتقای این زیرساخت در حال انجام است."}, status=400)
-    lv = get_infra_level(p, item_id)
     if lv >= len(levels):
         return web.json_response({"success": False, "error": "max_level"}, status=400)
     cost = levels[lv]["cost"]; res_cost = levels[lv].get("resources", {})
@@ -2060,29 +2243,13 @@ async def upgrade_infra(request):
     if req_power and get_power_total(p) < get_power_used(p) + req_power:
         return web.json_response({"success": False, "error": "not_enough_power",
                                   "message": "برق کافی ندارید. ابتدا نیروگاه بسازید یا ارتقا دهید."}, status=400)
-    ensure_player_fields(p)
     for k, a in res_cost.items():
         if p["resources"].get(k, 0) < a:
             return web.json_response({"success": False, "error": "not_enough_resource",
                                       "message": f"{RESOURCE_NAMES[k]} کافی ندارید."}, status=400)
-    label = f"ساخت {item['name']}" if lv == 0 else f"ارتقای {item['name']} به سطح {lv + 1}"
-    build_s = int(levels[lv].get("time") or 0)
-    if build_s > 0:
-        # ساخت زمان‌دار: هزینه همین حالا کسر می‌شود و سطح بعد از پایان زمان اعمال می‌شود.
-        now = utcnow()
-        p["money"] -= cost
-        for k, a in res_cost.items(): p["resources"][k] -= a
-        p.setdefault("build_queue", []).append({
-            "id": str(uuid.uuid4()), "kind": "infra", "item_id": item_id, "level": lv + 1, "label": label,
-            "start": now.isoformat(), "end": (now + timedelta(seconds=build_s)).isoformat()})
-        save_state()
-        return web.json_response({"success": True, "queued": True, "ready_in": build_s, "player": serialize_player(p)})
-    p["money"] -= cost
-    for k, a in res_cost.items(): p["resources"][k] -= a
-    p["infra_levels"][item_id] = lv + 1
+    build_s = start_home_job(p, "infra", item_id, item, lv, cost, res_cost, levels)
     save_state()
-    return web.json_response({"success": True, "completion_message": done_message(label),
-                              "player": serialize_player(p)})
+    return web.json_response({"success": True, "queued": True, "ready_in": build_s, "player": serialize_player(p)})
 
 async def upgrade_economy(request):
     uid = get_auth_user_id(request)
@@ -2094,22 +2261,24 @@ async def upgrade_economy(request):
     p = players[uid]
     if not p.get("country") or p.get("is_eliminated"):
         return web.json_response({"success": False, "error": "invalid_state"}, status=400)
-    accrue_player(p)
+    accrue_player(p); ensure_player_fields(p)
+    busy = home_active_job(p)
+    if busy:
+        return home_busy_response(busy)
     item = ECONOMY[item_id]; lv = get_infra_level(p, item_id); levels = item["levels"]
     if lv >= len(levels):
         return web.json_response({"success": False, "error": "max_level"}, status=400)
     cost = levels[lv]["cost"]
     if p.get("money", 0) < cost:
-        return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
+        return web.json_response({"success": False, "error": "not_enough_money",
+                                  "message": "پول کافی ندارید."}, status=400)
     req_power = item["power_required"]
     if get_power_total(p) < get_power_used(p) + req_power:
         return web.json_response({"success": False, "error": "not_enough_power",
                                   "message": "برق کافی ندارید. ابتدا نیروگاه بسازید."}, status=400)
-    p["money"] -= cost; p["infra_levels"][item_id] = lv + 1
+    build_s = start_home_job(p, "economy", item_id, item, lv, cost, {}, levels)
     save_state()
-    label = f"ساخت {item['name']}" if lv == 0 else f"ارتقای {item['name']} به سطح {lv + 1}"
-    return web.json_response({"success": True, "completion_message": done_message(label),
-                              "player": serialize_player(p)})
+    return web.json_response({"success": True, "queued": True, "ready_in": build_s, "player": serialize_player(p)})
 
 async def train_unit(request):
     uid = get_auth_user_id(request)
@@ -2118,6 +2287,7 @@ async def train_unit(request):
     try: count = int(data.get("count", 1))
     except: count = 1
     count = max(1, min(count, 100000))
+    request_id = str(data.get("request_id") or "")[:64]
     if unit_id not in ARMY_UNITS:
         return web.json_response({"success": False, "error": "invalid_unit"}, status=400)
     if uid not in players: players[uid] = create_player(uid)
@@ -2125,6 +2295,9 @@ async def train_unit(request):
     if not p.get("country") or p.get("is_eliminated"):
         return web.json_response({"success": False, "error": "invalid_state"}, status=400)
     ensure_player_fields(p); accrue_player(p)
+    # ارسال دوبارهٔ همان درخواست (دوبار کلیک، تلاش مجدد شبکه) نباید دوباره هزینه کسر کند یا سفارش ثبت کند.
+    if request_id and request_id in p["factory_request_ids"]:
+        return web.json_response({"success": True, "duplicate": True, "queued": True, "player": serialize_player(p)})
     unit = ARMY_UNITS[unit_id]; group = unit["group"]
     ml = unit.get("min_level", {}); missing = []
     for r in unit["requires"]:
@@ -2134,10 +2307,13 @@ async def train_unit(request):
     if missing:
         return web.json_response({"success": False, "error": "no_infra",
                                   "message": "ابتدا بسازید: " + "، ".join(f"«{m}»" for m in missing)}, status=400)
-    cap = get_group_capacity(p, group); used = get_group_units(p, group)
-    # یگان‌های در صف ساخت هم از ظرفیت رزرو می‌شوند
-    used += sum(max(0, int(j.get("count", 0) or 0)) for j in p.get("build_queue", [])
-                if j.get("kind") == "train" and ARMY_UNITS.get(j.get("unit_id"), {}).get("group") == group)
+    queue = factory_queues(p)[group]; limit = FACTORY_QUEUE_LIMITS[group]
+    if len(queue) >= limit:
+        return web.json_response({"success": False, "error": "queue_full",
+                                  "message": f"صف کارخانهٔ {FACTORY_GROUP_NAMES[group]} پر است (حداکثر {limit} سفارش). "
+                                             "تا تکمیل یکی از سفارش‌ها صبر کنید."}, status=400)
+    cap = get_group_capacity(p, group)
+    used = get_group_units(p, group) + queued_units_in_group(p, group)   # واحدهای داخل صف از ظرفیت رزرو می‌شوند
     store = {"land": "پادگان", "naval": "بندر", "air": "فرودگاه", "missile": "انبار موشک"}.get(group, "")
     if cap <= 0:
         return web.json_response({"success": False, "error": "no_storage",
@@ -2148,32 +2324,34 @@ async def train_unit(request):
     count = min(count, cap - used)
     total_cost = unit["cost"] * count; total_mp = unit["manpower"] * count
     if p.get("money", 0) < total_cost:
-        return web.json_response({"success": False, "error": "not_enough_money"}, status=400)
+        return web.json_response({"success": False, "error": "not_enough_money",
+                                  "message": "پول کافی ندارید."}, status=400)
     if p.get("manpower", 0) < total_mp:
-        return web.json_response({"success": False, "error": "not_enough_manpower"}, status=400)
+        return web.json_response({"success": False, "error": "not_enough_manpower",
+                                  "message": "نیروی انسانی کافی ندارید."}, status=400)
     for k, a in unit["resources"].items():
         if p["resources"].get(k, 0) < a * count:
             return web.json_response({"success": False, "error": "not_enough_resource",
                                       "message": f"{RESOURCE_NAMES[k]} کافی ندارید."}, status=400)
     p["money"] -= total_cost; p["manpower"] -= total_mp
     for k, a in unit["resources"].items(): p["resources"][k] -= a * count
-    build_s = int(unit.get("build_seconds") or 0)
-    if build_s > 0:
-        # یگان زمان‌دار: هزینه همین حالا کسر می‌شود، یگان بعد از پایان زمان به موجودی اضافه می‌شود.
-        now = utcnow()
-        p.setdefault("build_queue", []).append({
-            "id": str(uuid.uuid4()), "kind": "train", "unit_id": unit_id, "count": count,
-            "label": f"ساخت {count:,} {unit['name']}",
-            "start": now.isoformat(), "end": (now + timedelta(seconds=build_s)).isoformat()})
-        save_state()
-        return web.json_response({"success": True, "queued": True, "ready_in": build_s, "player": serialize_player(p)})
-    p["units"][unit_id] = p["units"].get(unit_id, 0) + count
-    recompute_army(p); save_state()
-    return web.json_response({"success": True, "completion_message": done_message(f"ساخت {count:,} {unit['name']}"),
-                              "player": serialize_player(p)})
+    now = utcnow(); unit_s = int(unit.get("build_seconds") or 0) or 60
+    queue.append({
+        "id": str(uuid.uuid4()), "kind": "train", "group": group, "unit_id": unit_id,
+        "count": count, "delivered": 0, "unit_seconds": unit_s,
+        # اگر صف خالی است همین حالا شروع می‌شود؛ وگرنه سفارش منتظر می‌ماند تا قبلی تمام شود.
+        "start": now.isoformat() if not queue else None, "queued_at": now.isoformat(),
+        "label": f"تولید {count:,} {unit['name']}"})
+    if request_id:
+        p["factory_request_ids"].append(request_id)
+        del p["factory_request_ids"][:-FACTORY_REQUEST_ID_KEEP]
+    save_state()
+    return web.json_response({"success": True, "queued": True, "ready_in": unit_s * count,
+                              "unit_seconds": unit_s, "player": serialize_player(p)})
 
 async def get_army_units(request):
-    return web.json_response({"units": ARMY_UNITS, "resources": RESOURCE_NAMES, "groups": GROUP_NAMES})
+    return web.json_response({"units": ARMY_UNITS, "resources": RESOURCE_NAMES, "groups": GROUP_NAMES,
+                              "queue_limits": FACTORY_QUEUE_LIMITS, "queue_names": FACTORY_GROUP_NAMES})
 
 # =========================================================
 # API Diplomacy
@@ -5748,12 +5926,134 @@ async def _run_ticks_for_all_worlds():
                         # دقیقاً در لحظهٔ پایان زمان، حتی اگر بازیکن آفلاین باشد، اعلان ثبت می‌شود.
                         if _pl.get("country") and not _pl.get("is_eliminated"): process_deliveries(_pl)
                         process_build_queue(_pl)
+                        process_factory_queues(_pl)
                 except Exception as exc:
                     logging.error("world tick (%s): %s", wid, exc)
                 finally:
                     _persist_active_world_memory()
             _activate_world(previous if previous in worlds_registry else "1")
             save_state()
+
+
+# =========================================================
+# پایان فعالیت‌های خانه + ارسال پیام تلگرام به بازیکن (حتی وقتی بازی/ربات بسته است)
+# =========================================================
+ACTIVITY_LOOP_SECONDS = 2
+_TG_PERMANENT_ERRORS = {"TelegramForbiddenError", "TelegramBadRequest", "TelegramUnauthorizedError", "TelegramNotFound"}
+
+def _players_of_world(wid):
+    if str(wid) == str(active_world_id):
+        return players
+    return (world_states.get(str(wid)) or {}).get("players") or {}
+
+def _world_has_due_activity(wid, now):
+    for pl in _players_of_world(wid).values():
+        if not isinstance(pl, dict): continue
+        for job in pl.get("build_queue") or []:
+            end = parse_dt(job.get("end")) if isinstance(job, dict) else None
+            if end and end <= now: return True
+    return False
+
+def _tg_entry_ready(entry, now):
+    nxt = parse_dt(entry.get("next_try")) if isinstance(entry, dict) else None
+    return not (nxt and nxt > now)
+
+def _activity_work_due(now):
+    for wid in list(worlds_registry.keys()):
+        if _world_has_due_activity(wid, now): return True
+        for pl in _players_of_world(wid).values():
+            if isinstance(pl, dict) and any(_tg_entry_ready(e, now) for e in (pl.get("tg_outbox") or [])):
+                return True
+    return False
+
+def _collect_tg_pending(now):
+    pending = []
+    for wid in sorted(worlds_registry.keys(), key=lambda x: int(x)):
+        for uid_, pl in _players_of_world(wid).items():
+            if not isinstance(pl, dict): continue
+            for e in pl.get("tg_outbox") or []:
+                if isinstance(e, dict) and e.get("id") and _tg_entry_ready(e, now):
+                    pending.append((str(wid), uid_, e["id"], e.get("text") or ""))
+    return pending
+
+async def _send_tg_pending(pending):
+    """ارسال واقعی؛ خارج از WORLD_SWITCH_LOCK. خروجی: [(wid, uid, entry_id, ok, permanent, retry_after)]."""
+    results = []
+    for wid, uid_, eid, text in pending:
+        ok = permanent = False; retry_after = None
+        try:
+            await bot.send_message(chat_id=uid_, text=text)
+            ok = True
+        except Exception as exc:
+            name = type(exc).__name__
+            permanent = name in _TG_PERMANENT_ERRORS
+            retry_after = getattr(exc, "retry_after", None)
+            logging.warning("activity telegram notice failed for %s (%s): %s", uid_, name, exc)
+        results.append((wid, uid_, eid, ok, permanent, retry_after))
+        await asyncio.sleep(0.05)
+    return results
+
+def _apply_tg_results(results):
+    """نتیجهٔ ارسال را در پروندهٔ بازیکن ثبت می‌کند (زیر قفل). ارسال موفق ⇒ حذف از صف و ثبت در tg_done."""
+    changed = False; now = utcnow()
+    for wid, uid_, eid, ok, permanent, retry_after in results:
+        pl = _players_of_world(wid).get(uid_)
+        if not isinstance(pl, dict): continue
+        box = pl.setdefault("tg_outbox", [])
+        entry = next((e for e in box if isinstance(e, dict) and e.get("id") == eid), None)
+        if entry is None: continue
+        if ok or permanent or int(entry.get("attempts", 0)) + 1 >= TG_OUTBOX_MAX_ATTEMPTS:
+            box.remove(entry)
+            done = pl.setdefault("tg_done", []); done.append(eid)
+            del done[:-TG_DONE_KEEP]
+        else:
+            attempts = int(entry.get("attempts", 0)) + 1
+            delay = float(retry_after) if retry_after else min(300, 5 * (2 ** attempts))
+            entry["attempts"] = attempts
+            entry["next_try"] = (now + timedelta(seconds=delay)).isoformat()
+        changed = True
+    return changed
+
+async def _run_activity_tick():
+    """تیک سریع (هر چند ثانیه): پایان فعالیت‌های خانه را در لحظهٔ پایان ثبت و پیام تلگرام آن را یک‌بار می‌فرستد.
+    اگر کاری سررسید نشده باشد، قفل گرفته نمی‌شود."""
+    now = utcnow()
+    if not _activity_work_due(now):
+        return
+    pending = []
+    async with WORLD_SWITCH_LOCK:
+        previous = str(active_world_id)
+        _persist_active_world_memory()
+        changed = False
+        try:
+            for wid in sorted(worlds_registry.keys(), key=lambda x: int(x)):
+                if not _world_has_due_activity(wid, now): continue
+                _activate_world(wid)
+                try:
+                    for _pl in list(players.values()):
+                        if not isinstance(_pl, dict): continue
+                        if process_build_queue(_pl): changed = True
+                except Exception as exc:
+                    logging.error("activity tick (%s): %s", wid, exc)
+                finally:
+                    _persist_active_world_memory()
+        finally:
+            _activate_world(previous if previous in worlds_registry else "1")
+        pending = _collect_tg_pending(utcnow())
+        if changed: save_state()      # ثبت پایان فعالیت پیش از ارسال پیام؛ با ریستارت دوباره ثبت نمی‌شود
+    if not pending:
+        return
+    results = await _send_tg_pending(pending)
+    async with WORLD_SWITCH_LOCK:
+        _persist_active_world_memory()
+        if _apply_tg_results(results):
+            save_state()              # اعلان ارسال‌شده بلافاصله ذخیره می‌شود تا با ریستارت تکرار نشود
+
+async def activity_loop():
+    while True:
+        await asyncio.sleep(ACTIVITY_LOOP_SECONDS)
+        try: await _run_activity_tick()
+        except Exception as e: logging.error("activity loop: %s", e)
 
 
 def _worlds_with_transits():
@@ -5802,6 +6102,7 @@ async def main():
     asyncio.create_task(autosave_loop())
     asyncio.create_task(war_tick_loop())
     asyncio.create_task(transit_loop())
+    asyncio.create_task(activity_loop())
     await start_web_server()
     await bot.delete_webhook(drop_pending_updates=True)
     try:
