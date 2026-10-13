@@ -104,7 +104,7 @@ def L(**kw):
 
 INFRASTRUCTURE = {
     # ==================== برق ====================
-    # با هر ارتقا برق تولیدی، قیمت و زمان ساخت هر سه بیشتر می‌شوند (time = ثانیه؛ سطح ۱: زغال ۲۲، بادی ۳۲، خورشیدی ۴۱، هسته‌ای ۸۱ دقیقه).
+    # با هر ارتقا قیمت و زمان ساخت بیشتر می‌شوند؛ زمان نهایی همهٔ سطح‌ها در _apply_auto_times (۲۰ دقیقه تا ۲ ساعت) تنظیم می‌شود.
     "power_coal": {
         "name": "نیروگاه زغال‌سنگ", "group": "power", "icon": "⚡",
         "desc": "ارزان و در دسترس، اما برق کمی تولید می‌کند. هر ارتقا برق بیشتری می‌دهد ولی گران‌تر و زمان‌برتر است.",
@@ -376,24 +376,28 @@ ECONOMY = {
 # =========================================================
 # زمان‌بندی فعالیت‌ها
 # =========================================================
-# فعالیت‌های خانه (ساخت، ارتقا، سرمایه‌گذاری): هر سطحی که زمان صریح ندارد، زمانش از هزینه‌اش
-# محاسبه می‌شود: دقیقه = ۸ + ۱۸ × (هزینه به میلیون)^۰٫۷، با کف ۵ و سقف ۲۴۰ دقیقه.
-# نمونه: ۰٫۲۵ میلیون ≈ ۱۴ دقیقه، ۱ میلیون ≈ ۲۶، ۳ میلیون ≈ ۴۷، ۷٫۵ میلیون ≈ ۸۲، ۳۲ میلیون ≈ ۲۰۴ دقیقه.
-HOME_TIME_BASE_MIN = 8
-HOME_TIME_PER_MIN = 18
-HOME_TIME_EXP = 0.7
-HOME_TIME_MIN_SEC = 5 * 60
-HOME_TIME_MAX_SEC = 240 * 60
+# فعالیت‌های خانه (ساخت، ارتقا، سرمایه‌گذاری): زمان هر سطح از هزینه‌اش محاسبه می‌شود (مقیاس لگاریتمی)؛
+# ارزان‌ترین سطح ≈ ۲۰ دقیقه و گران‌ترین سطح ≈ ۲ ساعت. چون هزینه با هر سطح بالاتر می‌رود، زمان هم بیشتر می‌شود.
+HOME_TIME_MIN_SEC = 20 * 60
+HOME_TIME_MAX_SEC = 120 * 60
+HOME_TIME_COST_LOW = 180_000
+HOME_TIME_COST_HIGH = 36_840_000
+HOME_TIME_STEP_SEC = 60
 
 def auto_home_seconds(cost):
-    minutes = HOME_TIME_BASE_MIN + HOME_TIME_PER_MIN * ((max(0, cost) / 1_000_000.0) ** HOME_TIME_EXP)
-    return int(max(HOME_TIME_MIN_SEC, min(HOME_TIME_MAX_SEC, round(minutes) * 60)))
+    c = min(max(float(cost or 0), HOME_TIME_COST_LOW), HOME_TIME_COST_HIGH)
+    f = (math.log(c) - math.log(HOME_TIME_COST_LOW)) / (math.log(HOME_TIME_COST_HIGH) - math.log(HOME_TIME_COST_LOW))
+    sec = HOME_TIME_MIN_SEC + f * (HOME_TIME_MAX_SEC - HOME_TIME_MIN_SEC)
+    sec = int(round(sec / HOME_TIME_STEP_SEC) * HOME_TIME_STEP_SEC)
+    return max(HOME_TIME_MIN_SEC, min(HOME_TIME_MAX_SEC, sec))
 
 def _apply_auto_times(catalog):
     for item in catalog.values():
+        prev = 0
         for lv in item["levels"]:
-            if not lv.get("time"):
-                lv["time"] = auto_home_seconds(lv.get("cost", 0))
+            t = auto_home_seconds(lv.get("cost", 0))
+            if t <= prev: t = min(HOME_TIME_MAX_SEC, prev + HOME_TIME_STEP_SEC)   # با بالا رفتن سطح زمان کمتر نشود
+            lv["time"] = t; prev = t
 
 _apply_auto_times(INFRASTRUCTURE)
 _apply_auto_times(ECONOMY)
@@ -407,49 +411,49 @@ TG_DONE_KEEP = 100
 
 ARMY_UNITS = {
     "infantry": {"name": "پیاده‌نظام", "group": "land", "requires": ["land_barracks", "land_hq"],
-        "cost": 50_000, "manpower": 300, "resources": {"food": 100}, "daily": {"food": 2},
+        "cost": 50_000, "manpower": 1500, "resources": {"food": 100}, "daily": {"food": 2},
         "attack": 20, "defense": 10},
     "tank": {"name": "تانک", "group": "land", "requires": ["land_barracks", "land_hq", "land_tank_factory"],
-        "cost": 150_000, "manpower": 250, "resources": {"steel": 300, "food": 150}, "daily": {"food": 3, "oil": 4, "steel": 1},
+        "cost": 150_000, "manpower": 4000, "resources": {"steel": 300, "food": 150}, "daily": {"food": 3, "oil": 4, "steel": 1},
         "attack": 50, "defense": 25},
     "ship": {"name": "ناو دریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 250_000, "manpower": 200, "resources": {"oil": 250, "food": 150}, "daily": {"food": 4, "oil": 10, "steel": 1},
+        "cost": 250_000, "manpower": 12000, "resources": {"oil": 250, "food": 150}, "daily": {"food": 4, "oil": 10, "steel": 1},
         "attack": 50, "defense": 60},
     "submarine": {"name": "زیردریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 200_000, "manpower": 120, "resources": {"oil": 200, "steel": 150}, "daily": {"food": 2, "oil": 8, "steel": 1},
+        "cost": 200_000, "manpower": 8000, "resources": {"oil": 200, "steel": 150}, "daily": {"food": 2, "oil": 8, "steel": 1},
         "attack": 45, "defense": 25},
     "transport_ship": {"name": "ناو ترابری", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 180_000, "manpower": 150, "resources": {"oil": 150, "steel": 200}, "daily": {"food": 2, "oil": 5, "steel": 1},
+        "cost": 180_000, "manpower": 6000, "resources": {"oil": 150, "steel": 200}, "daily": {"food": 2, "oil": 5, "steel": 1},
         "attack": 5, "defense": 40, "transport_capacity": 500},
     "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 800_000, "manpower": 500, "resources": {"oil": 800, "steel": 1200}, "daily": {"food": 8, "oil": 30, "steel": 2},
+        "cost": 800_000, "manpower": 40000, "resources": {"oil": 800, "steel": 1200}, "daily": {"food": 8, "oil": 30, "steel": 2},
         "attack": 25, "defense": 90, "aircraft_capacity": 40},
     "fighter": {"name": "جنگنده", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 200_000, "manpower": 150, "resources": {"oil": 200, "steel": 100}, "daily": {"food": 1, "oil": 5},
+        "cost": 200_000, "manpower": 5000, "resources": {"oil": 200, "steel": 100}, "daily": {"food": 1, "oil": 5},
         "attack": 45, "defense": 40},
     "bomber": {"name": "بمب‌افکن", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 250_000, "manpower": 180, "resources": {"oil": 300, "steel": 150}, "daily": {"food": 2, "oil": 8},
+        "cost": 250_000, "manpower": 6000, "resources": {"oil": 300, "steel": 150}, "daily": {"food": 2, "oil": 8},
         "attack": 60, "defense": 15},
     "helicopter": {"name": "بالگرد", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 120_000, "manpower": 100, "resources": {"oil": 120, "steel": 60}, "daily": {"food": 1, "oil": 3},
+        "cost": 120_000, "manpower": 3000, "resources": {"oil": 120, "steel": 60}, "daily": {"food": 1, "oil": 3},
         "attack": 30, "defense": 35},
     "air_tanker": {"name": "هواپیمای سوخت‌رسان", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 220_000, "manpower": 120, "resources": {"oil": 250, "steel": 120}, "daily": {"food": 1, "oil": 8},
+        "cost": 220_000, "manpower": 4000, "resources": {"oil": 250, "steel": 120}, "daily": {"food": 1, "oil": 8},
         "attack": 2, "defense": 20, "refuel_capacity": 20},
     # یگان‌ها و موشک‌ها: علاوه بر هزینهٔ ساخت، منابع روزانهٔ نگهداری دارند
     "cruise_missile": {"name": "موشک کروز", "group": "missile", "requires": ["missile_depot", "missile_factory"],
         "min_level": {"missile_factory": 1},
-        "cost": 400_000, "manpower": 100, "resources": {"steel": 300, "oil": 200, "food": 50},
+        "cost": 400_000, "manpower": 3000, "resources": {"steel": 300, "oil": 200, "food": 50},
         "daily": {"food": 2, "oil": 5, "steel": 3},
         "attack": 70, "defense": 5},
     "ballistic_missile": {"name": "موشک بالستیک", "group": "missile", "requires": ["missile_depot", "missile_factory"],
         "min_level": {"missile_factory": 3},
-        "cost": 900_000, "manpower": 150, "resources": {"steel": 600, "oil": 400, "food": 100},
+        "cost": 900_000, "manpower": 8000, "resources": {"steel": 600, "oil": 400, "food": 100},
         "daily": {"food": 3, "oil": 10, "steel": 6},
         "attack": 120, "defense": 10},
     "icbm": {"name": "موشک قاره‌پیما", "group": "missile", "requires": ["missile_depot", "missile_factory"],
         "min_level": {"missile_factory": 5},
-        "cost": 2_500_000, "manpower": 300, "resources": {"steel": 1200, "oil": 900, "food": 200},
+        "cost": 2_500_000, "manpower": 20000, "resources": {"steel": 1200, "oil": 900, "food": 200},
         "daily": {"food": 5, "oil": 20, "steel": 12},
         "attack": 250, "defense": 20},
 }
