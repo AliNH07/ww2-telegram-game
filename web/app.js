@@ -597,7 +597,7 @@ async function refreshHeaderRank() {
     } catch (e) {}
 }
 
-document.getElementById("header-rank-button")?.addEventListener("click", () => {
+document.querySelector(".header-flag-box")?.addEventListener("click", () => {   // پرچم و نشان رتبه هر دو به رتبه‌بندی می‌روند
     showGamePage("ranking");
     loadRankings();
 });
@@ -1551,28 +1551,71 @@ function renderEconomyList() {
     }
     entries.forEach(([iid, item]) => {
         const card = document.createElement("article");
-        card.className = "eco-investment-card";
+        card.className = "eco-investment-card eco-compact";
         const built = item.level > 0;
         const next = item.next;
-        const currentIncome = Number(item.current?.income || 0);
-        const nextIncome = Number(next?.income || 0);
-        const incomeGain = nextIncome - currentIncome;
         const maxPips = Array.from({length:item.max_level || 0}, (_,i) => `<i class="${i < item.level ? "on" : ""}"></i>`).join("");
-        const statusText = !built ? "آمادهٔ سرمایه‌گذاری" : `سطح ${item.level} از ${item.max_level}`;
         const cannotAfford = !!next && Number(player.money || 0) < Number(next.cost || 0);
-        const homeBusy = !!next && !!homeActiveJob();
-        const buttonText = !next ? "حداکثر سطح" : (homeBusy ? "⏳ صف خانه مشغول است" : cannotAfford ? "پول کافی نیست" : (built ? `ارتقای سرمایه‌گذاری · ${formatMoney(next.cost)}` : `سرمایه‌گذاری · ${formatMoney(next.cost)}`));
+        // بیرون فقط نام، سطح و قیمت؛ اطلاعات کامل داخل باکسی که با کلیک باز می‌شود.
         card.innerHTML = `
-            <div class="eco-card-top"><span class="eco-card-icon">${item.icon || "💼"}</span><div class="eco-card-title"><h3>${escapeHtml(item.name || "سرمایه‌گذاری")}</h3><small>${statusText}</small></div><span class="eco-card-level">${built ? `${item.level}/${item.max_level}` : "جدید"}</span></div>
-            <p class="eco-card-desc">${escapeHtml(item.desc || "")}</p>
+            <div class="eco-card-top"><span class="eco-card-icon">${item.icon || "💼"}</span><div class="eco-card-title"><h3>${escapeHtml(item.name || "سرمایه‌گذاری")}</h3><small>${built ? `سطح ${item.level} از ${item.max_level}` : "جدید"}</small></div></div>
             <div class="eco-level-pips">${maxPips}</div>
-            <div class="eco-income-panel"><small>درآمد روزانهٔ ${built ? "فعلی" : "سطح ۱"}</small><strong>${formatMoney(built ? currentIncome : Number(next?.income || 0))}</strong>${built && next ? `<span>پس از ارتقا: ${formatMoney(nextIncome)} <i>(${incomeGain >= 0 ? "+" : "−"}${formatMoney(Math.abs(incomeGain))})</i></span>` : !built ? `<span>قابل ارتقا تا ${item.max_level} سطح</span>` : `<span>بالاترین سطح</span>`}</div>
-            <div class="eco-card-facts"><span>⚡ برق لازم <b>${formatNumber(item.power_required || 0)}</b></span><span>🪙 هزینه <b>${next ? formatMoney(next.cost) : "—"}</b></span><span>⏱ زمان <b>${next ? fmtDurationFa(next.time) : "—"}</b></span></div>
-            <button class="eco-invest-button ${cannotAfford && !homeBusy ? "action-denied" : ""}" ${!next || cannotAfford || homeBusy ? "disabled" : ""} ${cannotAfford ? `title="پول لازم: ${formatMoney(next.cost)} · موجودی شما: ${formatMoney(player.money || 0)}"` : ""}>${buttonText}${cannotAfford ? `<span class="action-error-inline">کمبود ${formatMoney(next.cost - Number(player.money || 0))}</span>` : ""}</button>`;
-        const btn = card.querySelector(".eco-invest-button");
-        if (next && !cannotAfford && !homeBusy) btn.addEventListener("click", () => upgradeEconomy(iid));
+            <div class="eco-price ${cannotAfford ? "is-short" : ""}">${next ? `🪙 ${formatMoney(next.cost)}` : "حداکثر سطح"}</div>`;
+        card.addEventListener("click", () => openEconomySheet(iid));
         c.appendChild(card);
     });
+}
+
+function openEconomySheet(iid) {
+    const item = player?.economy?.[iid];
+    if (!item) return;
+    closeInfraSheet();
+    const built = item.level > 0, next = item.next;
+    const curInc = Number(item.current?.income || 0), nextInc = Number(next?.income || 0);
+    const busyJob = homeActiveJob();
+    const cost = Number(next?.cost || 0);
+    const moneyOk = !next || Number(player.money || 0) >= cost;
+    const powerOk = !next || !item.power_required || freePower() >= item.power_required;
+    const rows = [];
+    if (busyJob) rows.push(`<div class="is-row is-bad"><span>⏳ فعالیت در حال انجام</span><b>${escapeHtml(busyJob.label || "فعالیت")} <small>(${fmtCountdown(Date.parse(busyJob.end) - serverNowMs())} مانده)</small></b></div>`);
+    rows.push(`<div class="is-row"><span>💵 درآمد روزانه</span><b>${next ? (built ? `از ${formatMoney(curInc)} به ${formatMoney(nextInc)}` : formatMoney(nextInc)) : formatMoney(curInc)}</b></div>`);
+    if (next && built) rows.push(`<div class="is-row"><span>📈 افزایش درآمد</span><b>+${formatMoney(nextInc - curInc)} / روز</b></div>`);
+    if (next) rows.push(`<div class="is-row"><span>⏱️ زمان ساخت</span><b>${fmtDurationFa(next.time)}</b></div>`);
+    rows.push(`<div class="is-row ${powerOk ? "" : "is-bad"}"><span>⚡ برق لازم</span><b>${formatNumber(item.power_required || 0)} واحد <small>(برق آزاد: ${formatNumber(freePower())})</small></b></div>`);
+    rows.push(`<div class="is-row"><span>📊 سطح</span><b>${built ? `${item.level} از ${item.max_level}` : `۰ از ${item.max_level}`}</b></div>`);
+    if (next && cost > 0 && nextInc > 0) {
+        const days = cost / (nextInc - (built ? curInc : 0) || nextInc);
+        rows.push(`<div class="is-row"><span>♻️ بازگشت سرمایه</span><b>حدود ${formatNumber(Math.max(1, Math.ceil(days)))} روز</b></div>`);
+    }
+    let okLabel = !next ? "حداکثر سطح" : built ? "ارتقا" : "سرمایه‌گذاری";
+    if (next) { if (busyJob) okLabel = "صف خانه مشغول است"; else if (!moneyOk) okLabel = "پول کافی نیست"; else if (!powerOk) okLabel = "برق کافی نیست"; }
+    const canGo = !!next && moneyOk && powerOk && !busyJob;
+    const ov = document.createElement("div");
+    ov.id = "infra-sheet"; ov.className = "modal-overlay";
+    ov.innerHTML = `
+        <div class="ic-sheet">
+            <div class="is-head">
+                <div class="ic-hex"><span>${item.icon || "💼"}</span></div>
+                <div class="is-titles"><div class="is-name">${escapeHtml(item.name || "")}</div><div class="is-sub">${built ? `ارتقا از سطح ${item.level} به ${item.level + 1}` : "سرمایه‌گذاری جدید · سطح ۱"}</div></div>
+                <button class="is-close" aria-label="بستن">✕</button>
+            </div>
+            <p class="is-desc">${escapeHtml(item.desc || "")}</p>
+            <div class="is-rows">${rows.join("")}</div>
+            ${next ? `<div class="is-price ${moneyOk ? "" : "is-bad"}"><span>قیمت</span><b>${formatMoney(cost)}</b></div>` : ""}
+            ${next && !moneyOk ? `<div class="is-lack">${formatMoney(cost - Number(player.money || 0))} کم دارید</div>` : ""}
+            <div class="modal-actions"><button class="modal-cancel">انصراف</button><button class="modal-ok" ${canGo ? "" : "disabled"}>${okLabel}</button></div>
+        </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener("click", e => { if (e.target === ov) closeInfraSheet(); });
+    ov.querySelector(".is-close").onclick = closeInfraSheet;
+    ov.querySelector(".modal-cancel").onclick = closeInfraSheet;
+    const okBtn = ov.querySelector(".modal-ok");
+    okBtn.onclick = async () => {
+        if (okBtn.disabled) return;
+        okBtn.disabled = true;
+        closeInfraSheet();
+        await upgradeEconomy(iid);
+    };
 }
 async function upgradeEconomy(iid) {
     if (!userId) return;
