@@ -1,4 +1,4 @@
-import os, json, hmac, hashlib, uuid, logging, asyncio, random, math, copy, time, contextlib, contextvars
+import threading, os, json, hmac, hashlib, uuid, logging, asyncio, random, math, copy, time, contextlib, contextvars
 from datetime import datetime, timezone, timedelta
 from urllib.parse import parse_qsl
 
@@ -1421,6 +1421,88 @@ def _activate_world(world_id):
     return True
 
 
+
+# ---------------- ذخیرهٔ پایدار در دیتابیس رایگان (برای Render رایگان که دیسک ندارد) ----------------
+# اگر متغیر محیطی DATABASE_URL (مثلاً از Neon یا Supabase) تنظیم شده باشد، نسخهٔ کامل state در Postgres هم ذخیره می‌شود
+# و موقع شروع از همان‌جا خوانده می‌شود. اگر تنظیم نباشد رفتار قبلی (فقط فایل محلی) بدون تغییر می‌ماند.
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+_DB_STATE = {"pending": None, "thread": None}
+_DB_LOCK = threading.Lock()
+_DB_WAKE = threading.Event()
+
+def _db_connect():
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL, connect_timeout=10)
+    with conn.cursor() as cur:
+        cur.execute("CREATE TABLE IF NOT EXISTS game_state (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT now())")
+    conn.commit()
+    return conn
+
+def _db_load_state_text():
+    if not DATABASE_URL: return None
+    try:
+        conn = _db_connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT value FROM game_state WHERE key = 'main'")
+                row = cur.fetchone()
+            return row[0] if row else None
+        finally:
+            conn.close()
+    except Exception as e:
+        logging.error("DB load failed: %s", e)
+        return None
+
+def _db_worker():
+    while True:
+        _DB_WAKE.wait(); _DB_WAKE.clear()
+        time.sleep(2)  # چند ذخیرهٔ پشت‌سرهم یکی می‌شوند
+        with _DB_LOCK:
+            text = _DB_STATE["pending"]; _DB_STATE["pending"] = None
+        if text is None: continue
+        try:
+            conn = _db_connect()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("INSERT INTO game_state (key, value, updated_at) VALUES ('main', %s, now()) "
+                                "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()", (text,))
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as e:
+            logging.error("DB save failed: %s", e)
+            with _DB_LOCK:
+                if _DB_STATE["pending"] is None: _DB_STATE["pending"] = text
+            time.sleep(10); _DB_WAKE.set()
+
+def _db_queue_save(text):
+    if not DATABASE_URL: return
+    with _DB_LOCK:
+        _DB_STATE["pending"] = text
+        if _DB_STATE["thread"] is None:
+            t = threading.Thread(target=_db_worker, daemon=True); _DB_STATE["thread"] = t; t.start()
+    _DB_WAKE.set()
+
+def _db_flush():
+    """هنگام خاموش‌شدن، آخرین state را همین‌جا ذخیره می‌کند."""
+    with _DB_LOCK:
+        text = _DB_STATE["pending"]; _DB_STATE["pending"] = None
+    if not text or not DATABASE_URL: return
+    try:
+        conn = _db_connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO game_state (key, value, updated_at) VALUES ('main', %s, now()) "
+                            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()", (text,))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        logging.error("DB flush failed: %s", e)
+
+import atexit as _atexit
+_atexit.register(_db_flush)
+
 def save_state():
     try:
         _persist_active_world_memory()
@@ -1430,16 +1512,27 @@ def save_state():
             "worlds": worlds_registry,
             "world_states": {str(wid): payload for wid, payload in world_states.items()},
         }
+        text = json.dumps(state, ensure_ascii=False)
         tmp = STATE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(state, f, ensure_ascii=False)
+            f.write(text)
         os.replace(tmp, STATE_FILE)
+        _db_queue_save(text)
     except Exception as e:
         logging.error("save_state failed: %s", e)
 
 
 def load_state():
     global worlds_registry, world_states, active_world_id
+    db_text = _db_load_state_text()
+    if db_text:
+        try:
+            json.loads(db_text)
+            os.makedirs(DATA_DIR, exist_ok=True)
+            with open(STATE_FILE, "w", encoding="utf-8") as f: f.write(db_text)
+            logging.info("State restored from database.")
+        except Exception as e:
+            logging.error("DB state invalid, using local file: %s", e)
     if not os.path.exists(STATE_FILE):
         logging.info("No state, fresh start.")
         world_states = {"1": _fresh_world_state()}
