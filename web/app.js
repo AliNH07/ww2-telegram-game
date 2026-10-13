@@ -956,6 +956,138 @@ document.addEventListener("click", event => {
     showToast(player.game_finished ? "فصل پایان یافته؛ عملیات غیرفعال است." : "فصل هنوز آغاز نشده؛ فعلاً فقط مشاهده و پیام خصوصی مجاز است.", "error");
 }, true);
 
+/* =========================================================
+   Feedback: لرزش کوتاه + صدای عملیات اصلی (ساخت، سرمایه‌گذاری، ...)
+   -----------------------------------------------------------
+   ▸ فایل‌های صوتی را داخل پوشهٔ  web/sounds/  بگذار و فقط نام فایل را
+     در FX_ACTIONS زیر عوض کن. اگر برای عملیاتی  sound: ""  بگذاری، فقط لرزش دارد.
+   ▸ اگر فایلی وجود نداشته باشد، بازی بدون خطا ادامه می‌دهد (فقط لرزش اجرا می‌شود).
+   ▸ شدت لرزش: "light" | "medium" | "heavy"  (در تلگرام: HapticFeedback، در بقیه: navigator.vibrate)
+========================================================= */
+const FX_SOUND_BASE = "/sounds/";          // مسیر پایهٔ فایل‌های صوتی (اگر sound با / یا http شروع شود، همان مسیر کامل استفاده می‌شود)
+const FX_ACTIONS = {
+    build:        { sound: "build.mp3",        volume: 0.8, haptic: "medium" },  // ساخت / ارتقای زیرساخت
+    invest:       { sound: "invest.mp3",       volume: 0.8, haptic: "medium" },  // سرمایه‌گذاری اقتصادی
+    train:        { sound: "train.mp3",        volume: 0.8, haptic: "medium" },  // تولید یگان نظامی
+    deploy:       { sound: "deploy.mp3",       volume: 0.8, haptic: "heavy"  },  // اعزام نیرو
+    war:          { sound: "war.mp3",          volume: 0.8, haptic: "heavy"  },  // ارسال اعلان جنگ
+    market:       { sound: "market.mp3",       volume: 0.7, haptic: "light"  },  // بازار جهانی
+    loan:         { sound: "loan.mp3",         volume: 0.7, haptic: "light"  },  // وام
+    diplomacy:    { sound: "diplomacy.mp3",    volume: 0.7, haptic: "light"  },  // پیمان‌ها
+    announcement: { sound: "announcement.mp3", volume: 0.7, haptic: "light"  },  // انتشار بیانیه
+    satellite:    { sound: "satellite.mp3",    volume: 0.7, haptic: "medium" },  // ماهواره و اسکن
+    default:      { sound: "click.mp3",        volume: 0.6, haptic: "light"  },  // سایر عملیات
+};
+// هر دکمه با اولین انتخابگری که بخواند، به عملیات متناظر وصل می‌شود.
+const FX_TARGETS = [
+    ["#infra-sheet[data-fx='build'] .modal-ok",  "build"],
+    ["#infra-sheet[data-fx='invest'] .modal-ok", "invest"],
+    [".eco-invest-button",                       "invest"],
+    ["#tr-ok",                                   "train"],
+    ["#dp-go",                                   "deploy"],
+    ["#war-declare-submit, [data-war-reason-submit]", "war"],
+    ["#market-confirm-trade, #mk-submit",        "market"],
+    [".ln-btn[data-act='accept'], .ln-btn[data-act='repay'], #ln-submit", "loan"],
+    ["#diplomacy-propose-button, .diplomacy-item [data-accept]", "diplomacy"],
+    ["#ann-publish-confirm",                     "announcement"],
+    ["#sat-launch, .sat-scan",                   "satellite"],
+];
+const FX_MIN_GAP_MS = 350;                 // حداقل فاصله بین دو بازخورد برای یک عملیات (ضد کلیک‌های پیاپی)
+const FX_GLOBAL_GAP_MS = 120;              // حداقل فاصله بین هر دو بازخورد
+const FX_VIBRATE_MS = { light: 12, medium: 20, heavy: 32 };
+
+const Fx = (() => {
+    const STORE_KEY = "fl93_fx_settings";
+    const prefs = { sound: true, haptic: true };
+    try {
+        const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+        if (saved.sound === false) prefs.sound = false;
+        if (saved.haptic === false) prefs.haptic = false;
+    } catch (e) {}
+    const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(prefs)); } catch (e) {} };
+
+    const tgHaptic = () => {
+        try { return tg?.HapticFeedback && (!tg.isVersionAtLeast || tg.isVersionAtLeast("6.1")) ? tg.HapticFeedback : null; }
+        catch (e) { return null; }
+    };
+    const hapticSupported = () => !!tgHaptic() || typeof navigator.vibrate === "function";
+
+    const audios = new Map();
+    const failed = new Set();
+    const resolve = name => (/^(\/|https?:)/.test(name) ? name : FX_SOUND_BASE + name);
+
+    function playSound(name, volume) {
+        if (!name) return;
+        const src = resolve(name);
+        if (failed.has(src)) return;
+        try {
+            let a = audios.get(src);
+            if (!a) {
+                a = new Audio(src);
+                a.preload = "auto";
+                a.addEventListener("error", () => failed.add(src));   // فایل نبود؟ دیگر تلاش نکن
+                audios.set(src, a);
+            }
+            a.volume = Math.min(1, Math.max(0, volume ?? 0.7));
+            a.currentTime = 0;
+            const p = a.play();
+            if (p && typeof p.catch === "function") p.catch(() => {});   // محدودیت autoplay یا خطای پخش نباید بازی را خراب کند
+        } catch (e) {}
+    }
+
+    function vibrate(level) {
+        try {
+            const h = tgHaptic();
+            if (h) { h.impactOccurred(level || "light"); return; }
+        } catch (e) {}
+        try { if (typeof navigator.vibrate === "function") navigator.vibrate(FX_VIBRATE_MS[level] || FX_VIBRATE_MS.light); } catch (e) {}
+    }
+
+    const lastByKey = {};
+    let lastAny = 0;
+    function trigger(key) {
+        const cfg = FX_ACTIONS[key] || FX_ACTIONS.default;
+        if (!cfg) return;
+        const now = Date.now();
+        if (now - (lastByKey[key] || 0) < FX_MIN_GAP_MS || now - lastAny < FX_GLOBAL_GAP_MS) return;
+        lastByKey[key] = lastAny = now;
+        if (prefs.haptic && cfg.haptic) vibrate(cfg.haptic);
+        if (prefs.sound && cfg.sound) playSound(cfg.sound, cfg.volume);
+    }
+
+    function refreshMenu() {
+        const sBtn = document.getElementById("fx-toggle-sound"), hBtn = document.getElementById("fx-toggle-haptic");
+        const paint = (btn, on) => {
+            if (!btn) return;
+            const st = btn.querySelector(".fx-state");
+            if (st) { st.textContent = on ? "روشن" : "خاموش"; st.classList.toggle("off", !on); }
+            btn.setAttribute("aria-pressed", on ? "true" : "false");
+        };
+        paint(sBtn, prefs.sound);
+        paint(hBtn, prefs.haptic);
+        if (hBtn) hBtn.classList.toggle("hidden", !hapticSupported());   // دستگاه بدون لرزش: گزینه نمایش داده نمی‌شود
+    }
+
+    document.addEventListener("click", ev => {
+        const toggle = ev.target?.closest?.("#fx-toggle-sound, #fx-toggle-haptic");
+        if (toggle) {
+            const k = toggle.id === "fx-toggle-sound" ? "sound" : "haptic";
+            prefs[k] = !prefs[k]; save(); refreshMenu();
+            if (prefs[k]) { if (k === "haptic") vibrate("light"); else playSound(FX_ACTIONS.default.sound, FX_ACTIONS.default.volume); }
+            return;
+        }
+        if (!ev.isTrusted) return;
+        const el = ev.target?.closest?.("button, [role='button']");
+        if (!el || el.disabled) return;
+        for (const [sel, key] of FX_TARGETS) {
+            if (el.matches(sel)) { trigger(key); return; }
+        }
+    }, true);   // این شنونده بعد از قفل «فصل شروع نشده» ثبت می‌شود؛ پس عملیات مسدود‌شده صدا/لرزش نمی‌دهند
+
+    refreshMenu();
+    return { trigger, prefs, refreshMenu };
+})();
+
 const RK_TABS = [
     { id: "overall", key: "overall", label: "کلی", info: "<b>کلی</b> ترکیبِ چهار دستهٔ دیگر است. امتیازِ هر دسته نسبت به بهترین کشورِ همان دسته محاسبه می‌شود؛ بنابراین یک عددِ بسیار بزرگ در یک دسته، امتیازِ دسته‌های دیگر را محو نمی‌کند." },
     { id: "economy", key: "economy", label: "اقتصادی", info: "<b>اقتصادی</b> بر چه اساسیه: درآمدِ خالصِ روزانه‌ی کشور، بعد از کسرِ هزینه‌ی نگهداری — هر $1,000 یک امتیاز." },
@@ -1456,7 +1588,7 @@ function openInfraSheet(iid) {
     else if (!need.resOk) okLabel = "منابع کافی نیست";
 
     const ov = document.createElement("div");
-    ov.id = "infra-sheet";
+    ov.id = "infra-sheet"; ov.dataset.fx = "build";
     ov.className = "modal-overlay";
     ov.innerHTML = `
         <div class="ic-sheet">
@@ -1615,7 +1747,7 @@ function openEconomySheet(iid) {
     if (next) { if (busyJob) okLabel = "صف خانه مشغول است"; else if (!moneyOk) okLabel = "پول کافی نیست"; else if (!powerOk) okLabel = "برق کافی نیست"; }
     const canGo = !!next && moneyOk && powerOk && !busyJob;
     const ov = document.createElement("div");
-    ov.id = "infra-sheet"; ov.className = "modal-overlay";
+    ov.id = "infra-sheet"; ov.dataset.fx = "invest"; ov.className = "modal-overlay";
     ov.innerHTML = `
         <div class="ic-sheet">
             <div class="is-head">
