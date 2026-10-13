@@ -314,62 +314,107 @@ ECONOMY = {
     "eco_agriculture": {
         "name": "کشاورزی و دامداری", "group": "eco", "icon": "🌾",
         "desc": "سرمایه‌گذاری کم‌ریسک در تولید و صادرات محصولات غذایی.", "power_required": 2,
-        "levels": [L(cost=900_000, income=250_000), L(cost=1_500_000, income=400_000), L(cost=2_300_000, income=600_000), L(cost=3_300_000, income=850_000), L(cost=4_500_000, income=1_150_000)],
+        "levels": [L(cost=720_000, income=250_000), L(cost=1_200_000, income=400_000), L(cost=1_840_000, income=600_000), L(cost=2_640_000, income=850_000), L(cost=3_600_000, income=1_150_000)],
     },
     "eco_textile": {
         "name": "کارخانه نساجی", "group": "eco", "icon": "🧵",
         "desc": "تولید پوشاک و منسوجات برای بازار داخلی و صادرات.", "power_required": 3,
-        "levels": [L(cost=1_140_000, income=300_000), L(cost=1_820_000, income=480_000), L(cost=2_740_000, income=720_000), L(cost=3_800_000, income=1_000_000), L(cost=5_300_000, income=1_400_000)],
+        "levels": [L(cost=910_000, income=300_000), L(cost=1_460_000, income=480_000), L(cost=2_190_000, income=720_000), L(cost=3_040_000, income=1_000_000), L(cost=4_240_000, income=1_400_000)],
     },
     "eco_fishing": {
         "name": "شیلات و فرآوری غذا", "group": "eco", "icon": "🐟",
         "desc": "صادرات محصولات دریایی با سرمایه‌گذاری آغازین مناسب.", "power_required": 2,
-        "levels": [L(cost=1_050_000, income=275_000), L(cost=1_700_000, income=450_000), L(cost=2_600_000, income=680_000), L(cost=3_700_000, income=950_000), L(cost=5_000_000, income=1_300_000)],
+        "levels": [L(cost=840_000, income=275_000), L(cost=1_360_000, income=450_000), L(cost=2_080_000, income=680_000), L(cost=2_960_000, income=950_000), L(cost=4_000_000, income=1_300_000)],
     },
     "eco_construction": {
         "name": "شرکت عمرانی", "group": "eco", "icon": "🏗️",
         "desc": "پروژه‌های ساخت‌وساز داخلی و قراردادهای عمرانی.", "power_required": 3,
-        "levels": [L(cost=1_520_000, income=400_000), L(cost=2_280_000, income=600_000), L(cost=3_420_000, income=900_000), L(cost=4_750_000, income=1_250_000), L(cost=6_460_000, income=1_700_000)],
+        "levels": [L(cost=1_220_000, income=400_000), L(cost=1_820_000, income=600_000), L(cost=2_740_000, income=900_000), L(cost=3_800_000, income=1_250_000), L(cost=5_170_000, income=1_700_000)],
     },
     "eco_mining": {
         "name": "معدن‌کاری", "group": "eco", "icon": "⛏️",
         "desc": "استخراج و فروش مواد معدنی؛ درآمد مناسب با مصرف برق بیشتر.", "power_required": 4,
-        "levels": [L(cost=1_520_000, income=400_000), L(cost=2_360_000, income=620_000), L(cost=3_420_000, income=900_000), L(cost=4_750_000, income=1_250_000), L(cost=6_460_000, income=1_700_000)],
+        "levels": [L(cost=1_220_000, income=400_000), L(cost=1_890_000, income=620_000), L(cost=2_740_000, income=900_000), L(cost=3_800_000, income=1_250_000), L(cost=5_170_000, income=1_700_000)],
     },
     "eco_steel": {
         "name": "کارخانه فولاد", "group": "eco", "icon": "⚙️",
         "desc": "تولید محصولات فلزی و صنعتی با هزینهٔ آغازین بالاتر.", "power_required": 5,
-        "levels": [L(cost=1_900_000, income=500_000), L(cost=2_890_000, income=760_000), L(cost=4_100_000, income=1_080_000), L(cost=5_620_000, income=1_480_000), L(cost=7_600_000, income=2_000_000)],
+        "levels": [L(cost=1_520_000, income=500_000), L(cost=2_310_000, income=760_000), L(cost=3_280_000, income=1_080_000), L(cost=4_500_000, income=1_480_000), L(cost=6_080_000, income=2_000_000)],
     },
     "eco_tourism": {
         "name": "گردشگری و هتل‌داری", "group": "eco", "icon": "🏨",
         "desc": "درآمد از گردشگری، هتل‌ها و خدمات شهری.", "power_required": 4,
-        "levels": [L(cost=2_090_000, income=550_000), L(cost=3_040_000, income=800_000), L(cost=4_370_000, income=1_150_000), L(cost=6_080_000, income=1_600_000), L(cost=8_170_000, income=2_150_000)],
+        "levels": [L(cost=1_670_000, income=550_000), L(cost=2_430_000, income=800_000), L(cost=3_500_000, income=1_150_000), L(cost=4_860_000, income=1_600_000), L(cost=6_540_000, income=2_150_000)],
     },
     "eco_trade": {
         "name": "تجارت بین‌الملل", "group": "eco", "icon": "🚢",
         "desc": "گسترش شبکهٔ واردات و صادرات کشور.", "power_required": 6,
-        "levels": [L(cost=2_470_000, income=650_000), L(cost=3_610_000, income=950_000), L(cost=5_130_000, income=1_350_000), L(cost=7_030_000, income=1_850_000), L(cost=9_500_000, income=2_500_000)],
+        "levels": [L(cost=1_980_000, income=650_000), L(cost=2_890_000, income=950_000), L(cost=4_100_000, income=1_350_000), L(cost=5_620_000, income=1_850_000), L(cost=7_600_000, income=2_500_000)],
     },
     "eco_electronics": {
         "name": "کارخانهٔ تجهیزات الکترونیکی", "group": "eco", "icon": "🔌",
         "desc": "مونتاژ و فروش تجهیزات برقی و الکترونیکی.", "power_required": 7,
-        "levels": [L(cost=2_660_000, income=700_000), L(cost=3_990_000, income=1_050_000), L(cost=5_700_000, income=1_500_000), L(cost=7_790_000, income=2_050_000), L(cost=10_260_000, income=2_700_000)],
+        "levels": [L(cost=2_130_000, income=700_000), L(cost=3_190_000, income=1_050_000), L(cost=4_560_000, income=1_500_000), L(cost=6_230_000, income=2_050_000), L(cost=8_210_000, income=2_700_000)],
     },
     "eco_oil": {
         "name": "پالایشگاه نفت", "group": "eco", "icon": "🛢️",
         "desc": "تبدیل نفت خام به فرآورده‌های قابل صادرات.", "power_required": 8,
-        "levels": [L(cost=3_230_000, income=850_000), L(cost=4_560_000, income=1_200_000), L(cost=6_460_000, income=1_700_000), L(cost=8_740_000, income=2_300_000), L(cost=11_780_000, income=3_100_000)],
+        "levels": [L(cost=2_580_000, income=850_000), L(cost=3_650_000, income=1_200_000), L(cost=5_170_000, income=1_700_000), L(cost=6_990_000, income=2_300_000), L(cost=9_420_000, income=3_100_000)],
     },
     "eco_chemicals": {
         "name": "مجتمع پتروشیمی", "group": "eco", "icon": "🧪",
         "desc": "تولید مواد شیمیایی و فرآورده‌های صنعتی برای صادرات.", "power_required": 9,
-        "levels": [L(cost=3_420_000, income=900_000), L(cost=5_130_000, income=1_350_000), L(cost=7_220_000, income=1_900_000), L(cost=9_690_000, income=2_550_000), L(cost=12_540_000, income=3_300_000)],
+        "levels": [L(cost=2_740_000, income=900_000), L(cost=4_100_000, income=1_350_000), L(cost=5_780_000, income=1_900_000), L(cost=7_750_000, income=2_550_000), L(cost=10_030_000, income=3_300_000)],
     },
     "eco_bank": {
         "name": "بانک مرکزی", "group": "eco", "icon": "🏦",
         "desc": "زیرساخت مالی کشور؛ درآمد بالا با سرمایه‌گذاری بیشتر.", "power_required": 10,
-        "levels": [L(cost=3_800_000, income=1_000_000), L(cost=5_700_000, income=1_500_000), L(cost=8_360_000, income=2_200_000), L(cost=11_400_000, income=3_000_000), L(cost=15_200_000, income=4_000_000)],
+        "levels": [L(cost=3_040_000, income=1_000_000), L(cost=4_560_000, income=1_500_000), L(cost=6_690_000, income=2_200_000), L(cost=9_120_000, income=3_000_000), L(cost=12_160_000, income=4_000_000)],
+    },
+    "eco_market": {
+        "name": "بازار و خرده‌فروشی", "group": "eco", "icon": "🛒",
+        "desc": "فروشگاه‌ها و بازارهای محلی؛ شروع ارزان با درآمد روزانهٔ کم.", "power_required": 1,
+        "levels": [L(cost=90_000, income=25_000), L(cost=150_000, income=42_000), L(cost=240_000, income=68_000), L(cost=380_000, income=105_000), L(cost=560_000, income=155_000)],
+    },
+    "eco_handicraft": {
+        "name": "صنایع دستی", "group": "eco", "icon": "🏺",
+        "desc": "تولید و صادرات صنایع دستی؛ سرمایهٔ اولیهٔ کم و درآمد پایدار.", "power_required": 1,
+        "levels": [L(cost=110_000, income=30_000), L(cost=180_000, income=50_000), L(cost=290_000, income=80_000), L(cost=450_000, income=125_000), L(cost=680_000, income=185_000)],
+    },
+    "eco_dairy": {
+        "name": "صنایع لبنی و بسته‌بندی", "group": "eco", "icon": "🥛",
+        "desc": "فرآوری لبنیات و مواد غذایی بسته‌بندی‌شده.", "power_required": 2,
+        "levels": [L(cost=180_000, income=48_000), L(cost=290_000, income=78_000), L(cost=450_000, income=120_000), L(cost=680_000, income=180_000), L(cost=980_000, income=260_000)],
+    },
+    "eco_transport": {
+        "name": "حمل‌ونقل و لجستیک", "group": "eco", "icon": "🚛",
+        "desc": "ناوگان باربری و انبارداری برای بازار داخلی.", "power_required": 3,
+        "levels": [L(cost=260_000, income=70_000), L(cost=420_000, income=112_000), L(cost=650_000, income=172_000), L(cost=960_000, income=252_000), L(cost=1_400_000, income=360_000)],
+    },
+    "eco_it": {
+        "name": "فناوری اطلاعات", "group": "eco", "icon": "💻",
+        "desc": "شرکت‌های نرم‌افزاری و خدمات دیجیتال.", "power_required": 4,
+        "levels": [L(cost=900_000, income=240_000), L(cost=1_450_000, income=390_000), L(cost=2_200_000, income=590_000), L(cost=3_200_000, income=850_000), L(cost=4_500_000, income=1_200_000)],
+    },
+    "eco_pharma": {
+        "name": "داروسازی", "group": "eco", "icon": "💊",
+        "desc": "تولید دارو و تجهیزات پزشکی برای داخل و صادرات.", "power_required": 5,
+        "levels": [L(cost=1_400_000, income=375_000), L(cost=2_200_000, income=590_000), L(cost=3_300_000, income=880_000), L(cost=4_700_000, income=1_250_000), L(cost=6_500_000, income=1_730_000)],
+    },
+    "eco_auto": {
+        "name": "خودروسازی", "group": "eco", "icon": "🚗",
+        "desc": "خط تولید خودرو و قطعات صنعتی.", "power_required": 7,
+        "levels": [L(cost=2_000_000, income=540_000), L(cost=3_100_000, income=830_000), L(cost=4_500_000, income=1_200_000), L(cost=6_300_000, income=1_670_000), L(cost=8_600_000, income=2_280_000)],
+    },
+    "eco_aerospace": {
+        "name": "صنایع هوافضا", "group": "eco", "icon": "🛰️",
+        "desc": "فناوری پیشرفتهٔ هوایی و فضایی با درآمد بالا.", "power_required": 9,
+        "levels": [L(cost=3_000_000, income=800_000), L(cost=4_500_000, income=1_200_000), L(cost=6_500_000, income=1_730_000), L(cost=9_000_000, income=2_400_000), L(cost=12_000_000, income=3_200_000)],
+    },
+    "eco_stock": {
+        "name": "بورس و بازار سرمایه", "group": "eco", "icon": "📈",
+        "desc": "بازار سهام و اوراق؛ بیشترین بازده با سرمایهٔ بالا.", "power_required": 10,
+        "levels": [L(cost=3_500_000, income=930_000), L(cost=5_300_000, income=1_400_000), L(cost=7_700_000, income=2_050_000), L(cost=10_600_000, income=2_820_000), L(cost=14_000_000, income=3_730_000)],
     },
 }
 
