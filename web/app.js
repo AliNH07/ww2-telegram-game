@@ -20,6 +20,7 @@ let lastActionErrorAt = 0;
 let availableWorlds = [];
 let adminWarsCache = [];
 let adminWorldsCache = [];
+let adminUnMessagesCache = [];
 let adminAutoRefreshTimer = null;
 
 let player = null;
@@ -399,6 +400,10 @@ async function loadPlayer() {
     try {
         player = await apiGet("/api/player");
         if (player) player._clientAt = Date.now();
+        if (player?.reset_notice) {
+            const note = player.reset_notice;
+            setTimeout(() => gameConfirm(note, { title: "ریست شدید", ok: "متوجه شدم", cancel: "بستن" }), 300);
+        }
         selectedCountry = player?.country || null;
     } catch (e) { console.error(e); }
 }
@@ -409,6 +414,7 @@ async function refreshPlayer() {
     try {
         const fresh = await apiGet("/api/player");
         if (fresh && !fresh.error) {
+            if (fresh.reset_notice) { await handlePlayerReset(fresh); return; }
             player = fresh; player._clientAt = Date.now();
             selectedCountry = player?.country || null;
             const gameScreen = document.getElementById("game");
@@ -435,6 +441,14 @@ async function refreshPlayer() {
         }
     } catch (e) { if (e.name !== "AbortError") console.error(e); }
     finally { playerRefreshInFlight = false; }
+}
+
+async function handlePlayerReset(p) {
+    stopStatsPolling();
+    player = null; selectedCountry = null;
+    document.getElementById("game")?.classList.remove("booting");
+    await gameConfirm(p.reset_notice || "ریست شدید.", { title: "ریست شدید", ok: "متوجه شدم", cancel: "بستن" });
+    await showWorldSelection();
 }
 
 let fastPlayerInterval = null;
@@ -956,138 +970,6 @@ document.addEventListener("click", event => {
     showToast(player.game_finished ? "فصل پایان یافته؛ عملیات غیرفعال است." : "فصل هنوز آغاز نشده؛ فعلاً فقط مشاهده و پیام خصوصی مجاز است.", "error");
 }, true);
 
-/* =========================================================
-   Feedback: لرزش کوتاه + صدای عملیات اصلی (ساخت، سرمایه‌گذاری، ...)
-   -----------------------------------------------------------
-   ▸ فایل‌های صوتی را داخل پوشهٔ  web/sounds/  بگذار و فقط نام فایل را
-     در FX_ACTIONS زیر عوض کن. اگر برای عملیاتی  sound: ""  بگذاری، فقط لرزش دارد.
-   ▸ اگر فایلی وجود نداشته باشد، بازی بدون خطا ادامه می‌دهد (فقط لرزش اجرا می‌شود).
-   ▸ شدت لرزش: "light" | "medium" | "heavy"  (در تلگرام: HapticFeedback، در بقیه: navigator.vibrate)
-========================================================= */
-const FX_SOUND_BASE = "/sounds/";          // مسیر پایهٔ فایل‌های صوتی (اگر sound با / یا http شروع شود، همان مسیر کامل استفاده می‌شود)
-const FX_ACTIONS = {
-    build:        { sound: "build.mp3",        volume: 0.8, haptic: "medium" },  // ساخت / ارتقای زیرساخت
-    invest:       { sound: "invest.mp3",       volume: 0.8, haptic: "medium" },  // سرمایه‌گذاری اقتصادی
-    train:        { sound: "train.mp3",        volume: 0.8, haptic: "medium" },  // تولید یگان نظامی
-    deploy:       { sound: "deploy.mp3",       volume: 0.8, haptic: "heavy"  },  // اعزام نیرو
-    war:          { sound: "war.mp3",          volume: 0.8, haptic: "heavy"  },  // ارسال اعلان جنگ
-    market:       { sound: "market.mp3",       volume: 0.7, haptic: "light"  },  // بازار جهانی
-    loan:         { sound: "loan.mp3",         volume: 0.7, haptic: "light"  },  // وام
-    diplomacy:    { sound: "diplomacy.mp3",    volume: 0.7, haptic: "light"  },  // پیمان‌ها
-    announcement: { sound: "announcement.mp3", volume: 0.7, haptic: "light"  },  // انتشار بیانیه
-    satellite:    { sound: "satellite.mp3",    volume: 0.7, haptic: "medium" },  // ماهواره و اسکن
-    default:      { sound: "click.mp3",        volume: 0.6, haptic: "light"  },  // سایر عملیات
-};
-// هر دکمه با اولین انتخابگری که بخواند، به عملیات متناظر وصل می‌شود.
-const FX_TARGETS = [
-    ["#infra-sheet[data-fx='build'] .modal-ok",  "build"],
-    ["#infra-sheet[data-fx='invest'] .modal-ok", "invest"],
-    [".eco-invest-button",                       "invest"],
-    ["#tr-ok",                                   "train"],
-    ["#dp-go",                                   "deploy"],
-    ["#war-declare-submit, [data-war-reason-submit]", "war"],
-    ["#market-confirm-trade, #mk-submit",        "market"],
-    [".ln-btn[data-act='accept'], .ln-btn[data-act='repay'], #ln-submit", "loan"],
-    ["#diplomacy-propose-button, .diplomacy-item [data-accept]", "diplomacy"],
-    ["#ann-publish-confirm",                     "announcement"],
-    ["#sat-launch, .sat-scan",                   "satellite"],
-];
-const FX_MIN_GAP_MS = 350;                 // حداقل فاصله بین دو بازخورد برای یک عملیات (ضد کلیک‌های پیاپی)
-const FX_GLOBAL_GAP_MS = 120;              // حداقل فاصله بین هر دو بازخورد
-const FX_VIBRATE_MS = { light: 12, medium: 20, heavy: 32 };
-
-const Fx = (() => {
-    const STORE_KEY = "fl93_fx_settings";
-    const prefs = { sound: true, haptic: true };
-    try {
-        const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
-        if (saved.sound === false) prefs.sound = false;
-        if (saved.haptic === false) prefs.haptic = false;
-    } catch (e) {}
-    const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(prefs)); } catch (e) {} };
-
-    const tgHaptic = () => {
-        try { return tg?.HapticFeedback && (!tg.isVersionAtLeast || tg.isVersionAtLeast("6.1")) ? tg.HapticFeedback : null; }
-        catch (e) { return null; }
-    };
-    const hapticSupported = () => !!tgHaptic() || typeof navigator.vibrate === "function";
-
-    const audios = new Map();
-    const failed = new Set();
-    const resolve = name => (/^(\/|https?:)/.test(name) ? name : FX_SOUND_BASE + name);
-
-    function playSound(name, volume) {
-        if (!name) return;
-        const src = resolve(name);
-        if (failed.has(src)) return;
-        try {
-            let a = audios.get(src);
-            if (!a) {
-                a = new Audio(src);
-                a.preload = "auto";
-                a.addEventListener("error", () => failed.add(src));   // فایل نبود؟ دیگر تلاش نکن
-                audios.set(src, a);
-            }
-            a.volume = Math.min(1, Math.max(0, volume ?? 0.7));
-            a.currentTime = 0;
-            const p = a.play();
-            if (p && typeof p.catch === "function") p.catch(() => {});   // محدودیت autoplay یا خطای پخش نباید بازی را خراب کند
-        } catch (e) {}
-    }
-
-    function vibrate(level) {
-        try {
-            const h = tgHaptic();
-            if (h) { h.impactOccurred(level || "light"); return; }
-        } catch (e) {}
-        try { if (typeof navigator.vibrate === "function") navigator.vibrate(FX_VIBRATE_MS[level] || FX_VIBRATE_MS.light); } catch (e) {}
-    }
-
-    const lastByKey = {};
-    let lastAny = 0;
-    function trigger(key) {
-        const cfg = FX_ACTIONS[key] || FX_ACTIONS.default;
-        if (!cfg) return;
-        const now = Date.now();
-        if (now - (lastByKey[key] || 0) < FX_MIN_GAP_MS || now - lastAny < FX_GLOBAL_GAP_MS) return;
-        lastByKey[key] = lastAny = now;
-        if (prefs.haptic && cfg.haptic) vibrate(cfg.haptic);
-        if (prefs.sound && cfg.sound) playSound(cfg.sound, cfg.volume);
-    }
-
-    function refreshMenu() {
-        const sBtn = document.getElementById("fx-toggle-sound"), hBtn = document.getElementById("fx-toggle-haptic");
-        const paint = (btn, on) => {
-            if (!btn) return;
-            const st = btn.querySelector(".fx-state");
-            if (st) { st.textContent = on ? "روشن" : "خاموش"; st.classList.toggle("off", !on); }
-            btn.setAttribute("aria-pressed", on ? "true" : "false");
-        };
-        paint(sBtn, prefs.sound);
-        paint(hBtn, prefs.haptic);
-        if (hBtn) hBtn.classList.toggle("hidden", !hapticSupported());   // دستگاه بدون لرزش: گزینه نمایش داده نمی‌شود
-    }
-
-    document.addEventListener("click", ev => {
-        const toggle = ev.target?.closest?.("#fx-toggle-sound, #fx-toggle-haptic");
-        if (toggle) {
-            const k = toggle.id === "fx-toggle-sound" ? "sound" : "haptic";
-            prefs[k] = !prefs[k]; save(); refreshMenu();
-            if (prefs[k]) { if (k === "haptic") vibrate("light"); else playSound(FX_ACTIONS.default.sound, FX_ACTIONS.default.volume); }
-            return;
-        }
-        if (!ev.isTrusted) return;
-        const el = ev.target?.closest?.("button, [role='button']");
-        if (!el || el.disabled) return;
-        for (const [sel, key] of FX_TARGETS) {
-            if (el.matches(sel)) { trigger(key); return; }
-        }
-    }, true);   // این شنونده بعد از قفل «فصل شروع نشده» ثبت می‌شود؛ پس عملیات مسدود‌شده صدا/لرزش نمی‌دهند
-
-    refreshMenu();
-    return { trigger, prefs, refreshMenu };
-})();
-
 const RK_TABS = [
     { id: "overall", key: "overall", label: "کلی", info: "<b>کلی</b> ترکیبِ چهار دستهٔ دیگر است. امتیازِ هر دسته نسبت به بهترین کشورِ همان دسته محاسبه می‌شود؛ بنابراین یک عددِ بسیار بزرگ در یک دسته، امتیازِ دسته‌های دیگر را محو نمی‌کند." },
     { id: "economy", key: "economy", label: "اقتصادی", info: "<b>اقتصادی</b> بر چه اساسیه: درآمدِ خالصِ روزانه‌ی کشور، بعد از کسرِ هزینه‌ی نگهداری — هر $1,000 یک امتیاز." },
@@ -1588,7 +1470,7 @@ function openInfraSheet(iid) {
     else if (!need.resOk) okLabel = "منابع کافی نیست";
 
     const ov = document.createElement("div");
-    ov.id = "infra-sheet"; ov.dataset.fx = "build";
+    ov.id = "infra-sheet";
     ov.className = "modal-overlay";
     ov.innerHTML = `
         <div class="ic-sheet">
@@ -1747,7 +1629,7 @@ function openEconomySheet(iid) {
     if (next) { if (busyJob) okLabel = "صف خانه مشغول است"; else if (!moneyOk) okLabel = "پول کافی نیست"; else if (!powerOk) okLabel = "برق کافی نیست"; }
     const canGo = !!next && moneyOk && powerOk && !busyJob;
     const ov = document.createElement("div");
-    ov.id = "infra-sheet"; ov.dataset.fx = "invest"; ov.className = "modal-overlay";
+    ov.id = "infra-sheet"; ov.className = "modal-overlay";
     ov.innerHTML = `
         <div class="ic-sheet">
             <div class="is-head">
@@ -3036,14 +2918,17 @@ async function loadAdminPanel() {
     const list = document.getElementById("admin-player-list");
     if (list && !adminOverviewCache) list.innerHTML = `<div class="admin-empty"><span class="admin-loader"></span>در حال دریافت اطلاعات بازی…</div>`;
     try {
-        const [data, warsData, globalData, communicationsData] = await Promise.all([
-            apiGet("/api/admin/overview"), apiGet("/api/admin/wars"), apiGet("/api/admin/global"), apiGet("/api/admin/communications")
+        const [data, warsData, globalData, communicationsData, unData] = await Promise.all([
+            apiGet("/api/admin/overview"), apiGet("/api/admin/wars"), apiGet("/api/admin/global"), apiGet("/api/admin/communications"),
+            apiGet("/api/admin/un-messages")
         ]);
         if (requestWorldId !== String(selectedWorldId)) return;
         adminWarsCache = warsData?.wars || [];
         adminWorldsCache = globalData?.worlds || [];
         adminPrivateMessagesCache = communicationsData?.messages || [];
+        adminUnMessagesCache = unData?.messages || [];
         renderAdminGlobal();
+        renderAdminUnMessages();
         renderAdminCommunications();
         if (!data?.success) {
             if (error) { error.textContent = data?.message || (data?.error === "forbidden" ? "دسترسی به پنل مدیریت رد شد." : "احراز هویت تلگرام تأیید نشد؛ بازی را از داخل تلگرام باز کن."); error.classList.remove("hidden"); }
@@ -3107,7 +2992,7 @@ function renderAdminGlobal() {
     const total = key => data.reduce((a,w) => a + Number(w[key] || 0), 0);
     if (stats) stats.innerHTML = [["🌍 دنیاها", data.length], ["👥 بازیکنان", total("total_players")], ["🏳️ کشورهای اشغال‌شده", total("countries_taken")], ["🟢 بازیکنان فعال", total("active_players")], ["⚔️ جنگ‌های در انتظار", total("pending_wars")], ["📨 پیام‌های خصوصی", total("private_message_count")]].map(([label,value]) => `<div class="admin-global-stat"><span>${label}</span><strong>${adminFormatNumber(value)}</strong></div>`).join("");
     const list = document.getElementById("admin-world-picker");
-    if (list && !list.classList.contains("hidden")) renderAdminWorldPicker();
+    if (list) renderAdminWorldPicker();
     renderAdminNavigation();
 }
 function renderAdminWorldPicker() {
@@ -3121,11 +3006,11 @@ function renderAdminCommunications() {
     const renderItem = m => `<article class="admin-news-row"><div><b>${escapeHtml(COUNTRY_NAMES[m.from] || m.from || "نامشخص")} ← ${escapeHtml(COUNTRY_NAMES[m.to] || m.to || "نامشخص")}</b><p>${escapeHtml(m.text || "")}</p><small>${escapeHtml(m.at ? new Date(m.at).toLocaleString("fa-IR") : "")}</small></div></article>`;
     root.innerHTML = `<h4>📋 پیام‌های دارای نشانه شکایت (${flagged.length})</h4>${flagged.length ? flagged.map(renderItem).join("") : '<div class="admin-empty">شکایتی از متن پیام‌ها شناسایی نشد.</div>'}<h4 style="margin-top:20px">💬 پیام‌های خصوصی اخیر (${messages.length})</h4>${messages.length ? messages.map(renderItem).join("") : '<div class="admin-empty">پیامی در این دنیا ثبت نشده است.</div>'}`;
 }
-document.getElementById("admin-show-worlds")?.addEventListener("click", e => {
-    const list = document.getElementById("admin-world-picker");
-    const opened = list.classList.toggle("hidden") === false;
-    e.currentTarget.setAttribute("aria-expanded", String(opened));
-    if (opened) renderAdminWorldPicker();
+document.getElementById("admin-add-world-btn")?.addEventListener("click", () => {
+    const form = document.getElementById("admin-create-world-form");
+    if (!form) return;
+    const opened = form.classList.toggle("hidden") === false;
+    if (opened) document.getElementById("admin-new-world-name")?.focus();
 });
 document.getElementById("admin-world-picker")?.addEventListener("click", async e => {
     const btn = e.target.closest("[data-pick-world]"); if (!btn) return;
@@ -3217,7 +3102,7 @@ document.getElementById("admin-create-world-form")?.addEventListener("submit", a
     try {
         const result = await apiPost("/api/admin/worlds/create", { name });
         showToast(result.message || (result.success ? "دنیای جدید ساخته شد." : "ساخت دنیا ناموفق بود."), result.success ? "success" : "error");
-        if (result.success) { if (input) input.value = ""; await fetchAvailableWorlds(); await loadAdminPanel(); }
+        if (result.success) { if (input) input.value = ""; document.getElementById("admin-create-world-form")?.classList.add("hidden"); await fetchAvailableWorlds(); await loadAdminPanel(); }
     } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
     finally { if (submit) submit.disabled = false; }
 });
@@ -3255,7 +3140,7 @@ function renderAdminOverview() {
             const handle = p.telegram_username ? "@" + p.telegram_username : "نام کاربری ثبت نشده";
             const stateTags = [p.vip ? "VIP" : "", p.is_eliminated ? "حذف‌شده" : "", p.is_online ? "آنلاین" : `آخرین ورود ${adminRelativeTime(p.last_seen_at)}`].filter(Boolean).join(" · ");
             const exactSeen = p.last_seen_at ? new Date(p.last_seen_at).toLocaleString("fa-IR") : "سابقهٔ ورود ثبت نشده";
-            return `<div role="button" tabindex="0" class="admin-player-row ${Number(adminSelectedPlayerId) === Number(p.user_id) ? "selected" : ""} ${p.is_eliminated ? "eliminated" : ""}" data-admin-player="${p.user_id}"><span class="admin-player-flag">${escapeHtml(p.country_flag || "🌐")}</span><span class="admin-player-main"><b>${escapeHtml(name)}</b><small class="admin-player-handle">${escapeHtml(handle)}</small><small class="admin-player-id">آیدی تلگرام: <strong>${p.user_id}</strong> <button type="button" class="admin-copy-id" data-admin-copy-id="${p.user_id}" title="کپی آیدی">کپی</button></small><small>${escapeHtml(p.country_name || "بدون کشور")}${stateTags ? " · " + escapeHtml(stateTags) : ""}</small><small class="admin-player-last-seen">آخرین فعالیت دقیق: ${escapeHtml(exactSeen)}</small></span><span class="admin-player-metrics"><b>$${adminFormatNumber(p.money)}</b><small>نیرو ${adminFormatNumber(p.manpower)}</small><small>${escapeHtml(adminRelativeTime(p.last_seen_at))}</small></span><span class="admin-player-chevron">›</span></div>`;
+            return `<div role="button" tabindex="0" class="admin-player-row ${Number(adminSelectedPlayerId) === Number(p.user_id) ? "selected" : ""} ${p.is_eliminated ? "eliminated" : ""}" data-admin-player="${p.user_id}"><span class="admin-player-flag">${escapeHtml(p.country_flag || "🌐")}</span><span class="admin-player-main"><b>${escapeHtml(name)}</b><small class="admin-player-handle">${escapeHtml(handle)}</small><small class="admin-player-id">آیدی تلگرام: <strong>${p.user_id}</strong> <button type="button" class="admin-copy-id" data-admin-copy-id="${p.user_id}" title="کپی آیدی">کپی</button></small><small>${escapeHtml(p.country_name || "بدون کشور")}${stateTags ? " · " + escapeHtml(stateTags) : ""}</small><small class="admin-player-last-seen">آخرین فعالیت دقیق: ${escapeHtml(exactSeen)}</small></span><span class="admin-player-metrics"><b>$${adminFormatNumber(p.money)}</b><small>نیرو ${adminFormatNumber(p.manpower)}</small><small>${escapeHtml(adminRelativeTime(p.last_seen_at))}</small></span><span class="admin-row-actions"><button type="button" class="admin-row-btn" data-admin-adjust="${p.user_id}">💰 افزایش موجودی</button><button type="button" class="admin-row-btn danger" data-admin-reset="${p.user_id}">♻️ ریست</button></span><span class="admin-player-chevron">›</span></div>`;
         }).join("");
     }
     const selected = playersList.find(p => Number(p.user_id) === Number(adminSelectedPlayerId));
@@ -3352,6 +3237,65 @@ async function adminAdjustSelectedPlayer(operation) {
         await loadAdminPanel();
     } catch (e) { showToast("خطا در تغییر موجودی.", "error"); }
 }
+
+function renderAdminUnMessages() {
+    const root = document.getElementById("admin-un-list"); if (!root) return;
+    const rows = adminUnMessagesCache || [];
+    const pill = document.getElementById("admin-un-count"); if (pill) pill.textContent = adminFormatNumber(rows.length);
+    if (!rows.length) { root.innerHTML = `<div class="admin-empty">هنوز پیامی به سازمان ملل ارسال نشده است.</div>`; return; }
+    root.innerHTML = rows.map(m => {
+        const who = [m.user_name, m.username ? "@" + m.username : ""].filter(Boolean).join(" · ") || "نام ثبت نشده";
+        return `<article class="admin-news-row"><span class="admin-news-dot"></span><div><b>🌍 ${escapeHtml(m.world_name || ("دنیای " + m.world_id))} · ${escapeHtml(COUNTRY_FLAGS[m.country] || "")} ${escapeHtml(m.country_name || COUNTRY_NAMES[m.country] || m.country || "—")}</b><p>${escapeHtml(m.text || "")}</p><small class="admin-un-meta">👤 ${escapeHtml(who)} · آیدی تلگرام: ${escapeHtml(String(m.user_id))}<br>${escapeHtml(m.at ? new Date(m.at).toLocaleString("fa-IR") : "")}</small></div></article>`;
+    }).join("");
+}
+
+async function adminResetPlayer(uid) {
+    const p = adminOverviewCache?.players?.find(x => Number(x.user_id) === Number(uid));
+    const label = p ? `${adminPlayerName(p)} (${p.country_name || "بدون کشور"})` : String(uid);
+    if (!(await gameConfirm(`بازیکن «${label}» از همین دنیا حذف شود و بازی او کاملاً از ابتدا شروع شود؟\nاین کار قابل بازگشت نیست.`, { title: "ریست بازیکن", ok: "ریست", danger: true }))) return;
+    try {
+        const r = await apiPost("/api/admin/player/reset", { user_id: Number(uid) });
+        showToast(r.message || (r.success ? "بازیکن ریست شد." : "ریست انجام نشد."), r.success ? "success" : "error");
+        if (r.success) {
+            if (Number(adminSelectedPlayerId) === Number(uid)) { adminSelectedPlayerId = null; adminSelectedPlayerDetailOpen = false; }
+            await loadAdminPanel();
+            renderAdminOverview();
+        }
+    } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+}
+
+function adminOpenAdjustModal(uid) {
+    const p = adminOverviewCache?.players?.find(x => Number(x.user_id) === Number(uid));
+    if (!p) { showToast("بازیکن پیدا نشد.", "error"); return; }
+    document.getElementById("admin-adjust-modal")?.remove();
+    const ov = document.createElement("div");
+    ov.id = "admin-adjust-modal"; ov.className = "modal-overlay admin-adjust-modal";
+    ov.innerHTML = `<section class="modal-box admin-adjust-box" role="dialog" aria-modal="true">
+        <div class="modal-title">💰 موجودی ${escapeHtml(adminPlayerName(p))} <small>(${escapeHtml(p.country_name || "بدون کشور")})</small></div>
+        <label>مورد<select id="aam-field"><option value="money">خزانه ($)</option><option value="manpower">نیروی انسانی</option><option value="food">غذا</option><option value="steel">آهن</option><option value="uranium">اورانیوم</option><option value="oil">نفت</option></select></label>
+        <label>مقدار<input id="aam-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="مثلاً 1000000"></label>
+        <div class="admin-adjust-actions"><button type="button" class="add" data-op="add">＋ افزودن</button><button type="button" class="sub" data-op="subtract">− کسر</button></div>
+        <button type="button" class="modal-cancel">بستن</button></section>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.addEventListener("click", e => { if (e.target === ov) close(); });
+    ov.querySelector(".modal-cancel").onclick = close;
+    ov.querySelectorAll("[data-op]").forEach(btn => btn.onclick = async () => {
+        const amount = Number(ov.querySelector("#aam-amount").value);
+        if (!Number.isSafeInteger(amount) || amount <= 0) { showToast("مقدار باید عدد صحیح و بزرگ‌تر از صفر باشد.", "error"); return; }
+        btn.disabled = true;
+        try {
+            const r = await apiPost("/api/admin/player/adjust", { user_id: Number(uid), field: ov.querySelector("#aam-field").value, amount, operation: btn.dataset.op });
+            if (!r.success) { showToast(r.message || "تغییر انجام نشد.", "error"); btn.disabled = false; return; }
+            showToast(r.message || "موجودی به‌روزرسانی شد.", "success");
+            close();
+            await loadAdminPanel();
+            if (!adminSelectedPlayerDetailOpen) renderAdminOverview();
+        } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); btn.disabled = false; }
+    });
+    ov.querySelector("#aam-amount").focus();
+}
+
 async function adminCopyId(value) {
     try {
         await navigator.clipboard.writeText(String(value));
@@ -3370,6 +3314,10 @@ document.getElementById("admin-clear-search")?.addEventListener("click", () => {
 document.getElementById("admin-player-list")?.addEventListener("click", event => {
     const copy = event.target.closest("[data-admin-copy-id]");
     if (copy) { event.stopPropagation(); adminCopyId(copy.dataset.adminCopyId); return; }
+    const adjBtn = event.target.closest("[data-admin-adjust]");
+    if (adjBtn) { event.stopPropagation(); adminOpenAdjustModal(Number(adjBtn.dataset.adminAdjust)); return; }
+    const resetBtn = event.target.closest("[data-admin-reset]");
+    if (resetBtn) { event.stopPropagation(); adminResetPlayer(Number(resetBtn.dataset.adminReset)); return; }
     const row = event.target.closest("[data-admin-player]"); if (!row) return;
     adminSelectedPlayerId = Number(row.dataset.adminPlayer); adminSelectedPlayerDetailOpen = true; renderAdminOverview();
     document.getElementById("admin-player-editor")?.scrollIntoView({ behavior: "instant", block: "start" });
@@ -4296,7 +4244,7 @@ async function renderPmInbox() {
         c.innerHTML = "";
         const un = document.createElement("div");
         un.className = "contact-item pm-conv-item un-pm-item";
-        un.innerHTML = `<div class="contact-info"><span class="un-pm-icon">🌐</span><div class="pm-conv-text"><span class="contact-name">سازمان ملل</span><span class="pm-conv-last">گفت‌وگوی رسمی · فعلاً فقط نمایشی</span></div></div><span class="un-pm-tag">رسمی</span>`;
+        un.innerHTML = `<div class="contact-info"><span class="un-pm-icon">🌐</span><div class="pm-conv-text"><span class="contact-name">سازمان ملل</span><span class="pm-conv-last">گفت‌وگوی رسمی با مدیریت</span></div></div><span class="un-pm-tag">رسمی</span>`;
         un.onclick = openUnitedNationsPM;
         c.appendChild(un);
         if (!list.length) {
@@ -4356,7 +4304,7 @@ const UN_PM_TARGET = "__un__";
 let unPmLocalMessages = [];
 function renderUnitedNationsPMMessages() {
     const box = document.getElementById("pm-messages");
-    box.innerHTML = `<div class="un-pm-placeholder"><span>🌐</span><strong>گفت‌وگوی سازمان ملل</strong><p>پیام‌ها فعلاً فقط در همین صفحه نمایش داده می‌شوند و برای سازمان ملل یا هیچ بازیکنی ارسال نمی‌شوند.</p></div>`;
+    box.innerHTML = `<div class="un-pm-placeholder"><span>🌐</span><strong>گفت‌وگوی سازمان ملل</strong><p>پیام شما برای مدیریت سازمان ملل ارسال می‌شود و فقط مدیر آن را می‌بیند.</p></div>`;
     unPmLocalMessages.forEach(text => {
         const bubble = document.createElement("div");
         bubble.className = "pm-msg pm-mine un-pm-local-msg";
@@ -4373,10 +4321,16 @@ function openUnitedNationsPM() {
     renderUnitedNationsPMMessages();
     const input = document.getElementById("pm-input");
     const send = document.getElementById("pm-send");
-    input.value = ""; input.disabled = false; input.placeholder = "پیام نمایشی به سازمان ملل...";
+    input.value = ""; input.disabled = false; input.placeholder = "پیام به سازمان ملل...";
     send.disabled = false;
     document.getElementById("pm-conversation").classList.add("un-pm-local");
     document.getElementById("pm-conversation").classList.remove("un-pm-readonly", "hidden");
+    apiGet("/api/un/mine").then(d => {
+        if (Array.isArray(d?.messages)) {
+            unPmLocalMessages = d.messages.map(m => m.text);
+            if (currentPMTarget === UN_PM_TARGET) renderUnitedNationsPMMessages();
+        }
+    }).catch(() => {});
 }
 
 function openPM(target) {
@@ -4411,10 +4365,13 @@ async function sendPM() {
     if (!text || !currentPMTarget) return;
     ta.value = ""; ta.style.height = "";
     if (currentPMTarget === UN_PM_TARGET) {
-        // این چت هنوز به سرور وصل نیست؛ پیام صرفاً در رابط همین نشست نشان داده می‌شود.
-        unPmLocalMessages.push(text);
-        renderUnitedNationsPMMessages();
-        showToast("پیام فقط در همین صفحه نمایش داده شد و برای کسی ارسال نشد.", "success");
+        try {
+            const r = await apiPost("/api/un/send", { text });
+            if (!r.success) { ta.value = text; showToast(r.message || "ارسال پیام ناموفق بود.", "error"); return; }
+            unPmLocalMessages.push(text);
+            renderUnitedNationsPMMessages();
+            showToast("پیام برای مدیریت سازمان ملل ارسال شد.", "success");
+        } catch { ta.value = text; showToast("ارتباط با سرور برقرار نشد.", "error"); }
         return;
     }
     await apiPost("/api/pm/send", { target: currentPMTarget, text });
