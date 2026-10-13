@@ -1342,6 +1342,7 @@ function openInfraSheet(iid) {
     } else if (figNext) {
         rows.push(`<div class="is-row"><span>${figNext.label}</span><b>${figNow ? `از ${figNow.value} به ${figNext.value}` : figNext.value}</b></div>`);
     }
+    if (item.next.time) rows.push(`<div class="is-row"><span>⏱️ زمان ساخت</span><b>${fmtDurationFa(item.next.time)}</b></div>`);
     rows.push(`<div class="is-row"><span>🔧 هزینهٔ نگهداری روزانه</span><b>${formatMoney(item.next_upkeep)}${built ? ` <small>(الان ${formatMoney(item.upkeep)})</small>` : ""}</b></div>`);
     if (item.group === "power") {
         rows.push(`<div class="is-row"><span>⚡ برق تولیدی</span><b>${formatNumber(item.next.capacity)} واحد</b></div>`);
@@ -1398,6 +1399,7 @@ function openInfraSheet(iid) {
                 return;
             }
             player = d.player; updateHomeStats(); closeInfraSheet();
+            if (d.queued) showToast(`ساخت در صف قرار گرفت؛ حدود ${fmtDurationFa(d.ready_in)} دیگر آماده می‌شود.`, "success");
             const activeTab = document.querySelector(".infra-tab.active")?.dataset.infraTab || "power";
             renderInfraTab(activeTab);
         } catch (e) {
