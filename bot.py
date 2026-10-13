@@ -2549,7 +2549,33 @@ NAVAL_WAYPOINTS = {
     "sea:westpacific": (129.0, 14.0), "sea:seajapan": (138.0, 32.0), "sea:iceland": (-20.0, 64.0),
     "sea:tyrrhenian": (12.5, 39.0), "sea:skagerrak": (9.0, 58.0),
     "sea:norwegian": (0.0, 65.0), "sea:barents": (35.0, 72.0),
+    # --- مرحلهٔ ۲ (اصلاح مسیر دریایی): نقاط جدید برای جلوگیری از عبور خط مستقیم از خشکی ---
+    # تنگهٔ لوزون (شمال فیلیپین): مسیر غرب اقیانوس آرام ← دریای چین جنوبی دیگر از روی جزایر فیلیپین نمی‌گذرد.
+    "sea:luzon": (121.5, 20.0),
+    # خلیج فارس (بعد از تنگهٔ هرمز تا سکوها)
+    "sea:gulf_e": (55.5, 26.0), "sea:gulf": (53.5, 26.3),
+    # مسیر تنگه‌های ترکیه (شرق مدیترانه ← دریای اژه ← داردانل ← مرمره ← بسفر ← دریای سیاه)
+    "sea:aegean_s": (26.0, 36.2), "sea:aegean_c": (25.3, 37.85), "sea:aegean_n": (25.2, 39.3),
+    "sea:dardanelles": (26.35, 40.14), "sea:gelibolu": (26.65, 40.37),
+    "sea:marmara": (28.0, 40.78), "sea:marmara_east": (28.9, 40.9),
 }
+# زنجیرهٔ اجباری گذرگاه‌ها برای رسیدن به منابع (فقط گراف سکوها/معدن‌ها؛ مسیرهای کشور به کشور همان COUNTRY_SEA_LANES است).
+# هر زنجیره گره‌ها را پشت‌سرهم وصل می‌کند و یال‌های میان‌بُری که تنگه را دور می‌زنند حذف می‌شوند.
+SEA_SITE_CHAINS = [
+    ["sea:red", "babmandeb", "sea:arabian"],                       # دریای سرخ ↔ دریای عرب فقط با باب‌المندب
+    ["sea:arabian", "hormuz", "sea:gulf_e", "sea:gulf"],           # دریای عرب ↔ خلیج فارس فقط با هرمز
+    ["sea:northpacific", "sea:bering"],                            # بن‌بست: فقط برای سکوی برینگ (قطبی نیست)
+    ["sea:eastmed", "sea:aegean_s", "sea:aegean_c", "sea:aegean_n", "sea:dardanelles",
+     "sea:gelibolu", "sea:marmara", "sea:marmara_east", "bosporus"],  # مدیترانه ↔ دریای سیاه فقط با بسفر
+]
+SEA_SITE_CHAIN_CUTS = [("sea:red", "sea:arabian"), ("sea:eastmed", "bosporus"), ("sea:arabian", "sea:gulf"),
+                       ("sea:arabian", "sea:gulf_e"), ("sea:red", "hormuz"), ("sea:red", "sea:gulf")]
+# مقصدهایی که فقط از یک دروازهٔ مشخص قابل‌دسترسی‌اند (آخرین گره پیش از خط مستقیم کوتاه تا سکو).
+SITE_SEA_GATEWAY = {
+    "oil_gulf": "sea:gulf", "oil_ghawar": "sea:gulf",
+    "food_ukraine": "bosporus",
+}
+# نکته: دریای خزر عمداً بررسی نمی‌شود (تصمیم مالک بازی: سکوهای خزر فعلاً رها شده‌اند).
 COUNTRY_SEA_LANES = {
     # مسیرها به ترتیب از کشور اول به کشور دوم نوشته شده‌اند؛ معکوس آن‌ها به‌طور خودکار برعکس می‌شود.
     ("germany", "britain"): ["sea:north", "dover"],
@@ -2558,11 +2584,11 @@ COUNTRY_SEA_LANES = {
     ("germany", "italy"): ["sea:north", "dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:tyrrhenian"],
     ("france", "italy"): ["sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:tyrrhenian"],
     ("italy", "britain"): ["sea:tyrrhenian", "sea:westmed", "gibraltar", "sea:westafrica", "sea:biscay", "sea:channel", "dover"],
-    ("germany", "china"): ["sea:north", "dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:eastchina"],
-    ("france", "china"): ["sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:eastchina"],
-    ("italy", "china"): ["sea:tyrrhenian", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:eastchina"],
-    ("britain", "china"): ["dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:eastchina"],
-    ("ussr", "japan"): ["sea:baltic", "sea:skagerrak", "sea:norwegian", "sea:arcticmid", "sea:barents", "sea:arcticeast", "sea:bering", "sea:northpacific", "sea:seajapan"],
+    ("germany", "china"): ["sea:north", "dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "babmandeb", "sea:arabian", "malacca", "sea:southchina", "sea:luzon", "sea:westpacific", "sea:eastchina"],
+    ("france", "china"): ["sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "babmandeb", "sea:arabian", "malacca", "sea:southchina", "sea:luzon", "sea:westpacific", "sea:eastchina"],
+    ("italy", "china"): ["sea:tyrrhenian", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "babmandeb", "sea:arabian", "malacca", "sea:southchina", "sea:luzon", "sea:westpacific", "sea:eastchina"],
+    ("britain", "china"): ["dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "babmandeb", "sea:arabian", "malacca", "sea:southchina", "sea:luzon", "sea:westpacific", "sea:eastchina"],
+    ("ussr", "japan"): ["sea:baltic", "sea:skagerrak", "sea:north", "dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "babmandeb", "sea:arabian", "malacca", "sea:southchina", "sea:luzon", "sea:westpacific", "sea:seajapan"],
     ("china", "japan"): ["sea:eastchina", "sea:seajapan"],
     ("usa", "japan"): ["sea:caribbean", "panama", "sea:eastpacific", "sea:northpacific", "sea:seajapan"],
     ("usa", "china"): ["sea:caribbean", "panama", "sea:eastpacific", "sea:northpacific", "sea:westpacific", "sea:eastchina"],
@@ -2571,15 +2597,15 @@ COUNTRY_SEA_LANES = {
     ("usa", "italy"): ["sea:natlantic", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:tyrrhenian"],
     ("usa", "britain"): ["sea:natlantic", "sea:biscay", "sea:channel", "dover"],
     ("usa", "ussr"): ["sea:natlantic", "sea:iceland", "sea:norwegian", "sea:skagerrak", "sea:baltic"],
-    ("ussr", "china"): ["sea:baltic", "sea:skagerrak", "sea:norwegian", "sea:arcticmid", "sea:barents", "sea:arcticeast", "sea:bering", "sea:northpacific", "sea:westpacific", "sea:eastchina"],
+    ("ussr", "china"): ["sea:baltic", "sea:skagerrak", "sea:north", "dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "babmandeb", "sea:arabian", "malacca", "sea:southchina", "sea:luzon", "sea:westpacific", "sea:eastchina"],
     ("france", "ussr"): ["sea:channel", "dover", "sea:north", "sea:skagerrak", "sea:baltic"],
     ("italy", "ussr"): ["sea:tyrrhenian", "sea:westmed", "gibraltar", "sea:westafrica", "sea:biscay", "sea:channel", "dover", "sea:north", "sea:skagerrak", "sea:baltic"],
     ("britain", "ussr"): ["dover", "sea:north", "sea:skagerrak", "sea:baltic"],
     ("germany", "ussr"): ["sea:north", "sea:skagerrak", "sea:baltic"],
-    ("britain", "japan"): ["dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:seajapan"],
-    ("france", "japan"): ["sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:seajapan"],
-    ("italy", "japan"): ["sea:tyrrhenian", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:seajapan"],
-    ("germany", "japan"): ["sea:north", "dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "sea:arabian", "malacca", "sea:southchina", "sea:westpacific", "sea:seajapan"],
+    ("britain", "japan"): ["dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "babmandeb", "sea:arabian", "malacca", "sea:southchina", "sea:luzon", "sea:westpacific", "sea:seajapan"],
+    ("france", "japan"): ["sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "babmandeb", "sea:arabian", "malacca", "sea:southchina", "sea:luzon", "sea:westpacific", "sea:seajapan"],
+    ("italy", "japan"): ["sea:tyrrhenian", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "babmandeb", "sea:arabian", "malacca", "sea:southchina", "sea:luzon", "sea:westpacific", "sea:seajapan"],
+    ("germany", "japan"): ["sea:north", "dover", "sea:channel", "sea:biscay", "sea:westafrica", "gibraltar", "sea:westmed", "sea:centralmed", "sea:eastmed", "suez", "sea:red", "babmandeb", "sea:arabian", "malacca", "sea:southchina", "sea:luzon", "sea:westpacific", "sea:seajapan"],
 }
 
 def loc_coords(cid, loc):
@@ -2617,18 +2643,32 @@ def _sea_node_xy(n):
     i = STRAITS_DATA.get(n)
     return (i["lon"], i["lat"]) if i else None
 
+SEA_POLAR_LAT = 66.5  # مرحلهٔ ۴: مسیر قطبی (شمالگان/جنوبگان) در مسیر‌یابی کشتی‌ها نیست.
+
 def _sea_graph():
     g = _SEA_CACHE.get("g")
     if g: return g
-    nodes = sorted(set(NAVAL_WAYPOINTS) | set(STRAITS_DATA))
+    nodes = sorted(n for n in set(NAVAL_WAYPOINTS) | set(STRAITS_DATA)
+                   if _sea_node_xy(n) and abs(_sea_node_xy(n)[1]) < SEA_POLAR_LAT)
     xy = {n: _sea_node_xy(n) for n in nodes}
     adj = {n: {} for n in nodes}
     def link(a, b):
         if a == b or a not in xy or b not in xy: return
         d = _great_circle_km(xy[a], xy[b]); adj[a][b] = d; adj[b][a] = d
     for lane in COUNTRY_SEA_LANES.values():
-        lane = [x for x in lane if x in xy]
-        for a, b in zip(lane, lane[1:]): link(a, b)
+        # گره‌های قطبی حذف می‌شوند و مسیر در همان نقطه قطع می‌شود (دو گرهٔ دو سوی آن به‌هم وصل نمی‌شوند).
+        seg = []
+        for x in list(lane) + [None]:
+            if x in xy: seg.append(x); continue
+            for a, b in zip(seg, seg[1:]): link(a, b)
+            seg = []
+    # زنجیرهٔ تنگه‌ها: عبور از هرمز، باب‌المندب و بسفر برای منابع اجباری است.
+    for a_, b_ in SEA_SITE_CHAIN_CUTS:
+        if a_ in adj and b_ in adj[a_]: del adj[a_][b_]
+        if b_ in adj and a_ in adj[b_]: del adj[b_][a_]
+    for chain in SEA_SITE_CHAINS:
+        chain = [x for x in chain if x in xy]
+        for a_, b_ in zip(chain, chain[1:]): link(a_, b_)
     # گره‌هایی که در هیچ مسیر تعریف‌شده‌ای نیستند به دو گرهٔ دریایی نزدیک وصل می‌شوند.
     linked = [n for n in nodes if adj[n]]
     for n in nodes:
@@ -2666,7 +2706,7 @@ def _sea_graph():
                 nd = dik + dist[k][j]
                 if nd < dist[i][j]: dist[i][j] = nd; nxt[i][j] = nxt[i][k]
     ref = max((d for row in dist for d in row if d != INF), default=1.0)
-    g = {"nodes": nodes, "xy": xy, "idx": idx, "dist": dist, "nxt": nxt, "ref": max(1.0, ref)}
+    g = {"nodes": nodes, "xy": xy, "idx": idx, "dist": dist, "nxt": nxt, "adj": adj, "ref": max(1.0, ref)}
     _SEA_CACHE["g"] = g
     return g
 
@@ -2695,46 +2735,119 @@ def sea_travel_seconds(km):
 def sea_seconds_per_km():
     return (TRAVEL_MAX_SECONDS - TRAVEL_MIN_SECONDS) / _sea_ref_km()
 
-def sea_route_between(a_xy, b_xy, skip=()):
-    """کوتاه‌ترین مسیر دریایی بین دو نقطه؛ لیست شناسهٔ گذرگاه‌ها/تنگه‌هایی که باید از آن‌ها گذشت."""
+def _sea_blocked_nodes(traveler):
+    """مرحلهٔ ۴: تنگه‌هایی که برای این مسافر بسته‌اند (مالک همیشه آزاد است)؛ مسیر‌یاب تا جای ممکن آن‌ها را دور می‌زند."""
+    if not traveler: return set()
+    return {sid for sid in STRAITS_DATA if strait_policy(sid, traveler).get("closed", False)}
+
+def _sea_shortest(starts, ends, blocked=()):
+    """Dijkstra چندمنبعی روی گراف دریایی. starts/ends: {نام گره: هزینهٔ اتصال به نقطهٔ واقعی (km)}.
+    گره‌های blocked عبور داده نمی‌شوند. خروجی: (طول کل km، لیست گره‌ها) یا None."""
+    import heapq
+    g = _sea_graph(); adj = g["adj"]
+    blocked = set(blocked or ())
+    heap = [(c, n, (n,)) for n, c in starts.items() if n in adj and n not in blocked]
+    heapq.heapify(heap); done = set()
+    while heap:
+        c, n, path = heapq.heappop(heap)
+        if n in done: continue
+        done.add(n)
+        if n in ends:
+            # اولین گره‌ای که با هزینهٔ اتصال انتهایی کمینه شود؛ برای درستی همهٔ end ها بررسی می‌شوند
+            best_end = c + ends[n]
+            # ادامهٔ جست‌وجو فقط اگر گرهٔ نزدیک‌تر دیگری با مجموع کمتر ممکن باشد
+            cand = (best_end, list(path))
+            while heap and heap[0][0] < cand[0]:
+                c2, n2, p2 = heapq.heappop(heap)
+                if n2 in done: continue
+                done.add(n2)
+                if n2 in ends and c2 + ends[n2] < cand[0]: cand = (c2 + ends[n2], list(p2))
+                for m, d in adj[n2].items():
+                    if m not in done and m not in blocked: heapq.heappush(heap, (c2 + d, m, p2 + (m,)))
+            return cand
+        for m, d in adj[n].items():
+            if m not in done and m not in blocked: heapq.heappush(heap, (c + d, m, path + (m,)))
+    return None
+
+def _sea_choose(starts, ends, traveler=None):
+    """کوتاه‌ترین مسیر؛ تنگهٔ بسته تا جای ممکن دور زده می‌شود.
+    خروجی: (گره‌ها، {"alt": مسیر جایگزین انتخاب شد, "blocked": ناچار از تنگهٔ بسته می‌گذرد})."""
+    blocked = _sea_blocked_nodes(traveler)
+    free = _sea_shortest(starts, ends, ())
+    if not free: return [], {"alt": False, "blocked": False}
+    if not blocked or not any(n in blocked for n in free[1]):
+        return free[1], {"alt": False, "blocked": False}
+    alt = _sea_shortest(starts, ends, blocked)
+    if alt: return alt[1], {"alt": True, "blocked": False, "free_km": free[0], "alt_km": alt[0]}
+    return free[1], {"alt": False, "blocked": True}
+
+def _sea_access_nodes(country):
+    """گره‌های دریایی که بندر کشور از طریق مسیرهای تعریف‌شدهٔ بازی به آن‌ها وصل است (برای جلوگیری از خط مستقیم روی خشکی)."""
+    cache = _SEA_CACHE.setdefault("access", {})
+    if country in cache: return cache[country]
+    out = []
+    for (a, b), lane in COUNTRY_SEA_LANES.items():
+        if not lane: continue
+        if a == country and lane[0] not in out: out.append(lane[0])
+        if b == country and lane[-1] not in out: out.append(lane[-1])
+    cache[country] = out
+    return out
+
+def _sea_start_nodes(a_xy, src, k=3):
+    g = _sea_graph(); nodes, xy, idx = g["nodes"], g["xy"], g["idx"]
+    if src in idx: return {src: 0.0}
+    return {nodes[i]: _great_circle_km(a_xy, xy[nodes[i]])
+            for i in sorted(range(len(nodes)), key=lambda i: _great_circle_km(a_xy, xy[nodes[i]]))[:k]}
+
+def sea_route_between(a_xy, b_xy, skip=(), traveler=None, info=None):
+    """کوتاه‌ترین مسیر دریایی بین دو نقطه؛ لیست شناسهٔ گذرگاه‌ها/تنگه‌هایی که باید از آن‌ها گذشت.
+    تنگهٔ بسته برای traveler تا جای ممکن دور زده می‌شود (info برای گزارش alt/blocked پر می‌شود)."""
     g = _sea_graph(); nodes, xy = g["nodes"], g["xy"]
     if not a_xy or not b_xy or _great_circle_km(a_xy, b_xy) < 150: return []
-    near = lambda p: sorted(range(len(nodes)), key=lambda i: _great_circle_km(p, xy[nodes[i]]))[:3]
-    best = None
-    for i in near(a_xy):
-        for j in near(b_xy):
-            d = _great_circle_km(a_xy, xy[nodes[i]]) + g["dist"][i][j] + _great_circle_km(xy[nodes[j]], b_xy)
-            if best is None or d < best[0]: best = (d, i, j)
-    if not best: return []
-    path, i, j = [best[1]], best[1], best[2]
-    while i != j:
-        i = g["nxt"][i][j]
-        if i is None: return []
-        path.append(i)
-    return [nodes[k] for k in path if nodes[k] not in skip]
+    near = lambda p: {nodes[i]: _great_circle_km(p, xy[nodes[i]])
+                      for i in sorted(range(len(nodes)), key=lambda i: _great_circle_km(p, xy[nodes[i]]))[:3]}
+    path, meta = _sea_choose(near(a_xy), near(b_xy), traveler)
+    if info is not None: info.update(meta)
+    return [n for n in path if n not in skip]
+
+def sea_route_to_node(a_xy, gateway, traveler=None, info=None, src=None):
+    """کوتاه‌ترین مسیر گراف از نقطهٔ a تا یک گرهٔ مشخص (دروازهٔ اجباری)؛ لیست گره‌ها شامل خود دروازه."""
+    g = _sea_graph()
+    if not a_xy or gateway not in g["idx"]: return []
+    path, meta = _sea_choose(_sea_start_nodes(a_xy, src), {gateway: 0.0}, traveler)
+    if info is not None: info.update(meta)
+    return path
 
 def _sea_loc_xy(cid, loc):
     """نقطهٔ دریایی یک موضع: خانه برای ناوها بندر کشور است."""
     if loc == "home": return COUNTRY_PORT_COORDS.get(cid) or loc_coords(cid, loc)
     return loc_coords(cid, loc)
 
-def _sea_geometry(cid, src, dst, target_country=None):
-    """مسیر واقعی دریایی و طول آن (کیلومتر)، بدون محاسبهٔ زمان."""
+def _sea_geometry(cid, src, dst, target_country=None, traveler=None):
+    """مسیر واقعی دریایی و طول آن (کیلومتر)، بدون محاسبهٔ زمان.
+    مرحلهٔ ۴: همیشه کوتاه‌ترین مسیر گراف دریایی؛ اگر تنگهٔ بسته (برای traveler، پیش‌فرض cid) روی آن باشد
+    نزدیک‌ترین مسیر جایگزین انتخاب می‌شود و فقط اگر جایگزینی نبود همان مسیر کوتاه می‌ماند (info: alt/blocked)."""
     if target_country is None and isinstance(dst, str) and dst.startswith("country:"):
         target_country = dst.split(":", 1)[1]
+    traveler = traveler or cid
     a = _sea_loc_xy(cid, src)
     b = (COUNTRY_PORT_COORDS.get(target_country) or loc_coords(cid, dst)) if target_country else _sea_loc_xy(cid, dst)
     if not a or not b: return None
+    info = {"alt": False, "blocked": False}
+    g = _sea_graph()
     if target_country:
-        nodes = list(_country_route_straits(cid, target_country, cid) or [])
-        if nodes and src != "home":
-            cands = [(i, _great_circle_km(a, _sea_node_xy(n))) for i, n in enumerate(nodes) if _sea_node_xy(n)]
-            if cands:
-                ni = min(cands, key=lambda r: r[1])[0]
-                nodes = nodes[ni + (1 if nodes[ni] == src else 0):]
-        if not nodes: nodes = sea_route_between(a, b, skip={src, dst})
+        nodes = []
+        if cid != target_country:
+            ends = {n: _great_circle_km(_sea_node_xy(n), b) for n in _sea_access_nodes(target_country) if n in g["idx"]}
+            starts = ({n: _great_circle_km(a, _sea_node_xy(n)) for n in _sea_access_nodes(cid) if n in g["idx"]}
+                      if src == "home" else _sea_start_nodes(a, src))
+            if starts and ends:
+                nodes, info = _sea_choose(starts, ends, traveler)
+        if not nodes: nodes = sea_route_between(a, b, skip={src, dst}, traveler=traveler, info=info)
+    elif dst in SITE_SEA_GATEWAY and SITE_SEA_GATEWAY[dst] in g["idx"]:
+        nodes = sea_route_to_node(a, SITE_SEA_GATEWAY[dst], traveler=traveler, info=info, src=src)
     else:
-        nodes = sea_route_between(a, b, skip={src, dst})
+        nodes = sea_route_between(a, b, skip={src, dst}, traveler=traveler, info=info)
     clean = []
     for n in nodes:
         if n in (src, dst) or not _sea_node_xy(n): continue
@@ -2744,11 +2857,12 @@ def _sea_geometry(cid, src, dst, target_country=None):
     legs = [_great_circle_km(points[i], points[i + 1]) for i in range(len(points) - 1)]
     km = sum(legs)
     return {"nodes": clean, "points": points, "leg_km": legs, "km": km,
-            "straits": [n for n in clean if n in STRAITS_DATA]}
+            "straits": [n for n in clean if n in STRAITS_DATA],
+            "alt_route": bool(info.get("alt")), "via_closed": bool(info.get("blocked"))}
 
-def plan_sea_voyage(cid, src, dst, target_country=None):
+def plan_sea_voyage(cid, src, dst, target_country=None, traveler=None):
     """مسیر واقعی دریایی، طول آن (کیلومتر) و زمان حرکت را برمی‌گرداند؛ همهٔ مأموریت‌های دریایی از همین‌جا زمان می‌گیرند."""
-    geo = _sea_geometry(cid, src, dst, target_country)
+    geo = _sea_geometry(cid, src, dst, target_country, traveler)
     if not geo: return None
     geo["seconds"] = sea_travel_seconds(geo["km"])
     return geo
@@ -2871,8 +2985,15 @@ def _turn_back(t, now, reason=None):
     here = geo_interp(fr, to, min(1.0, elapsed / total)) if (fr and to and total > 0) else fr
     t["from_ll"] = here; t["to_ll"] = (COUNTRY_PORT_COORDS.get(cid, loc_coords(cid, t["origin"])) if t["origin"] == "home" and has_naval_units(t.get("units", {})) else loc_coords(cid, t["origin"]))
     t["kind"] = "back"; t["to"] = t["origin"]; t["from"] = "mid"; t["dst_free"] = False
-    t["full_path"] = None; t["leg"] = 0; t["passage"] = False
+    fp = t.get("full_path"); lg = int(t.get("leg") or 0)
+    t["full_path"] = None; t["leg"] = 0; t["passage"] = False; t["whole_path"] = False
     t["start"] = now.isoformat(); t["arrive"] = (now + timedelta(minutes=elapsed)).isoformat()
+    if fp and len(fp) > 2 and has_naval_units(t.get("units", {})) and 0 <= lg < len(fp) - 1:
+        # مرحلهٔ ۵: بازگشت دریایی از همان مسیر دریایی که آمده (نه خط مستقیم روی خشکی)؛ زمان = طول واقعی مسیر برگشت.
+        back = [list(here)] + [list(x) for x in reversed(fp[:lg + 1])]
+        km = sum(_great_circle_km(back[i], back[i + 1]) for i in range(len(back) - 1))
+        t["full_path"] = back; t["whole_path"] = True; t["to_ll"] = list(back[-1])
+        t["arrive"] = (now + timedelta(seconds=max(1.0, km * sea_seconds_per_km()))).isoformat()
     back_name = loc_label(t["to"])
     announce("turnback", "بازگشت نیرو از میانهٔ راه",
              f"{cname(cid)} نیروهای خود را که به {dst_name} می‌رفتند از میانهٔ راه به {back_name} بازگرداند"
@@ -3298,7 +3419,7 @@ def _start_route_battle(a, b, now, position):
     sea_battle = has_naval_units(a.get("units")) and has_naval_units(b.get("units"))
     front = "naval" if sea_battle else "land"
     for t in (a, b):
-        resume = {k: t.get(k) for k in ("from", "to", "from_ll", "to_ll", "start", "arrive", "kind", "dst_free", "origin", "passage", "route_final_dst", "route_remaining_straits", "full_path", "leg")}
+        resume = {k: t.get(k) for k in ("from", "to", "from_ll", "to_ll", "start", "arrive", "kind", "dst_free", "origin", "passage", "route_final_dst", "route_remaining_straits", "full_path", "leg", "whole_path")}
         t["route_battle"] = {"id": bid, "front": front, "started_at": start, "ends_at": end, "position": list(position), "resume": resume}
         t["from"] = "mid"; t["to"] = "mid"; t["from_ll"] = list(position); t["to_ll"] = list(position)
         t["start"] = start; t["arrive"] = end
@@ -3467,6 +3588,17 @@ async def transit_loop():
         try: await _run_transits_for_all_worlds()
         except Exception as e: logging.error("transit tick: %s", e)
 
+def _route_strait_blockers(cid, route_nodes):
+    """مرحلهٔ ۳: پیش از حرکت، تنگه‌هایی از مسیر که عبور از آن‌ها طبق قوانین فعلی بازی ممکن نیست را پیدا می‌کند.
+    تنگهٔ بستهٔ دشمن بدون پیمان، گذرگاه نبرد است و مجاز می‌ماند؛ ولی با پیمان عدم تجاوز، عبور ممنوع است
+    (قبلاً ناوگان تا خود تنگه می‌رفت و بعد برمی‌گشت). خروجی: متن خطا یا None."""
+    for sid in route_nodes or []:
+        if sid not in STRAITS_DATA: continue
+        owner = site_owner(sid)
+        if owner and owner != cid and strait_policy(sid, cid).get("closed") and have_treaty(cid, owner, "non_aggression"):
+            return f"{loc_label(sid)} بسته است و به‌دلیل پیمان عدم تجاوز با {cname(owner)} نمی‌توانید از آن عبور کنید."
+    return None
+
 async def dispatch_forces(request):
     uid = get_auth_user_id(request)
     if not uid: return _bad("unauthorized", 401)
@@ -3533,6 +3665,12 @@ async def dispatch_forces(request):
         policy = strait_policy(sid, cid)
         if sid_owner and sid_owner != cid and not policy["closed"]:
             toll_due += max(0, int(policy.get("toll", 0)))
+    if plan and plan.get("via_closed"):
+        closed_names = [loc_label(sid) for sid in route_straits
+                        if sid in STRAITS_DATA and strait_policy(sid, cid).get("closed")]
+        return _bad("مسیر دریایی وجود ندارد؛ تنگهٔ بسته: " + "، ".join(closed_names or ["نامشخص"]))
+    blocked_msg = _route_strait_blockers(cid, route_straits)
+    if blocked_msg: return _bad(blocked_msg)
     if p.get("money", 0) < toll_due:
         return _bad(f"برای عوارض مسیر دریایی خزانه کافی نیست؛ عوارض موردنیاز {toll_due:,}$ و موجودی شما {p.get('money', 0):,}$ است.")
 
@@ -3589,7 +3727,7 @@ async def get_map_transits(request):
         if not fr or not to: continue
         fp = None if rb else t.get("full_path")
         out.append({"id": t["id"], "country": cid, "from_ll": list(fr), "to_ll": list(to),
-                    "path": fp, "leg": int(t.get("leg") or 0),
+                    "path": fp, "leg": int(t.get("leg") or 0), "whole_path": bool(t.get("whole_path")) and not rb,
                     "battle_ll": list((rb or t.get("arrival_battle") or {}).get("position") or []) or None, "kind": t["kind"],
                     "from_name": "⚔️ نبرد در مسیر" if (t.get("route_battle") or t.get("arrival_battle")) else ("میانهٔ راه" if t["from"] == "mid" else loc_label(t["from"])),
                     "to_name": "درگیری" if (t.get("route_battle") or t.get("arrival_battle")) else loc_label(t["to"]),
@@ -4233,13 +4371,23 @@ def _infra_ready(country, infra_id):
 
 def _trade_sea_plan(a, b, traveler):
     """مسیر واقعی دریایی کشتی تجاری از بندر a تا بندر b؛ اگر یکی از تنگه‌های مسیر برای traveler بسته باشد، حمل دریایی ممکن نیست."""
-    geo = _sea_geometry(a, "home", f"country:{b}", b)
+    geo = _sea_geometry(a, "home", f"country:{b}", b, traveler)
     if not geo: return None
     if any(strait_policy(sid, traveler).get("closed", False) for sid in geo["straits"]):
         return None
     geo = dict(geo)
     geo["seconds"] = sea_travel_seconds(geo["km"])
     return geo
+
+
+def _no_route_message(a, b, traveler, default):
+    """اگر تنها مانع حمل دریایی تنگهٔ بسته (بدون مسیر جایگزین) باشد، علت را صریح می‌گوید."""
+    if _infra_ready(a, "naval_port") and _infra_ready(b, "naval_port"):
+        geo = _sea_geometry(a, "home", f"country:{b}", b, traveler)
+        if geo and geo.get("via_closed"):
+            names = [STRAITS_DATA[sid]["name"] for sid in geo["straits"] if strait_policy(sid, traveler).get("closed", False)]
+            return "مسیر دریایی وجود ندارد؛ تنگهٔ بسته: " + "، ".join(names or ["نامشخص"])
+    return default
 
 
 def _route_candidates(a, b, traveler_cid=None):
@@ -4286,11 +4434,11 @@ def _route_quote(a, b, amount, preferred_mode=None):
         return None, "در زمان جنگ، تجارت مستقیم بین دو کشور تحریم است."
     routes = _route_candidates(a, b, traveler_cid=b)
     if not routes:
-        return None, "هیچ مسیر قابل استفاده‌ای بین دو کشور وجود ندارد."
+        return None, _no_route_message(a, b, b, "هیچ مسیر قابل استفاده‌ای بین دو کشور وجود ندارد.")
     quotes = [_price_route(a, b, amount, b, r) for r in routes]
     if preferred_mode:
         same = [q for q in quotes if q["mode"] == preferred_mode]
-        if not same: return None, "این نوع حمل برای این معامله ممکن نیست."
+        if not same: return None, (_no_route_message(a, b, b, "این نوع حمل برای این معامله ممکن نیست.") if preferred_mode == "sea" else "این نوع حمل برای این معامله ممکن نیست.")
         return min(same, key=lambda x: x["transport_cost"]), None
     # ارزان‌ترین مسیر مجاز انتخاب می‌شود.
     return min(quotes, key=lambda x: x["transport_cost"]), None
@@ -4300,7 +4448,7 @@ def _route_options(a, b, amount, traveler_cid=None):
     if _war_between(a, b): return [], "در زمان جنگ، تجارت مستقیم بین دو کشور تحریم است."
     traveler = traveler_cid or b
     routes = _route_candidates(a, b, traveler_cid=traveler)
-    if not routes: return [], "هیچ مسیر قابل استفاده‌ای بین دو کشور وجود ندارد."
+    if not routes: return [], _no_route_message(a, b, traveler, "هیچ مسیر قابل استفاده‌ای بین دو کشور وجود ندارد.")
     return [_price_route(a, b, amount, traveler, r) for r in routes], None
 
 
