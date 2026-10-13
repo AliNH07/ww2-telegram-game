@@ -131,6 +131,7 @@ async function apiPost(path, body = {}, params = {}) {
                 }
             }
         }
+        if (result?.player && typeof result.player === "object") result.player._clientAt = Date.now();
         if (result?.success) {
             if (result.completion_message) enqueueActivityToast(result.completion_message, null);
             handleActivityNotices(result.player);
@@ -772,39 +773,131 @@ function updateHomeStats() {
     document.querySelectorAll(".sb-money").forEach(e => { e.textContent = formatMoney(player.money); });
     renderResourceBars();
     renderHomeActivities();
+    refreshBuildViewsIfChanged();
 }
 
-/* ---------- فعالیت‌های در حال انجام (صفحهٔ خانه) ----------
-   هر کار صف ساخت (player.build_queue) یک ردیف دارد: نام، زمان باقی‌مانده و نوار پیشرفت.
-   زمان‌ها با ساعت سرور (player.server_now) همگام می‌شوند تا ساعت دستگاه اثری نداشته باشد. */
+/* ---------- صف‌های در حال انجام (صفحهٔ خانه) ----------
+   دو صف مستقل و هم‌زمان:
+   ۱) صف فعالیت‌های خانه (player.build_queue): فقط یک فعالیت؛ نام، زمان باقی‌مانده و نوار پیشرفت.
+   ۲) صف کارخانهٔ ارتش (player.factory_queues): برای هر دسته (زمینی/دریایی/هوایی/موشکی) یک صف؛ سفارش فعال با
+      نام یگان، تعداد باقی‌مانده، زمان تکمیل و نوار پیشرفت. واحدها یکی‌یکی و طبق زمان ساخت تحویل می‌شوند.
+   زمان‌ها با ساعت سرور (player.server_now) همگام می‌شوند تا ساعت دستگاه اثری نداشته باشد.
+   نوار پیشرفت از راست به چپ پر می‌شود (جهت rtl + لنگر راست). */
 let activitiesRefreshAt = 0;
 function fmtCountdown(ms) {
     const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
     const p2 = n => String(n).padStart(2, "0");
     return h ? `${h}:${p2(m)}:${p2(r)}` : `${p2(m)}:${p2(r)}`;
 }
+function serverNowMs() {
+    const offset = player?.server_now ? Date.parse(player.server_now) - (player._clientAt || Date.now()) : 0;
+    return Date.now() + (Number.isFinite(offset) ? offset : 0);
+}
+// فعالیت در حال انجام در صف خانه (اگر باشد)
+function homeActiveJob() {
+    const now = serverNowMs();
+    const live = (player?.build_queue || []).map(j => ({ j, end: Date.parse(j.end) }))
+        .filter(x => Number.isFinite(x.end) && x.end > now).sort((a, b) => a.end - b.end);
+    return live.length ? live[0].j : null;
+}
+function homeBusyText() {
+    const job = homeActiveJob();
+    if (!job) return "";
+    return `${job.label || "فعالیت"} · ${fmtCountdown(Date.parse(job.end) - serverNowMs())} مانده`;
+}
+function factoryLimit(group) { return Number(player?.factory_queue_limits?.[group]) || ({ land: 20, naval: 16, air: 20, missile: 12 })[group] || 0; }
+// خط زمانی یک صف کارخانه: سفارش اول از start سرور شروع می‌شود و هر سفارش بعدی از لحظهٔ پایان قبلی
+function factoryTimeline(group) {
+    const now = serverNowMs(), rows = []; let cursor = null;
+    (player?.factory_queues?.[group] || []).forEach(o => {
+        const count = Math.max(1, Number(o.count) || 1), us = Math.max(1, Number(o.unit_seconds) || 1) * 1000;
+        let start = o.start ? Date.parse(o.start) : cursor;
+        if (!Number.isFinite(start)) start = now;
+        if (cursor != null && start < cursor) start = cursor;
+        const end = start + count * us;
+        const delivered = now >= end ? count : Math.max(Number(o.delivered) || 0, Math.min(count, Math.floor(Math.max(0, now - start) / us)));
+        const waiting = now < start;
+        rows.push({ o, group, count, start, end, waiting, delivered, remaining: count - delivered,
+                    left: end - now, pct: waiting ? 0 : Math.min(100, Math.max(0, (now - start) / (end - start) * 100)) });
+        cursor = end;
+    });
+    return rows;
+}
+function barHtml(pct) {
+    return `<div class="hm-act-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct.toFixed(1)}%"></i></div>`;
+}
 function renderHomeActivities() {
     const box = document.getElementById("home-activities"), list = document.getElementById("home-activities-list");
-    if (!box || !list) return;
-    const offset = player?.server_now ? Date.parse(player.server_now) - (player._clientAt || Date.now()) : 0;
-    const now = Date.now() + (Number.isFinite(offset) ? offset : 0);
+    const now = serverNowMs();
     const jobs = (player?.build_queue || []).map(job => {
         const start = Date.parse(job.start), end = Date.parse(job.end);
         return { job, start, end, left: end - now };
     }).filter(x => Number.isFinite(x.start) && Number.isFinite(x.end));
     const active = jobs.filter(x => x.left > 0).sort((a, b) => a.end - b.end);
     // کاری که زمانش تمام شده دیگر «در حال انجام» نیست؛ یک‌بار وضعیت از سرور تازه می‌شود تا نتیجه ثبت شود.
-    if (jobs.some(x => x.left <= 0) && Date.now() - activitiesRefreshAt > 3000) {
+    const factoryDone = ["land", "naval", "air", "missile"].some(g => factoryTimeline(g).some(r => r.left <= 0));
+    if ((jobs.some(x => x.left <= 0) || factoryDone) && Date.now() - activitiesRefreshAt > 3000) {
         activitiesRefreshAt = Date.now(); refreshPlayer();
     }
-    box.classList.toggle("hidden", !active.length);
-    list.innerHTML = active.map(x => {
-        const pct = Math.min(100, Math.max(0, ((now - x.start) / Math.max(1, x.end - x.start)) * 100));
-        return `<div class="hm-act-row"><div class="hm-act-head"><b>${escapeHtml(x.job.label || "فعالیت")}</b><span>${fmtCountdown(x.left)} مانده</span></div>
-            <div class="hm-act-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct.toFixed(1)}%"></i></div></div>`;
+    if (box && list) {
+        box.classList.toggle("hidden", !active.length);
+        list.innerHTML = active.map(x => {
+            const pct = Math.min(100, Math.max(0, ((now - x.start) / Math.max(1, x.end - x.start)) * 100));
+            return `<div class="hm-act-row"><div class="hm-act-head"><b>${escapeHtml(x.job.label || "فعالیت")}</b><span>${fmtCountdown(x.left)} مانده</span></div>${barHtml(pct)}</div>`;
+        }).join("");
+    }
+    renderHomeFactory();
+    renderFactoryPanel();
+}
+function renderHomeFactory() {
+    const box = document.getElementById("home-factory"), list = document.getElementById("home-factory-list");
+    if (!box || !list) return;
+    const rows = [];
+    ["land", "naval", "air", "missile"].forEach(g => {
+        const tl = factoryTimeline(g).filter(r => r.left > 0);
+        if (!tl.length) return;
+        const cur = tl[0], u = ARMY_UNITS[cur.o.unit_id] || { name: cur.o.unit_id }, waiting = tl.length - 1;
+        rows.push(`<div class="hm-act-row"><div class="hm-act-head"><b>${GROUP_ICONS[g] || ""} ${escapeHtml(u.name)}</b><span>${fmtCountdown(cur.left)} مانده</span></div>
+            <div class="hm-act-sub"><span>${formatNumber(cur.remaining)} از ${formatNumber(cur.count)} باقی‌مانده</span>${waiting ? `<span>+${formatNumber(waiting)} سفارش در انتظار</span>` : ""}</div>${barHtml(cur.pct)}</div>`);
+    });
+    box.classList.toggle("hidden", !rows.length);
+    list.innerHTML = rows.join("");
+}
+// بخش «صف کارخانه» در صفحهٔ ارتش: سفارش‌های دستهٔ انتخاب‌شده
+function renderFactoryPanel() {
+    const box = document.getElementById("army-factory-queue");
+    if (!box || box.closest(".game-page")?.classList.contains("hidden") || !player) return;
+    const g = currentArmyTab, tl = factoryTimeline(g).filter(r => r.left > 0), limit = factoryLimit(g);
+    const head = document.getElementById("army-factory-head"), body = document.getElementById("army-factory-list");
+    if (head) head.innerHTML = `<b>🏭 صف کارخانه · ${GROUP_TITLES[g] || ""}</b><span class="fq-count ${tl.length >= limit ? "full" : ""}">${formatNumber(tl.length)} از ${formatNumber(limit)} سفارش</span>`;
+    if (!body) return;
+    if (!tl.length) { body.innerHTML = `<div class="fq-empty">صف کارخانه خالی است؛ یگان موردنظر را سفارش دهید.</div>`; return; }
+    body.innerHTML = tl.map((r, i) => {
+        const u = ARMY_UNITS[r.o.unit_id] || { name: r.o.unit_id };
+        return `<div class="fq-row ${r.waiting ? "waiting" : "active"}">
+            <div class="hm-act-head"><b>${i + 1}. ${escapeHtml(u.name)}</b><span>${r.waiting ? "در انتظار" : "در حال تولید"}</span></div>
+            <div class="fq-stats"><span>سفارش‌داده‌شده <b>${formatNumber(r.count)}</b></span><span>باقی‌مانده <b>${formatNumber(r.remaining)}</b></span>
+                <span>زمان تکمیل <b>${fmtCountdown(r.left)}</b></span></div>${barHtml(r.pct)}</div>`;
     }).join("");
 }
 setInterval(renderHomeActivities, 1000);
+
+// وقتی سطح ساختمان‌ها یا صف‌ها تغییر کرد (مثلاً فعالیتی تمام شد)، صفحه‌ای که باز است تازه شود.
+let buildSignature = null;
+function refreshBuildViewsIfChanged() {
+    if (!player) return;
+    const sig = JSON.stringify([(player.build_queue || []).map(j => j.id),
+        Object.entries(player.infra || {}).map(([k, v]) => k + ":" + v.level),
+        Object.entries(player.economy || {}).map(([k, v]) => k + ":" + v.level),
+        ["land", "naval", "air", "missile"].map(g => (player.factory_queues?.[g] || []).map(o => o.id + ":" + (o.delivered || 0)))]);
+    if (sig === buildSignature) return;
+    const first = buildSignature === null; buildSignature = sig;
+    if (first) return;
+    const visible = id => { const el = document.getElementById(id); return el && !el.classList.contains("hidden"); };
+    if (visible("economy")) renderEconomyList();
+    if (visible("infrastructure") && !document.getElementById("infra-sheet")) renderInfraTab(document.querySelector(".infra-tab.active")?.dataset.infraTab || "power");
+    if (visible("army")) { renderArmySummary(); renderBaseCards(); renderArmyTabsCounts(); renderArmyUnitsNew(); }
+}
 
 function updateSeasonGateBanner() {
     const banner = document.getElementById("season-gate-banner");
@@ -1298,6 +1391,7 @@ function renderInfraList(cid, filterFn) {
         if (!item.next) btnLabel = "حداکثر سطح";
         else btnLabel = built ? `ارتقا به سطح ${item.level + 1} — ${formatMoney(need.cost)}`
                               : `ساخت — ${formatMoney(need.cost)}`;
+        if (item.next && homeActiveJob()) btnLabel = "⏳ صف خانه مشغول است";
         const short = need && !need.moneyOk;
 
         const card = document.createElement("div");
@@ -1353,8 +1447,11 @@ function openInfraSheet(iid) {
         rows.push(`<div class="is-row ${r.ok ? "" : "is-bad"}"><span>${RESOURCE_ICONS[r.key] || ""} ${RESOURCE_NAMES[r.key] || r.key} لازم</span><b>${formatNumber(r.need)} <small>(موجود: ${formatNumber(r.have)})</small></b></div>`);
     });
 
+    const busyJob = homeActiveJob();
+    if (busyJob) rows.unshift(`<div class="is-row is-bad"><span>⏳ فعالیت در حال انجام</span><b>${escapeHtml(busyJob.label || "فعالیت")} <small>(${fmtCountdown(Date.parse(busyJob.end) - serverNowMs())} مانده)</small></b></div>`);
     let okLabel = built ? "ارتقا" : "ساخت";
-    if (!need.moneyOk) okLabel = "پول کافی نیست";
+    if (busyJob) okLabel = "صف خانه مشغول است";
+    else if (!need.moneyOk) okLabel = "پول کافی نیست";
     else if (!need.powerOk) okLabel = "برق کافی نیست";
     else if (!need.resOk) okLabel = "منابع کافی نیست";
 
@@ -1380,7 +1477,7 @@ function openInfraSheet(iid) {
             ${need.moneyOk ? "" : `<div class="is-lack">${formatMoney(need.cost - (player.money ?? 0))} کم دارید</div>`}
             <div class="modal-actions">
                 <button class="modal-cancel">انصراف</button>
-                <button class="modal-ok" ${need.canBuild ? "" : "disabled"}>${okLabel}</button>
+                <button class="modal-ok" ${need.canBuild && !busyJob ? "" : "disabled"}>${okLabel}</button>
             </div>
         </div>`;
     document.body.appendChild(ov);
@@ -1395,7 +1492,8 @@ function openInfraSheet(iid) {
             const d = await apiPost("/api/upgrade-infra", { category: iid });
             if (!d.success) {
                 showToast(d.message || "امکان ساخت نیست.", "error");
-                okBtn.disabled = false;
+                if (d.error === "home_busy") { closeInfraSheet(); await refreshPlayer(); }
+                else okBtn.disabled = false;
                 return;
             }
             player = d.player; updateHomeStats(); closeInfraSheet();
@@ -1462,16 +1560,17 @@ function renderEconomyList() {
         const maxPips = Array.from({length:item.max_level || 0}, (_,i) => `<i class="${i < item.level ? "on" : ""}"></i>`).join("");
         const statusText = !built ? "آمادهٔ سرمایه‌گذاری" : `سطح ${item.level} از ${item.max_level}`;
         const cannotAfford = !!next && Number(player.money || 0) < Number(next.cost || 0);
-        const buttonText = !next ? "حداکثر سطح" : (cannotAfford ? "پول کافی نیست" : (built ? `ارتقای سرمایه‌گذاری · ${formatMoney(next.cost)}` : `سرمایه‌گذاری · ${formatMoney(next.cost)}`));
+        const homeBusy = !!next && !!homeActiveJob();
+        const buttonText = !next ? "حداکثر سطح" : (homeBusy ? "⏳ صف خانه مشغول است" : cannotAfford ? "پول کافی نیست" : (built ? `ارتقای سرمایه‌گذاری · ${formatMoney(next.cost)}` : `سرمایه‌گذاری · ${formatMoney(next.cost)}`));
         card.innerHTML = `
             <div class="eco-card-top"><span class="eco-card-icon">${item.icon || "💼"}</span><div class="eco-card-title"><h3>${escapeHtml(item.name || "سرمایه‌گذاری")}</h3><small>${statusText}</small></div><span class="eco-card-level">${built ? `${item.level}/${item.max_level}` : "جدید"}</span></div>
             <p class="eco-card-desc">${escapeHtml(item.desc || "")}</p>
             <div class="eco-level-pips">${maxPips}</div>
             <div class="eco-income-panel"><small>درآمد روزانهٔ ${built ? "فعلی" : "سطح ۱"}</small><strong>${formatMoney(built ? currentIncome : Number(next?.income || 0))}</strong>${built && next ? `<span>پس از ارتقا: ${formatMoney(nextIncome)} <i>(${incomeGain >= 0 ? "+" : "−"}${formatMoney(Math.abs(incomeGain))})</i></span>` : !built ? `<span>قابل ارتقا تا ${item.max_level} سطح</span>` : `<span>بالاترین سطح</span>`}</div>
-            <div class="eco-card-facts"><span>⚡ برق لازم <b>${formatNumber(item.power_required || 0)}</b></span><span>🪙 هزینه <b>${next ? formatMoney(next.cost) : "—"}</b></span></div>
-            <button class="eco-invest-button ${cannotAfford ? "action-denied" : ""}" ${!next || cannotAfford ? "disabled" : ""} ${cannotAfford ? `title="پول لازم: ${formatMoney(next.cost)} · موجودی شما: ${formatMoney(player.money || 0)}"` : ""}>${buttonText}${cannotAfford ? `<span class="action-error-inline">کمبود ${formatMoney(next.cost - Number(player.money || 0))}</span>` : ""}</button>`;
+            <div class="eco-card-facts"><span>⚡ برق لازم <b>${formatNumber(item.power_required || 0)}</b></span><span>🪙 هزینه <b>${next ? formatMoney(next.cost) : "—"}</b></span><span>⏱ زمان <b>${next ? fmtDurationFa(next.time) : "—"}</b></span></div>
+            <button class="eco-invest-button ${cannotAfford && !homeBusy ? "action-denied" : ""}" ${!next || cannotAfford || homeBusy ? "disabled" : ""} ${cannotAfford ? `title="پول لازم: ${formatMoney(next.cost)} · موجودی شما: ${formatMoney(player.money || 0)}"` : ""}>${buttonText}${cannotAfford ? `<span class="action-error-inline">کمبود ${formatMoney(next.cost - Number(player.money || 0))}</span>` : ""}</button>`;
         const btn = card.querySelector(".eco-invest-button");
-        if (next && !cannotAfford) btn.addEventListener("click", () => upgradeEconomy(iid));
+        if (next && !cannotAfford && !homeBusy) btn.addEventListener("click", () => upgradeEconomy(iid));
         c.appendChild(card);
     });
 }
@@ -1479,8 +1578,9 @@ async function upgradeEconomy(iid) {
     if (!userId) return;
     try {
         const d = await apiPost("/api/upgrade-economy", { category: iid });
-        if (!d.success) { showToast(d.message || "خطا"); return; }
+        if (!d.success) { showToast(d.message || "خطا", "error"); if (d.error === "home_busy") await refreshPlayer(); renderEconomyList(); return; }
         player = d.player; updateHomeStats(); renderEconomyList();
+        if (d.queued) showToast(`سرمایه‌گذاری در صف قرار گرفت؛ حدود ${fmtDurationFa(d.ready_in)} دیگر کامل می‌شود.`, "success");
     } catch (e) { showToast("خطا."); }
 }
 
@@ -1496,12 +1596,14 @@ async function openArmyPage() {
     renderBaseCards();
     renderArmyTabsCounts();
     renderArmyUnitsNew();
+    renderFactoryPanel();
 }
 
 function selectArmyTabAndReveal(group, scroll = true) {
     currentArmyTab = group;
     document.querySelectorAll(".army-tab").forEach(t => t.classList.toggle("active", t.dataset.armyTab === group));
     renderArmyUnitsNew();
+    renderFactoryPanel();
     if (scroll) {
         requestAnimationFrame(() => document.getElementById("army-units-new")?.scrollIntoView({behavior: "smooth", block: "start"}));
     }
@@ -1530,9 +1632,9 @@ function getGroupUsed(group) {
     Object.entries(ARMY_UNITS).forEach(([uid_, u]) => {
         if (u.group === group) t += player?.units?.[uid_] ?? 0;
     });
-    // یگان‌های در صف ساخت هم ظرفیت را اشغال می‌کنند
-    (player?.build_queue || []).forEach(job => {
-        if (job.kind === "train" && ARMY_UNITS[job.unit_id]?.group === group) t += Number(job.count) || 0;
+    // یگان‌های هنوز تحویل‌نشدهٔ صف کارخانه هم ظرفیت را اشغال می‌کنند
+    (player?.factory_queues?.[group] || []).forEach(o => {
+        t += Math.max(0, (Number(o.count) || 0) - (Number(o.delivered) || 0));
     });
     return t;
 }
@@ -1611,8 +1713,10 @@ function renderArmyUnitsNew() {
         const full = used >= cap;
         const totalPower = Math.round(count * (u.attack + u.defense * (player.def_mult?.[group] ?? 1)));
 
+        const queueFull = (player.factory_queues?.[group] || []).length >= factoryLimit(group);
         let statusText = "آماده آموزش";
         if (missing.length) statusText = "🔒 قفل است — برای دیدن نیازها «تولید» را بزنید";
+        else if (queueFull) statusText = "صف کارخانه پر است.";
         else if (full) statusText = "ظرفیت پر است.";
 
         const card = document.createElement("div");
@@ -1628,7 +1732,7 @@ function renderArmyUnitsNew() {
                 </div>
             </div>
             <div class="unit-card-new-action">
-                <button class="unit-produce-btn" ${!missing.length && full ? "disabled" : ""}>⚙️ تولید</button>
+                <button class="unit-produce-btn" ${!missing.length && (full || queueFull) ? "disabled" : ""}>⚙️ تولید</button>
                 <span class="unit-status-text">${statusText}</span>
             </div>`;
         card.querySelector(".unit-produce-btn").addEventListener("click", () => {
@@ -1689,16 +1793,22 @@ function openLockSheet(uid_) {
     ov.querySelector(".modal-cancel").onclick = closeInfraSheet;
 }
 
-async function trainUnit(uid_, count) {
-    if (!userId) return false;
+let trainInFlight = false;
+function newRequestId() {
+    return (window.crypto?.randomUUID?.()) || `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+}
+async function trainUnit(uid_, count, requestId) {
+    if (!userId || trainInFlight) return false;      // دوبار کلیک پشت‌سرهم سفارش دوباره ثبت نمی‌کند
+    trainInFlight = true;
     try {
-        const d = await apiPost("/api/train-unit", { unit_id: uid_, count });
+        const d = await apiPost("/api/train-unit", { unit_id: uid_, count, request_id: requestId || newRequestId() });
         if (!d.success) { showToast(d.message || "خطا", "error"); return false; }
         player = d.player; if (player) player._clientAt = Date.now();
-        if (d.queued) showToast(`ساخت در صف قرار گرفت؛ حدود ${fmtDurationFa(d.ready_in)} دیگر آماده می‌شود.`, "success");
-        updateHomeStats(); renderArmySummary(); renderBaseCards(); renderArmyTabsCounts(); renderArmyUnitsNew();
+        if (d.queued && !d.duplicate) showToast(`سفارش در صف کارخانه ثبت شد؛ تکمیل کامل حدود ${fmtDurationFa(d.ready_in)} دیگر.`, "success");
+        updateHomeStats(); renderArmySummary(); renderBaseCards(); renderArmyTabsCounts(); renderArmyUnitsNew(); renderFactoryPanel();
         return true;
     } catch (e) { showToast("خطا."); return false; }
+    finally { trainInFlight = false; }
 }
 
 function unitCost(u) { return u.cost; }
@@ -1743,13 +1853,19 @@ function openTrainSheet(uid_) {
         </div>`;
     document.body.appendChild(ov);
     const inp = ov.querySelector(".tr-input"), okBtn = ov.querySelector("#tr-ok");
+    let sheetRequestId = newRequestId();
     const getN = () => Math.max(0, Math.floor(Number(inp.value) || 0));
     const update = () => {
         const n = getN(), rows = [];
         rows.push(`<div class="is-row"><span>تعداد فعلی</span><b>${formatNumber(player.units?.[uid_] ?? 0)}</b></div>`);
         Object.entries(u.daily || {}).forEach(([k, d]) =>
             rows.push(`<div class="is-row"><span>🔁 مصرف روزانه · ${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}</span><b>${formatNumber(d * n)} <small>(هر عدد ${formatNumber(d)})</small></b></div>`));
-        if (u.build_seconds) rows.push(`<div class="is-row"><span>⏱ زمان ساخت</span><b>${fmtDurationFa(u.build_seconds)}</b></div>`);
+        if (u.build_seconds) {
+            rows.push(`<div class="is-row"><span>⏱ زمان ساخت هر واحد</span><b>${fmtDurationFa(u.build_seconds)}</b></div>`);
+            if (n > 0) rows.push(`<div class="is-row"><span>⏳ زمان تکمیل کل سفارش</span><b>${fmtDurationFa(u.build_seconds * n)}</b></div>`);
+        }
+        const qLen = (player.factory_queues?.[u.group] || []).length, qMax = factoryLimit(u.group);
+        rows.push(`<div class="is-row ${qLen >= qMax ? "is-bad" : ""}"><span>🏭 سفارش‌های صف ${GROUP_TITLES[u.group] || ""}</span><b>${formatNumber(qLen)} از ${formatNumber(qMax)}</b></div>`);
         if (u.transport_capacity) rows.push(`<div class="is-row"><span>🚚 ظرفیت حمل (تانک/پیاده در دریا)</span><b>${formatNumber(u.transport_capacity)}</b></div>`);
         if (u.aircraft_capacity) rows.push(`<div class="is-row"><span>🛬 ظرفیت هواپیما در دریا</span><b>${formatNumber(u.aircraft_capacity)}</b></div>`);
         if (u.refuel_capacity) rows.push(`<div class="is-row"><span>⛽ ظرفیت سوخت‌رسانی در خشکی</span><b>${formatNumber(u.refuel_capacity)}</b></div>`);
@@ -1764,12 +1880,13 @@ function openTrainSheet(uid_) {
         Object.entries(u.resources || {}).forEach(([k, a]) => {
             bad = row(`${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}`, a * n, Math.floor(player.resources?.[k] ?? 0), false) || bad;
         });
+        if (qLen >= qMax) bad = true;
         if (n > capLeft) { bad = true; rows.push(`<div class="is-row is-bad"><span>📦 ظرفیت آزاد</span><b>${formatNumber(capLeft)}</b></div>`); }
         ov.querySelector("#tr-rows").innerHTML = rows.join("");
         ov.querySelector("#tr-price").className = "is-price" + (bad ? " is-bad" : "");
         ov.querySelector("#tr-price").innerHTML = `<span>قیمت ${formatNumber(n)} عدد</span><b>${formatMoney(cost * n)}</b>`;
         okBtn.disabled = bad || n < 1;
-        okBtn.textContent = n < 1 ? "تعداد را وارد کنید" : bad ? "امکان تولید نیست" : `تولید ${formatNumber(n)} عدد`;
+        okBtn.textContent = n < 1 ? "تعداد را وارد کنید" : qLen >= qMax ? "صف کارخانه پر است" : bad ? "امکان تولید نیست" : `ثبت سفارش ${formatNumber(n)} عدد`;
     };
     ov.querySelectorAll(".tr-step").forEach(b => b.onclick = () => { inp.value = Math.max(1, getN() + Number(b.dataset.d)); update(); });
     ov.querySelectorAll(".tr-quick button").forEach(b => b.onclick = () => { inp.value = b.dataset.n; update(); });
@@ -1781,7 +1898,7 @@ function openTrainSheet(uid_) {
     okBtn.onclick = async () => {
         if (okBtn.disabled) return;
         okBtn.disabled = true;
-        if (await trainUnit(uid_, getN())) closeInfraSheet(); else update();
+        if (await trainUnit(uid_, getN(), sheetRequestId)) closeInfraSheet(); else { sheetRequestId = newRequestId(); update(); }
     };
     update();
 }
