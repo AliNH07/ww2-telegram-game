@@ -104,28 +104,29 @@ def L(**kw):
 
 INFRASTRUCTURE = {
     # ==================== برق ====================
+    # با هر ارتقا برق تولیدی، قیمت و زمان ساخت هر سه بیشتر می‌شوند (time = ثانیه؛ سطح ۱: زغال ۲۲، بادی ۳۲، خورشیدی ۴۱، هسته‌ای ۸۱ دقیقه).
     "power_coal": {
         "name": "نیروگاه زغال‌سنگ", "group": "power", "icon": "⚡",
-        "desc": "ارزان و در دسترس، اما برق کمی تولید می‌کند.",
-        "levels": [L(cost=900_000, capacity=20), L(cost=1_200_000, capacity=40), L(cost=1_500_000, capacity=60)],
+        "desc": "ارزان و در دسترس، اما برق کمی تولید می‌کند. هر ارتقا برق بیشتری می‌دهد ولی گران‌تر و زمان‌برتر است.",
+        "levels": [L(cost=900_000, capacity=20, time=22 * 60), L(cost=1_400_000, capacity=44, time=33 * 60), L(cost=2_000_000, capacity=72, time=46 * 60)],
     },
     "power_wind": {
         "name": "نیروگاه بادی", "group": "power", "icon": "💨",
-        "desc": "برق متوسط با هزینهٔ نگهداری کم. هر سطح برق بیشتری تولید می‌کند.",
-        "levels": [L(cost=1_300_000, capacity=34), L(cost=2_100_000, capacity=56), L(cost=2_500_000, capacity=60)],
+        "desc": "برق متوسط با هزینهٔ نگهداری کم. هر ارتقا برق بیشتری می‌دهد ولی گران‌تر و زمان‌برتر است.",
+        "levels": [L(cost=1_300_000, capacity=34, time=32 * 60), L(cost=2_300_000, capacity=70, time=48 * 60), L(cost=3_400_000, capacity=110, time=67 * 60)],
     },
     "power_solar": {
         "name": "نیروگاه خورشیدی", "group": "power", "icon": "☀️",
-        "desc": "برقی بیشتر از نیروگاه بادی با ساخت گران‌تر.",
-        "levels": [L(cost=2_400_000, capacity=72), L(cost=2_700_000, capacity=86), L(cost=3_000_000, capacity=90)],
+        "desc": "برقی بیشتر از نیروگاه بادی با ساخت گران‌تر. هر ارتقا برق بیشتری می‌دهد ولی گران‌تر و زمان‌برتر است.",
+        "levels": [L(cost=2_400_000, capacity=72, time=41 * 60), L(cost=3_600_000, capacity=120, time=62 * 60), L(cost=5_000_000, capacity=172, time=86 * 60)],
     },
     "power_nuclear": {
         "name": "نیروگاه هسته‌ای", "group": "power", "icon": "☢️",
-        "desc": "پربازده‌ترین نیروگاه. برق زیادی تولید می‌کند اما اورانیوم مصرف می‌کند.",
+        "desc": "پربازده‌ترین نیروگاه. برق زیادی تولید می‌کند اما اورانیوم مصرف می‌کند. هر ارتقا برق بیشتری می‌دهد ولی گران‌تر و زمان‌برتر است.",
         "levels": [
-            L(cost=6_400_000, capacity=164, resources={"uranium": 5_000}),
-            L(cost=8_000_000, capacity=180, resources={"uranium": 12_000}),
-            L(cost=10_000_000, capacity=260, resources={"uranium": 25_000}),
+            L(cost=6_400_000, capacity=164, time=81 * 60, resources={"uranium": 5_000}),
+            L(cost=9_500_000, capacity=290, time=122 * 60, resources={"uranium": 12_000}),
+            L(cost=14_000_000, capacity=440, time=170 * 60, resources={"uranium": 25_000}),
         ],
     },
 
@@ -1047,6 +1048,10 @@ def process_build_queue(player):
         if job.get("kind") == "train" and job.get("unit_id") in ARMY_UNITS:
             units = player.setdefault("units", {})
             units[job["unit_id"]] = units.get(job["unit_id"], 0) + max(0, int(job.get("count", 0) or 0))
+            done = True
+        if job.get("kind") == "infra" and job.get("item_id") in INFRASTRUCTURE:
+            lv_now = player.setdefault("infra_levels", {}).get(job["item_id"], 0)
+            player["infra_levels"][job["item_id"]] = max(lv_now, int(job.get("level", 0) or 0))
             done = True
         # کار از صف خارج می‌شود و اعلان آن همین‌جا (دقیقاً در لحظهٔ پایان) فقط یک بار ثبت می‌شود.
         push_activity_notice(player, done_message(job.get("label") or "فعالیت"),
@@ -2040,6 +2045,13 @@ async def upgrade_infra(request):
     item = INFRASTRUCTURE[item_id]; lv = get_infra_level(p, item_id); levels = item["levels"]
     if lv >= len(levels):
         return web.json_response({"success": False, "error": "max_level"}, status=400)
+    process_build_queue(p)
+    if any(j.get("kind") == "infra" and j.get("item_id") == item_id for j in p.get("build_queue", [])):
+        return web.json_response({"success": False, "error": "in_progress",
+                                  "message": "ساخت یا ارتقای این زیرساخت در حال انجام است."}, status=400)
+    lv = get_infra_level(p, item_id)
+    if lv >= len(levels):
+        return web.json_response({"success": False, "error": "max_level"}, status=400)
     cost = levels[lv]["cost"]; res_cost = levels[lv].get("resources", {})
     if p.get("money", 0) < cost:
         return web.json_response({"success": False, "error": "not_enough_money",
@@ -2053,11 +2065,22 @@ async def upgrade_infra(request):
         if p["resources"].get(k, 0) < a:
             return web.json_response({"success": False, "error": "not_enough_resource",
                                       "message": f"{RESOURCE_NAMES[k]} کافی ندارید."}, status=400)
+    label = f"ساخت {item['name']}" if lv == 0 else f"ارتقای {item['name']} به سطح {lv + 1}"
+    build_s = int(levels[lv].get("time") or 0)
+    if build_s > 0:
+        # ساخت زمان‌دار: هزینه همین حالا کسر می‌شود و سطح بعد از پایان زمان اعمال می‌شود.
+        now = utcnow()
+        p["money"] -= cost
+        for k, a in res_cost.items(): p["resources"][k] -= a
+        p.setdefault("build_queue", []).append({
+            "id": str(uuid.uuid4()), "kind": "infra", "item_id": item_id, "level": lv + 1, "label": label,
+            "start": now.isoformat(), "end": (now + timedelta(seconds=build_s)).isoformat()})
+        save_state()
+        return web.json_response({"success": True, "queued": True, "ready_in": build_s, "player": serialize_player(p)})
     p["money"] -= cost
     for k, a in res_cost.items(): p["resources"][k] -= a
     p["infra_levels"][item_id] = lv + 1
     save_state()
-    label = f"ساخت {item['name']}" if lv == 0 else f"ارتقای {item['name']} به سطح {lv + 1}"
     return web.json_response({"success": True, "completion_message": done_message(label),
                               "player": serialize_player(p)})
 
