@@ -2983,9 +2983,30 @@ body #market .market-action.sell {
 #home .hm-act-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: #F4F0FA; }
 #home .hm-act-head b { font-weight: 800; }
 #home .hm-act-head span { color: #62ddb4; font-variant-numeric: tabular-nums; white-space: nowrap; direction: ltr; }
+#home .hm-act-sub { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 11.5px; color: rgba(244,240,250,.72); }
+#home .hm-factory { border-color: rgba(98,221,180,.28); }
+#home .hm-factory .hm-act-title { color: #62ddb4; }
 /* نوار پیشرفت از راست به چپ پر می‌شود */
 #home .hm-act-bar { position: relative; height: 10px; margin-top: 8px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; direction: rtl; }
 #home .hm-act-bar i { position: absolute; top: 0; bottom: 0; right: 0; left: auto; border-radius: 999px; background: linear-gradient(270deg, #A36CE1, #62ddb4); transition: width .9s linear; }
+
+/* ---------- صف کارخانه (صفحهٔ ارتش) ---------- */
+#army .fq-section { margin: 0 0 12px; padding: 12px 14px; border-radius: 16px; direction: rtl; overflow: hidden;
+    border: 1px solid rgba(98,221,180,.28); background: linear-gradient(rgba(14,8,26,.74), rgba(14,8,26,.74)), #1c1230; }
+#army .fq-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; color: #62ddb4; }
+#army .fq-head b { font-weight: 800; }
+#army .fq-count { padding: 2px 8px; border-radius: 999px; font-size: 11px; color: #F4F0FA; background: rgba(255,255,255,.1); font-variant-numeric: tabular-nums; }
+#army .fq-count.full { color: #ffb4a8; background: rgba(255,120,100,.16); }
+#army .fq-empty { padding: 8px 0 2px; font-size: 12px; color: rgba(244,240,250,.6); }
+#army .fq-row + .fq-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08); }
+#army .fq-row .hm-act-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: #F4F0FA; }
+#army .fq-row .hm-act-head span { font-size: 11.5px; color: #62ddb4; }
+#army .fq-row.waiting .hm-act-head span { color: rgba(244,240,250,.55); }
+#army .fq-row.waiting { opacity: .78; }
+#army .fq-stats { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin-top: 5px; font-size: 11.5px; color: rgba(244,240,250,.72); }
+#army .fq-stats b { color: #F4F0FA; font-variant-numeric: tabular-nums; }
+#army .hm-act-bar { position: relative; height: 10px; margin-top: 8px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; direction: rtl; }
+#army .hm-act-bar i { position: absolute; top: 0; bottom: 0; right: 0; left: auto; border-radius: 999px; background: linear-gradient(270deg, #A36CE1, #62ddb4); transition: width .9s linear; }
 
 /* ==================== پنل جمع‌وجور مدیریت تنگه ==================== */
 .map-info-strait-controls.sp{margin:10px 0 0;padding:10px;border-radius:16px;display:flex;flex-direction:column;gap:8px;background:linear-gradient(145deg,rgba(47,29,67,.96),rgba(30,17,46,.96))}
