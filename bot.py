@@ -1423,6 +1423,8 @@ loans = {}         # وام‌ها
 market_sanctions = {}  # کشور تحریم‌کننده -> مجموعه‌ای از کشورهای محروم از خرید
 diplomacy_proposals = {}  # پیشنهادهای پیمان
 active_treaties = []      # پیمان‌های فعال
+un_messages = []          # پیام‌های بازیکنان به سازمان ملل (برای مدیر)
+reset_notices = {}        # uid(str) -> متن اعلان «ریست شدید»
 
 def create_player(user_id):
     return {"user_id": user_id, "country": None, "money": STARTING_MONEY, "army": 0,
@@ -1518,7 +1520,7 @@ WORLD_STATE_KEYS = [
     "occupied_countries", "occupied_assets", "occupation_yields", "war_declarations", "active_wars", "war_reports", "announcements",
     "unions", "private_messages", "pm_read", "market_listings", "news_feed", "STRAITS_DATA",
     "site_forces", "war_events", "war_history", "transits", "loans", "admin_audit", "market_sanctions",
-    "diplomacy_proposals", "active_treaties",
+    "diplomacy_proposals", "active_treaties", "un_messages", "reset_notices",
 ]
 DEFAULT_STRAITS_DATA = copy.deepcopy(STRAITS_DATA)
 worlds_registry = {"1": {"id": 1, "name": "دنیای ۱", "created_at": None,
@@ -1614,6 +1616,7 @@ def _fresh_world_state():
         "site_forces": {}, "war_events": [], "war_history": [], "transits": [], "loans": {},
         "admin_audit": [], "market_sanctions": {},
         "diplomacy_proposals": {}, "active_treaties": [],
+        "un_messages": [], "reset_notices": {},
     }
 
 
@@ -1834,7 +1837,7 @@ def world_scoped(handler):
                     try:
                         finalize_world_if_due()
                         path = request.path
-                        exempt_before_start = {"/api/select-country", "/api/pm/send", "/api/activity-notices/ack"}
+                        exempt_before_start = {"/api/select-country", "/api/pm/send", "/api/activity-notices/ack", "/api/un/send"}
                         is_admin_path = path.startswith("/api/admin/")
                         result = None
                         if request.method == "POST" and not is_admin_path and path not in exempt_before_start:
@@ -1927,7 +1930,7 @@ async def admin_global(request):
                 "total_players": len(rows), "countries_taken": len(country_set),
                 "active_players": sum(1 for r in rows if (t := parse_dt(r.get("last_seen_at"))) and (now-t).total_seconds() <= 900),
                 "pending_wars": sum(1 for w in (state.get("war_declarations") or {}).values() if isinstance(w, dict) and w.get("status") == "pending_admin"),
-                "private_message_count": len(message_keys),
+                "private_message_count": len(message_keys), "un_message_count": len(state.get("un_messages") or []),
                 "registration_open": bool(meta.get("registration_open", not bool(start))),
                 "game_started_at": start.isoformat() if start else None,
                 "game_ends_at": end.isoformat() if end else None,
@@ -2205,7 +2208,12 @@ async def get_player(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
     if uid not in players: players[uid] = create_player(uid); save_state()
-    return web.json_response(serialize_player(players[uid]))
+    data = serialize_player(players[uid])
+    note = reset_notices.pop(str(uid), None)
+    if note:
+        data["reset_notice"] = note
+        save_state()
+    return web.json_response(data)
 
 async def get_countries(request):
     result = []
@@ -5877,6 +5885,139 @@ async def admin_broadcast(request):
 # =========================================================
 # Web Server
 # =========================================================
+# =========================================================
+# ریست بازیکن و پیام‌های سازمان ملل
+# =========================================================
+UN_MESSAGE_LIMIT = 1000
+UN_MESSAGE_KEEP = 500
+
+def _player_display_name(p):
+    full = " ".join(x for x in [str(p.get("telegram_first_name", "") or "").strip(),
+                                str(p.get("telegram_last_name", "") or "").strip()] if x)
+    if full: return full
+    uname = str(p.get("telegram_username", "") or "").strip()
+    return ("@" + uname) if uname else ""
+
+def reset_player_in_world(uid):
+    # بازیکن را از دنیای فعال کاملاً حذف می‌کند و همهٔ ردپای کشورش را پاک می‌کند.
+    p = players.get(uid)
+    if not p: return False
+    cid = p.get("country")
+    if cid:
+        for k, o in list(map_holdings.items()):
+            if o == cid: del map_holdings[k]
+        for k, o in list(strait_holdings.items()):
+            if o == cid:
+                del strait_holdings[k]; reset_strait_policy(k)
+        for k, g in list(site_forces.items()):
+            if g.get("owner") == cid: del site_forces[k]
+        transits[:] = [t for t in transits if t.get("owner") != cid]
+        now_iso = utcnow().isoformat()
+        for l in loans.values():
+            if cid in (l.get("lender"), l.get("borrower")) and l.get("status") in ("pending", "active", "overdue"):
+                l["status"] = "cancelled_reset"; l["closed_at"] = now_iso
+        for l in market_listings.values():
+            if l.get("status") == "open" and cid in (l.get("seller"), l.get("buyer")):
+                l["status"] = "cancelled_reset"
+        for u_id, u in list(unions.items()):
+            if u.get("leader_country") == cid:
+                del unions[u_id]; continue
+            for key in ("members", "invites", "requests"):
+                if cid in u.get(key, []): u[key].remove(cid)
+        for pr in diplomacy_proposals.values():
+            if pr.get("status") == "pending" and cid in (pr.get("from_country"), pr.get("to_country")):
+                pr["status"] = "cancelled"
+        active_treaties[:] = [t for t in active_treaties if cid not in (t.get("country_a"), t.get("country_b"))]
+        for wid_, w in list(war_declarations.items()):
+            if cid in (w.get("attacker"), w.get("defender")):
+                w["resolved"] = True; w["status"] = "resolved"
+                active_wars.pop(wid_, None)
+        for colony, occ in list(occupied_countries.items()):
+            if occ == cid:
+                del occupied_countries[colony]
+                occupied_assets.pop(colony, None); occupation_yields.pop(colony, None)
+        market_sanctions.pop(cid, None)
+        for by in list(market_sanctions):
+            if cid in (market_sanctions[by] or []):
+                market_sanctions[by] = [x for x in market_sanctions[by] if x != cid]
+                if not market_sanctions[by]: del market_sanctions[by]
+    del players[uid]
+    return True
+
+async def admin_reset_player(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    try: target = int(data.get("user_id"))
+    except (TypeError, ValueError):
+        return web.json_response({"success": False, "message": "شناسهٔ بازیکن نامعتبر است."}, status=400)
+    p = players.get(target)
+    if not p:
+        return web.json_response({"success": False, "message": "بازیکن در این دنیا پیدا نشد."}, status=404)
+    label = _player_display_name(p) or str(target)
+    country_name = COUNTRIES.get(p.get("country"), {}).get("name", "بدون کشور")
+    world_name = _world_meta().get("name", f"دنیای {active_world_id}")
+    reset_player_in_world(target)
+    text = (f"♻️ ریست شدید\nمدیریت بازی شما را از «{world_name}» حذف کرد و بازی شما از ابتدا شروع می‌شود. "
+            "هنگام ورود دوباره، دنیا و کشور را از نو انتخاب کنید.")
+    reset_notices[str(target)] = text
+    log_admin_action("ریست بازیکن", target, f"world={active_world_id}; country={country_name}; name={label}")
+    await _tg_send(target, text)
+    save_state()
+    return web.json_response({"success": True, "message": f"بازیکن «{label}» ریست شد و از «{world_name}» حذف گردید."})
+
+async def send_un_message(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    text = str(data.get("text") or "").strip()[:UN_MESSAGE_LIMIT]
+    if not text: return _bad("متن پیام را بنویسید.")
+    p = _me(uid)
+    cid = p.get("country")
+    if not cid or p.get("is_eliminated"):
+        return _bad("برای ارسال پیام باید در این دنیا کشور داشته باشید.")
+    mine = [m for m in un_messages if m.get("user_id") == uid]
+    if mine:
+        last = parse_dt(mine[-1].get("at"))
+        if last and (utcnow() - last).total_seconds() < 3:
+            return _bad("لطفاً چند ثانیه صبر کنید.", 429)
+    meta = _world_meta()
+    world_name = meta.get("name", f"دنیای {active_world_id}")
+    msg = {"id": str(uuid.uuid4()), "world_id": int(active_world_id), "world_name": world_name,
+           "country": cid, "country_name": COUNTRIES[cid]["name"], "user_id": int(uid),
+           "user_name": _player_display_name(p), "username": str(p.get("telegram_username", "") or ""),
+           "text": text, "at": utcnow().isoformat()}
+    un_messages.append(msg)
+    del un_messages[:-UN_MESSAGE_KEEP]
+    save_state()
+    try:
+        await notify_admin(f"📨 پیام جدید به سازمان ملل\n🌍 {world_name}\n{COUNTRIES[cid]['flag']} {COUNTRIES[cid]['name']} · "
+                           f"{msg['user_name'] or 'بدون نام'} ({uid})\n\n{text[:500]}")
+    except Exception as e:
+        logging.warning("un notify: %s", e)
+    return web.json_response({"success": True, "message": "پیام برای مدیریت سازمان ملل ارسال شد."})
+
+async def get_un_mine(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"error": "unauthorized"}, status=401)
+    rows = [{"id": m.get("id"), "text": m.get("text", ""), "at": m.get("at")}
+            for m in un_messages if m.get("user_id") == uid][-50:]
+    return web.json_response({"messages": rows})
+
+async def admin_un_messages(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    async with WORLD_SWITCH_LOCK:
+        _persist_active_world_memory()
+        rows = []
+        for wid, meta in worlds_registry.items():
+            state = world_states.get(str(wid)) or {}
+            for m in state.get("un_messages") or []:
+                if isinstance(m, dict):
+                    rows.append({**m, "world_id": int(wid), "world_name": meta.get("name", f"دنیای {wid}")})
+    rows.sort(key=lambda m: m.get("at") or "", reverse=True)
+    return web.json_response({"success": True, "messages": rows[:300], "total": len(rows)})
+
 WEB_DIR = os.path.join("web")
 
 NO_CACHE = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"}
@@ -5891,11 +6032,10 @@ async def create_web_app():
     app.router.add_get("/app.js", app_js)
     app.router.add_static("/images/", path=os.path.join(WEB_DIR, "images"), name="images")
     app.router.add_static("/fonts/", path=os.path.join(WEB_DIR, "fonts"), name="fonts")
-    os.makedirs(os.path.join(WEB_DIR, "sounds"), exist_ok=True)   # فایل‌های صوتی عملیات (مثلاً build.mp3)
-    app.router.add_static("/sounds/", path=os.path.join(WEB_DIR, "sounds"), name="sounds")
 
     app.router.add_get("/api/worlds", get_worlds)
     app.router.add_get("/api/admin/global", admin_global)
+    app.router.add_get("/api/admin/un-messages", admin_un_messages)
     for path, h in [
         ("/api/player", get_player), ("/api/countries", get_countries),
         ("/api/army-units", get_army_units),
@@ -5905,7 +6045,7 @@ async def create_web_app():
         ("/api/diplomacy", get_diplomacy), ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
         ("/api/admin/overview", admin_overview),
-        ("/api/admin/wars", admin_wars), ("/api/admin/communications", admin_communications), ("/health", health)]:
+        ("/api/admin/wars", admin_wars), ("/api/admin/communications", admin_communications), ("/api/un/mine", get_un_mine), ("/health", health)]:
         app.router.add_get(path, h if path == "/health" else world_scoped(h))
 
     for path, h in [
@@ -5932,7 +6072,8 @@ async def create_web_app():
         ("/api/border/settings", set_border_settings), ("/api/admin/player/update", admin_update_player),
         ("/api/admin/player/adjust", admin_player_adjust), ("/api/admin/player/message", admin_player_message),
         ("/api/admin/bulk-adjust", admin_bulk_adjust), ("/api/admin/broadcast", admin_broadcast),
-        ("/api/admin/war/review", admin_review_war)]:
+        ("/api/admin/war/review", admin_review_war),
+        ("/api/admin/player/reset", admin_reset_player), ("/api/un/send", send_un_message)]:
         app.router.add_post(path, world_scoped(h))
     app.router.add_post("/api/admin/worlds/create", admin_create_world)
     app.router.add_post("/api/admin/world/start", world_scoped(admin_start_world))
