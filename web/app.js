@@ -5021,7 +5021,8 @@ async function initWorldMap() {
     const inGameRealm = rid => typeof rid === "number" && !!keyById[rid];
     mapBorders = topojson.mesh(world, world.objects.countries, (x, y) => {
         const rx = realmOfGeom.get(x), ry = realmOfGeom.get(y);
-        return rx !== ry;
+        // فقط مرزی که حداقل یک طرفش کشور حاضر در بازی است؛ مرز کشورهای اضافه‌نشده کشیده نمی‌شود
+        return rx !== ry && (inGameRealm(rx) || inGameRealm(ry));
     });
     mapCoast = topojson.mesh(world, world.objects.countries, (x, y) => x === y);
 
