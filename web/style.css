@@ -3194,3 +3194,15 @@ body #home .hm-country {
     color: #FFFFFF; font-weight: 700;
     text-shadow: 0 1px 4px rgba(0, 0, 0, .6);
 }
+
+
+/* پس‌زمینهٔ تصویر کشور برای کارت بیانیه */
+.ann-card { position: relative; overflow: hidden; isolation: isolate; }
+.ann-card.has-bg::before {
+    content: ""; position: absolute; inset: 0; z-index: -2;
+    background-image: var(--ann-bg); background-size: cover; background-position: center;
+}
+.ann-card.has-bg::after {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    background: linear-gradient(180deg, rgba(14,8,22,.55) 0%, rgba(14,8,22,.72) 45%, rgba(14,8,22,.9) 100%);
+}
