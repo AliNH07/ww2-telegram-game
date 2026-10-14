@@ -404,12 +404,12 @@ ECONOMY = {
     "eco_pharma": {
         "name": "داروسازی", "group": "eco", "icon": "💊",
         "desc": "تولید دارو و تجهیزات پزشکی برای داخل و صادرات.", "power_required": 5,
-        "levels": [L(cost=1_750_000, income=1_260_000), L(cost=2_750_000, income=2_060_000), L(cost=4_120_000, income=3_220_000), L(cost=5_880_000, income=4_760_000), L(cost=8_120_000, income=6_830_000)],
+        "levels": [L(cost=2_400_000, income=1_260_000), L(cost=2_750_000, income=2_060_000), L(cost=4_120_000, income=3_220_000), L(cost=5_880_000, income=4_760_000), L(cost=8_120_000, income=6_830_000)],
     },
     "eco_auto": {
         "name": "خودروسازی", "group": "eco", "icon": "🚗",
         "desc": "خط تولید خودرو و قطعات صنعتی.", "power_required": 7,
-        "levels": [L(cost=3_000_000, income=2_205_000), L(cost=4_650_000, income=3_555_000), L(cost=6_750_000, income=5_360_000), L(cost=9_450_000, income=7_785_000), L(cost=12_900_000, income=11_020_000)],
+        "levels": [L(cost=3_600_000, income=2_205_000), L(cost=4_650_000, income=3_555_000), L(cost=6_750_000, income=5_360_000), L(cost=9_450_000, income=7_785_000), L(cost=12_900_000, income=11_020_000)],
     },
     "eco_aerospace": {
         "name": "صنایع هوافضا", "group": "eco", "icon": "🛰️",
@@ -562,8 +562,7 @@ MAP_RESOURCES = {
     # همهٔ سکوها و معدن‌ها در دریا هستند (روی خشکی کشور فعال نمی‌افتند) — zone: sea
     # ---------- نفت ----------
     "oil_gulf": {"type": "oil", "zone": "sea", "name": "سکوی قطر", "lon": 51.5, "lat": 27.0, "production": 5_000_000},
-    "oil_caspian": {"type": "oil", "zone": "sea", "name": "سکوی آذربایجان", "lon": 50.8, "lat": 40.2, "production": 3_000_000},
-    "oil_northsea": {"type": "oil", "zone": "sea", "name": "سکوی دانمارک", "lon": 3.2, "lat": 56.5, "production": 4_000_000},
+    "oil_northsea": {"type": "oil", "zone": "sea", "name": "سکوی دانمارک", "lon": 5.5, "lat": 57.8, "production": 4_000_000},
     "oil_gom": {"type": "oil", "zone": "sea", "name": "سکوی آمریکا (خلیج مکزیک)", "lon": -90.5, "lat": 28.2, "production": 4_000_000},
     "oil_campos": {"type": "oil", "zone": "sea", "name": "سکوی برزیل", "lon": -40.0, "lat": -22.5, "production": 2_500_000},
     "oil_texas": {"type": "oil", "zone": "sea", "name": "سکوی مکزیک", "lon": -94.5, "lat": 26.5, "production": 4_000_000},
@@ -574,11 +573,10 @@ MAP_RESOURCES = {
     "oil_barents": {"type": "oil", "zone": "sea", "name": "سکوی روسیه (بارنتس)", "lon": 38.0, "lat": 73.0, "production": 3_000_000},
     "oil_southchina": {"type": "oil", "zone": "sea", "name": "سکوی ویتنام", "lon": 111.0, "lat": 13.0, "production": 3_500_000},
     "oil_beaufort": {"type": "oil", "zone": "sea", "name": "سکوی آمریکا (بوفورت)", "lon": -145.0, "lat": 71.5, "production": 3_000_000},
-    "oil_norway": {"type": "oil", "zone": "sea", "name": "سکوی نروژ", "lon": 2.0, "lat": 60.5, "production": 3_500_000},
+    "oil_norway": {"type": "oil", "zone": "sea", "name": "سکوی نروژ", "lon": 3.0, "lat": 63.0, "production": 3_500_000},
     "oil_india": {"type": "oil", "zone": "sea", "name": "سکوی هند", "lon": 70.5, "lat": 19.5, "production": 3_500_000},
     "oil_medeast": {"type": "oil", "zone": "sea", "name": "سکوی مصر", "lon": 29.5, "lat": 33.0, "production": 2_500_000},
     # ---------- آهن ----------
-    "steel_ural": {"type": "steel", "zone": "sea", "name": "معدن آهن قزاقستان (خزر)", "lon": 50.5, "lat": 42.5, "production": 3_000_000},
     "steel_ruhr": {"type": "steel", "zone": "sea", "name": "معدن آهن هلند", "lon": 3.0, "lat": 53.5, "production": 4_000_000},
     "steel_brazil": {"type": "steel", "zone": "sea", "name": "معدن آهن برزیل", "lon": -33.0, "lat": -8.0, "production": 3_500_000},
     "steel_mesabi": {"type": "steel", "zone": "sea", "name": "معدن آهن کانادا (گرند بنکس)", "lon": -51.0, "lat": 44.0, "production": 3_000_000},
@@ -587,6 +585,8 @@ MAP_RESOURCES = {
     "steel_tasman": {"type": "steel", "zone": "sea", "name": "معدن آهن استرالیا", "lon": 156.0, "lat": -30.0, "production": 3_000_000},
     "steel_arabian": {"type": "steel", "zone": "sea", "name": "معدن آهن هند", "lon": 71.0, "lat": 15.0, "production": 3_000_000},
     "steel_biscay": {"type": "steel", "zone": "sea", "name": "معدن آهن فرانسه", "lon": -6.0, "lat": 45.5, "production": 3_000_000},
+    "oil_blacksea": {"type": "oil", "zone": "sea", "name": "سکوی ترکیه (دریای سیاه)", "lon": 34.5, "lat": 43.0, "production": 3_000_000},
+    "steel_blacksea": {"type": "steel", "zone": "sea", "name": "معدن آهن بلغارستان (دریای سیاه)", "lon": 37.5, "lat": 43.8, "production": 3_000_000},
     # ---------- اورانیوم ----------
     "uranium_kazakh": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم یونان (آیونی)", "lon": 18.0, "lat": 35.5, "production": 2_500_000},
     "uranium_canada": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم کانادا", "lon": -85.0, "lat": 59.5, "production": 2_000_000},
@@ -600,25 +600,18 @@ MAP_RESOURCES = {
     "food_ukraine": {"type": "food", "zone": "sea", "name": "ماهیگیری رومانی (دریای سیاه)", "lon": 31.0, "lat": 43.5, "production": 2_500_000},
     "food_india": {"type": "food", "zone": "sea", "name": "ماهیگیری هند (خلیج بنگال)", "lon": 88.0, "lat": 14.0, "production": 2_500_000},
     "food_peru": {"type": "food", "zone": "sea", "name": "ماهیگیری پرو", "lon": -80.0, "lat": -12.5, "production": 2_500_000},
-    "food_norway": {"type": "food", "zone": "sea", "name": "ماهیگیری نروژ", "lon": 5.0, "lat": 67.0, "production": 2_500_000},
     "food_japansea": {"type": "food", "zone": "sea", "name": "ماهیگیری ژاپن", "lon": 135.0, "lat": 40.0, "production": 2_500_000},
     "food_bering": {"type": "food", "zone": "sea", "name": "ماهیگیری آمریکا (برینگ)", "lon": -170.0, "lat": 58.0, "production": 2_500_000},
     # ---------- آفریقا: منابع بیشتر از هر منطقهٔ دیگر ----------
     "oil_gabon": {"type": "oil", "zone": "sea", "name": "سکوی گابن", "lon": 8.0, "lat": -2.5, "production": 3_500_000},
-    "oil_ghana": {"type": "oil", "zone": "sea", "name": "سکوی غنا", "lon": -2.5, "lat": 3.8, "production": 3_000_000},
     "oil_libya": {"type": "oil", "zone": "sea", "name": "سکوی لیبی", "lon": 19.0, "lat": 33.0, "production": 4_000_000},
     "oil_algeria": {"type": "oil", "zone": "sea", "name": "سکوی الجزایر", "lon": 5.0, "lat": 38.0, "production": 3_500_000},
     "oil_redsea": {"type": "oil", "zone": "sea", "name": "سکوی سودان (دریای سرخ)", "lon": 37.8, "lat": 21.5, "production": 3_000_000},
     "oil_mozambique": {"type": "oil", "zone": "sea", "name": "سکوی موزامبیک", "lon": 42.5, "lat": -13.5, "production": 3_000_000},
     "oil_namibia": {"type": "oil", "zone": "sea", "name": "سکوی نامیبیا", "lon": 11.0, "lat": -27.0, "production": 3_000_000},
-    "oil_senegal": {"type": "oil", "zone": "sea", "name": "سکوی سنگال", "lon": -18.0, "lat": 13.5, "production": 3_000_000},
     "steel_safrica": {"type": "steel", "zone": "sea", "name": "معدن آهن آفریقای جنوبی", "lon": 16.0, "lat": -34.5, "production": 3_500_000},
     "steel_morocco": {"type": "steel", "zone": "sea", "name": "معدن آهن مراکش", "lon": -11.5, "lat": 31.0, "production": 3_000_000},
-    "steel_tanzania": {"type": "steel", "zone": "sea", "name": "معدن آهن تانزانیا", "lon": 41.5, "lat": -7.0, "production": 3_000_000},
-    "steel_guinea": {"type": "steel", "zone": "sea", "name": "معدن آهن گینه بیسائو", "lon": -17.5, "lat": 10.0, "production": 3_000_000},
     "uranium_safrica": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم آفریقای جنوبی", "lon": 15.0, "lat": -31.5, "production": 2_400_000},
-    "uranium_madagascar": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم ماداگاسکار", "lon": 50.8, "lat": -17.0, "production": 2_200_000},
-    "uranium_gabon": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم کنگو", "lon": 7.0, "lat": -6.0, "production": 2_200_000},
     "food_namibia": {"type": "food", "zone": "sea", "name": "ماهیگیری نامیبیا (بنگوئلا)", "lon": 12.5, "lat": -24.0, "production": 2_500_000},
     "food_senegal": {"type": "food", "zone": "sea", "name": "ماهیگیری سنگال", "lon": -18.5, "lat": 15.5, "production": 2_500_000},
     "food_somalia": {"type": "food", "zone": "sea", "name": "ماهیگیری سومالی", "lon": 52.5, "lat": 10.0, "production": 2_500_000},
@@ -2053,6 +2046,26 @@ async def admin_create_world(request):
         log_admin_action("ساخت دنیای جدید", None, f"world_id={next_id}; name={name}")
         save_state()
         return web.json_response({"success": True, "world": worlds_registry[str(next_id)]})
+
+async def admin_delete_world(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    wid = str(data.get("world_id", "")).strip()
+    async with WORLD_SWITCH_LOCK:
+        if wid not in worlds_registry:
+            return web.json_response({"success": False, "message": "این دنیا وجود ندارد."}, status=404)
+        if len(worlds_registry) <= 1:
+            return web.json_response({"success": False, "message": "آخرین دنیا قابل حذف نیست."}, status=400)
+        _persist_active_world_memory()
+        name = worlds_registry[wid].get("name", wid)
+        worlds_registry.pop(wid, None)
+        world_states.pop(wid, None)
+        if str(active_world_id) == wid:
+            _activate_world(sorted(worlds_registry, key=lambda x: int(x))[0])
+        log_admin_action("حذف دنیا", None, f"world_id={wid}; name={name}")
+        save_state()
+    return web.json_response({"success": True, "message": f"دنیای «{name}» حذف شد."})
 
 async def autosave_loop():
     while True:
@@ -6175,6 +6188,7 @@ async def create_web_app():
         ("/api/admin/player/reset", admin_reset_player), ("/api/un/send", send_un_message), ("/api/guide/seen", mark_guide_seen)]:
         app.router.add_post(path, world_scoped(h))
     app.router.add_post("/api/admin/worlds/create", admin_create_world)
+    app.router.add_post("/api/admin/worlds/delete", admin_delete_world)
     app.router.add_post("/api/admin/world/start", world_scoped(admin_start_world))
     app.router.add_post("/api/admin/world/registration", world_scoped(admin_set_world_registration))
 
