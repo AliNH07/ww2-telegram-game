@@ -4595,7 +4595,11 @@ async def invite_union(request):
     if any(target in other.get("members", []) for other in unions.values() if other["id"] != u_id):
         return web.json_response({"success": False, "error": "in_other"}, status=400)
     u.setdefault("invites", [])
-    if target not in u["invites"]: u["invites"].append(target)
+    newly_invited = target not in u["invites"]
+    if newly_invited: u["invites"].append(target)
+    if newly_invited:
+        notify_country(target, f"🤝 {COUNTRIES[cid]['name']} شما را به اتحادیه «{u.get('name', 'اتحادیه')}» دعوت می‌کند.\n"
+                               "برای قبول یا رد، وارد بازی شوید و در بخش ارتباطات ← اتحادیه تصمیم بگیرید.")
     save_state()
     return web.json_response({"success": True})
 
@@ -4638,7 +4642,11 @@ async def request_union_membership(request):
         if other["id"] != u_id and cid in other.get("requests", []):
             other["requests"].remove(cid)
     requests = u.setdefault("requests", [])
-    if cid not in requests: requests.append(cid)
+    newly_requested = cid not in requests
+    if newly_requested: requests.append(cid)
+    if newly_requested:
+        notify_country(u.get("leader_country"), f"📨 {COUNTRIES[cid]['name']} می‌خواهد به اتحادیه «{u.get('name', 'اتحادیه')}» بپیوندد.\n"
+                                               "برای قبول یا رد، وارد بازی شوید و در بخش ارتباطات ← اتحادیه ← مدیریت تصمیم بگیرید.")
     save_state()
     return web.json_response({"success": True, "pending": True})
 
