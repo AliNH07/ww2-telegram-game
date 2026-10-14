@@ -1646,17 +1646,12 @@ function openEconomySheet(iid) {
     if (next) {
         const upNow = Number(item.upkeep || 0), upNext = Number(item.next_upkeep || 0);
         rows.push(`<div class="is-row"><span>🔧 هزینهٔ روزانه</span><b>${built ? `از ${formatMoney(upNow)} به ${formatMoney(upNext)}` : formatMoney(upNext)}</b></div>`);
-        rows.push(`<div class="is-row"><span>💎 سود خالص روزانه</span><b>${formatMoney(nextInc - upNext)}${built ? ` <small>(الان ${formatMoney(curInc - upNow)})</small>` : ""}</b></div>`);
     } else {
         rows.push(`<div class="is-row"><span>🔧 هزینهٔ روزانه</span><b>${formatMoney(Number(item.upkeep || 0))}</b></div>`);
     }
     if (next) rows.push(`<div class="is-row"><span>⏱️ زمان ساخت</span><b>${fmtDurationFa(next.time)}</b></div>`);
     rows.push(`<div class="is-row ${powerOk ? "" : "is-bad"}"><span>⚡ برق لازم</span><b>${formatNumber(item.power_required || 0)} واحد <small>(برق آزاد: ${formatNumber(freePower())})</small></b></div>`);
     rows.push(`<div class="is-row"><span>📊 سطح</span><b>${built ? `${item.level} از ${item.max_level}` : `۰ از ${item.max_level}`}</b></div>`);
-    if (next && cost > 0 && nextInc > 0) {
-        const days = cost / (nextInc - (built ? curInc : 0) || nextInc);
-        rows.push(`<div class="is-row"><span>♻️ بازگشت سرمایه</span><b>حدود ${formatNumber(Math.max(1, Math.ceil(days)))} روز</b></div>`);
-    }
     let okLabel = !next ? "حداکثر سطح" : built ? "ارتقا" : "سرمایه‌گذاری";
     if (next) { if (busyJob) okLabel = "صف خانه مشغول است"; else if (!moneyOk) okLabel = "پول کافی نیست"; else if (!powerOk) okLabel = "برق کافی نیست"; }
     const canGo = !!next && moneyOk && powerOk && !busyJob;
