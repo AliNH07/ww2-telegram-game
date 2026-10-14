@@ -1415,8 +1415,13 @@ function renderInfraList(cid, filterFn) {
     const c = document.getElementById(cid);
     if (!c || !player?.infra) return;
     c.innerHTML = "";
-    Object.entries(player.infra).forEach(([iid, item]) => {
-        if (!filterFn(item)) return;
+    const infraSortKey = item => {
+        const f = infraMainFigure(item, item.level > 0 ? item.current : item.next, item.level > 0 ? item.level : 1);
+        const n = f ? parseFloat(String(f.value).replace(/[^0-9.]/g, "")) : 0;
+        return Number.isFinite(n) ? n : 0;
+    };
+    // کمترین مقدار بالا، بیشترین مقدار پایین
+    Object.entries(player.infra).filter(([, it]) => filterFn(it)).sort((x, y) => infraSortKey(x[1]) - infraSortKey(y[1])).forEach(([iid, item]) => {
         const built = item.level > 0;
         const need = infraNeeds(item);
         const fig = infraMainFigure(item, built ? item.current : item.next, built ? item.level : 1);
@@ -1584,7 +1589,8 @@ function renderEconomyList() {
     bindEconomyFilters();
     c.innerHTML = "";
     c.classList.remove("economy-list-grid"); c.classList.add("infra-card-list");
-    const entries = Object.entries(player.economy).filter(([iid]) => currentEconomyFilter === "all" || economyCategoryFor(iid) === currentEconomyFilter);
+    const entries = Object.entries(player.economy).filter(([iid]) => currentEconomyFilter === "all" || economyCategoryFor(iid) === currentEconomyFilter)
+        .sort((x, y) => Number((x[1].level > 0 ? x[1].current?.income : x[1].next?.income) || 0) - Number((y[1].level > 0 ? y[1].current?.income : y[1].next?.income) || 0)); // کمترین درآمد بالا، بیشترین پایین
     if (!entries.length) {
         c.innerHTML = `<div class="economy-empty-state">در این دسته هنوز گزینه‌ای وجود ندارد.</div>`;
         return;
@@ -2836,7 +2842,7 @@ document.querySelectorAll(".nav-item").forEach(item => {
         else if (page === "map") setTimeout(() => initWorldMap(), 30);
         else if (page === "communications") {
             resetNewsFilter();
-            Promise.allSettled([loadAnnouncements(), loadUnion(), loadNews()]).catch(console.error);
+            Promise.allSettled([loadAnnouncements(), loadUnion(), loadNews({ markSeen: isNewsTabVisible() })]).catch(console.error);
             refreshNotificationBadge();
         }
         else if (page === "market") { loadMarketListings(); loadMyListings(); }
@@ -2900,7 +2906,7 @@ gameMenuPanel?.addEventListener("click", async (event) => {
         resetNewsFilter();
         loadAnnouncements().catch(console.error);
         loadUnion().catch(console.error);
-        loadNews().catch(console.error);
+        loadNews({ markSeen: isNewsTabVisible() }).catch(console.error);
     }
     else if (page === "home") updateHomeStats();
 });
@@ -4253,7 +4259,14 @@ function resetNewsFilter() {
     renderNewsList();
 }
 
-async function loadNews() {
+function isNewsTabVisible() {
+    const p = document.getElementById("comm-news");
+    return !!p && !p.classList.contains("hidden");
+}
+
+// markSeen=false: فقط شمارندهٔ «جدید» به‌روز می‌شود و خبرها دیده‌شده حساب نمی‌شوند (مثلاً وقتی تب بیانیه‌ها باز است)
+async function loadNews(opts) {
+    const markSeen = !opts || opts.markSeen !== false;
     const c = document.getElementById("news-list");
     if (!c) return;
     try {
@@ -4261,11 +4274,14 @@ async function loadNews() {
         newsItemsCache = Array.isArray(news) ? news : [];
         knownNewsIds = newsItemsCache.map(n => n.id).filter(Boolean);
         const seenNow = getSeenNews();
-        newsNewIds = new Set(knownNewsIds.filter(id => !seenNow.has(id)));
+        // همهٔ خبرهای دیده‌نشده برچسب «جدید» می‌گیرند؛ برچسب‌ها تا خروج از تب اخبار ثابت می‌مانند
+        knownNewsIds.forEach(id => { if (!seenNow.has(id)) newsNewIds.add(id); });
         renderNewsList();
-        newsNewIds.forEach(id => seenNow.add(id));
-        if (newsNewIds.size) saveSeenNews(seenNow); else syncNewsBadges();
-        setNotifBadge(0);
+        if (markSeen) {
+            knownNewsIds.forEach(id => seenNow.add(id));
+            saveSeenNews(seenNow);
+            setNotifBadge(0);
+        } else syncNewsBadges();
     } catch (e) {
         c.innerHTML = `<div class="news-item"><h3>اخبار</h3><p>دریافت خبرها ممکن نشد.</p></div>`;
     }
