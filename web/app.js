@@ -3618,6 +3618,7 @@ async function openAnnouncementComposer() {
     ov.innerHTML = `
         <section class="modal-box ann-composer-box" role="dialog" aria-modal="true" aria-labelledby="ann-composer-title">
             <div class="ann-modal-head"><div><span class="ann-modal-kicker">بیانیهٔ رسمی کشور</span><h2 class="modal-title" id="ann-composer-title">بیانیهٔ جدید</h2></div><button class="ann-modal-close" type="button" aria-label="بستن">×</button></div>
+            <div class="ann-img-picker" id="ann-img-picker"><div class="ann-img-title">تصویر بیانیه <b>(انتخاب اجباری)</b></div><div class="ann-img-list" id="ann-img-list"><div class="ann-img-empty">در حال دریافت تصاویر…</div></div></div>
             <textarea id="ann-composer-text" class="ann-input ann-composer-text" maxlength="${ANNOUNCEMENT_LIMIT}" placeholder="متن بیانیه را بنویسید…" aria-label="متن بیانیه"></textarea>
             <div class="ann-composer-meta"><span id="ann-char-count">۰ / ۲۰٬۰۰۰</span><span>نوبت ${ANNOUNCEMENT_SLOT_NAMES[currentSlot - 1]} انتشار</span></div>
             <div class="ann-modal-actions"><button type="button" class="modal-cancel ann-modal-cancel">انصراف</button><button type="button" class="ann-publish-button" id="ann-publish-confirm">انتشار بیانیه · ${announcementCurrency(currentCost)}</button></div>
@@ -3626,6 +3627,23 @@ async function openAnnouncementComposer() {
     const input = ov.querySelector("#ann-composer-text");
     const counter = ov.querySelector("#ann-char-count");
     const publish = ov.querySelector("#ann-publish-confirm");
+    const imgList = ov.querySelector("#ann-img-list");
+    let selectedImage = null;
+    const updatePublishState = () => { publish.disabled = !selectedImage; };
+    updatePublishState();
+    (async () => {
+        try {
+            const r = await apiGet("/api/announcements/images");
+            const imgs = Array.isArray(r?.images) ? r.images : [];
+            if (!imgs.length) { imgList.innerHTML = `<div class="ann-img-empty">برای کشور شما تصویری ثبت نشده است؛ انتشار ممکن نیست.</div>`; return; }
+            imgList.innerHTML = imgs.map(im => `<button type="button" class="ann-img-opt" data-img="${escapeHtml(im.id)}" aria-pressed="false"><img src="${escapeHtml(im.url)}" alt="" loading="lazy"><span class="ann-img-check">✓</span></button>`).join("");
+            imgList.querySelectorAll(".ann-img-opt").forEach(btn => btn.addEventListener("click", () => {
+                selectedImage = btn.dataset.img;
+                imgList.querySelectorAll(".ann-img-opt").forEach(b => { const on = b === btn; b.classList.toggle("selected", on); b.setAttribute("aria-pressed", on ? "true" : "false"); });
+                updatePublishState();
+            }));
+        } catch (e) { imgList.innerHTML = `<div class="ann-img-empty">دریافت تصاویر ناموفق بود.</div>`; }
+    })();
     const close = () => ov.remove();
     ov.querySelector(".ann-modal-close").onclick = close;
     ov.querySelector(".ann-modal-cancel").onclick = close;
@@ -3633,15 +3651,16 @@ async function openAnnouncementComposer() {
     input.addEventListener("input", () => { counter.textContent = `${input.value.length.toLocaleString("fa-IR")} / ${ANNOUNCEMENT_LIMIT.toLocaleString("fa-IR")}`; });
     publish.onclick = async () => {
         const text = input.value.trim();
+        if (!selectedImage) { showToast("ابتدا یک تصویر برای بیانیه انتخاب کنید.", "error"); return; }
         if (!text) { showToast("متن بیانیه را بنویسید.", "error"); input.focus(); return; }
         publish.disabled = true;
         publish.textContent = "در حال انتشار…";
         try {
-            const d = await apiPost("/api/announcements/create", { text });
+            const d = await apiPost("/api/announcements/create", { text, image: selectedImage });
             if (!d.success) {
                 showToast(d.message || "انتشار بیانیه انجام نشد.", "error");
-                publish.disabled = false;
                 publish.textContent = `انتشار بیانیه · ${announcementCurrency(currentCost)}`;
+                updatePublishState();
                 await loadAnnouncementStatus(true);
                 return;
             }
@@ -3651,7 +3670,7 @@ async function openAnnouncementComposer() {
             loadAnnouncements();
         } catch (e) {
             showToast("ارتباط با سرور برقرار نشد.", "error");
-            publish.disabled = false;
+            updatePublishState();
             publish.textContent = `انتشار بیانیه · ${announcementCurrency(currentCost)}`;
         }
     };
@@ -3706,11 +3725,11 @@ async function loadAnnouncements() {
                     <div class="ann-balance-track"><span class="ann-balance-support" style="width:${supportPercent.toFixed(2)}%"></span><span class="ann-balance-accuse" style="width:${accusePercent.toFixed(2)}%"></span></div>
                     <div class="ann-balance-legend"><span class="support-legend">● حمایت ${support.length.toLocaleString("fa-IR")}</span><span class="accuse-legend">● محکومیت ${accuse.length.toLocaleString("fa-IR")}</span></div>
                 </div>
-                ${(supportFlags || accuseFlags) ? `<div class="ann-flags">${supportFlags ? `<div class="ann-flags-row"><span>✅ حمایت</span> ${supportFlags}</div>` : ""}${accuseFlags ? `<div class="ann-flags-row"><span>⚑ محکومیت</span> ${accuseFlags}</div>` : ""}</div>` : ""}
+                ${(supportFlags || accuseFlags) ? `<div class="ann-flags ann-flags-split"><div class="ann-flags-col support"><span class="ann-flags-head">✅ حمایت‌کنندگان</span><div class="ann-flags-items">${supportFlags || '<small class="ann-flags-none">—</small>'}</div></div><div class="ann-flags-col accuse"><span class="ann-flags-head">⚑ محکوم‌کنندگان</span><div class="ann-flags-items">${accuseFlags || '<small class="ann-flags-none">—</small>'}</div></div></div>` : ""}
                 <div class="ann-card-footer"><button type="button" class="ann-reply-button" data-reply-ann="${escapeHtml(a.id)}">↩ پاسخ‌ها <span>${(a.comments || []).length}</span></button></div>`;
             // پس‌زمینهٔ تصویر کشور: web/images/announcements/<شناسه‌کشور>.jpg (اگر فایل نبود، کارت ساده می‌ماند)
-            if (a.from_country) {
-                const bgUrl = annBackgroundUrl(a.from_country);
+            if (a.image || a.from_country) {
+                const bgUrl = a.image || annBackgroundUrl(a.from_country);
                 const probe = new Image();
                 probe.onload = () => { div.style.setProperty("--ann-bg", `url("${bgUrl}")`); div.classList.add("has-bg"); };
                 probe.src = bgUrl;
