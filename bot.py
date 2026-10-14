@@ -2494,13 +2494,11 @@ async def propose_treaty(request):
     diplomacy_proposals[pid] = {"id": pid, "from_user": uid, "from_country": fc,
         "to_user": tuid, "to_country": target, "treaty_type": ttype,
         "duration_days": dur, "status": "pending", "created_at": utcnow().isoformat()}
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ قبول", callback_data=f"treaty:accept:{active_world_id}:{pid}"),
-        InlineKeyboardButton(text="❌ رد", callback_data=f"treaty:reject:{active_world_id}:{pid}")]])
+    # فقط اطلاع‌رسانی؛ تأیید یا رد باید داخل بازی، در بخش دیپلماسی انجام شود.
     try:
         await _tg_send(tuid,
-            f"📜 پیشنهاد {TREATY_TYPE_NAMES[ttype]}\nاز {COUNTRIES[fc]['name']} به مدت {dur} روز",
-            reply_markup=kb)
+            f"📜 پیشنهاد {TREATY_TYPE_NAMES[ttype]}\nاز {COUNTRIES[fc]['name']} به مدت {dur} روز\n"
+            "برای تأیید یا رد، وارد بازی شوید و در بخش «دیپلماسی» تصمیم بگیرید.")
     except Exception as e: logging.warning("treaty msg: %s", e)
     save_state()
     return web.json_response({"success": True, "message": "پیشنهاد ثبت شد."})
@@ -4285,17 +4283,15 @@ async def _broadcast_announcement_notification(cid, author_uid=None):
     country_name = COUNTRIES[cid]["name"]
     text = (f"📢 بیانیهٔ جدید\nکشور «{country_name}» بیانیه‌ای منتشر کرد.\n"
             "متن بیانیه فقط در بخش «ارتباطات ← بیانیه‌ها» قابل مشاهده است.")
-    semaphore = asyncio.Semaphore(8)
-    async def send_to(uid):
-        if author_uid is not None and str(uid) == str(author_uid):
-            return
-        async with semaphore:
-            try:
-                await _tg_send(int(uid), text)
-            except Exception as e:
-                logging.warning("announcement notification failed for %s: %s", uid, e)
-    recipients = [uid for uid in players.keys() if author_uid is None or str(uid) != str(author_uid)]
-    await asyncio.gather(*(send_to(uid) for uid in recipients))
+    # ارسال مستقیم (نه از صف _tg_send): این تابع به‌صورت تسک پس‌زمینه اجرا می‌شود و صف
+    # درخواست تا آن لحظه خالی شده است، پس پیام‌ها از طریق صف هرگز ارسال نمی‌شدند.
+    recipients = [uid for uid in list(players.keys()) if author_uid is None or str(uid) != str(author_uid)]
+    items = [(int(uid), text, None) for uid in recipients]
+    try:
+        sent, failed = await _flush_tg_outbox(items)
+        logging.info("announcement notification: sent=%s failed=%s", sent, failed)
+    except Exception as e:
+        logging.warning("announcement notification failed: %s", e)
 
 async def _broadcast_strait_notification(text):
     """Send public strait-policy changes to every registered player; the bot middleware adds the game button."""
