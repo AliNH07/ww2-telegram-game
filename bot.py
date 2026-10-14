@@ -135,37 +135,37 @@ INFRASTRUCTURE = {
         "power_required": 2,
         "name": "اردوگاه آموزشی", "group": "manpower", "icon": "👥",
         "desc": "پایگاه آموزش نیرو. هر سطح نیروی بیشتری تربیت می‌کند.",
-        "levels": [L(cost=220_000, production=2000), L(cost=480_000, production=5000), L(cost=1_050_000, production=12000), L(cost=2_000_000, production=25000), L(cost=3_600_000, production=50000)],
+        "levels": [L(cost=220_000, production=20000), L(cost=480_000, production=50000), L(cost=1_050_000, production=120000), L(cost=2_000_000, production=250000), L(cost=3_600_000, production=500000)],
     },
     "manpower_barracks_training": {
         "power_required": 3,
         "name": "پادگان آموزشی", "group": "manpower", "icon": "👥",
         "desc": "پادگان تخصصی آموزش سرباز.",
-        "levels": [L(cost=300_000, production=3000), L(cost=650_000, production=7000), L(cost=1_400_000, production=16000), L(cost=2_700_000, production=34000), L(cost=4_900_000, production=68000)],
+        "levels": [L(cost=300_000, production=30000), L(cost=650_000, production=70000), L(cost=1_400_000, production=160000), L(cost=2_700_000, production=340000), L(cost=4_900_000, production=680000)],
     },
     "manpower_volunteer": {
         "power_required": 2,
         "name": "پایگاه داوطلبان", "group": "manpower", "icon": "👥",
         "desc": "داوطلبان داوطلبانه ثبت‌نام می‌کنند.",
-        "levels": [L(cost=180_000, production=2400), L(cost=430_000, production=5600), L(cost=1_050_000, production=13000), L(cost=2_300_000, production=28000), L(cost=4_600_000, production=55000)],
+        "levels": [L(cost=180_000, production=24000), L(cost=430_000, production=56000), L(cost=1_050_000, production=130000), L(cost=2_300_000, production=280000), L(cost=4_600_000, production=550000)],
     },
     "manpower_medical": {
         "power_required": 3,
         "name": "مرکز پزشکی", "group": "manpower", "icon": "👥",
         "desc": "سلامت سربازان را تأمین می‌کند و تولید نیرو را بالا می‌برد.",
-        "levels": [L(cost=260_000, production=2600), L(cost=560_000, production=6200), L(cost=1_250_000, production=14000), L(cost=2_500_000, production=30000), L(cost=4_700_000, production=60000)],
+        "levels": [L(cost=260_000, production=26000), L(cost=560_000, production=62000), L(cost=1_250_000, production=140000), L(cost=2_500_000, production=300000), L(cost=4_700_000, production=600000)],
     },
     "manpower_mobilization": {
         "power_required": 4,
         "name": "مرکز بسیج", "group": "manpower", "icon": "👥",
         "desc": "در زمان جنگ نیروهای بیشتری جذب می‌کند.",
-        "levels": [L(cost=340_000, production=3800), L(cost=720_000, production=9000), L(cost=1_500_000, production=20000), L(cost=2_900_000, production=42000), L(cost=5_300_000, production=85000)],
+        "levels": [L(cost=340_000, production=38000), L(cost=720_000, production=90000), L(cost=1_500_000, production=200000), L(cost=2_900_000, production=420000), L(cost=5_300_000, production=850000)],
     },
     "manpower_academy": {
         "power_required": 5,
         "name": "آکادمی نظامی", "group": "manpower", "icon": "👥",
         "desc": "افسران کارآزموده پرورش می‌دهد.",
-        "levels": [L(cost=430_000, production=4500), L(cost=900_000, production=11000), L(cost=1_800_000, production=24000), L(cost=3_400_000, production=50000), L(cost=6_000_000, production=100000)],
+        "levels": [L(cost=430_000, production=45000), L(cost=900_000, production=110000), L(cost=1_800_000, production=240000), L(cost=3_400_000, production=500000), L(cost=6_000_000, production=1000000)],
     },
 
     # ==================== غذا (۳ آیتم) ====================
@@ -441,8 +441,19 @@ def auto_home_seconds(cost):
     sec = int(round(sec / HOME_TIME_STEP_SEC) * HOME_TIME_STEP_SEC)
     return max(HOME_TIME_MIN_SEC, min(HOME_TIME_MAX_SEC, sec))
 
+# زمان ساخت نیروگاه‌ها (دقیقه): از ۲۰ دقیقه شروع می‌شود و با هر ارتقا کمی بیشتر می‌شود
+POWER_TIMES_MIN = {
+    "power_coal":    [20, 25, 31],
+    "power_wind":    [22, 28, 35],
+    "power_solar":   [25, 32, 40],
+    "power_nuclear": [30, 38, 47],
+}
+
 def _apply_auto_times(catalog):
-    for item in catalog.values():
+    for iid, item in catalog.items():
+        if iid in POWER_TIMES_MIN:
+            for lv, m in zip(item["levels"], POWER_TIMES_MIN[iid]): lv["time"] = m * 60
+            continue
         prev = 0
         for lv in item["levels"]:
             t = auto_home_seconds(lv.get("cost", 0))
@@ -780,11 +791,11 @@ WELFARE_RECOVERY_PER_PERIOD = 3.0       # هر دوره ۳ واحد جبران �
 WELFARE_RECOVERY_PERIOD_HOURS = 6
 WELFARE_EVENT_MIN_H, WELFARE_EVENT_MAX_H = 2, 6
 WELFARE_EVENTS = {
-    "earthquake": {"name": "زلزله",     "icon": "🌋", "bld": "housing",    "drop": 6.0, "chance": 0.7},
-    "pandemic":   {"name": "همه‌گیری",   "icon": "🦠", "bld": "hospital",   "drop": 5.0, "chance": 0.7},
-    "crime":      {"name": "موج سرقت",  "icon": "🚨", "bld": "police",     "drop": 4.0, "chance": 0.8},
-    "drought":    {"name": "خشکسالی",   "icon": "⚠️", "bld": "university", "drop": 3.0, "chance": 0.7},
-    "famine":     {"name": "قحطی",      "icon": "🍞", "bld": "metro",      "drop": 5.0, "chance": 0.6},
+    "earthquake": {"name": "زلزله",     "icon": "🌋", "bld": "housing",    "drop": 6.0, "chance": 0.7, "hours": 3},
+    "pandemic":   {"name": "همه‌گیری",   "icon": "🦠", "bld": "hospital",   "drop": 5.0, "chance": 0.7, "hours": 3},
+    "crime":      {"name": "موج سرقت",  "icon": "🚨", "bld": "police",     "drop": 4.0, "chance": 0.8, "hours": 1.5},
+    "drought":    {"name": "خشکسالی",   "icon": "⚠️", "bld": "university", "drop": 3.0, "chance": 0.7, "hours": 2},
+    "famine":     {"name": "قحطی",      "icon": "🍞", "bld": "metro",      "drop": 5.0, "chance": 0.6, "hours": 3},
 }
 COUNTRY_RISKS = {"germany": ["crime"], "britain": ["pandemic"], "ussr": ["famine", "drought"],
                  "usa": ["crime", "earthquake"], "france": ["drought"], "italy": ["earthquake"],
@@ -799,11 +810,18 @@ def welfare_gross(player):
     return min(WELFARE_MAX, total)
 
 def welfare_penalty_now(player):
-    pen = player.get("welfare_penalty", 0) or 0
+    """مجموع خسارت‌های موقتِ فعال رویدادها (هر خسارت تا زمان پایانش دارد و بعد کاملاً برمی‌گردد)."""
+    now = utcnow(); total = 0.0
+    for pen in player.get("welfare_penalties") or []:
+        until = parse_dt(pen.get("until"))
+        if until and until > now: total += float(pen.get("amt", 0) or 0)
+    # سازگاری با دادهٔ قدیمی (افت تدریجی)
+    old = player.get("welfare_penalty", 0) or 0
     at = parse_dt(player.get("welfare_pen_at"))
-    if pen <= 0 or not at: return 0.0
-    hours = max(0.0, (utcnow() - at).total_seconds() / 3600)
-    return max(0.0, pen - WELFARE_RECOVERY_PER_PERIOD * hours / WELFARE_RECOVERY_PERIOD_HOURS)
+    if old > 0 and at:
+        hours = max(0.0, (now - at).total_seconds() / 3600)
+        total += max(0.0, old - WELFARE_RECOVERY_PER_PERIOD * hours / WELFARE_RECOVERY_PERIOD_HOURS)
+    return total
 
 def welfare_bonus(player):
     return max(0.0, welfare_gross(player) - welfare_penalty_now(player))
@@ -5556,7 +5574,7 @@ async def vip_command(message: types.Message):
 # =========================================================
 # Stats (آمار کشور: رفاه و امنیت)
 # =========================================================
-def welfare_tick():
+async def welfare_tick():
     import random
     meta = _world_meta()
     started = parse_dt(meta.get("game_started_at"))
@@ -5567,31 +5585,41 @@ def welfare_tick():
         cid = p.get("country")
         if not cid or not p.get("started_at") or p.get("is_eliminated"): continue
         ensure_player_fields(p)
+        pens = p.get("welfare_penalties")
+        if pens:   # پاک‌کردن خسارت‌های تمام‌شده
+            alive = [x for x in pens if (parse_dt(x.get("until")) or now) > now]
+            if len(alive) != len(pens): p["welfare_penalties"] = alive; changed = True
         nxt = parse_dt(p.get("welfare_next_at"))
         if nxt is None:
             p["welfare_next_at"] = (now + timedelta(hours=random.uniform(1, WELFARE_EVENT_MAX_H - 2))).isoformat()
             changed = True; continue
         if now < nxt: continue
+        p["welfare_next_at"] = (now + timedelta(hours=random.uniform(WELFARE_EVENT_MIN_H, WELFARE_EVENT_MAX_H))).isoformat()
+        changed = True
+        gross = welfare_gross(p)
+        if gross <= 0: continue                                            # رفاهی نیست که آسیب ببیند
         risks = COUNTRY_RISKS.get(cid, [])
         keys = list(WELFARE_EVENTS)
         key = random.choices(keys, weights=[3 if k in risks else 1 for k in keys])[0]
         ev = WELFARE_EVENTS[key]
         lvl = min(get_infra_level(p, ev["bld"]), len(INFRASTRUCTURE[ev["bld"]]["levels"]))
-        p["welfare_next_at"] = (now + timedelta(hours=random.uniform(WELFARE_EVENT_MIN_H, WELFARE_EVENT_MAX_H))).isoformat()
-        changed = True
-        if random.random() > ev["chance"] * (1 - 0.15 * lvl): continue   # زیرساخت احتمال را کم می‌کند
-        drop = ev["drop"] * (1 - 0.12 * lvl)                              # و افت را هم
-        cur_pen = welfare_penalty_now(p); gross = welfare_gross(p)
+        # هرچه رفاه بالاتر باشد احتمال وقوع رویداد کمتر می‌شود (تا ۱۵٪ شانس پایه)
+        chance = ev["chance"] * max(0.15, 1 - 0.85 * gross / WELFARE_MAX)
+        if random.random() > chance: continue
+        drop = max(1.0, ev["drop"] * (1 - 0.12 * lvl))                    # ساختمان مرتبط افت را کم می‌کند
+        cur_pen = welfare_penalty_now(p)
         eff = max(0.0, min(drop, gross - cur_pen))                        # نه زیرِ صفر
-        if eff < 0.05: eff = 0.0
-        if eff > 0:
-            p["welfare_penalty"] = cur_pen + eff; p["welfare_pen_at"] = now.isoformat()
+        if eff < 0.05: continue
+        hours = ev.get("hours", 2)
+        until = now + timedelta(hours=hours)
+        p.setdefault("welfare_penalties", []).append({"key": key, "amt": round(eff, 2), "until": until.isoformat()})
         bname = INFRASTRUCTURE[ev["bld"]]["name"]
-        text = (f"{ev['icon']} {ev['name']} — رفاه {eff:.1f} واحد کم شد ({bname} سطح {lvl} از 5)" if eff > 0
-                else f"{ev['icon']} {ev['name']} — خسارتی به رفاه نزد ({bname} سطح {lvl} از 5)")
+        hlabel = f"{hours:g}"
+        text = f"{ev['icon']} {ev['name']} — رفاه {eff:.1f} واحد موقتاً کم شد (حدود {hlabel} ساعت) ({bname} سطح {lvl} از 5)"
         evs = p.setdefault("welfare_events", [])
-        evs.append({"at": now.isoformat(), "text": text, "key": key, "drop": round(eff, 2)})
+        evs.append({"at": now.isoformat(), "text": text, "key": key, "drop": round(eff, 2), "until": until.isoformat()})
         del evs[:-30]
+        await notify_user(uid_, f"{ev['icon']} {ev['name']} در کشور شما رخ داد!\nرفاه و امنیت کشور {eff:.1f}٪ موقتاً کاهش یافت و حدود {hlabel} ساعت دیگر به حالت عادی برمی‌گردد.")
     if changed: save_state()
 
 async def get_stats(request):
@@ -6177,7 +6205,7 @@ async def _run_ticks_for_all_worlds():
                     finalize_world_if_due()
                     await check_wars_tick()
                     await _announce_season_transition_if_needed()
-                    welfare_tick()
+                    await welfare_tick()
                     loan_tick()
                     for _pl in list(players.values()):
                         if not isinstance(_pl, dict): continue
