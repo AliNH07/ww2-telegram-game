@@ -2207,14 +2207,14 @@ function dispatchPanelHtml() {
 }
 
 /* قوانین اعزام (آینهٔ قوانین سرور): دریا/خشکی، ناو ترابری، ناو هواپیمابر، سوخت‌رسان */
-function dispatchRuleErrors(units, zone) {
+function dispatchRuleErrors(units, zone, groundOverride) {
     const errs = [], U = k => ARMY_UNITS[k] || {}, n = k => Math.max(0, units[k] || 0);
     const sum = (...ids) => ids.reduce((a, k) => a + n(k), 0);
     const banned = Object.keys(units).filter(k => n(k) > 0 && U(k).group &&
         (U(k).group === "missile" || (zone === "land" && U(k).group === "naval")));
     if (banned.length) errs.push(`این یگان‌ها نمی‌توانند به ${zone === "land" ? "خشکی" : "این موضع"} بروند: ${banned.map(unitName).join("، ")}`);
     if (zone === "sea") {
-        const g = sum("infantry", "tank"), c1 = n("transport_ship") * (U("transport_ship").transport_capacity || 0);
+        const g = (groundOverride ?? sum("infantry", "tank")), c1 = n("transport_ship") * (U("transport_ship").transport_capacity || 0);
         if (g > c1) errs.push(`در دریا، تانک و پیاده‌نظام به ${unitName("transport_ship")} نیاز دارند (ظرفیت ${formatNumber(c1)} از ${formatNumber(g)} یگان)`);
         const p = sum("fighter", "bomber", "air_tanker"), c2 = n("aircraft_carrier") * (U("aircraft_carrier").aircraft_capacity || 0);
         if (p > c2) errs.push(`در دریا، جنگنده و بمب‌افکن به ${unitName("aircraft_carrier")} نیاز دارند (ظرفیت ${formatNumber(c2)} از ${formatNumber(p)} هواپیما)`);
@@ -2230,6 +2230,7 @@ function dispatchErrorsFor(from, to, picked) {
     if (typeof to === "string" && to.startsWith("country:")) {
         const errs = dispatchRuleErrors(picked, "sea");
         const ground = (picked.infantry || 0) + (picked.tank || 0);
+        if ((picked.transport_ship || 0) > 0 && ground < 1) errs.push("ناو ترابری بدون محموله نمی‌تواند برای حمله یا تصرف برود؛ حداقل یک پیاده‌نظام یا تانک همراهش بفرست.");
         if (ground > 0 && !(picked.transport_ship > 0)) errs.push("برای انتقال پیاده‌نظام یا تانک تا بندر دشمن، ناو ترابری لازم است.");
         if (!Object.keys(picked).some(k => (picked[k] || 0) > 0 && ARMY_UNITS[k]?.group === "naval")) errs.push("برای این مسیر دریایی باید ناو انتخاب کنی.");
         return errs;
@@ -2237,12 +2238,15 @@ function dispatchErrorsFor(from, to, picked) {
     const dst = warSites.find(s => s.id === to);
     const combined = { ...picked };
     if (dst?.owner === selectedCountry) Object.entries(poolOf(to)).forEach(([k, v]) => combined[k] = (combined[k] || 0) + v);
-    const errs = dispatchRuleErrors(combined, dst?.zone || (dst?.kind === "strait" ? "sea" : "land"));
+    const sentGround = (picked.infantry || 0) + (picked.tank || 0);
+    const errs = dispatchRuleErrors(combined, dst?.zone || (dst?.kind === "strait" ? "sea" : "land"), sentGround);
+    if (dst?.owner !== selectedCountry && (picked.transport_ship || 0) > 0 && sentGround < 1)
+        errs.push("ناو ترابری بدون محموله نمی‌تواند برای حمله یا تصرف برود؛ حداقل یک پیاده‌نظام یا تانک همراهش بفرست.");
     if (from && from !== "home") {
         const zs = warSites.find(s => s.id === from)?.zone || (warSites.find(s => s.id === from)?.kind === "strait" ? "sea" : "land");
         const before = poolOf(from), after = {};
         Object.keys(before).forEach(k => after[k] = before[k] - (picked[k] || 0));
-        if (!dispatchRuleErrors(before, zs).length && dispatchRuleErrors(after, zs).length)
+        if (!dispatchRuleErrors(before, zs, 0).length && dispatchRuleErrors(after, zs, 0).length)
             errs.push("با خروج این یگان‌ها، نیروهای باقی‌مانده در مبدأ بدون پشتیبان می‌مانند");
     }
     return errs;
