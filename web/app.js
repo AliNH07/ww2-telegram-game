@@ -5017,7 +5017,7 @@ async function initWorldMap() {
     const inGameRealm = rid => typeof rid === "number" && !!keyById[rid];
     mapBorders = topojson.mesh(world, world.objects.countries, (x, y) => {
         const rx = realmOfGeom.get(x), ry = realmOfGeom.get(y);
-        return rx !== ry && (inGameRealm(rx) || inGameRealm(ry));
+        return rx !== ry;
     });
     mapCoast = topojson.mesh(world, world.objects.countries, (x, y) => x === y);
 
@@ -5380,8 +5380,14 @@ function drawMapNow() {
     }
     // مرز کشورها و ساحل
     if (mapBorders) {
+        // مرز مشکی و خوش‌حالت؛ ضخامت با زوم تنظیم می‌شود و یک هالهٔ روشن و نازک زیرش می‌نشیند تا روی همهٔ رنگ‌ها خوانا باشد
+        const bz = Math.max(1, Math.min(4, mapProjection.scale() / (mapSize || 1)));
+        const bw = Math.min(2.4, 0.9 + bz * 0.22);
+        ctx.lineCap = "round"; ctx.lineJoin = "round";
         ctx.beginPath(); mapPath(mapBorders);
-        ctx.lineWidth = 0.6; ctx.strokeStyle = "rgba(215,228,245,0.5)"; ctx.stroke();
+        ctx.lineWidth = bw + 1.2; ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.stroke();
+        ctx.beginPath(); mapPath(mapBorders);
+        ctx.lineWidth = bw; ctx.strokeStyle = "#000"; ctx.stroke();
     }
     if (mapCoast) {
         ctx.beginPath(); mapPath(mapCoast);
