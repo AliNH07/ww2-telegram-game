@@ -3235,15 +3235,16 @@ body #home .hm-country {
 .ann-flags-none { color: #6f6384; }
 
 /* ==================== یکسان‌سازی نمایش در همهٔ گوشی‌ها ==================== */
-/* ارتش: کارت‌های پادگان/فرودگاه/بندر/انبار موشک همیشه چهارتا در یک ردیف (روی گوشی‌های کوچک هم دو ردیف نشود). */
-#army .base-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px; }
-#army .base-card { min-height: 94px !important; padding: 8px 6px 9px !important; }
-@media (max-width: 400px) {
-    #army .base-card-head { flex-direction: column-reverse; align-items: center; justify-content: center; gap: 4px; text-align: center; }
-    #army .base-card-name { font-size: 10px; line-height: 1.35; text-align: center; }
-    #army .base-card-value { font-size: 15px; text-align: center; }
-    #army .base-card-max { text-align: center; font-size: 8.5px; }
-}
+/* ارتش: کارت‌های پایگاه در دو ردیف دوتایی، با چیدمان مرتب و یکسان در همهٔ عرض‌ها. */
+#army .base-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; }
+#army .base-card { min-height: 0 !important; padding: 12px 12px 12px !important; gap: 10px !important; align-items: stretch; }
+#army .base-card-head { flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 9px !important; text-align: right !important; }
+#army .base-card-icon { width: 30px !important; height: 30px !important; font-size: 15px !important; border-radius: 9px !important; order: 0; }
+#army .base-card-name { font-size: 13px !important; font-weight: 700; line-height: 1.3 !important; text-align: right !important; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#army .base-card-row { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin: 0; }
+#army .base-card-value { font-size: 20px !important; margin: 0 !important; text-align: right !important; line-height: 1.1; }
+#army .base-card-max { font-size: 11px !important; text-align: left !important; white-space: nowrap; color: #998BB1; }
+#army .base-card-progress { height: 6px !important; margin-top: 0 !important; }
 
 /* زیرساخت: اندازهٔ منابع (غذا، آهن، اورانیوم، نفت...) ثابت و مستقل از عرض صفحه است. */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
