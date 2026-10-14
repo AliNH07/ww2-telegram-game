@@ -2859,12 +2859,18 @@ function closeGuide() {
     guideModal?.classList.add("hidden");
     try { localStorage.setItem(guideSeenKey(), "1"); } catch (e) {}
 }
-function maybeShowGuide() {
+async function maybeShowGuide() {
+    // فقط بار اولِ ورود به داشبورد؛ هم در مرورگر و هم روی سرور ثبت می‌شود.
     let seen = false;
     try { seen = localStorage.getItem(guideSeenKey()) === "1"; } catch (e) {}
     if (seen) return;
+    try {
+        const me = await apiGet("/api/player");
+        if (me && me.guide_seen) { try { localStorage.setItem(guideSeenKey(), "1"); } catch (e) {} return; }
+    } catch (e) {}
     openGuide();
     try { localStorage.setItem(guideSeenKey(), "1"); } catch (e) {}
+    try { await apiPost("/api/guide/seen", {}); } catch (e) {}
 }
 document.getElementById("guide-close")?.addEventListener("click", closeGuide);
 guideModal?.addEventListener("click", (event) => { if (event.target === guideModal) closeGuide(); });
