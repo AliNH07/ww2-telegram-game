@@ -623,6 +623,25 @@ function getSeenNews() {
 }
 function saveSeenNews(set) {
     try { localStorage.setItem(seenNewsKey(), JSON.stringify([...set].slice(-300))); } catch (e) {}
+    syncNewsBadges();
+}
+let knownNewsIds = [];
+let pmUnreadCount = 0;
+let newsUnseenCount = 0;
+const badgeText = n => (n > 99 ? "99+" : String(n));
+function updateFooterCommBadge() {
+    const el = document.getElementById("nav-comm-badge");
+    if (!el) return;
+    const total = (pmUnreadCount || 0) + (newsUnseenCount || 0);
+    el.textContent = badgeText(total);
+    el.classList.toggle("hidden", !(total > 0));
+}
+function syncNewsBadges() {
+    const seen = getSeenNews();
+    newsUnseenCount = knownNewsIds.filter(id => id && !seen.has(id)).length;
+    const el = document.getElementById("news-tab-badge");
+    if (el) { el.textContent = badgeText(newsUnseenCount); el.classList.toggle("hidden", !(newsUnseenCount > 0)); }
+    updateFooterCommBadge();
 }
 const dismissedNotifsKey = () => `fl93_dismissed_notifications_${userId || "guest"}`;
 function getDismissedNotifications() {
@@ -648,6 +667,8 @@ async function refreshNotificationBadge() {
     try {
         const news = await apiGet("/api/news");
         const list = Array.isArray(news) ? news : [];
+        knownNewsIds = list.map(n => n.id).filter(Boolean);
+        syncNewsBadges();
         const seen = getSeenNews();
         const dismissed = getDismissedNotifications();
         setNotifBadge(list.filter(n => n.id && !seen.has(n.id) && !dismissed.has(n.id)).length);
@@ -4161,6 +4182,7 @@ function inferNewsCategory(item) {
     return "general";
 }
 
+let newsNewIds = new Set();
 function renderNewsList() {
     const c = document.getElementById("news-list");
     if (!c) return;
@@ -4172,9 +4194,10 @@ function renderNewsList() {
     }
     list.forEach(item => {
         const div = document.createElement("article");
-        div.className = `news-item news-category-${inferNewsCategory(item)}`;
+        const isNewItem = !!item.id && newsNewIds.has(item.id);
+        div.className = `news-item news-category-${inferNewsCategory(item)}${isNewItem ? " is-new" : ""}`;
         const categoryNames = { military: "نظامی", diplomacy: "دیپلماسی", economy: "اقتصاد", trade: "تجارت", territory: "قلمرو", union: "اتحادیه", general: "عمومی" };
-        div.innerHTML = `<div class="news-item-top"><h3>${escapeHtml(item.title || "خبر")}</h3><span class="news-category-label">${categoryNames[inferNewsCategory(item)] || "عمومی"}</span></div>
+        div.innerHTML = `<div class="news-item-top"><h3>${escapeHtml(item.title || "خبر")}</h3>${isNewItem ? '<span class="news-new-tag">جدید</span>' : ""}<span class="news-category-label">${categoryNames[inferNewsCategory(item)] || "عمومی"}</span></div>
             <p>${escapeHtml(item.text || "")}</p>${item.at ? `<time>${escapeHtml(formatNewsTime(item.at))}</time>` : ""}`;
         c.appendChild(div);
     });
@@ -4188,6 +4211,7 @@ document.querySelectorAll("[data-news-filter]").forEach(button => button.addEven
 
 function resetNewsFilter() {
     currentNewsFilter = "all";
+    newsNewIds = new Set();
     document.querySelectorAll("[data-news-filter]").forEach(item => item.classList.toggle("active", item.dataset.newsFilter === "all"));
     renderNewsList();
 }
@@ -4198,8 +4222,13 @@ async function loadNews() {
     try {
         const news = await apiGet("/api/news");
         newsItemsCache = Array.isArray(news) ? news : [];
+        knownNewsIds = newsItemsCache.map(n => n.id).filter(Boolean);
+        const seenNow = getSeenNews();
+        newsNewIds = new Set(knownNewsIds.filter(id => !seenNow.has(id)));
         renderNewsList();
-        refreshNotificationBadge();
+        newsNewIds.forEach(id => seenNow.add(id));
+        if (newsNewIds.size) saveSeenNews(seenNow); else syncNewsBadges();
+        setNotifBadge(0);
     } catch (e) {
         c.innerHTML = `<div class="news-item"><h3>اخبار</h3><p>دریافت خبرها ممکن نشد.</p></div>`;
     }
@@ -4209,6 +4238,7 @@ async function loadNews() {
    Private Messages
 ========================================================= */
 function setPmBadges(n) {
+    pmUnreadCount = n || 0; updateFooterCommBadge();
     ["pm-tab-badge", "pm-sub-badge"].forEach(id => {
         const el = document.getElementById(id); if (!el) return;
         el.textContent = n > 99 ? "99+" : String(n);
