@@ -3166,3 +3166,31 @@ body .bottom-nav .nav-home.active .nav-icon {
 }
 body .bottom-nav .nav-home small { color: #00F0FF; }
 .nav-badge { background: #00F0FF; color: #10202a; box-shadow: 0 0 0 2px #59318A; }
+
+
+/* ==================== فوتر: اندازه‌ها و حالت فعال/غیرفعال خانه ==================== */
+:root { --nav-icon: 22px; --nav-home: 50px; --nav-home-lift: 16px; }
+body .bottom-nav .nav-item small { font-size: 10.5px; font-weight: 600; }
+body .bottom-nav .nav-home { padding-bottom: 8px; }
+body .bottom-nav .nav-home .nav-icon { transition: transform .28s cubic-bezier(.3,1.4,.5,1), background .25s ease, box-shadow .25s ease, color .25s ease; }
+body .bottom-nav .nav-home .nav-icon svg { width: 25px; height: 25px; }
+/* غیرفعال: کوچک‌تر، بدون نئون */
+body .bottom-nav .nav-home:not(.active) .nav-icon {
+    transform: scale(.8) translateY(6px);
+    background: linear-gradient(145deg, #6d3fa3, #4a2672);
+    color: #d9c8f0;
+    box-shadow: 0 0 0 3px #59318A, 0 0 0 4.5px rgba(255,255,255,.14);
+}
+body .bottom-nav .nav-home:not(.active) small { color: #d9c8f0; font-weight: 600; font-size: 10.5px; }
+/* فعال: بزرگ و نئونی */
+body .bottom-nav .nav-home.active .nav-icon { transform: scale(1) translateY(0); }
+body .bottom-nav .nav-home.active small { font-size: 11px; font-weight: 800; color: #00F0FF; }
+.nav-badge { top: -8px; right: -10px; min-width: 17px; height: 17px; font-size: 10px; }
+
+/* کشور هم‌زمینهٔ برچسب فصل */
+body #home .hm-country {
+    background: rgba(0, 0, 0, .45);
+    border: 1px solid rgba(255, 255, 255, .22);
+    color: #FFFFFF; font-weight: 700;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+}
