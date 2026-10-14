@@ -891,8 +891,8 @@ def compute_rates(player, _occ=True, at_time=None):
         if owner != country: continue
         s = STRAITS_DATA.get(key)
         if s:
-            income += s["income"]
-            strait_income += s["income"]
+            # تنگه‌ها درآمد روزانه ندارند؛ فقط عوارض هنگام عبور مستقیماً به خزانهٔ مالک واریز می‌شود.
+            pass
 
     # کشور اشغال‌شده: ۳۰٪ درآمد پایه/اقتصادی و تولید نیروی انسانیِ کشور مغلوب به اشغالگر می‌رسد.
     if _occ:
@@ -1046,7 +1046,6 @@ def occupy_country(attacker_cid, defender_cid, resolve_wars=True, announce_event
     for k, owner in list(strait_holdings.items()):
         if owner == defender_cid:
             strait_holdings[k] = attacker_cid
-            reset_strait_policy(k)
 
     for k in list(site_forces):
         force_owner = site_forces[k].get("owner")
@@ -1112,7 +1111,6 @@ def occupy_colony(attacker_cid, colony_cid, previous_occupier):
     for sid in strait_ids:
         if strait_holdings.get(sid) == previous_occupier:
             strait_holdings[sid] = attacker_cid
-            reset_strait_policy(sid)
             moved_straits.append(sid)
     # نیروهای مستقر در دارایی‌هایی که منتقل شدند نیز زیر مالکیت جدید قرار می‌گیرند.
     moved_site_ids = map_ids | strait_ids
@@ -2723,7 +2721,7 @@ async def get_map_sites(request):
         sites.append({**info, "id": k, "kind": "resource", "owner": map_holdings.get(k)})
     for k, info in STRAITS_DATA.items():
         sites.append({"id": k, "kind": "strait", "type": "strait", "name": info["name"],
-                      "lon": info["lon"], "lat": info["lat"], "income": info["income"],
+                      "lon": info["lon"], "lat": info["lat"],
                       "zone": "sea", "owner": strait_holdings.get(k),
                       "toll": int(info.get("toll", 0) or 0), "closed": bool(info.get("closed", False)),
                       "country_rules": info.get("country_rules", {}) if isinstance(info.get("country_rules", {}), dict) else {}})
@@ -2831,6 +2829,8 @@ def strait_policy(site_id, country_id=None):
     """Effective toll/closure for one traveler. The owner always crosses its own strait freely."""
     info = STRAITS_DATA.get(site_id, {})
     owner = strait_holdings.get(site_id)
+    if not owner:
+        return {"toll": 0, "closed": False, "custom": False}
     if country_id and country_id == owner:
         return {"toll": 0, "closed": False, "custom": False}
     base_toll = max(0, int(info.get("toll", 0) or 0))
@@ -2845,7 +2845,7 @@ def strait_policy(site_id, country_id=None):
     }
 
 def reset_strait_policy(site_id):
-    """A newly captured strait starts with neutral, open settings under its new owner."""
+    """فقط وقتی تنگه بی‌صاحب می‌شود (حذف مالک) به حالت باز برمی‌گردد؛ با تصرف، تنظیمات تا تغییر مالک باقی می‌مانند."""
     if site_id in STRAITS_DATA:
         STRAITS_DATA[site_id]["toll"] = 0
         STRAITS_DATA[site_id]["closed"] = False
@@ -3474,7 +3474,6 @@ def _resolve_strait_passage(t, player):
             old_owner = owner
             set_site_owner(sid, cid)
             site_forces.pop(sid, None)
-            reset_strait_policy(sid)
             msg = (f"{cname(cid)} از تنگهٔ بستهٔ {loc_label(sid)} عبور کرد و آن را از {cname(old_owner)} گرفت؛ "
                    f"مهاجم {attacker_lost:,} یگان از دست داد و {units_count(survivors):,} باقی ماند؛ "
                    f"مدافع {defender_before:,} یگان در این موضع از دست داد. ناوگان باقی‌مانده به مسیر خود ادامه می‌دهد.")
@@ -3788,7 +3787,6 @@ def resolve_arrival(t):
             surv = dict(units) if empty else {k: max(1, int(n * 0.8)) for k, n in units.items()}
             attacker_lost = attacker_before - units_count(surv)
             site_forces[dst] = {"owner": cid, "units": surv}; set_site_owner(dst, cid)
-            if kind == "strait": reset_strait_policy(dst)
             msg = (f"{cname(cid)} {meta['name']} را از {cname(owner)} تصرف کرد؛ "
                    f"مهاجم {attacker_lost:,} یگان از دست داد و {units_count(surv):,} باقی ماند؛ "
                    f"مدافع {defender_before:,} یگان پادگان را از دست داد.")
@@ -4357,7 +4355,7 @@ async def _broadcast_announcement_notification(cid, author_uid=None):
     except Exception as e:
         logging.warning("announcement notification failed: %s", e)
 
-async def _broadcast_strait_notification(text):
+async def _broadcast_strait_notification(text, uids=None):
     """Send public strait-policy changes to every registered player; the bot middleware adds the game button."""
     semaphore = asyncio.Semaphore(8)
     async def send_to(uid):
@@ -4366,11 +4364,14 @@ async def _broadcast_strait_notification(text):
                 await bot.send_message(int(uid), f"⚓ خبر تنگه\n{text}\n\nبرای دیدن موقعیت و تنظیمات، نقشهٔ بازی را باز کنید.")
             except Exception as e:
                 logging.warning("strait notification failed for %s: %s", uid, e)
-    await asyncio.gather(*(send_to(uid) for uid in list(players.keys())))
+    targets = list(uids) if uids is not None else list(players.keys())
+    await asyncio.gather(*(send_to(uid) for uid in targets), return_exceptions=True)
 
 def _schedule_strait_broadcast(text):
     try:
-        asyncio.get_running_loop().create_task(_broadcast_strait_notification(text))
+        # فهرست گیرنده‌ها همین‌جا و در دنیای فعال ثبت می‌شود تا با جابه‌جایی دنیا اشتباه نشود.
+        uids = [uid for uid, pl in players.items() if pl.get("country") and not pl.get("is_eliminated")]
+        asyncio.get_running_loop().create_task(_broadcast_strait_notification(text, uids))
     except RuntimeError:
         logging.warning("strait notification skipped: no active event loop")
 
