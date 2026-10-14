@@ -3091,6 +3091,7 @@ function renderAdminWorlds() {
                 <small class="admin-world-status">وضعیت: ${status} · ثبت‌نام ${registrationOpen ? "باز" : "بسته"}${w.game_ends_at ? ` · پایان: ${escapeHtml(new Date(w.game_ends_at).toLocaleString("fa-IR"))}` : ""}</small>
             </div>
             <div class="admin-world-actions">
+                <button type="button" class="admin-world-delete" data-world-delete="${w.id}">🗑 حذف دنیا</button>
                 <button type="button" data-enter-world="${w.id}">${String(w.id) === String(selectedWorldId) ? "دنیای فعلی" : "مدیریت این دنیا"}</button>
                 ${!started && !finished ? `<button type="button" data-world-start="${w.id}">▶ شروع فصل ۳۱روزه</button>` : ""}
                 ${!finished ? `<button type="button" data-world-registration="${w.id}" data-open="${registrationOpen ? "0" : "1"}">${registrationOpen ? "🔒 بستن ثبت‌نام" : "🔓 بازگشایی ثبت‌نام"}</button>` : ""}
@@ -3103,6 +3104,25 @@ function renderAdminWorlds() {
             await switchAdminWorld(button.dataset.enterWorld);
             document.querySelector('[data-admin-tab="players"]')?.click();
         } catch { showToast("تغییر دنیا ناموفق بود.", "error"); }
+        finally { button.disabled = false; }
+    }));
+    root.querySelectorAll("[data-world-delete]").forEach(button => button.addEventListener("click", async () => {
+        const wid = String(button.dataset.worldDelete);
+        const w = (adminWorldsCache || []).find(x => String(x.id) === wid);
+        if (!confirm(`دنیای «${w?.name || wid}» با همهٔ بازیکنان و اطلاعاتش برای همیشه حذف شود؟ این کار برگشت‌پذیر نیست.`)) return;
+        button.disabled = true;
+        try {
+            const result = await apiPost("/api/admin/worlds/delete", { world_id: wid });
+            showToast(result.message || (result.success ? "دنیا حذف شد." : "حذف انجام نشد."), result.success ? "success" : "error");
+            if (result.success) {
+                await fetchAvailableWorlds();
+                if (String(selectedWorldId) === wid) {
+                    const next = (availableWorlds || [])[0];
+                    if (next) selectedWorldId = String(next.id);
+                }
+                await loadAdminPanel();
+            }
+        } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
         finally { button.disabled = false; }
     }));
     root.querySelectorAll("[data-world-start]").forEach(button => button.addEventListener("click", async () => {
@@ -5216,8 +5236,8 @@ function updateMapSitePositions() {
     const rot = mapProjection.rotate();
     const zoom = mapProjection.scale() / mapSize;
     // با دورشدن کوچک می‌شوند تا روی کشورهای کوچک نیفتند؛ با نزدیک‌شدن کمی بزرگ‌تر
-    const kBig = Math.max(0.32, Math.min(1.5, 0.6 * Math.pow(zoom, 0.6)));   // نفت و تنگه
-    const kSmall = kBig * 0.8;                                                // معدن و غذا
+    const kBig = Math.max(0.22, Math.min(1.5, 0.4 * Math.pow(zoom, 0.7)));   // نفت و تنگه
+    const kSmall = kBig * 0.75;                                                // معدن و غذا
     const kMark = Math.max(0.5, Math.min(1.1, 0.7 * Math.pow(zoom, 0.5)));
     mapSitesSvg.selectAll(".map-mark").each(function (d) {
         const p = viewCos(d.lon, d.lat, rot) > 0.02 ? mapProjection([d.lon, d.lat]) : null;
