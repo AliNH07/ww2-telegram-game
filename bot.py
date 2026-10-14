@@ -2778,7 +2778,7 @@ def site_zone(site_id):
     m = site_meta(site_id)
     return m["zone"] if m else None
 
-def dispatch_rule_errors(units, zone):
+def dispatch_rule_errors(units, zone, ground=None):
     """قوانین اعزام: بررسی می‌کند ترکیب نیرو در موضعی با این zone (sea/land) مجاز و پشتیبانی‌شده باشد."""
     errs = []
     cnt = lambda *ids: sum(max(0, units.get(i, 0)) for i in ids)
@@ -2790,7 +2790,8 @@ def dispatch_rule_errors(units, zone):
         errs.append("این یگان‌ها نمی‌توانند به " + ("خشکی" if zone == "land" else "این موضع") + " بروند: "
                     + "، ".join(nm(k) for k in banned))
     if zone == "sea":
-        ground = cnt("infantry", "tank")
+        # ground: تعداد نیروی زمینی که واقعاً حمل می‌شود. نیروهای زمینی که از قبل در موضع مستقر هستند (نگهبان) نیاز به ناو ترابری ندارند.
+        ground = cnt("infantry", "tank") if ground is None else ground
         cap = units.get("transport_ship", 0) * ARMY_UNITS["transport_ship"]["transport_capacity"]
         if ground > cap:
             errs.append(f"در دریا، تانک و پیاده‌نظام به {nm('transport_ship')} نیاز دارند "
@@ -4054,7 +4055,11 @@ async def dispatch_forces(request):
         if owner == cid:
             for k, n in garrison(dst).items(): combined[k] = combined.get(k, 0) + n
         zone = "sea" if target_country else site_zone(dst)
-        errs = dispatch_rule_errors(combined, zone)
+        # ناو ترابری بدون محموله نمی‌تواند برای حمله یا تصرف برود.
+        sent_ground = units.get("infantry", 0) + units.get("tank", 0)
+        if owner != cid and units.get("transport_ship", 0) > 0 and sent_ground < 1:
+            return _bad("ناو ترابری بدون محموله نمی‌تواند برای حمله یا تصرف برود؛ حداقل یک پیاده‌نظام یا تانک همراهش بفرست.")
+        errs = dispatch_rule_errors(combined, zone, ground=sent_ground)
         if errs: return _bad(errs[0])
         if target_country:
             ground_count = units.get("infantry", 0) + units.get("tank", 0)
@@ -4067,7 +4072,8 @@ async def dispatch_forces(request):
     if src != "home":  # با رفتن این یگان‌ها، نیروهای باقی‌مانده نباید بی‌پشتیبان بمانند
         zs = site_zone(src)
         after = {k: pool.get(k, 0) - units.get(k, 0) for k in pool}
-        if not dispatch_rule_errors(pool, zs) and dispatch_rule_errors(after, zs):
+        # نیروی زمینیِ باقی‌مانده بدون ناو ترابری می‌تواند به‌عنوان نگهبان بماند؛ فقط پشتیبانی هواپیماها بررسی می‌شود.
+        if not dispatch_rule_errors(pool, zs, ground=0) and dispatch_rule_errors(after, zs, ground=0):
             return _bad("با خروج این یگان‌ها، نیروهای باقی‌مانده در این موضع بدون پشتیبان (ناو ترابری / ناو هواپیمابر / سوخت‌رسان) می‌مانند.")
 
     naval = has_naval_units(units)
