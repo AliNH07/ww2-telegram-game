@@ -4342,7 +4342,7 @@ async def get_announcement_status(request):
                               "reset_seconds": _announcement_reset_seconds(now),
                               "can_publish": used < 4 and cooldown <= 0})
 
-async def _broadcast_announcement_notification(cid, author_uid=None):
+async def _broadcast_announcement_notification(cid, author_uid=None, recipients=None):
     """ارسال اعلان کوتاه بیانیه به دیگر بازیکنان؛ نویسنده اعلان خودش را نمی‌گیرد."""
     if cid not in COUNTRIES:
         return
@@ -4351,7 +4351,10 @@ async def _broadcast_announcement_notification(cid, author_uid=None):
             "متن بیانیه فقط در بخش «ارتباطات ← بیانیه‌ها» قابل مشاهده است.")
     # ارسال مستقیم (نه از صف _tg_send): این تابع به‌صورت تسک پس‌زمینه اجرا می‌شود و صف
     # درخواست تا آن لحظه خالی شده است، پس پیام‌ها از طریق صف هرگز ارسال نمی‌شدند.
-    recipients = [uid for uid in list(players.keys()) if author_uid is None or str(uid) != str(author_uid)]
+    # recipients باید هنگام انتشار و در دنیای همان بیانیه ساخته شده باشد؛ این تسک بعداً اجرا می‌شود
+    # و ممکن است دنیای فعال تا آن موقع عوض شده باشد.
+    if recipients is None:
+        recipients = [uid for uid in list(players.keys()) if author_uid is None or str(uid) != str(author_uid)]
     items = [(int(uid), text, None) for uid in recipients]
     try:
         sent, failed = await _flush_tg_outbox(items)
@@ -4464,7 +4467,9 @@ async def create_announcement(request):
     push_news("بیانیه", f"کشور «{COUNTRIES[cid]['name']}» بیانیه‌ای منتشر کرد؛ متن فقط در بخش بیانیه‌هاست.")
     save_state()
     try:
-        asyncio.get_running_loop().create_task(_broadcast_announcement_notification(cid, uid))
+        # گیرندگان همین‌جا و فقط از بازیکنان همین دنیا ثبت می‌شوند.
+        ann_recipients = [u_ for u_ in list(players.keys()) if str(u_) != str(uid)]
+        asyncio.get_running_loop().create_task(_broadcast_announcement_notification(cid, uid, ann_recipients))
     except RuntimeError:
         logging.warning("announcement notification skipped: no active event loop")
     return web.json_response({"success": True, "announcement": ann, "cost": cost,
