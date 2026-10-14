@@ -354,27 +354,27 @@ ECONOMY = {
     "eco_trade": {
         "name": "تجارت بین‌الملل", "group": "eco", "icon": "🚢",
         "desc": "گسترش شبکهٔ واردات و صادرات کشور.", "power_required": 6,
-        "levels": [L(cost=1_980_000, income=1_170_000), L(cost=2_890_000, income=1_795_000), L(cost=4_100_000, income=2_670_000), L(cost=5_620_000, income=3_825_000), L(cost=7_600_000, income=5_405_000)],
+        "levels": [L(cost=2_000_000, income=1_180_000), L(cost=2_920_000, income=1_815_000), L(cost=4_140_000, income=2_695_000), L(cost=5_680_000, income=3_865_000), L(cost=7_680_000, income=5_460_000)],
     },
     "eco_electronics": {
         "name": "کارخانهٔ تجهیزات الکترونیکی", "group": "eco", "icon": "🔌",
         "desc": "مونتاژ و فروش تجهیزات برقی و الکترونیکی.", "power_required": 7,
-        "levels": [L(cost=2_130_000, income=1_285_000), L(cost=3_190_000, income=2_020_000), L(cost=4_560_000, income=3_030_000), L(cost=6_230_000, income=4_325_000), L(cost=8_210_000, income=5_945_000)],
+        "levels": [L(cost=2_800_000, income=1_690_000), L(cost=4_190_000, income=2_655_000), L(cost=5_990_000, income=3_985_000), L(cost=8_190_000, income=5_685_000), L(cost=10_790_000, income=7_815_000)],
     },
     "eco_oil": {
         "name": "پالایشگاه نفت", "group": "eco", "icon": "🛢️",
         "desc": "تبدیل نفت خام به فرآورده‌های قابل صادرات.", "power_required": 8,
-        "levels": [L(cost=2_580_000, income=1_590_000), L(cost=3_650_000, income=2_360_000), L(cost=5_170_000, income=3_500_000), L(cost=6_990_000, income=4_940_000), L(cost=9_420_000, income=6_945_000)],
+        "levels": [L(cost=3_200_000, income=1_970_000), L(cost=4_530_000, income=2_925_000), L(cost=6_410_000, income=4_340_000), L(cost=8_670_000, income=6_125_000), L(cost=11_680_000, income=8_615_000)],
     },
     "eco_chemicals": {
         "name": "مجتمع پتروشیمی", "group": "eco", "icon": "🧪",
         "desc": "تولید مواد شیمیایی و فرآورده‌های صنعتی برای صادرات.", "power_required": 9,
-        "levels": [L(cost=2_740_000, income=1_725_000), L(cost=4_100_000, income=2_705_000), L(cost=5_780_000, income=3_990_000), L(cost=7_750_000, income=5_580_000), L(cost=10_030_000, income=7_520_000)],
+        "levels": [L(cost=4_000_000, income=2_520_000), L(cost=5_990_000, income=3_950_000), L(cost=8_440_000, income=5_825_000), L(cost=11_310_000, income=8_145_000), L(cost=14_640_000, income=10_980_000)],
     },
     "eco_bank": {
         "name": "بانک مرکزی", "group": "eco", "icon": "🏦",
         "desc": "زیرساخت مالی کشور؛ درآمد بالا با سرمایه‌گذاری بیشتر.", "power_required": 10,
-        "levels": [L(cost=3_040_000, income=1_955_000), L(cost=4_560_000, income=3_070_000), L(cost=6_690_000, income=4_705_000), L(cost=9_120_000, income=6_685_000), L(cost=12_160_000, income=9_280_000)],
+        "levels": [L(cost=5_000_000, income=3_215_000), L(cost=7_500_000, income=5_050_000), L(cost=11_000_000, income=7_740_000), L(cost=15_000_000, income=10_995_000), L(cost=20_000_000, income=15_265_000)],
     },
     "eco_market": {
         "name": "بازار و خرده‌فروشی", "group": "eco", "icon": "🛒",
@@ -404,22 +404,22 @@ ECONOMY = {
     "eco_pharma": {
         "name": "داروسازی", "group": "eco", "icon": "💊",
         "desc": "تولید دارو و تجهیزات پزشکی برای داخل و صادرات.", "power_required": 5,
-        "levels": [L(cost=1_400_000, income=1_010_000), L(cost=2_200_000, income=1_650_000), L(cost=3_300_000, income=2_575_000), L(cost=4_700_000, income=3_810_000), L(cost=6_500_000, income=5_465_000)],
+        "levels": [L(cost=1_750_000, income=1_260_000), L(cost=2_750_000, income=2_060_000), L(cost=4_120_000, income=3_220_000), L(cost=5_880_000, income=4_760_000), L(cost=8_120_000, income=6_830_000)],
     },
     "eco_auto": {
         "name": "خودروسازی", "group": "eco", "icon": "🚗",
         "desc": "خط تولید خودرو و قطعات صنعتی.", "power_required": 7,
-        "levels": [L(cost=2_000_000, income=1_470_000), L(cost=3_100_000, income=2_370_000), L(cost=4_500_000, income=3_575_000), L(cost=6_300_000, income=5_190_000), L(cost=8_600_000, income=7_345_000)],
+        "levels": [L(cost=3_000_000, income=2_205_000), L(cost=4_650_000, income=3_555_000), L(cost=6_750_000, income=5_360_000), L(cost=9_450_000, income=7_785_000), L(cost=12_900_000, income=11_020_000)],
     },
     "eco_aerospace": {
         "name": "صنایع هوافضا", "group": "eco", "icon": "🛰️",
         "desc": "فناوری پیشرفتهٔ هوایی و فضایی با درآمد بالا.", "power_required": 9,
-        "levels": [L(cost=3_000_000, income=2_240_000), L(cost=4_500_000, income=3_495_000), L(cost=6_500_000, income=5_245_000), L(cost=9_000_000, income=7_535_000), L(cost=12_000_000, income=10_405_000)],
+        "levels": [L(cost=5_900_000, income=4_405_000), L(cost=8_850_000, income=6_875_000), L(cost=12_780_000, income=10_315_000), L(cost=17_700_000, income=14_820_000), L(cost=23_600_000, income=20_465_000)],
     },
     "eco_stock": {
         "name": "بورس و بازار سرمایه", "group": "eco", "icon": "📈",
         "desc": "بازار سهام و اوراق؛ بیشترین بازده با سرمایهٔ بالا.", "power_required": 10,
-        "levels": [L(cost=3_500_000, income=2_660_000), L(cost=5_300_000, income=4_185_000), L(cost=7_700_000, income=6_315_000), L(cost=10_600_000, income=9_010_000), L(cost=14_000_000, income=12_320_000)],
+        "levels": [L(cost=6_000_000, income=4_560_000), L(cost=9_090_000, income=7_175_000), L(cost=13_200_000, income=10_825_000), L(cost=18_170_000, income=15_445_000), L(cost=24_000_000, income=21_120_000)],
     },
 }
 
@@ -449,6 +449,23 @@ POWER_TIMES_MIN = {
     "power_nuclear": [30, 38, 47],
 }
 
+# صنایع سنگین اقتصاد: زمان ساخت از ۲۰ دقیقه (ارزان‌ترین سطح) تا ۳ ساعت (گران‌ترین سطح) بر اساس قیمت؛ با هر ارتقا بیشتر می‌شود.
+HEAVY_ECO_IDS = ("eco_stock", "eco_aerospace", "eco_bank", "eco_chemicals", "eco_oil", "eco_auto", "eco_electronics", "eco_trade", "eco_pharma")
+HEAVY_TIME_MIN_SEC = 20 * 60
+HEAVY_TIME_MAX_SEC = 180 * 60
+
+def _apply_heavy_eco_times(catalog):
+    costs = [lv["cost"] for iid in HEAVY_ECO_IDS for lv in catalog[iid]["levels"]]
+    lo, hi = min(costs), max(costs)
+    for iid in HEAVY_ECO_IDS:
+        prev = 0
+        for lv in catalog[iid]["levels"]:
+            f = (math.log(lv["cost"]) - math.log(lo)) / (math.log(hi) - math.log(lo))
+            t = HEAVY_TIME_MIN_SEC + f * (HEAVY_TIME_MAX_SEC - HEAVY_TIME_MIN_SEC)
+            t = int(round(t / HOME_TIME_STEP_SEC) * HOME_TIME_STEP_SEC)
+            if t <= prev: t = prev + HOME_TIME_STEP_SEC
+            lv["time"] = t; prev = t
+
 def _apply_auto_times(catalog):
     for iid, item in catalog.items():
         if iid in POWER_TIMES_MIN:
@@ -462,6 +479,7 @@ def _apply_auto_times(catalog):
 
 _apply_auto_times(INFRASTRUCTURE)
 _apply_auto_times(ECONOMY)
+_apply_heavy_eco_times(ECONOMY)
 
 # صف کارخانهٔ ارتش: برای هر دسته یک صف مستقل. ظرفیت = تعداد «سفارش» ثبت‌شده در صف (نه تعداد واحدها).
 FACTORY_QUEUE_LIMITS = {"land": 20, "naval": 16, "air": 20, "missile": 12}
