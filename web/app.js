@@ -162,6 +162,11 @@ function homeImageUrl(cid) {
     return `/images/home/${cid}.jpg`;
 }
 
+// تصویر پس‌زمینهٔ کارت بیانیه (جدا از پرچم و تصویر خانه)
+function annBackgroundUrl(cid) {
+    return `/images/announcements/${cid}.jpg`;
+}
+
 function flagInline(cid, small) {
     if (!cid || !COUNTRY_IMAGE_EXT[cid]) return "";
     const cls = small ? "flag-inline flag-inline-sm" : "flag-inline";
@@ -3703,6 +3708,13 @@ async function loadAnnouncements() {
                 </div>
                 ${(supportFlags || accuseFlags) ? `<div class="ann-flags">${supportFlags ? `<div class="ann-flags-row"><span>✅ حمایت</span> ${supportFlags}</div>` : ""}${accuseFlags ? `<div class="ann-flags-row"><span>⚑ محکومیت</span> ${accuseFlags}</div>` : ""}</div>` : ""}
                 <div class="ann-card-footer"><button type="button" class="ann-reply-button" data-reply-ann="${escapeHtml(a.id)}">↩ پاسخ‌ها <span>${(a.comments || []).length}</span></button></div>`;
+            // پس‌زمینهٔ تصویر کشور: web/images/announcements/<شناسه‌کشور>.jpg (اگر فایل نبود، کارت ساده می‌ماند)
+            if (a.from_country) {
+                const bgUrl = annBackgroundUrl(a.from_country);
+                const probe = new Image();
+                probe.onload = () => { div.style.setProperty("--ann-bg", `url("${bgUrl}")`); div.classList.add("has-bg"); };
+                probe.src = bgUrl;
+            }
             c.appendChild(div);
         });
         c.querySelectorAll(".ann-react[data-react]").forEach(b => b.onclick = () => reactAnn(b.dataset.id, b.dataset.react));
@@ -3797,7 +3809,7 @@ function openAnnouncementReply(id) {
         const current = announcementCache.get(String(id)) || announcement;
         const comments = Array.isArray(current.comments) ? current.comments : [];
         commentsBox.innerHTML = renderAnnouncementThread(comments);
-        if (!comments.length) commentsBox.innerHTML = `<div class="ann-thread-empty"><span>✦</span><strong>هنوز پاسخی ثبت نشده</strong><p>اولین پاسخ را بنویس و گفتگو را شروع کن.</p></div>`;
+        if (!comments.length) commentsBox.innerHTML = `<div class="ann-thread-empty"><span>🌍</span><strong>هنوز پاسخی ثبت نشده</strong><p>اولین پاسخ را بنویس و گفتگو را شروع کن.</p></div>`;
         ov.querySelector(".ann-thread-count").textContent = `${comments.length.toLocaleString("fa-IR")} پاسخ`;
         commentsBox.querySelectorAll("[data-reply-to-comment]").forEach(btn => btn.onclick = () => {
             replyingTo = { id: btn.dataset.replyToComment, name: btn.dataset.replyToName || "کشور" };
