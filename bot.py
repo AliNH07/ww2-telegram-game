@@ -2548,6 +2548,11 @@ async def propose_treaty(request):
     for x in diplomacy_proposals.values():
         if x.get("status") == "pending" and x["from_user"] == uid and x["to_country"] == target and x["treaty_type"] == ttype:
             return web.json_response({"success": False, "error": "duplicate", "message": "پیشنهاد مشابهی در انتظار پاسخ است."}, status=400)
+    # اگر طرف مقابل از قبل همین پیمان را به ما پیشنهاد داده، نباید پیشنهاد متقابل ثبت شود؛ باید همان را بپذیریم.
+    for x in diplomacy_proposals.values():
+        if x.get("status") == "pending" and x["from_country"] == target and x["to_country"] == fc and x["treaty_type"] == ttype:
+            return web.json_response({"success": False, "error": "reverse_pending",
+                "message": f"{COUNTRIES[target]['name']} قبلاً {TREATY_TYPE_NAMES[ttype]} را به شما پیشنهاد داده است؛ در بخش «پیشنهادهای دریافتی» آن را بپذیرید یا رد کنید."}, status=400)
     pid = str(uuid.uuid4())
     diplomacy_proposals[pid] = {"id": pid, "from_user": uid, "from_country": fc,
         "to_user": tuid, "to_country": target, "treaty_type": ttype,
@@ -4609,6 +4614,7 @@ async def respond_union_invite(request):
     u["invites"].remove(cid)
     if accept and cid not in u.setdefault("members", []):
         u["members"].append(cid)
+        push_news("اتحادیه", f"{COUNTRIES[cid]['name']} به اتحادیه «{u.get('name', 'اتحادیه')}» پیوست.")
         for other in unions.values():
             if other["id"] == u_id: continue
             if cid in other.get("requests", []): other["requests"].remove(cid)
@@ -4655,6 +4661,7 @@ async def respond_union_request(request):
     u["requests"].remove(target)
     if accept and target not in u.setdefault("members", []):
         u["members"].append(target)
+        push_news("اتحادیه", f"{COUNTRIES[target]['name']} به اتحادیه «{u.get('name', 'اتحادیه')}» پیوست.")
         if target in u.setdefault("invites", []): u["invites"].remove(target)
         for other in unions.values():
             if other["id"] == u_id: continue
