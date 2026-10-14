@@ -5840,11 +5840,6 @@ function renderWelfarePage() {
             <div class="st-line"><span>سقف پاداش</span><b>${fmt1(max)}٪</b></div>
             <div class="st-line"><span>افزایش درآمد روزانه</span><b class="st-good-soft">+${formatStatsAmount(d.welfare_extra_income)}</b></div>
         </div>
-        <div class="st-card welfare-buildings-card">
-            <div class="welfare-card-heading"><span>🏥</span><div><b>ساختمان‌های مرتبط</b><small>برای دیدن ساخت و ارتقا وارد زیرساخت شوید</small></div></div>
-            <div class="welfare-building-chips">${buildings.length ? buildings.map(b => `<span>${escapeHtml(b.icon || "🏗️")} ${escapeHtml(b.name || "ساختمان رفاهی")}</span>`).join("") : `<span>ساختمان رفاهی تعریف نشده است</span>`}</div>
-            <button type="button" class="iws-details-button" id="welfare-open-infra">رفتن به زیرساخت‌های رفاه و امنیت ←</button>
-        </div>
         <div class="st-card st-card-plain welfare-events-card">
             <h3>رویدادها و امنیت</h3>
             <p class="st-muted">رویدادهای محتمل در کشور شما: ${risks.length ? escapeHtml(risks.join("، ")) : "—"}</p>
@@ -5852,11 +5847,6 @@ function renderWelfarePage() {
             <div class="welfare-events-heading">رویدادهای اخیر</div>
             <ul class="st-events">${events.length ? events.map(e => `<li><span class="st-ev-text">${escapeHtml(e.text || "")}</span><span class="st-ev-time">${timeAgo(e.at, d.now)}</span></li>`).join("") : `<li><span class="st-ev-text">هنوز رویدادی رخ نداده است.</span></li>`}</ul>
         </div>`;
-    body.querySelector("#welfare-open-infra")?.addEventListener("click", async () => {
-        showGamePage("infrastructure");
-        await refreshPlayer();
-        renderInfraTab("welfare");
-    });
 }
 
 /* =========================================================
