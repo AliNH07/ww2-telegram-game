@@ -3233,3 +3233,22 @@ body #home .hm-country {
 .ann-flags-col.accuse .ann-flags-head { color: #ff858c; }
 .ann-flags-items { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
 .ann-flags-none { color: #6f6384; }
+
+/* ==================== یکسان‌سازی نمایش در همهٔ گوشی‌ها ==================== */
+/* ارتش: کارت‌های پادگان/فرودگاه/بندر/انبار موشک همیشه چهارتا در یک ردیف (روی گوشی‌های کوچک هم دو ردیف نشود). */
+#army .base-cards-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 6px; }
+#army .base-card { min-height: 94px !important; padding: 8px 6px 9px !important; }
+@media (max-width: 400px) {
+    #army .base-card-head { flex-direction: column-reverse; align-items: center; justify-content: center; gap: 4px; text-align: center; }
+    #army .base-card-name { font-size: 10px; line-height: 1.35; text-align: center; }
+    #army .base-card-value { font-size: 15px; text-align: center; }
+    #army .base-card-max { text-align: center; font-size: 8.5px; }
+}
+
+/* زیرساخت: اندازهٔ منابع (غذا، آهن، اورانیوم، نفت...) ثابت و مستقل از عرض صفحه است. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.resource-bar { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 9px; }
+.resource-chip { padding: 10px 12px 9px !important; border-radius: 16px; }
+.resource-chip-top { font-size: 12px !important; }
+.resource-chip-value { font-size: 17px !important; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.resource-chip-rate, .resource-chip-rate b, .resource-chip-rate span { font-size: 10px !important; }
