@@ -1837,7 +1837,7 @@ def world_scoped(handler):
                     try:
                         finalize_world_if_due()
                         path = request.path
-                        exempt_before_start = {"/api/select-country", "/api/pm/send", "/api/activity-notices/ack", "/api/un/send"}
+                        exempt_before_start = {"/api/select-country", "/api/pm/send", "/api/activity-notices/ack", "/api/un/send", "/api/guide/seen"}
                         is_admin_path = path.startswith("/api/admin/")
                         result = None
                         if request.method == "POST" and not is_admin_path and path not in exempt_before_start:
@@ -2209,11 +2209,20 @@ async def get_player(request):
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
     if uid not in players: players[uid] = create_player(uid); save_state()
     data = serialize_player(players[uid])
+    data["guide_seen"] = bool(players[uid].get("guide_seen"))
     note = reset_notices.pop(str(uid), None)
     if note:
         data["reset_notice"] = note
         save_state()
     return web.json_response(data)
+
+async def mark_guide_seen(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    p = players.get(uid)
+    if p is not None and not p.get("guide_seen"):
+        p["guide_seen"] = True; save_state()
+    return web.json_response({"success": True})
 
 async def get_countries(request):
     result = []
@@ -6069,7 +6078,7 @@ async def create_web_app():
         ("/api/admin/player/adjust", admin_player_adjust), ("/api/admin/player/message", admin_player_message),
         ("/api/admin/bulk-adjust", admin_bulk_adjust), ("/api/admin/broadcast", admin_broadcast),
         ("/api/admin/war/review", admin_review_war),
-        ("/api/admin/player/reset", admin_reset_player), ("/api/un/send", send_un_message)]:
+        ("/api/admin/player/reset", admin_reset_player), ("/api/un/send", send_un_message), ("/api/guide/seen", mark_guide_seen)]:
         app.router.add_post(path, world_scoped(h))
     app.router.add_post("/api/admin/worlds/create", admin_create_world)
     app.router.add_post("/api/admin/world/start", world_scoped(admin_start_world))
