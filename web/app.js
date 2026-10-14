@@ -5536,7 +5536,7 @@ function showSiteInfo(site) {
         const effectiveToll = site.owner === selectedCountry ? 0 : Number(personalRule?.toll ?? site.toll ?? 0);
         const effectiveClosed = site.owner === selectedCountry ? false : Boolean(personalRule?.closed ?? site.closed ?? false);
         const policyLabel = personalRule && site.owner !== selectedCountry ? "قانون ویژهٔ کشور شما" : "قانون عمومی";
-        descEl.textContent = `درآمد روزانه: ${formatMoney(site.income)} · عوارض برای شما: ${effectiveToll === 0 ? "رایگان" : formatMoney(effectiveToll)} · ${effectiveClosed ? "عبور بسته" : "عبور باز"} (${policyLabel})`;
+        descEl.textContent = `عوارض برای شما: ${effectiveToll === 0 ? "رایگان" : formatMoney(effectiveToll)} · ${effectiveClosed ? "عبور بسته" : "عبور باز"} (${policyLabel})`;
     } else {
         flagEl.textContent = RESOURCE_ICONS[site.type] || "📍";
         const zoneTxt = site.zone === "sea" ? "🌊 در دریا" : (site.zone === "land" ? "⛰️ در خشکی" : "");
@@ -5810,7 +5810,6 @@ function renderStats() {
                 <div class="st-line"><span>درآمد پایهٔ کشور</span><b>${formatStatsAmount(d.income_base)}</b></div>
                 ${Number(d.income_economy || 0) ? `<div class="st-line"><span>سرمایه‌گذاری‌های اقتصادی</span><b>${formatStatsAmount(d.income_economy)}</b></div>` : ""}
                 ${Number(d.income_map || 0) ? `<div class="st-line"><span>منابع نفتی و سکوهای نقشه</span><b>${formatStatsAmount(d.income_map)}</b></div>` : ""}
-                ${Number(d.income_straits || 0) ? `<div class="st-line"><span>تنگه‌ها و کانال‌ها</span><b>${formatStatsAmount(d.income_straits)}</b></div>` : ""}
                 ${Number(d.income_occupation || 0) ? `<div class="st-line"><span>کشورهای اشغال‌شده</span><b>${formatStatsAmount(d.income_occupation)}</b></div>` : ""}
                 <div class="st-line st-income-bonus"><span>درآمد اضافهٔ رفاه (${fmt1(Number(d.bonus || 0))}٪)</span><b>+${formatStatsAmount(d.welfare_extra_income)}</b></div>
             </div>
