@@ -4247,6 +4247,7 @@ async def get_announcements(request):
                 cm["parent_id"] = None; comments_migrated = True
         result.append({"id": a["id"], "from_country": a["from_country"], "text": a["text"],
                        "created_at": a["created_at"], "support": support, "accuse": accuse,
+                       "image": a.get("image"),
                        "my_reaction": reactions.get(current_cid) if current_cid else None,
                        "is_mine": bool(current_cid and current_cid == a.get("from_country")),
                        "comments": a.get("comments", []),
@@ -4319,6 +4320,43 @@ def _schedule_strait_broadcast(text):
     except RuntimeError:
         logging.warning("strait notification skipped: no active event loop")
 
+ANN_IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".jfif", ".gif"}
+
+def _announcement_images(cid):
+    """همهٔ تصاویر بیانیهٔ یک کشور را از web/images/announcements برمی‌گرداند.
+    پشتیبانی: پوشهٔ <cid>/ با هر تعداد عکس، و فایل‌های <cid>.ext یا <cid>_N.ext یا <cid>-N.ext"""
+    from urllib.parse import quote as _q
+    if cid not in COUNTRIES:
+        return []
+    base = os.path.join(WEB_DIR, "images", "announcements")
+    found = []
+    try:
+        sub = os.path.join(base, cid)
+        if os.path.isdir(sub):
+            for f in sorted(os.listdir(sub)):
+                if os.path.splitext(f)[1].lower() in ANN_IMG_EXTS:
+                    found.append(f"{cid}/{f}")
+        if os.path.isdir(base):
+            for f in sorted(os.listdir(base)):
+                stem, ext = os.path.splitext(f)
+                if ext.lower() not in ANN_IMG_EXTS or not os.path.isfile(os.path.join(base, f)):
+                    continue
+                if stem == cid or stem.startswith(cid + "_") or stem.startswith(cid + "-"):
+                    found.append(f)
+    except OSError as e:
+        logging.warning("announcement images listing failed: %s", e)
+    return [{"id": rel, "url": "/images/announcements/" + "/".join(_q(part) for part in rel.split("/"))} for rel in found]
+
+async def get_announcement_images(request):
+    uid = get_auth_user_id(request)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    cid = players.get(uid, {}).get("country")
+    if not cid:
+        return web.json_response({"success": False, "error": "no_country",
+                                  "message": "ابتدا کشور خود را انتخاب کنید."}, status=400)
+    return web.json_response({"success": True, "images": _announcement_images(cid)})
+
 async def create_announcement(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
@@ -4327,6 +4365,15 @@ async def create_announcement(request):
     if uid not in players: players[uid] = create_player(uid)
     p = players[uid]; cid = p.get("country")
     if not cid: return web.json_response({"success": False, "error": "no_country", "message": "ابتدا کشور خود را انتخاب کنید."}, status=400)
+    # انتخاب تصویر اجباری است و باید یکی از تصاویر همین کشور باشد.
+    chosen_image = str(data.get("image") or "").strip()
+    allowed_images = {img["id"]: img["url"] for img in _announcement_images(cid)}
+    if not chosen_image:
+        return web.json_response({"success": False, "error": "image_required",
+                                  "message": "برای انتشار بیانیه باید یک تصویر انتخاب کنید."}, status=400)
+    if chosen_image not in allowed_images:
+        return web.json_response({"success": False, "error": "invalid_image",
+                                  "message": "تصویر انتخاب‌شده معتبر نیست."}, status=400)
     now = utcnow()
     today = _announcement_day(now)
     anns = p.setdefault("announcements", {})
@@ -4351,7 +4398,8 @@ async def create_announcement(request):
     published_at = utcnow().isoformat()
     today_list.append(published_at); anns[today] = today_list
     ann = {"id": str(uuid.uuid4()), "from_country": cid, "text": text,
-           "created_at": published_at, "reactions": {}, "comments": []}
+           "created_at": published_at, "reactions": {}, "comments": [],
+           "image": allowed_images[chosen_image]}
     announcements.append(ann)
     # متن کامل بیانیه هرگز وارد خبرهای عمومی/اعلان‌ها نمی‌شود.
     push_news("بیانیه", f"کشور «{COUNTRIES[cid]['name']}» بیانیه‌ای منتشر کرد؛ متن فقط در بخش بیانیه‌هاست.")
@@ -6045,7 +6093,7 @@ async def create_web_app():
         ("/api/player", get_player), ("/api/countries", get_countries),
         ("/api/army-units", get_army_units),
         ("/api/wars", get_wars), ("/api/map-sites", get_map_sites),
-        ("/api/announcements", get_announcements), ("/api/announcements/status", get_announcement_status), ("/api/announcement", get_announcement_detail),
+        ("/api/announcements", get_announcements), ("/api/announcements/status", get_announcement_status), ("/api/announcements/images", get_announcement_images), ("/api/announcement", get_announcement_detail),
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market), ("/api/market/shipments", get_market_shipments),
         ("/api/diplomacy", get_diplomacy), ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
