@@ -5219,7 +5219,18 @@ function renderMapSites() {
         .attr("x", -11).attr("y", -11).attr("width", 22).attr("height", 22);
     g.each(function (d) {
         const s = d3.select(this);
-        if (d.kind === "strait") s.append("circle").attr("class", "site-shape").attr("r", 4.8);
+        if (d.kind === "strait") {
+            s.append("circle").attr("class", "site-shape").attr("r", 4.8);
+            // اگر تنگه برای کشور من بسته است، علامت بزرگ ممنوع روی آن نشان داده می‌شود
+            const rule = d.country_rules && d.country_rules[selectedCountry];
+            const closedForMe = !!d.owner && d.owner !== selectedCountry && Boolean(rule && rule.closed !== undefined ? rule.closed : d.closed);
+            if (closedForMe) {
+                const ban = s.append("g").attr("class", "site-ban").style("pointer-events", "none");
+                ban.append("circle").attr("r", 10).attr("fill", "#e11d2e").attr("stroke", "#fff").attr("stroke-width", 2);
+                ban.append("rect").attr("x", -6.5).attr("y", -1.7).attr("width", 13).attr("height", 3.4).attr("rx", 1.2)
+                    .attr("fill", "#fff").attr("transform", "rotate(-45)");
+            }
+        }
         else {
             const big = d.type === "oil";
             s.append("circle").attr("class", "site-shape").attr("r", big ? 10 : 7.5);
