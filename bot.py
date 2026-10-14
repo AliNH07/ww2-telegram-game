@@ -879,9 +879,7 @@ def compute_rates(player, _occ=True, at_time=None):
         res = MAP_RESOURCES.get(key)
         if not res: continue
         if res["type"] == "oil":
-            gain = res["production"] // 10
-            income += gain
-            map_income += gain
+            # سکوی نفت فقط نفت تولید می‌کند و درآمد پولی ندارد.
             resource_production["oil"] += res["production"] // 5
         elif res["type"] == "food":    resource_production["food"]    += res["production"] // 5
         elif res["type"] == "steel":   resource_production["steel"]   += res["production"] // 5
