@@ -5474,7 +5474,9 @@ function renderMapSites() {
         }
         else {
             const big = d.type === "oil";
-            s.append("circle").attr("class", "site-shape").attr("r", big ? 10 : 7.5);
+            // سکوی نفت دایره؛ معدن‌ها (آهن، اورانیوم، غذا) مربع
+            if (big) s.append("circle").attr("class", "site-shape").attr("r", 10);
+            else s.append("rect").attr("class", "site-shape").attr("x", -7).attr("y", -7).attr("width", 14).attr("height", 14);
             s.append("text").attr("class", "site-emoji").attr("text-anchor", "middle")
                 .attr("dominant-baseline", "central").attr("font-size", big ? 8.5 : 5.8)
                 .text(RESOURCE_ICONS[d.type] || "📍");
@@ -5624,8 +5626,7 @@ function drawMapNow() {
     ctx.fillStyle = water; ctx.fill();
 
     // مدارها و نصف‌النهارها
-    ctx.beginPath(); mapPath(mapGraticule);
-    ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.stroke();
+    // (خط‌های مدار و نصف‌النهار روی کره حذف شد)
 
     // خشکی‌ها (هم‌رنگ‌ها در یک مسیر؛ کشورهای اضافه‌نشده هاشور)
     ctx.lineJoin = "round";
