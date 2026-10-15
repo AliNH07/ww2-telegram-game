@@ -5036,24 +5036,111 @@ const MAP_COLORS = {
 };
 const MAP_SPHERE = { type: "Sphere" };
 
-/* ---------- نقشه سیاسی ۱۹۹۳ ----------
-   داده‌ی نقشه مرزهای امروزی دارد؛ این جدول آن را به قلمروهای سال ۱۹۹۳ تبدیل می‌کند.
-   (اعضا: id عددی کشور یا نام برای فیچرهای بدون id) */
-const SOVIET_BLOC = true;   // true: «شوروی» بازی = کل ۱۵ جمهوری | false: فقط روسیه
-const MAP_1993_REALMS = {
-    643: SOVIET_BLOC
-        ? [643, 804, 112, 498, 233, 428, 440, 268, 51, 31, 398, 860, 795, 417, 762]
-        : [643],
-    688: [688, 499, "Kosovo"],     // یوگسلاوی (صربستان + مونته‌نگرو + کوزوو)
-    729: [729, 728],               // سودان (سودان جنوبی هنوز جدا نشده)
-    360: [360, 626],               // اندونزی (تیمور شرقی جزو اندونزی)
-    706: [706, "Somaliland"],      // سومالی
-    196: [196, "N. Cyprus"]        // قبرس
+/* ---------- نقشه سیاسی ۱۹۳۶ ----------
+   داده‌ی نقشه مرزهای امروزی دارد؛ این بخش آن را به قلمروهای سال ۱۹۳۶ تبدیل می‌کند:
+   ۱) ادغام کشورهای امروزی در قلمرو ۱۹۳۶ (مستعمرات، جمهوری‌های شوروی)
+   ۲) برش‌های جغرافیایی (شرق آلمان، لهستان شرقی، ساخالین جنوبی) که با مرز امروزی فرق دارند. */
+const SOVIET_BLOC = true;    // true: «شوروی» ۱۹۳۶ = روسیه + جمهوری‌های اتحادیه | false: فقط روسیه
+const MAP_COLONIES = true;   // true: مستعمرات ۱۹۳۶ هم‌رنگ کشور مادر | false: فقط خاک اصلی
+const MAP_1936_REALMS = {
+    // شوروی ۱۹۳۶: بدون بالتیک و مولداوی (لهستان شرقی در برش‌ها جدا می‌شود)
+    643: SOVIET_BLOC ? [643, 804, 112, 51, 31, 268, 398, 860, 795, 762, 417] : [643],
+    // امپراتوری بریتانیا (دومینیون‌ها مثل کانادا، استرالیا، آفریقای جنوبی و ایرلند جدا هستند)
+    826: MAP_COLONIES
+        ? [826, 356, 586, 50, 104, 144, 458, 96, 702, 376, 275, 400, 196, "N. Cyprus", 729, 728, 404, 800, 834,
+           566, 288, 694, 270, 894, 716, 454, 72, 426, 748, "Somaliland", 84, 328, 388, 780, 44, 238, 242]
+        : [826],
+    // امپراتوری فرانسه
+    250: MAP_COLONIES
+        ? [250, 12, 788, 504, 478, 686, 466, 562, 148, 854, 324, 384, 204, 266, 178, 140, 120, 768, 450, 262,
+           760, 422, 704, 418, 116, 540]
+        : [250],
+    // ایتالیا + لیبی + شرق آفریقای ایتالیا (اتیوپی پس از ۱۹۳۶)
+    380: MAP_COLONIES ? [380, 434, 231, 232, 706] : [380],
+    // ژاپن + کره + تایوان
+    392: MAP_COLONIES ? [392, 410, 408, 158] : [392],
+    // آمریکا + فیلیپین
+    840: MAP_COLONIES ? [840, 608] : [840],
+    710: [710, 516]                // آفریقای جنوبی + نامیبیا
 };
-function realm1993(f) {
+// جفت‌مرزهای امروزی که در ۱۹۳۶ وجود نداشتند (به‌جایشان خط‌های دستی پایین کشیده می‌شود)
+const MAP_1936_CUT_PAIRS = [[616, 276], [616, 643], [616, 112], [616, 804], [804, 703], [804, 348], [804, 642]];
+// برش‌ها: بخشی از خاک امروزی کشور «منبع» که در ۱۹۳۶ مال کشور دیگری بوده. ring = [طول, عرض]
+// to: کلید کشور بازی؛ null یعنی کشور غیرفعال (طوسی)
+const MAP_1936_CLIPS = [
+    { name: "پومرانیا، نویمارک و سیلزی (آلمان)", to: "germany", sources: [616, 643],
+      ring: [[18.0,54.9],[17.95,54.55],[17.65,54.2],[17.45,53.95],[17.35,53.65],[17.3,53.4],[17.1,53.1],[16.85,52.9],
+             [16.35,52.7],[16.1,52.45],[15.85,52.25],[15.75,52.0],[16.3,51.75],[16.8,51.65],[17.3,51.5],[17.9,51.3],
+             [18.1,51.05],[18.5,50.75],[18.85,50.5],[18.85,50.3],[18.7,50.15],[18.5,50.0],
+             [18.0,49.3],[11.0,49.3],[11.0,55.3],[18.0,55.3]] },
+    { name: "پروس شرقی (آلمان)", to: "germany", sources: [616, 643],
+      ring: [[19.3,54.5],[19.2,54.25],[19.0,54.0],[18.95,53.75],[19.15,53.55],[19.55,53.5],[19.85,53.45],[20.05,53.42],
+             [20.35,53.33],[21.0,53.3],[21.5,53.35],[22.0,53.5],[22.35,53.7],[22.55,53.95],[22.75,54.1],[22.8,54.36],
+             [23.1,54.36],[23.1,55.6],[19.0,55.6]] },
+    { name: "ساخالین جنوبی (ژاپن)", to: "japan", sources: [643],
+      ring: [[141.2,45.5],[141.2,50.0],[146.0,50.0],[146.0,45.5]] }
+];
+if (SOVIET_BLOC) MAP_1936_CLIPS.push(
+    { name: "لهستان شرقی، بوکووینا و زاکارپاتیا (غیرفعال)", to: null, sources: [112, 804],
+      ring: [[27.6,55.9],[27.2,55.4],[27.0,54.9],[27.15,54.4],[27.25,53.95],[27.05,53.4],[26.75,52.9],[26.85,52.4],
+             [27.45,52.1],[27.55,51.7],[27.2,51.3],[27.35,50.9],[27.1,50.6],[26.55,50.3],[26.2,49.85],[26.45,49.4],
+             [26.55,48.95],[26.55,48.65],[26.6,48.4],[26.62,48.26],
+             [26.62,47.0],[20.0,47.0],[20.0,56.2],[27.6,56.2]] });
+// خط‌های مرزی ۱۹۳۶ که روی نقشه کشیده می‌شوند
+const MAP_1936_LINES = [
+    // آلمان ↔ لهستان/دانتسیگ (پومرانیا و سیلزی)
+    [[18.0,54.9],[17.95,54.55],[17.65,54.2],[17.45,53.95],[17.35,53.65],[17.3,53.4],[17.1,53.1],[16.85,52.9],
+     [16.35,52.7],[16.1,52.45],[15.85,52.25],[15.75,52.0],[16.3,51.75],[16.8,51.65],[17.3,51.5],[17.9,51.3],
+     [18.1,51.05],[18.5,50.75],[18.85,50.5],[18.85,50.3],[18.7,50.15],[18.5,50.0]],
+    // آلمان ↔ لهستان/دانتسیگ (پروس شرقی)
+    [[19.3,54.5],[19.2,54.25],[19.0,54.0],[18.95,53.75],[19.15,53.55],[19.55,53.5],[19.85,53.45],[20.05,53.42],
+     [20.35,53.33],[21.0,53.3],[21.5,53.35],[22.0,53.5],[22.35,53.7],[22.55,53.95],[22.75,54.1],[22.8,54.36]],
+    // آلمان ↔ چکسلواکی (در سیلزی)
+    [[14.82,50.87],[15.1,50.8],[15.45,50.78],[15.9,50.68],[16.2,50.62],[16.4,50.45],[16.6,50.2],[17.2,50.25],
+     [17.7,50.3],[18.0,50.05],[18.5,49.95]],
+    // ژاپن ↔ شوروی در ساخالین (مدار ۵۰)
+    [[141.2,50.0],[142.0,50.0],[143.0,50.0],[144.0,50.0],[145.0,50.0],[146.0,50.0]]
+];
+if (SOVIET_BLOC) MAP_1936_LINES.push(
+    // شوروی ↔ لهستان (خط ریگا) و ادامه تا دنیستر
+    [[27.6,55.9],[27.2,55.4],[27.0,54.9],[27.15,54.4],[27.25,53.95],[27.05,53.4],[26.75,52.9],[26.85,52.4],
+     [27.45,52.1],[27.55,51.7],[27.2,51.3],[27.35,50.9],[27.1,50.6],[26.55,50.3],[26.2,49.85],[26.45,49.4],
+     [26.55,48.95],[26.55,48.65],[26.6,48.4],[26.62,48.26]]);
+let mapClips = [], mapCustomBorders = null;
+
+function clipSourcePolys(ft, bb) {
+    const g = ft.geometry; if (!g) return null;
+    const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+    const keep = polys.filter(p => p[0].some(([x, y]) => x >= bb[0] && x <= bb[2] && y >= bb[1] && y <= bb[3]));
+    return keep.length ? { type: "Feature", properties: {}, geometry: { type: "MultiPolygon", coordinates: keep } } : null;
+}
+function buildMapClips(land) {
+    return MAP_1936_CLIPS.map(c => {
+        const ring = c.ring.slice(); ring.push(ring[0]);
+        let coords = ring;
+        if (d3.geoArea({ type: "Polygon", coordinates: [coords] }) > 2 * Math.PI) coords = ring.slice().reverse();
+        const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]);
+        const bb = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+        const feats = [];
+        c.sources.forEach(id => {
+            const ft = land.features.find(x => Number(x.id) === id);
+            const part = ft && clipSourcePolys(ft, bb);
+            if (part) feats.push(part);
+        });
+        return { to: c.to, poly: { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [coords] } }, feats };
+    });
+}
+function mapClipHit(ll) {
+    for (const c of mapClips) {
+        if (!c.feats.length || !d3.geoContains(c.poly, ll)) continue;
+        if (c.feats.some(ft => d3.geoContains(ft, ll))) return c;
+    }
+    return null;
+}
+function realm1936(f) {
     const id = (f.id === undefined || f.id === null) ? null : Number(f.id);
     const nm = f.properties && f.properties.name;
-    for (const [rid, members] of Object.entries(MAP_1993_REALMS)) {
+    for (const [rid, members] of Object.entries(MAP_1936_REALMS)) {
         if ((id !== null && members.includes(id)) || members.includes(nm)) return Number(rid);
     }
     return id !== null ? id : "n:" + nm;
@@ -5149,12 +5236,12 @@ async function initWorldMap() {
     Object.entries(COUNTRY_IDS).forEach(([k, id]) => { keyById[id] = k; });
     const R = Math.PI / 180;
 
-    // ---- قلمروهای ۱۹۹۳ ----
+    // ---- قلمروهای ۱۹۳۶ ----
     const geoms = world.objects.countries.geometries;
     const realmOfGeom = new Map();
     const realms = new Map();
     land.features.forEach((f, i) => {
-        const rid = realm1993(f);
+        const rid = realm1936(f);
         realmOfGeom.set(geoms[i], rid);
         let r = realms.get(rid);
         if (!r) { r = { rid, feats: [] }; realms.set(rid, r); }
@@ -5165,8 +5252,13 @@ async function initWorldMap() {
     mapBorders = topojson.mesh(world, world.objects.countries, (x, y) => {
         const rx = realmOfGeom.get(x), ry = realmOfGeom.get(y);
         // فقط مرزی که حداقل یک طرفش کشور حاضر در بازی است؛ مرز کشورهای اضافه‌نشده کشیده نمی‌شود
-        return rx !== ry && (inGameRealm(rx) || inGameRealm(ry));
+        if (rx === ry || !(inGameRealm(rx) || inGameRealm(ry))) return false;
+        const ix = Number(x.id), iy = Number(y.id);
+        // مرزهایی که در ۱۹۳۶ وجود نداشتند (مثلاً اودر-نایسه) کشیده نمی‌شوند
+        return !MAP_1936_CUT_PAIRS.some(([p, q]) => (ix === p && iy === q) || (ix === q && iy === p));
     });
+    mapClips = buildMapClips(land);
+    mapCustomBorders = { type: "MultiLineString", coordinates: MAP_1936_LINES };
     mapCoast = topojson.mesh(world, world.objects.countries, (x, y) => x === y);
 
     // اطلاعات ثابت هر قلمرو یک‌بار محاسبه می‌شود (نه در هر فریم)
@@ -5176,7 +5268,8 @@ async function initWorldMap() {
         const key = keyById[id] || null;
         // اسم فقط برای کشورهایی که در بازی هستند؛ بقیه بی‌نام
         const name = key ? COUNTRY_NAMES[key] : "";
-        const mf = mainLandFeature(f);
+        const homeFt = r.feats.find(ft => Number(ft.id) === r.rid) || f;   // برچسب روی خاک اصلی، نه مستعمرات
+        const mf = mainLandFeature(homeFt);
         const bb = d3.geoBounds(mf);
         let dLon = bb[1][0] - bb[0][0]; if (dLon < 0) dLon += 360;
         const c = d3.geoCentroid(mf);
@@ -5491,6 +5584,12 @@ function attachMapInteractions(svgEl) {
         const y = (e.clientY - rect.top) * (mapH / rect.height);
         const ll = mapProjection.invert([x, y]);
         if (!ll || !isFinite(ll[0]) || !isFinite(ll[1])) return;
+        const clip = mapClipHit(ll);
+        if (clip) {
+            const ch = clip.to ? mapFeatures.find(m => m.key === clip.to) : null;
+            showCountryInfo(ch ? ch.f : { id: -1 });
+            return;
+        }
         const hit = mapFeatures.find(m => d3.geoContains(m.f, ll));
         if (hit) showCountryInfo(hit.f);
     }, { signal });
@@ -5537,15 +5636,26 @@ function drawMapNow() {
         ctx.fill();
         ctx.lineWidth = 0.5; ctx.strokeStyle = g.fill; ctx.stroke();   // پوشاندن درز
     }
+    // برش‌های ۱۹۳۶ (مثلاً شرق آلمان) روی خاک امروزیِ کشور دیگر
+    for (const c of mapClips) {
+        if (!c.feats.length) continue;
+        const fill = mapFillFor({ key: c.to });
+        ctx.save();
+        ctx.beginPath(); mapPath(c.poly); ctx.clip();
+        ctx.beginPath(); for (const ft of c.feats) mapPath(ft);
+        ctx.fillStyle = fill; ctx.fill();
+        ctx.lineWidth = 0.5; ctx.strokeStyle = fill; ctx.stroke();
+        ctx.restore();
+    }
     // مرز کشورها و ساحل
     if (mapBorders) {
         // مرز مشکی و خوش‌حالت؛ ضخامت با زوم تنظیم می‌شود و یک هالهٔ روشن و نازک زیرش می‌نشیند تا روی همهٔ رنگ‌ها خوانا باشد
         const bz = Math.max(1, Math.min(4, mapProjection.scale() / (mapSize || 1)));
         const bw = Math.min(2.4, 0.9 + bz * 0.22);
         ctx.lineCap = "round"; ctx.lineJoin = "round";
-        ctx.beginPath(); mapPath(mapBorders);
+        ctx.beginPath(); mapPath(mapBorders); if (mapCustomBorders) mapPath(mapCustomBorders);
         ctx.lineWidth = bw + 1.2; ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.stroke();
-        ctx.beginPath(); mapPath(mapBorders);
+        ctx.beginPath(); mapPath(mapBorders); if (mapCustomBorders) mapPath(mapCustomBorders);
         ctx.lineWidth = bw; ctx.strokeStyle = "#000"; ctx.stroke();
     }
     if (mapCoast) {
