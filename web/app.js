@@ -312,13 +312,14 @@ function renderResourceBars() {
                 ${rateLine}${warnLine}`;
             chip.classList.toggle("selected", resourceDetailKey === key);
             chip.style.cursor = "pointer";
-            chip.addEventListener("click", () => { resourceDetailKey = resourceDetailKey === key ? null : key; renderResourceBars(); });
+            chip.addEventListener("click", () => { resourceDetailKey = resourceDetailKey === key ? null : key; resourceDetailMore = { sites: false, units: false }; renderResourceBars(); });
             bar.appendChild(chip);
         });
         if (resourceDetailKey) bar.appendChild(buildResourceDetail(resourceDetailKey));
     });
 }
 let resourceDetailKey = null;
+let resourceDetailMore = { sites: false, units: false };
 function buildResourceDetail(key) {
     const bd = player.resource_breakdown?.[key] || { infra: 0, sites: [], units: [] };
     const pm = bd.prod_mult ?? 1, cm = bd.cons_mult ?? 1;
@@ -328,18 +329,21 @@ function buildResourceDetail(key) {
     const sites = bd.sites || [];
     if (sites.length) {
         h += row(`دارایی‌های نقشه (${formatNumber(sites.length)} مورد)`, "+" + formatNumber(sites.reduce((t, x) => t + x.amount, 0) * pm), "up");
-        sites.forEach(x => { h += row("• " + escapeHtml(x.name), "+" + formatNumber(x.amount * pm), "sub"); });
+        (resourceDetailMore.sites ? sites : sites.slice(0, 2)).forEach(x => { h += row("• " + escapeHtml(x.name), "+" + formatNumber(x.amount * pm), "sub"); });
+        if (sites.length > 2) h += `<button type="button" class="rd-more" data-more="sites">${resourceDetailMore.sites ? "نمایش کمتر" : `نمایش همه (${formatNumber(sites.length - 2)} مورد دیگر)`}</button>`;
     }
     const units = bd.units || [];
     if (units.length) {
         h += row("مصرف نیروها", "−" + formatNumber(units.reduce((t, x) => t + x.amount, 0) * cm), "down");
-        units.forEach(x => { h += row(`• ${escapeHtml(x.name)} × ${formatNumber(x.count)}`, "−" + formatNumber(x.amount * cm), "sub"); });
+        (resourceDetailMore.units ? units : units.slice(0, 2)).forEach(x => { h += row(`• ${escapeHtml(x.name)} × ${formatNumber(x.count)}`, "−" + formatNumber(x.amount * cm), "sub"); });
+        if (units.length > 2) h += `<button type="button" class="rd-more" data-more="units">${resourceDetailMore.units ? "نمایش کمتر" : `نمایش همه (${formatNumber(units.length - 2)} مورد دیگر)`}</button>`;
     }
     const rate = Number(player.resource_production?.[key] ?? 0), use = Number(player.resource_consumption?.[key] ?? 0);
     h += row("خالص روزانه", (rate - use >= 0 ? "+" : "−") + formatNumber(Math.abs(rate - use)), rate - use >= 0 ? "up" : "down");
     const d = document.createElement("div");
     d.className = "resource-detail";
     d.innerHTML = h;
+    d.querySelectorAll(".rd-more").forEach(b => b.addEventListener("click", () => { const k = b.dataset.more; resourceDetailMore[k] = !resourceDetailMore[k]; renderResourceBars(); }));
     return d;
 }
 async function loadWorldAtlas() {
