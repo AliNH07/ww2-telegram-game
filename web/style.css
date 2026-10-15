@@ -3273,3 +3273,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* پرچم کوچک کشورهای مربوط به خبر */
 .news-flags { display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; margin-inline-end: 6px; }
 .news-flags .flag-inline { margin: 0; }
+
+/* نیروی دشمن در راه به سمت مواضع من: نوار قرمز */
+.wf-incoming { border-color: rgba(248,113,113,.75) !important; box-shadow: 0 0 0 1px rgba(248,113,113,.12); }
+.wf-incoming .wf-tr-bar i { background: linear-gradient(90deg, #ef4444, #fb7185) !important; }
+.wf-incoming .war-live-strip { margin-bottom: 6px; }
