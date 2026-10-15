@@ -843,6 +843,9 @@ def compute_rates(player, _occ=True, at_time=None):
     manpower_production = BASE_MANPOWER_PRODUCTION
     resource_production = {k: 0 for k in RESOURCE_NAMES}
     resource_consumption = {k: 0 for k in RESOURCE_NAMES}
+    res_infra = {k: 0 for k in RESOURCE_NAMES}
+    res_sites = {k: [] for k in RESOURCE_NAMES}
+    res_units = {k: [] for k in RESOURCE_NAMES}
     base_income = BASE_DAILY_INCOME
     income = base_income
     eco_income = 0
@@ -860,7 +863,9 @@ def compute_rates(player, _occ=True, at_time=None):
         if group == "manpower": manpower_production += lvl["production"]
         elif group == "resource":
             key = item.get("resource_key")
-            if key: resource_production[key] += lvl["production"]
+            if key:
+                resource_production[key] += lvl["production"]
+                res_infra[key] += lvl["production"]
 
     for item_id, item in ECONOMY.items():
         lv = get_infra_level(player, item_id)
@@ -878,12 +883,10 @@ def compute_rates(player, _occ=True, at_time=None):
         if owner != country: continue
         res = MAP_RESOURCES.get(key)
         if not res: continue
-        if res["type"] == "oil":
-            # سکوی نفت فقط نفت تولید می‌کند و درآمد پولی ندارد.
-            resource_production["oil"] += res["production"] // 5
-        elif res["type"] == "food":    resource_production["food"]    += res["production"] // 5
-        elif res["type"] == "steel":   resource_production["steel"]   += res["production"] // 5
-        elif res["type"] == "uranium": resource_production["uranium"] += res["production"] // 5
+        if res["type"] in res_sites:
+            amt = res["production"] // 5
+            resource_production[res["type"]] += amt
+            res_sites[res["type"]].append({"name": res.get("name", key), "amount": amt})
 
     for key, owner in strait_holdings.items():
         if owner != country: continue
@@ -949,6 +952,7 @@ def compute_rates(player, _occ=True, at_time=None):
             for k, a in u.get("daily", {}).items():
                 if k in resource_consumption:
                     resource_consumption[k] += a * n
+                    res_units[k].append({"name": u.get("name", uid_), "count": n, "amount": a * n})
 
     # افزایش مصرف غذا و نفت را فقط یک بار و روی مصرف واقعی اعمال می‌کنیم.
     consumption_mult = max(0.0, 1 + effects["food_oil_consumption_pct"] / 100.0)
@@ -964,7 +968,11 @@ def compute_rates(player, _occ=True, at_time=None):
             "power_capacity": power_capacity, "power_consumption": power_consumption,
             "manpower_production": manpower_production,
             "resource_production": resource_production,
-            "resource_consumption": resource_consumption}
+            "resource_consumption": resource_consumption,
+            "resource_breakdown": {k: {"infra": res_infra[k], "sites": res_sites[k], "units": res_units[k],
+                                       "prod_mult": production_mult,
+                                       "cons_mult": consumption_mult if k in ("food", "oil") else 1.0}
+                                   for k in RESOURCE_NAMES}}
 
 def _season_boundary_after(started, when):
     elapsed = max(0.0, (when - started).total_seconds() / 86400.0)
@@ -1411,6 +1419,7 @@ def serialize_player(player):
     data["game_winner_country"] = winner.get("country") if isinstance(winner, dict) else None
     data["resource_production"] = rates["resource_production"]
     data["resource_consumption"] = rates["resource_consumption"]
+    data["resource_breakdown"] = rates.get("resource_breakdown", {})
     data["power_capacity"] = rates["power_capacity"]
     data["power_consumption"] = rates["power_consumption"]
     data["manpower_production"] = rates["manpower_production"]
@@ -2739,7 +2748,7 @@ async def capture_site(request):
     return web.json_response({
         "success": False,
         "error": "dispatch_required",
-        "message": "تصرف مستقیم حذف شده است؛ برای تصرف سکو، معدن یا تنگه، از بخش جنگ نیروها را روی نقشه اعزام کنید. برای حمله به دارایی دشمن، اعلان جنگ باید تأیید شده باشد."
+        "message": "تصرف مستقیم حذف شده است؛ برای تصرف سکو، معدن یا تنگه، از بخش جنگ نیروها را روی نقشه اعزام کنید. تنگه‌ها، سکوها و معادن بدون اعلان جنگ هم قابل تصرف‌اند."
     }, status=400)
 
 # =========================================================
@@ -4047,8 +4056,6 @@ async def dispatch_forces(request):
     owner = target_owner if target_country else (site_owner(dst) if dst != "home" else None)
     if owner and owner != cid and have_treaty(cid, owner, "non_aggression"):
         return _bad("با این کشور پیمان عدم تجاوز دارید.")
-    if owner and owner != cid and not _war_between(cid, owner):
-        return _bad("برای حمله به کشور اصلی یا مستعمره‌ها و دارایی‌های نقشهٔ آن، ابتدا باید علیه کشور مالک اعلان جنگ کنید.")
 
     if dst != "home":
         combined = dict(units)
@@ -4130,6 +4137,7 @@ async def dispatch_forces(request):
     else:
         msg = f"نیروها به راه افتادند؛ زمان رسیدن: حدود {eta}."
     return web.json_response({"success": True, "outcome": "sent", "message": msg,
+                              "eta_seconds": secs, "eta_text": eta,
                               "player": serialize_player(p)})
 
 async def get_map_transits(request):
