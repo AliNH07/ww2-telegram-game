@@ -761,8 +761,9 @@ async function openNotificationsSheet() {
                 const div = document.createElement("div");
                 div.className = "notif-item" + (isNew ? " is-new" : "");
                 const t = formatNewsTime(item.at);
+                const notifFlags = (Array.isArray(item.countries) ? item.countries : []).map(c => flagInline(c, true)).join("");
                 div.innerHTML = `
-                    <div class="notif-title">${isNew ? '<span class="notif-dot"></span>' : ""}${escapeHtml(item.title || "")}</div>
+                    <div class="notif-title">${isNew ? '<span class="notif-dot"></span>' : ""}${notifFlags ? `<span class="news-flags">${notifFlags}</span>` : ""}${escapeHtml(item.title || "")}</div>
                     <p>${escapeHtml(item.text || "")}</p>
                     ${t ? `<div class="notif-time">${t}</div>` : ""}`;
                 box.appendChild(div);
@@ -4301,7 +4302,8 @@ function renderNewsList() {
         const isNewItem = !!item.id && newsNewIds.has(item.id);
         div.className = `news-item news-category-${inferNewsCategory(item)}${isNewItem ? " is-new" : ""}`;
         const categoryNames = { military: "نظامی", diplomacy: "دیپلماسی", economy: "اقتصاد", trade: "تجارت", territory: "قلمرو", union: "اتحادیه", general: "عمومی" };
-        div.innerHTML = `<div class="news-item-top"><h3>${escapeHtml(item.title || "خبر")}</h3>${isNewItem ? '<span class="news-new-tag">جدید</span>' : ""}<span class="news-category-label">${categoryNames[inferNewsCategory(item)] || "عمومی"}</span></div>
+        const newsFlags = (Array.isArray(item.countries) ? item.countries : []).map(c => flagInline(c, true)).join("");
+        div.innerHTML = `<div class="news-item-top"><h3>${newsFlags ? `<span class="news-flags">${newsFlags}</span>` : ""}${escapeHtml(item.title || "خبر")}</h3>${isNewItem ? '<span class="news-new-tag">جدید</span>' : ""}<span class="news-category-label">${categoryNames[inferNewsCategory(item)] || "عمومی"}</span></div>
             <p>${escapeHtml(item.text || "")}</p>${item.at ? `<time>${escapeHtml(formatNewsTime(item.at))}</time>` : ""}`;
         c.appendChild(div);
     });
