@@ -555,6 +555,17 @@ img { -webkit-user-drag: none; user-select: none; }
     border-color: rgba(255, 255, 255, 0.06);
     color: #998BB1; cursor: not-allowed;
 }
+.unit-card-new-info { display: flex; flex-wrap: wrap; gap: 6px; }
+.unit-card-new-info span {
+    font-size: 10.5px; color: #C8C1D5;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px; padding: 4px 8px;
+    display: inline-flex; gap: 4px; align-items: center;
+}
+.unit-card-new-info b { color: #f4f6f9; font-weight: bold; }
+.unit-price { font-size: 11px; font-weight: bold; opacity: 0.9; }
+.is-daily { display: block; margin-top: 2px; color: #998BB1; }
 .unit-status-text {
     font-size: 10.5px; color: #998BB1;
     text-align: left; flex-shrink: 0; line-height: 1.4;
