@@ -3303,3 +3303,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 #home .hm-season-detail{margin-top:2px;font-size:10px;color:#A194B7;line-height:1.7}
 #home .hm-season-detail b{color:#d8cbea}
 .st-season-line b{color:#f08a8a}
+
+/* برچسب مستعمره‌ها */
+.map-colony-label { font-weight: 500; }
+.map-colony-owner { fill: #ffd9a0; font-weight: 600; }
