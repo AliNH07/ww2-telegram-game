@@ -490,49 +490,49 @@ TG_DONE_KEEP = 100
 
 ARMY_UNITS = {
     "infantry": {"name": "پیاده‌نظام", "group": "land", "requires": ["land_barracks", "land_hq"],
-        "cost": 50_000, "manpower": 1500, "resources": {"food": 100}, "daily": {"food": 2},
+        "cost": 50_000, "manpower": 150, "resources": {"food": 100}, "daily": {"food": 2},
         "attack": 20, "defense": 10},
     "tank": {"name": "تانک", "group": "land", "requires": ["land_barracks", "land_hq", "land_tank_factory"],
-        "cost": 150_000, "manpower": 4000, "resources": {"steel": 300, "food": 150}, "daily": {"food": 3, "oil": 4, "steel": 1},
+        "cost": 150_000, "manpower": 400, "resources": {"steel": 300, "food": 150}, "daily": {"food": 3, "oil": 4, "steel": 1},
         "attack": 50, "defense": 25},
     "ship": {"name": "ناو دریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 250_000, "manpower": 12000, "resources": {"oil": 250, "food": 150}, "daily": {"food": 4, "oil": 10, "steel": 1},
+        "cost": 250_000, "manpower": 1200, "resources": {"oil": 250, "food": 150}, "daily": {"food": 4, "oil": 10, "steel": 1},
         "attack": 50, "defense": 60},
     "submarine": {"name": "زیردریایی", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 200_000, "manpower": 8000, "resources": {"oil": 200, "steel": 150}, "daily": {"food": 2, "oil": 8, "steel": 1},
+        "cost": 200_000, "manpower": 800, "resources": {"oil": 200, "steel": 150}, "daily": {"food": 2, "oil": 8, "steel": 1},
         "attack": 45, "defense": 25},
     "transport_ship": {"name": "ناو ترابری", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 180_000, "manpower": 6000, "resources": {"oil": 150, "steel": 200}, "daily": {"food": 2, "oil": 5, "steel": 1},
+        "cost": 180_000, "manpower": 600, "resources": {"oil": 150, "steel": 200}, "daily": {"food": 2, "oil": 5, "steel": 1},
         "attack": 5, "defense": 40, "transport_capacity": 500},
     "aircraft_carrier": {"name": "ناو هواپیمابر", "group": "naval", "requires": ["naval_port", "naval_shipyard"],
-        "cost": 800_000, "manpower": 40000, "resources": {"oil": 800, "steel": 1200}, "daily": {"food": 8, "oil": 30, "steel": 2},
+        "cost": 800_000, "manpower": 4000, "resources": {"oil": 800, "steel": 1200}, "daily": {"food": 8, "oil": 30, "steel": 2},
         "attack": 25, "defense": 90, "aircraft_capacity": 40},
     "fighter": {"name": "جنگنده", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 200_000, "manpower": 5000, "resources": {"oil": 200, "steel": 100}, "daily": {"food": 1, "oil": 5},
+        "cost": 200_000, "manpower": 500, "resources": {"oil": 200, "steel": 100}, "daily": {"food": 1, "oil": 5},
         "attack": 45, "defense": 40},
     "bomber": {"name": "بمب‌افکن", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 250_000, "manpower": 6000, "resources": {"oil": 300, "steel": 150}, "daily": {"food": 2, "oil": 8},
+        "cost": 250_000, "manpower": 600, "resources": {"oil": 300, "steel": 150}, "daily": {"food": 2, "oil": 8},
         "attack": 60, "defense": 15},
     "helicopter": {"name": "بالگرد", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 120_000, "manpower": 3000, "resources": {"oil": 120, "steel": 60}, "daily": {"food": 1, "oil": 3},
+        "cost": 120_000, "manpower": 300, "resources": {"oil": 120, "steel": 60}, "daily": {"food": 1, "oil": 3},
         "attack": 30, "defense": 35},
     "air_tanker": {"name": "هواپیمای سوخت‌رسان", "group": "air", "requires": ["air_airport", "air_arsenal"],
-        "cost": 220_000, "manpower": 4000, "resources": {"oil": 250, "steel": 120}, "daily": {"food": 1, "oil": 8},
+        "cost": 220_000, "manpower": 400, "resources": {"oil": 250, "steel": 120}, "daily": {"food": 1, "oil": 8},
         "attack": 2, "defense": 20, "refuel_capacity": 20},
     # یگان‌ها و موشک‌ها: علاوه بر هزینهٔ ساخت، منابع روزانهٔ نگهداری دارند
     "cruise_missile": {"name": "موشک کروز", "group": "missile", "requires": ["missile_depot", "missile_factory"],
         "min_level": {"missile_factory": 1},
-        "cost": 400_000, "manpower": 3000, "resources": {"steel": 300, "oil": 200, "food": 50},
+        "cost": 400_000, "manpower": 300, "resources": {"steel": 300, "oil": 200, "food": 50},
         "daily": {"food": 2, "oil": 5, "steel": 3},
         "attack": 70, "defense": 5},
     "ballistic_missile": {"name": "موشک بالستیک", "group": "missile", "requires": ["missile_depot", "missile_factory"],
         "min_level": {"missile_factory": 3},
-        "cost": 900_000, "manpower": 8000, "resources": {"steel": 600, "oil": 400, "food": 100},
+        "cost": 900_000, "manpower": 800, "resources": {"steel": 600, "oil": 400, "food": 100},
         "daily": {"food": 3, "oil": 10, "steel": 6},
         "attack": 120, "defense": 10},
     "icbm": {"name": "موشک قاره‌پیما", "group": "missile", "requires": ["missile_depot", "missile_factory"],
         "min_level": {"missile_factory": 5},
-        "cost": 2_500_000, "manpower": 20000, "resources": {"steel": 1200, "oil": 900, "food": 200},
+        "cost": 2_500_000, "manpower": 2000, "resources": {"steel": 1200, "oil": 900, "food": 200},
         "daily": {"food": 5, "oil": 20, "steel": 12},
         "attack": 250, "defense": 20},
 }
@@ -1096,7 +1096,7 @@ def occupy_country(attacker_cid, defender_cid, resolve_wars=True, announce_event
     if announce_event:
         msg = (f"{cname(attacker_cid)} با سقوط پایتخت، کشور {cname(defender_cid)} را حذف کرد؛ "
                "دارایی‌های نقشه و مستعمره‌های آن به فاتح منتقل شدند و ۳۰٪ درآمد پایه/اقتصادی و تولید نیروی انسانی آن حفظ می‌شود.")
-        push_news("اشغال کشور", msg, "warning")
+        push_news("اشغال کشور", msg, "warning", countries=[attacker_cid, defender_cid])
         push_war("occupy", msg, [attacker_cid, defender_cid])
 
 
@@ -1132,7 +1132,7 @@ def occupy_colony(attacker_cid, colony_cid, previous_occupier):
     # گرفتن یک مستعمره به‌تنهایی جنگ با کشور اصلی را تمام نمی‌کند؛ بازیکن می‌تواند به مستعمره‌های دیگر یا پایتخت حمله کند.
     msg = (f"{cname(attacker_cid)} مستعمرهٔ {cname(colony_cid)} را از {cname(previous_occupier)} گرفت. "
            f"{len(moved_map)} نقطهٔ منابع و {len(moved_straits)} تنگه/سکو منتقل شد؛ کشور اصلی {cname(previous_occupier)} همچنان فعال است.")
-    push_news("تغییر مالکیت مستعمره", msg, "warning")
+    push_news("تغییر مالکیت مستعمره", msg, "warning", countries=[attacker_cid, previous_occupier])
     push_war("colony_captured", msg, [attacker_cid, colony_cid, previous_occupier])
     push_history("colony", f"تصرف مستعمرهٔ {cname(colony_cid)}", attacker_cid, colony_cid, "attacker", msg)
     return True
@@ -1541,10 +1541,16 @@ def classify_news(title, text="", kind="info"):
         return "economy"
     return "general"
 
-def push_news(title, text, kind="info"):
-    news_feed.append({"id": str(uuid.uuid4()), "title": title, "text": text,
-                      "kind": kind, "category": classify_news(title, text, kind),
-                      "at": utcnow().isoformat()})
+def push_news(title, text, kind="info", countries=None):
+    row = {"id": str(uuid.uuid4()), "title": title, "text": text,
+           "kind": kind, "category": classify_news(title, text, kind),
+           "at": utcnow().isoformat()}
+    # کشورهای مربوط به خبر (برای نمایش پرچم کوچک کنار خبر)؛ بدون تکرار و حداکثر ۳ کشور
+    rel = []
+    for c in (countries or []):
+        if c in COUNTRIES and c not in rel: rel.append(c)
+    if rel: row["countries"] = rel[:3]
+    news_feed.append(row)
     if len(news_feed) > 200: del news_feed[:50]
 
 # هر دنیا نسخهٔ مستقل خود از داده‌های بازی را دارد. هنگام هر درخواست، وضعیت دنیای مربوط
@@ -2228,14 +2234,14 @@ async def war_cb(cb: types.CallbackQuery):
                         w["negotiation_ends"] = None
                         active_wars[war_id] = w
                         message = f"اعلان جنگ {COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} تأیید شد و جنگ اکنون آغاز شده است. دلیل: {w.get('reason', 'ثبت نشده')}"
-                        push_news("آغاز جنگ", message, "warning")
+                        push_news("آغاز جنگ", message, "warning", countries=[w["attacker"], w["defender"]])
                         push_war("war_started", message, [w["attacker"], w["defender"]])
                         await notify_world_players(message)
                         response = ("✅ درخواست تأیید شد و جنگ آغاز شد.", False)
                     elif action == "reject":
                         w["status"] = "rejected"
                         message = f"درخواست اعلان جنگ {COUNTRIES[w['attacker']]['name']} علیه {COUNTRIES[w['defender']]['name']} رد شد."
-                        push_news("درخواست جنگ رد شد", message)
+                        push_news("درخواست جنگ رد شد", message, countries=[w["attacker"], w["defender"]])
                         await notify_world_players(message)
                         response = ("❌ درخواست رد شد.", False)
                     else:
@@ -2665,7 +2671,7 @@ async def check_wars_tick():
             w["negotiation_ends"] = None
             active_wars[wid] = w
             msg = f"اعلان جنگ قدیمی بین {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} به جنگ فعال تبدیل شد."
-            push_news("آغاز جنگ", msg, "warning")
+            push_news("آغاز جنگ", msg, "warning", countries=[w["attacker"], w["defender"]])
             push_war("war_started", msg, [w["attacker"], w["defender"]])
             await notify_world_players(msg)
     for wid in list(active_wars.keys()):
@@ -2704,13 +2710,13 @@ async def admin_review_war(request):
         w["negotiation_ends"] = None
         active_wars[w["id"]] = w
         msg = f"⚔️ اعلان جنگ {attacker_name} علیه {defender_name} تأیید شد و جنگ اکنون آغاز شده است."
-        push_news("آغاز جنگ", msg, "warning")
+        push_news("آغاز جنگ", msg, "warning", countries=[w["attacker"], w["defender"]])
         push_war("war_started", msg, [w["attacker"], w["defender"]])
         await notify_world_players(msg)
     elif action == "reject":
         w["status"] = "rejected"
         msg = f"❎ درخواست اعلان جنگ {attacker_name} علیه {defender_name} رد شد."
-        push_news("رد درخواست جنگ", msg)
+        push_news("رد درخواست جنگ", msg, countries=[w["attacker"], w["defender"]])
         await notify_world_players(msg)
     else:
         return web.json_response({"success": False, "message": "عملیات نامعتبر است."}, status=400)
@@ -3366,7 +3372,7 @@ def loc_label(loc):
 
 def announce(kind, title, text, countries=()):
     """اعلان همزمان در اخبار جنگ و اعلان‌ها/اخبار عمومی (بدون ذکر تعداد نیرو)."""
-    push_war(kind, text, list(countries)); push_news(title, text)
+    push_war(kind, text, list(countries)); push_news(title, text, countries=list(countries))
 
 def notify_country(cid, text):
     """پیام خصوصی تلگرام به بازیکنِ آن کشور (علاوه بر اعلان‌های درون بازی)."""
@@ -3781,7 +3787,7 @@ def resolve_arrival(t):
         site_forces[dst] = {"owner": cid, "units": dict(units)}; set_site_owner(dst, cid)
         push_war("occupy", f"{cname(cid)} {meta['name']} را گرفت.", [cid])
         push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, None, "attacker", "بی‌صاحب بود")
-        push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را تصرف کرد.")
+        push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", f"{cname(cid)} {meta['name']} را تصرف کرد.", countries=[cid])
         notify_country(cid, f"✅ نیروهای شما به {meta['name']} رسیدند و آن را با موفقیت گرفتند.")
     else:
         _, dfd = get_player_by_country(owner)
@@ -3789,36 +3795,46 @@ def resolve_arrival(t):
         atk_p = units_power(units, p, "attack") * (1 + random.uniform(-0.08, 0.08))
         def_p = units_power(gar, dfd, "defense") * 1.10 * (1 + random.uniform(-0.08, 0.08))
         empty = units_count(gar) == 0
-        if empty or atk_p > def_p:
-            attacker_before = units_count(units)
-            defender_before = units_count(gar)
+        # تساوی قدرت: اگر قدرت کلی دو نیرو دقیقاً برابر باشد (مثلاً یک زیردریایی در برابر یک زیردریایی)
+        # برنده کاملاً شانسی (۵۰/۵۰) تعیین می‌شود؛ نه همیشه مهاجم و نه همیشه مدافع.
+        tie = (not empty) and math.isclose(units_power(units, p), units_power(gar, dfd), rel_tol=1e-9, abs_tol=1e-9)
+        attacker_wins = empty or ((random.random() < 0.5) if tie else (atk_p > def_p))
+        a_name, d_name, site_name = cname(cid), cname(owner), meta["name"]
+        site_word = "تنگه" if kind == "strait" else "منبع"
+        attacker_before = units_count(units)
+        defender_before = units_count(gar)
+        if attacker_wins:
             surv = dict(units) if empty else {k: max(1, int(n * 0.8)) for k, n in units.items()}
             attacker_lost = attacker_before - units_count(surv)
+            defender_lost = defender_before
             site_forces[dst] = {"owner": cid, "units": surv}; set_site_owner(dst, cid)
-            msg = (f"{cname(cid)} {meta['name']} را از {cname(owner)} تصرف کرد؛ "
-                   f"مهاجم {attacker_lost:,} یگان از دست داد و {units_count(surv):,} باقی ماند؛ "
-                   f"مدافع {defender_before:,} یگان پادگان را از دست داد.")
-            push_war("capture", msg, [cid, owner])
-            push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "attacker",
-                         f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}؛ تلفات مهاجم {attacker_lost}؛ تلفات مدافع {defender_before}")
-            push_news("تصرف تنگه" if kind == "strait" else "تصرف منبع", msg)
-            notify_country(cid, f"✅ {msg}")
-            notify_country(owner, f"⚠️ {msg}")
+            winner_side = "attacker"
+            result_line = f"{site_name} توسط {a_name} از {d_name} گرفته شد."
+            public_msg = f"{a_name} {site_name} را از {d_name} تصرف کرد."
+            news_title = "تصرف تنگه" if kind == "strait" else "تصرف منبع"
+            war_kind = "capture"
+            icon_atk, icon_def = "✅", "⚠️"
         else:
-            attacker_before = units_count(units)
-            defender_before = units_count(gar)
             returned = {k: int(n * 0.3) for k, n in units.items() if int(n * 0.3) > 0}
             _add_units(p["units"], returned)
             for k in list(gar): gar[k] = int(gar[k] * 0.8)
-            defender_after = units_count(gar)
-            msg = (f"{cname(owner)} حملهٔ {cname(cid)} به {meta['name']} را دفع کرد؛ "
-                   f"مهاجم {attacker_before-units_count(returned):,} یگان از دست داد و {units_count(returned):,} به خانه برگشت؛ "
-                   f"مدافع {defender_before-defender_after:,} یگان از دست داد و {defender_after:,} باقی ماند.")
-            push_war("repel", msg, [cid, owner])
-            push_history(kind, f"حملهٔ {cname(cid)} به {meta['name']}", cid, owner, "defender",
-                         f"حمله {int(atk_p)} در برابر دفاع {int(def_p)}؛ تلفات مهاجم {attacker_before-units_count(returned)}؛ تلفات مدافع {defender_before-defender_after}")
-            notify_country(cid, f"❌ {msg}")
-            notify_country(owner, f"🛡️ {msg}")
+            attacker_lost = attacker_before - units_count(returned)
+            defender_lost = defender_before - units_count(gar)
+            winner_side = "defender"
+            result_line = f"{site_name} گرفته نشد؛ {d_name} حملهٔ {a_name} را دفع کرد."
+            public_msg = f"{d_name} حملهٔ {a_name} به {site_name} را دفع کرد؛ {site_name} گرفته نشد."
+            news_title = f"دفع حمله به {site_word}"
+            war_kind = "repel"
+            icon_atk, icon_def = "❌", "🛡️"
+        # پیام بازیکنان (هر دو طرف یک متن): نتیجه + فقط تلفات دو طرف؛ بدون تعداد نیروی باقی‌مانده
+        casualties = f"تلفات {a_name}: {attacker_lost:,} یگان | تلفات {d_name}: {defender_lost:,} یگان"
+        # اخبار و گزارش جنگ عمومی: فقط نتیجه، بدون عدد
+        push_war(war_kind, public_msg, [cid, owner])
+        push_history(kind, f"حملهٔ {a_name} به {site_name}", cid, owner, winner_side,
+                     f"تلفات مهاجم {attacker_lost}؛ تلفات مدافع {defender_lost}")
+        push_news(news_title, public_msg, countries=[cid, owner])
+        notify_country(cid, f"{icon_atk} {result_line}\n{casualties}")
+        notify_country(owner, f"{icon_def} {result_line}\n{casualties}")
 
 def _transit_position(t, now):
     if t.get("route_battle"):
