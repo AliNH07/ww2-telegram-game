@@ -3296,3 +3296,10 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .abd-chip.home { background: rgba(80,200,120,.1); border-color: rgba(80,200,120,.3); }
 .abd-chip.away { background: rgba(var(--brand-rgb), .12); border-color: rgba(var(--brand-rgb), .35); }
 .abd-where { display: block; margin-top: 5px; font-size: 10px; color: #998BB1; line-height: 1.7; }
+
+/* اثر و شمارش معکوس فصل زیر درآمد روزانه */
+#home .hm-season-countdown{margin-top:6px;font-size:11px;font-weight:700;color:var(--brand);line-height:1.6}
+#home .hm-season-countdown:empty,#home .hm-season-detail:empty{display:none}
+#home .hm-season-detail{margin-top:2px;font-size:10px;color:#A194B7;line-height:1.7}
+#home .hm-season-detail b{color:#d8cbea}
+.st-season-line b{color:#f08a8a}
