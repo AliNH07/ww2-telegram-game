@@ -310,9 +310,37 @@ function renderResourceBars() {
                 <div class="resource-chip-top"><span>${RESOURCE_ICONS[key]} ${RESOURCE_NAMES[key]}</span></div>
                 <div class="resource-chip-value">${formatNumber(amt)}</div>
                 ${rateLine}${warnLine}`;
+            chip.classList.toggle("selected", resourceDetailKey === key);
+            chip.style.cursor = "pointer";
+            chip.addEventListener("click", () => { resourceDetailKey = resourceDetailKey === key ? null : key; renderResourceBars(); });
             bar.appendChild(chip);
         });
+        if (resourceDetailKey) bar.appendChild(buildResourceDetail(resourceDetailKey));
     });
+}
+let resourceDetailKey = null;
+function buildResourceDetail(key) {
+    const bd = player.resource_breakdown?.[key] || { infra: 0, sites: [], units: [] };
+    const pm = bd.prod_mult ?? 1, cm = bd.cons_mult ?? 1;
+    const row = (l, v, cls) => `<div class="rd-row ${cls || ""}"><span>${l}</span><b>${v}</b></div>`;
+    let h = `<div class="rd-title">${RESOURCE_ICONS[key]} جزئیات ${RESOURCE_NAMES[key]}</div>`;
+    if (bd.infra) h += row("تولید ساختمان‌ها", "+" + formatNumber(bd.infra * pm), "up");
+    const sites = bd.sites || [];
+    if (sites.length) {
+        h += row(`دارایی‌های نقشه (${formatNumber(sites.length)} مورد)`, "+" + formatNumber(sites.reduce((t, x) => t + x.amount, 0) * pm), "up");
+        sites.forEach(x => { h += row("• " + escapeHtml(x.name), "+" + formatNumber(x.amount * pm), "sub"); });
+    }
+    const units = bd.units || [];
+    if (units.length) {
+        h += row("مصرف نیروها", "−" + formatNumber(units.reduce((t, x) => t + x.amount, 0) * cm), "down");
+        units.forEach(x => { h += row(`• ${escapeHtml(x.name)} × ${formatNumber(x.count)}`, "−" + formatNumber(x.amount * cm), "sub"); });
+    }
+    const rate = Number(player.resource_production?.[key] ?? 0), use = Number(player.resource_consumption?.[key] ?? 0);
+    h += row("خالص روزانه", (rate - use >= 0 ? "+" : "−") + formatNumber(Math.abs(rate - use)), rate - use >= 0 ? "up" : "down");
+    const d = document.createElement("div");
+    d.className = "resource-detail";
+    d.innerHTML = h;
+    return d;
 }
 async function loadWorldAtlas() {
     if (worldData) return worldData;
@@ -2506,6 +2534,16 @@ function showDispatchConfirm(picked) {
     });
 }
 
+function showDispatchSent(d) {
+    const ov = document.createElement("div");
+    ov.className = "gs-overlay gs-bottom";
+    ov.innerHTML = `<div class="gs-sheet dispatch-sent-sheet"><div class="gs-sheet-head"><span>✅ نیروها اعزام شدند</span></div>
+        <div class="dispatch-sent-body"><p>نیروهای شما حدود <b>${escapeHtml(d.eta_text || "")}</b> دیگر می‌رسند.</p>
+        <p>برای پیگیری به بخش «جنگ» بروید.</p></div>
+        <button type="button" class="wf-send-btn dispatch-sent-ok">تأیید</button></div>`;
+    ov.addEventListener("click", e => { if (e.target === ov || e.target.closest(".dispatch-sent-ok")) ov.remove(); });
+    document.body.appendChild(ov);
+}
 async function sendDispatch() {
     const { from, to } = dispatchSel;
     if (!from || !to) { showToast("مبدا و مقصد را انتخاب کن.", "error"); return; }
@@ -2516,10 +2554,10 @@ async function sendDispatch() {
     try {
         const d = await apiPost("/api/war/dispatch", { from, to, units: picked });
         if (!d || !d.success) { showToast(d?.message || "اعزام انجام نشد.", "error"); if (btn) btn.disabled = false; return; }
-        showToast(d.message, "success");
         if (d.player) { player = d.player; updateHomeStats(); }
         dispatchSel = { from: null, to: null, units: {} };
         closeDispatchSheet();
+        if (d.eta_seconds > 0) showDispatchSent(d); else showToast(d.message, "success");
         await loadForces();
         refreshMapSites();
     } catch (e) { console.error(e); showToast("خطا در ارتباط با سرور.", "error"); if (btn) btn.disabled = false; }
@@ -5556,7 +5594,7 @@ function showSiteInfo(site) {
     } else {
         flagEl.textContent = RESOURCE_ICONS[site.type] || "📍";
         const zoneTxt = site.zone === "sea" ? "🌊 در دریا" : (site.zone === "land" ? "⛰️ در خشکی" : "");
-        descEl.textContent = `تولید: ${formatNumber(site.production)} در روز` + (zoneTxt ? ` — ${zoneTxt}` : "")
+        descEl.textContent = `تولید: ${formatNumber(Math.floor(Number(site.production || 0) / 5))} در روز` + (zoneTxt ? ` — ${zoneTxt}` : "")
             + ((site.type === "steel" || site.type === "uranium") ? " — تصرف: ارتش + ناو ترابری" : "");
     }
     nameEl.textContent = site.name;
@@ -5999,3 +6037,13 @@ setInterval(() => {
         if (currentWarTab === "war-forces-panel") loadForces();
     }
 }, 2500);
+
+
+/* ---------- دکمهٔ خانه روی نقشه ---------- */
+document.getElementById("map-home-btn")?.addEventListener("click", () => {
+    const cap = MAP_CAPITALS[player?.country];
+    if (!cap || !mapProjection) { showToast("کشور شما مشخص نیست.", "error"); return; }
+    setMapSpin(false);
+    mapRotation = [-cap[0], -cap[1]];
+    redrawMap();
+});
