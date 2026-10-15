@@ -2232,7 +2232,7 @@ async def start_command(message: types.Message):
     else:
         kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="🌍 ورود به بازی", web_app=WebAppInfo(url=game_url))]])
-        text = "⚔️ به FRONT-LINE 1993 خوش آمدید.\nبرای آغاز، دنیا و سپس کشور خود را انتخاب کنید."
+        text = "⚔️ به FRONT-LINE 1936 خوش آمدید.\nبرای آغاز، دنیا و سپس کشور خود را انتخاب کنید."
     await message.answer(text, reply_markup=kb)
 
 async def notify_admin(text, keyboard=None):
@@ -5432,7 +5432,7 @@ async def get_news(request):
             if det: row["countries"] = det
         rows.append(row)
     return web.json_response(rows or [
-        {"title": "سال ۱۹۹۳", "text": "جهان در آستانه یک بحران بزرگ قرار دارد."}])
+        {"title": "سال ۱۹۳۶", "text": "جهان در آستانه یک بحران بزرگ قرار دارد."}])
 
 def compute_rankings():
     rows = []
@@ -6058,7 +6058,7 @@ async def admin_player_message(request):
     if target_uid not in players: return web.json_response({"success": False, "message": "بازیکن پیدا نشد."}, status=404)
     p = players[target_uid]
     display_name = " ".join(x for x in [str(p.get("telegram_first_name", "") or "").strip(), str(p.get("telegram_last_name", "") or "").strip()] if x)
-    out_text = f"✉️ پیام مدیریت FRONT-LINE 1993\n\n{message_text}"
+    out_text = f"✉️ پیام مدیریت FRONT-LINE 1936\n\n{message_text}"
     world_key = str(request.query.get("world_id", "1"))
     ok_response = web.json_response({"success": True, "message": f"پیام برای {display_name or target_uid} ارسال شد."})
     async def _deliver(resp):
@@ -6544,7 +6544,7 @@ async def war_tick_loop():
 dp.message.register(vip_command, Command("vip"))
 
 async def main():
-    logging.info("FRONT-LINE 1993 GAME STARTING...")
+    logging.info("FRONT-LINE 1936 GAME STARTING...")
     load_state()
     asyncio.create_task(autosave_loop())
     asyncio.create_task(war_tick_loop())
