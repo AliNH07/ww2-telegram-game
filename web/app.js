@@ -1930,8 +1930,13 @@ function renderArmyUnitsNew() {
                     ${formatNumber(totalPower)}
                 </div>
             </div>
+            <div class="unit-card-new-info">
+                <span>⚔️ قدرت هر یگان <b>${formatNumber(Math.round(u.attack + u.defense * (player.def_mult?.[group] ?? 1)))}</b></span>
+                <span>⏱ زمان ساخت <b>${u.build_seconds ? fmtDurationFa(u.build_seconds) : "—"}</b></span>
+                <span>👥 نیروی انسانی <b>${formatNumber(u.manpower)}</b></span>
+            </div>
             <div class="unit-card-new-action">
-                <button class="unit-produce-btn" ${!missing.length && (full || queueFull) ? "disabled" : ""}>⚙️ تولید</button>
+                <button class="unit-produce-btn" ${!missing.length && (full || queueFull) ? "disabled" : ""}>⚙️ تولید <small class="unit-price">· ${formatMoney(unitCost(u))}</small></button>
                 <span class="unit-status-text">${statusText}</span>
             </div>`;
         card.querySelector(".unit-produce-btn").addEventListener("click", () => {
@@ -2057,8 +2062,6 @@ function openTrainSheet(uid_) {
     const update = () => {
         const n = getN(), rows = [];
         rows.push(`<div class="is-row"><span>تعداد فعلی</span><b>${formatNumber(player.units?.[uid_] ?? 0)}</b></div>`);
-        Object.entries(u.daily || {}).forEach(([k, d]) =>
-            rows.push(`<div class="is-row"><span>🔁 مصرف روزانه · ${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}</span><b>${formatNumber(d * n)} <small>(هر عدد ${formatNumber(d)})</small></b></div>`));
         if (u.build_seconds) {
             rows.push(`<div class="is-row"><span>⏱ زمان ساخت هر واحد</span><b>${fmtDurationFa(u.build_seconds)}</b></div>`);
             if (n > 0) rows.push(`<div class="is-row"><span>⏳ زمان تکمیل کل سفارش</span><b>${fmtDurationFa(u.build_seconds * n)}</b></div>`);
@@ -2068,17 +2071,22 @@ function openTrainSheet(uid_) {
         if (u.transport_capacity) rows.push(`<div class="is-row"><span>🚚 ظرفیت حمل (تانک/پیاده در دریا)</span><b>${formatNumber(u.transport_capacity)}</b></div>`);
         if (u.aircraft_capacity) rows.push(`<div class="is-row"><span>🛬 ظرفیت هواپیما در دریا</span><b>${formatNumber(u.aircraft_capacity)}</b></div>`);
         if (u.refuel_capacity) rows.push(`<div class="is-row"><span>⛽ ظرفیت سوخت‌رسانی در خشکی</span><b>${formatNumber(u.refuel_capacity)}</b></div>`);
-        const row = (label, need, have, money) => {
+        const row = (label, need, have, money, extra = "") => {
             const bad = need > have;
-            rows.push(`<div class="is-row ${bad ? "is-bad" : ""}"><span>${label}</span><b>${money ? formatMoney(need) : formatNumber(need)} <small>(موجود: ${money ? formatMoney(have) : formatNumber(have)})</small></b></div>`);
+            rows.push(`<div class="is-row ${bad ? "is-bad" : ""}"><span>${label}</span><b>${money ? formatMoney(need) : formatNumber(need)} <small>(موجود: ${money ? formatMoney(have) : formatNumber(have)})</small>${extra}</b></div>`);
             return bad;
         };
         let bad = false;
         bad = row("💰 هزینه", cost * n, player.money ?? 0, true) || bad;
         bad = row("👥 نیروی انسانی", u.manpower * n, Math.floor(player.manpower ?? 0), false) || bad;
+        // هر منبع فقط یک بار نمایش داده می‌شود: هزینهٔ ساخت + (اگر دارد) مصرف روزانه در همان ردیف
         Object.entries(u.resources || {}).forEach(([k, a]) => {
-            bad = row(`${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}`, a * n, Math.floor(player.resources?.[k] ?? 0), false) || bad;
+            const d = u.daily?.[k];
+            const extra = d ? `<small class="is-daily"> · 🔁 مصرف روزانه ${formatNumber(d * n)} (هر عدد ${formatNumber(d)})</small>` : "";
+            bad = row(`${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}`, a * n, Math.floor(player.resources?.[k] ?? 0), false, extra) || bad;
         });
+        Object.entries(u.daily || {}).filter(([k]) => !(u.resources || {})[k]).forEach(([k, d]) =>
+            rows.push(`<div class="is-row"><span>🔁 مصرف روزانه · ${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}</span><b>${formatNumber(d * n)} <small>(هر عدد ${formatNumber(d)})</small></b></div>`));
         if (qLen >= qMax) bad = true;
         if (n > capLeft) { bad = true; rows.push(`<div class="is-row is-bad"><span>📦 ظرفیت آزاد</span><b>${formatNumber(capLeft)}</b></div>`); }
         ov.querySelector("#tr-rows").innerHTML = rows.join("");
