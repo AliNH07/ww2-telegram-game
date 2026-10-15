@@ -3255,3 +3255,15 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .resource-chip-rate, .resource-chip-rate b, .resource-chip-rate span { font-size: 10px !important; }
 
 .admin-world-actions .admin-world-delete{background:rgba(180,30,30,.18);border:1px solid rgba(220,70,70,.6);color:#ff9b9b}
+
+.map-home-btn{right:auto;left:10px;top:10px}
+.dispatch-sent-sheet{height:auto;max-height:50vh;display:flex;flex-direction:column}
+.dispatch-sent-body{padding:16px;text-align:center;line-height:2}
+.dispatch-sent-ok{margin:8px 16px 16px}
+
+.resource-chip.selected{outline:1px solid #8a6cff}
+.resource-detail{grid-column:1/-1;width:100%;flex-basis:100%;background:rgba(255,255,255,.05);border-radius:10px;padding:10px;margin-top:6px;font-size:12px}
+.rd-title{font-weight:bold;margin-bottom:6px}
+.rd-row{display:flex;justify-content:space-between;padding:3px 0}
+.rd-row.sub{opacity:.75;font-size:11px;padding-right:8px}
+.rd-row.up b{color:#5fd28a}.rd-row.down b{color:#ff7a7a}
