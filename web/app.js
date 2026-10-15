@@ -3014,7 +3014,13 @@ const isAdminAccount = Number(userId) === ADMIN_TELEGRAM_ID;
 /* راهنمای شروع: فقط بار اول خودکار نمایش داده می‌شود */
 const guideModal = document.getElementById("guide-modal");
 const guideSeenKey = () => `fl93_guide_seen_${userId || "guest"}`;
-function openGuide() { guideModal?.classList.remove("hidden"); }
+function showGuideTab(name) {
+    guideModal?.querySelectorAll(".guide-tab").forEach(b => b.classList.toggle("active", b.dataset.guideTab === name));
+    guideModal?.querySelectorAll(".guide-pane").forEach(p => p.classList.toggle("active", p.id === `guide-pane-${name}`));
+    const pane = guideModal?.querySelector(`#guide-pane-${name}`); if (pane) pane.scrollTop = 0;
+}
+function openGuide(tab = "logic") { guideModal?.classList.remove("hidden"); showGuideTab(tab); }
+guideModal?.querySelectorAll(".guide-tab").forEach(b => b.addEventListener("click", () => showGuideTab(b.dataset.guideTab)));
 function closeGuide() {
     guideModal?.classList.add("hidden");
     try { localStorage.setItem(guideSeenKey(), "1"); } catch (e) {}
