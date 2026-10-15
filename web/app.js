@@ -2445,7 +2445,7 @@ function transitsHtml() {
             <div class="wf-tr-top"><b>${t.from_name} ← ${t.to_name}</b><small>${t.battle ? "در حال نبرد" : (t.kind === "back" ? "در حال بازگشت" : "در حال حرکت")} · ${formatNumber(total)} یگان</small></div>
             <div class="wf-tr-bar"><i data-tr-bar="${t.id}"></i></div>
             <div class="wf-tr-bottom"><span>⏱ <b data-tr-eta="${t.id}" dir="ltr">—</b></span>
-                ${t.kind === "go" ? `<button class="wf-tr-cancel" data-recall="${t.id}">بازگرداندن</button>` : ""}</div>
+                ${t.kind === "go" && !t.battle ? `<button class="wf-tr-cancel" data-recall="${t.id}">بازگرداندن</button>` : ""}</div>
         </div>`;
     }).join("");
 }
@@ -2455,7 +2455,7 @@ function incomingHtml() {
     return `<div class="wf-section"><span>🚨 نیروی دشمن در راه</span><small>${formatNumber(list.length)} گروه</small></div>` + list.map(t => `
         <div class="wf-transit wf-incoming">
             <div class="war-live-strip">🚨 ${flagInline(t.country, true)} ${escapeHtml(t.country_name || "")} به ${escapeHtml(t.to_name || "")} نیرو فرستاده است</div>
-            <div class="wf-tr-top"><small>${t.battle ? "درگیری در مسیر" : "زمان باقی‌مانده تا رسیدن نیروی دشمن"}</small></div>
+            <div class="wf-tr-top"><small>${t.battle ? "⚔️ نبرد در جریان است" : "زمان باقی‌مانده تا رسیدن نیروی دشمن"}</small></div>
             <div class="wf-tr-bar"><i data-in-bar="${t.id}"></i></div>
             <div class="wf-tr-bottom"><span>⏱ <b data-in-eta="${t.id}" dir="ltr">—</b></span></div>
         </div>`).join("");
