@@ -1406,6 +1406,32 @@ def build_catalog_status(player, catalog):
         }
     return result
 
+def army_locations(player):
+    """هر یگان کجاست: در خانه، در مواضع بیرون از خانه (سکو، تنگه، معدن، بندر، جبهه) یا در راه."""
+    cid = player.get("country")
+    out = {u: {"home": max(0, int(player.get("units", {}).get(u, 0) or 0)), "sites": [], "transit": 0}
+           for u in ARMY_UNITS}
+    if cid:
+        for sid, g in site_forces.items():
+            if g.get("owner") != cid: continue
+            if not (str(sid).startswith(("port:", "front:")) or site_owner(sid) == cid): continue
+            try:
+                meta = site_meta(sid); name = meta["name"] if meta else str(sid)
+            except Exception:
+                name = str(sid)
+            for u, n in (g.get("units") or {}).items():
+                n = int(n or 0)
+                if u in out and n > 0: out[u]["sites"].append({"name": name, "count": n})
+        for t in transits:
+            if t.get("owner") != cid: continue
+            for u, n in (t.get("units") or {}).items():
+                n = int(n or 0)
+                if u in out and n > 0: out[u]["transit"] += n
+    for v in out.values():
+        v["away"] = sum(s["count"] for s in v["sites"]) + v["transit"]
+        v["total"] = v["home"] + v["away"]
+    return out
+
 def serialize_player(player):
     ensure_player_fields(player); accrue_player(player); recompute_army(player)
     rates = compute_rates(player)
@@ -1429,6 +1455,7 @@ def serialize_player(player):
     data["economy"] = build_catalog_status(player, ECONOMY)
     data["satellite_built"] = get_infra_level(player, "satellite") > 0
     data["def_mult"] = {g: group_defense_mult(player, g) for g in ("land", "naval", "air", "missile")}
+    data["unit_locations"] = army_locations(player)
     return data
 
 # =========================================================
@@ -1541,7 +1568,22 @@ def classify_news(title, text="", kind="info"):
         return "economy"
     return "general"
 
+def _detect_news_countries(title, text):
+    """کشورهای بازیکن که نامشان در خبر آمده (به ترتیب ظهور). نام سکو/معدن/تنگه‌ها پیش‌تر حذف می‌شود
+    تا مثلاً «سکوی آمریکا (بوفورت)» یا «معدن آهن چین» پرچم اشتباه نیاورد."""
+    s = f"{title or ''} {text or ''}"
+    names = {v.get("name") for v in list(MAP_RESOURCES.values()) + list(STRAITS_DATA.values()) if v.get("name")}
+    for n in sorted(names, key=len, reverse=True):
+        s = s.replace(n, " ")
+    found = []
+    for cid, c in COUNTRIES.items():
+        pos = s.find(c["name"])
+        if pos >= 0: found.append((pos, cid))
+    return [cid for _, cid in sorted(found)][:3]
+
 def push_news(title, text, kind="info", countries=None):
+    if countries is None:
+        countries = _detect_news_countries(title, text)
     row = {"id": str(uuid.uuid4()), "title": title, "text": text,
            "kind": kind, "category": classify_news(title, text, kind),
            "at": utcnow().isoformat()}
@@ -3380,6 +3422,11 @@ def _country_route_straits_fallback(src_country, dst_country, traveler):
     candidates.sort(key=lambda row: (row[0], row[1], row[2]))
     return candidates[0][3] if candidates else []
 
+def _strait_bare(sid):
+    """نام تنگه بدون پیشوند «تنگه» (برای جمله‌هایی که خودشان «تنگهٔ …» دارند)."""
+    n = loc_label(sid)
+    return n[len("تنگه "):] if n.startswith("تنگه ") else n
+
 def loc_label(loc):
     if loc == "home": return "خانه"
     if loc == "mid": return "میانهٔ راه"
@@ -3503,7 +3550,7 @@ def _resolve_strait_passage(t, player):
             old_owner = owner
             set_site_owner(sid, cid)
             site_forces.pop(sid, None)
-            msg = (f"{cname(cid)} از تنگهٔ بستهٔ {loc_label(sid)} عبور کرد و آن را از {cname(old_owner)} گرفت؛ "
+            msg = (f"{cname(cid)} از تنگهٔ بستهٔ {_strait_bare(sid)} عبور کرد و آن را از {cname(old_owner)} گرفت؛ "
                    f"مهاجم {attacker_lost:,} یگان از دست داد و {units_count(survivors):,} باقی ماند؛ "
                    f"مدافع {defender_before:,} یگان در این موضع از دست داد. ناوگان باقی‌مانده به مسیر خود ادامه می‌دهد.")
             announce("capture", "تصرف تنگه در نبرد", msg, [cid, old_owner])
@@ -3520,7 +3567,7 @@ def _resolve_strait_passage(t, player):
                 guards[k] = int(guards[k] * 0.8)
                 if guards[k] <= 0: guards.pop(k, None)
             defender_lost = defender_before - units_count(guards)
-            msg = (f"{cname(owner)} عبور {cname(cid)} از تنگهٔ بستهٔ {loc_label(sid)} را دفع کرد؛ "
+            msg = (f"{cname(owner)} عبور {cname(cid)} از تنگهٔ بستهٔ {_strait_bare(sid)} را دفع کرد؛ "
                    f"مهاجم {attacker_lost:,} یگان از دست داد و {defender_lost:,} یگان مدافع نیز تلف شد؛ تنگه بسته ماند.")
             announce("repel", "دفاع از تنگه", msg, [cid, owner])
             push_history("strait", f"دفاع از {loc_label(sid)}", cid, owner, "defender",
@@ -5267,13 +5314,13 @@ async def set_strait_settings(request):
             else: rule["toll"], rule["closed"] = new_toll, False
             rules[country_id] = rule
             if action == "close":
-                text = f"کشور {owner_name} تنگه {sname} را برای کشور {cn} بست."
+                text = f"کشور {owner_name} {sname} را برای کشور {cn} بست."
             elif action == "free":
-                text = f"کشور {owner_name} عبور کشور {cn} از تنگه {sname} را رایگان کرد."
+                text = f"کشور {owner_name} عبور کشور {cn} از {sname} را رایگان کرد."
             elif cur["toll"] > 0 and not cur["closed"]:
-                text = f"کشور {owner_name} عوارض عبور کشور {cn} از تنگه {sname} را از {cur['toll']:,}$ به {amount:,}$ تغییر داد."
+                text = f"کشور {owner_name} عوارض عبور کشور {cn} از {sname} را از {cur['toll']:,}$ به {amount:,}$ تغییر داد."
             else:
-                text = f"کشور {owner_name} عوارض عبور کشور {cn} از تنگه {sname} را {amount:,}$ تعیین کرد."
+                text = f"کشور {owner_name} عوارض عبور کشور {cn} از {sname} را {amount:,}$ تعیین کرد."
             push_news("قانون ویژهٔ تنگه", text)
         else:
             old_toll, old_closed = int(info.get("toll", 0) or 0), bool(info.get("closed", False))
@@ -5282,13 +5329,13 @@ async def set_strait_settings(request):
                 return _reply("این وضعیت از قبل فعال است.", False)
             info["toll"], info["closed"] = new_toll, new_closed
             if action == "close":
-                text = f"کشور {owner_name} تنگه {sname} را بست."
+                text = f"کشور {owner_name} {sname} را بست."
             elif action == "free":
-                text = f"کشور {owner_name} عبور از تنگه {sname} را رایگان کرد."
+                text = f"کشور {owner_name} عبور از {sname} را رایگان کرد."
             elif old_toll > 0 and not old_closed:
-                text = f"کشور {owner_name} عوارض عبور از تنگه {sname} را از {old_toll:,}$ به {amount:,}$ تغییر داد."
+                text = f"کشور {owner_name} عوارض عبور از {sname} را از {old_toll:,}$ به {amount:,}$ تغییر داد."
             else:
-                text = f"کشور {owner_name} عوارض عبور از تنگه {sname} را {amount:,}$ تعیین کرد."
+                text = f"کشور {owner_name} عوارض عبور از {sname} را {amount:,}$ تعیین کرد."
             push_news("تغییر وضعیت تنگه", text)
         save_state()                      # پیام فقط پس از ثبت موفق تغییر ارسال می‌شود
         _schedule_strait_broadcast(text)
@@ -5369,6 +5416,9 @@ async def get_news(request):
             else:
                 row["text"] = "بیانیه‌ای منتشر شد؛ متن فقط در بخش بیانیه‌ها قابل مشاهده است."
             row["title"] = "بیانیه"
+        if not row.get("countries"):
+            det = _detect_news_countries(row.get("title"), row.get("text"))
+            if det: row["countries"] = det
         rows.append(row)
     return web.json_response(rows or [
         {"title": "سال ۱۹۹۳", "text": "جهان در آستانه یک بحران بزرگ قرار دارد."}])
