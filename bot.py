@@ -559,6 +559,8 @@ for _uid, _sec in UNIT_BUILD_SECONDS.items():
     ARMY_UNITS[_uid]["build_seconds"] = _sec
 assert all(u.get("build_seconds", 0) > 0 for u in ARMY_UNITS.values()), "every army unit needs build_seconds"
 
+REMOVED_MAP_SITES = ("food_safrica",)
+
 MAP_RESOURCES = {
     # همهٔ سکوها و معدن‌ها در دریا هستند (روی خشکی کشور فعال نمی‌افتند) — zone: sea
     # ---------- نفت ----------
@@ -598,11 +600,11 @@ MAP_RESOURCES = {
     "uranium_pacific": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم اقیانوس آرام", "lon": -150.0, "lat": 0.0, "production": 2_200_000},
     "uranium_baltic": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم لیتوانی", "lon": 19.5, "lat": 55.5, "production": 2_000_000},
     # ---------- غذا (آبزیان) ----------
-    "food_ukraine": {"type": "food", "zone": "sea", "name": "ماهیگیری رومانی (دریای سیاه)", "lon": 31.0, "lat": 43.5, "production": 2_500_000},
-    "food_india": {"type": "food", "zone": "sea", "name": "ماهیگیری هند (خلیج بنگال)", "lon": 88.0, "lat": 14.0, "production": 2_500_000},
-    "food_peru": {"type": "food", "zone": "sea", "name": "ماهیگیری پرو", "lon": -80.0, "lat": -12.5, "production": 2_500_000},
-    "food_japansea": {"type": "food", "zone": "sea", "name": "ماهیگیری ژاپن", "lon": 135.0, "lat": 40.0, "production": 2_500_000},
-    "food_bering": {"type": "food", "zone": "sea", "name": "ماهیگیری آمریکا (برینگ)", "lon": -170.0, "lat": 58.0, "production": 2_500_000},
+    "food_ukraine": {"type": "food", "zone": "sea", "name": "ماهیگیری رومانی (دریای سیاه)", "lon": 31.0, "lat": 43.5, "production": 2_350_000},
+    "food_india": {"type": "food", "zone": "sea", "name": "ماهیگیری هند (خلیج بنگال)", "lon": 88.0, "lat": 14.0, "production": 2_350_000},
+    "food_peru": {"type": "food", "zone": "sea", "name": "ماهیگیری پرو", "lon": -80.0, "lat": -12.5, "production": 2_350_000},
+    "food_japansea": {"type": "food", "zone": "sea", "name": "ماهیگیری ژاپن", "lon": 135.0, "lat": 40.0, "production": 2_350_000},
+    "food_bering": {"type": "food", "zone": "sea", "name": "ماهیگیری آمریکا (برینگ)", "lon": -170.0, "lat": 58.0, "production": 2_350_000},
     # ---------- آفریقا: منابع بیشتر از هر منطقهٔ دیگر ----------
     "oil_gabon": {"type": "oil", "zone": "sea", "name": "سکوی گابن", "lon": 8.0, "lat": -2.5, "production": 3_500_000},
     "oil_libya": {"type": "oil", "zone": "sea", "name": "سکوی لیبی", "lon": 19.0, "lat": 33.0, "production": 4_000_000},
@@ -613,11 +615,10 @@ MAP_RESOURCES = {
     "steel_safrica": {"type": "steel", "zone": "sea", "name": "معدن آهن آفریقای جنوبی", "lon": 16.0, "lat": -34.5, "production": 3_500_000},
     "steel_morocco": {"type": "steel", "zone": "sea", "name": "معدن آهن مراکش", "lon": -11.5, "lat": 31.0, "production": 3_000_000},
     "uranium_safrica": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم آفریقای جنوبی", "lon": 15.0, "lat": -31.5, "production": 2_400_000},
-    "food_namibia": {"type": "food", "zone": "sea", "name": "ماهیگیری نامیبیا (بنگوئلا)", "lon": 12.5, "lat": -24.0, "production": 2_500_000},
-    "food_senegal": {"type": "food", "zone": "sea", "name": "ماهیگیری سنگال", "lon": -18.5, "lat": 15.5, "production": 2_500_000},
-    "food_somalia": {"type": "food", "zone": "sea", "name": "ماهیگیری سومالی", "lon": 52.5, "lat": 10.0, "production": 2_500_000},
-    "food_madagascar": {"type": "food", "zone": "sea", "name": "ماهیگیری ماداگاسکار", "lon": 42.5, "lat": -19.0, "production": 2_500_000},
-    "food_safrica": {"type": "food", "zone": "sea", "name": "ماهیگیری آفریقای جنوبی", "lon": 14.5, "lat": -31.0, "production": 2_500_000},
+    "food_namibia": {"type": "food", "zone": "sea", "name": "ماهیگیری نامیبیا (بنگوئلا)", "lon": 12.5, "lat": -24.0, "production": 2_350_000},
+    "food_senegal": {"type": "food", "zone": "sea", "name": "ماهیگیری سنگال", "lon": -18.5, "lat": 15.5, "production": 2_350_000},
+    "food_somalia": {"type": "food", "zone": "sea", "name": "ماهیگیری سومالی", "lon": 52.5, "lat": 10.0, "production": 2_350_000},
+    "food_madagascar": {"type": "food", "zone": "sea", "name": "ماهیگیری ماداگاسکار", "lon": 42.5, "lat": -19.0, "production": 2_350_000},
     # ---------- نفتِ بیشتر در سایر مناطق ----------
     "oil_brunei": {"type": "oil", "zone": "sea", "name": "سکوی برونئی", "lon": 113.0, "lat": 5.8, "production": 3_000_000},
     "oil_indonesia": {"type": "oil", "zone": "sea", "name": "سکوی اندونزی", "lon": 108.0, "lat": -4.5, "production": 3_000_000},
@@ -1905,6 +1906,11 @@ def load_state():
                     if isinstance(player_row, dict) and not player_row.get("is_eliminated"):
                         player_row["started_at"] = None
                         player_row["last_update"] = None
+        # منابع حذف‌شده از بازی (مثلاً ماهیگیری آفریقای جنوبی) از ذخیره‌های قدیمی پاک می‌شوند.
+        for _ws in world_states.values():
+            for _key in ("map_holdings", "site_forces"):
+                if isinstance(_ws.get(_key), dict):
+                    for _sid in REMOVED_MAP_SITES: _ws[_key].pop(_sid, None)
         active_world_id = "1"
         _activate_world("1")
         logging.info("State loaded: %d players across %d worlds", len(players), len(worlds_registry))
