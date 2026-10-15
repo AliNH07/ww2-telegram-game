@@ -33,8 +33,9 @@ STARTING_MONEY = 10_000_000
 STARTING_MANPOWER = 5_000
 BASE_DAILY_INCOME = 500_000
 BASE_MANPOWER_PRODUCTION = 1_000
-# تقویم هر دنیا از لحظهٔ شروع مدیر آغاز می‌شود؛ طول فصل‌ها در مجموع ۳۱ روز است.
-SEASON_LENGTH_DAYS = {"بهار": 7, "تابستان": 7, "پاییز": 7, "زمستان": 10}
+# تقویم هر دنیا از لحظهٔ شروع مدیر آغاز می‌شود؛ هر فصل ۲ روز است و فصل‌ها چرخه‌ای تکرار می‌شوند (کل بازی ۳۱ روز).
+SEASON_LENGTH_DAYS = {"بهار": 2, "تابستان": 2, "پاییز": 2, "زمستان": 2}
+SEASON_CYCLE_DAYS = sum(SEASON_LENGTH_DAYS.values())
 GAME_TOTAL_DAYS = 31
 
 # ---- وام ----
@@ -49,16 +50,16 @@ SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
 
 # درصدهای اثر فصل‌ها. اعداد منفی، کاهش درآمد/تولید و اعداد مثبت، افزایش مصرف هستند.
 SEASON_EFFECTS = {
-    "بهار":   {"income_pct": 0,   "food_oil_consumption_pct": 0,  "resource_production_pct": 0,   "manpower_production_pct": 0},
-    "تابستان": {"income_pct": -5,  "food_oil_consumption_pct": 0,  "resource_production_pct": 0,   "manpower_production_pct": 0},
-    "پاییز":  {"income_pct": -15, "food_oil_consumption_pct": 25, "resource_production_pct": 0,   "manpower_production_pct": 0},
-    "زمستان": {"income_pct": -30, "food_oil_consumption_pct": 50, "resource_production_pct": -25, "manpower_production_pct": -25},
+    "بهار":   {"income_pct": 0,   "food_consumption_pct": 0,   "oil_consumption_pct": 0,   "food_oil_consumption_pct": 0,   "resource_production_pct": 0, "manpower_production_pct": 0},
+    "تابستان": {"income_pct": -5,  "food_consumption_pct": 50,  "oil_consumption_pct": 60,  "food_oil_consumption_pct": 0,   "resource_production_pct": 0, "manpower_production_pct": 0},
+    "پاییز":  {"income_pct": -10, "food_consumption_pct": 100, "oil_consumption_pct": 160, "food_oil_consumption_pct": 0,   "resource_production_pct": 0, "manpower_production_pct": 0},
+    "زمستان": {"income_pct": -23, "food_consumption_pct": 200, "oil_consumption_pct": 200, "food_oil_consumption_pct": 0,   "resource_production_pct": 0, "manpower_production_pct": 0},
 }
 SEASON_HINTS = {
-    "بهار": "🌱 بهار: همهٔ نرخ‌ها عادی هستند؛ اثر فصلی ۰٪.",
-    "تابستان": "☀️ تابستان: درآمد روزانه ۵٪ کمتر؛ سایر نرخ‌ها بدون تغییر فصلی.",
-    "پاییز": "🍂 پاییز: درآمد روزانه ۱۵٪ کمتر؛ مصرف غذا و نفت ۲۵٪ بیشتر.",
-    "زمستان": "❄️ زمستان: درآمد ۳۰٪ کمتر؛ مصرف غذا و نفت ۵۰٪ بیشتر؛ تولید منابع و نیروی انسانی ۲۵٪ کمتر.",
+    "بهار": "🌱 بهار: بدون اثر.",
+    "تابستان": "☀️ تابستان: مصرف غذا ۵۰٪ و نفت ۶۰٪ بیشتر؛ درآمد روزانه ۵٪ کمتر.",
+    "پاییز": "🍂 پاییز: مصرف غذا ۱۰۰٪ و نفت ۱۶۰٪ بیشتر؛ درآمد روزانه ۱۰٪ کمتر.",
+    "زمستان": "❄️ زمستان: مصرف غذا ۲۰۰٪ و نفت ۲۰۰٪ بیشتر؛ درآمد روزانه ۲۳٪ کمتر.",
 }
 
 STARTING_RESOURCES = {"food": 5_000, "steel": 5_000, "uranium": 0, "oil": 5_000}
@@ -653,12 +654,12 @@ def _world_meta(world_id=None):
 
 
 def _season_for_elapsed_days(elapsed_days):
-    cursor = 0
-    for season in SEASONS:
-        cursor += SEASON_LENGTH_DAYS[season]
-        if elapsed_days < cursor:
-            return season, cursor
-    return "زمستان", GAME_TOTAL_DAYS
+    """فصل چرخه‌ای (۲ روز برای هر فصل) و مرز پایان همین فصل بر حسب روز از شروع بازی."""
+    elapsed_days = max(0.0, float(elapsed_days))
+    step = SEASON_LENGTH_DAYS[SEASONS[0]]
+    idx = int(elapsed_days // step)
+    season = SEASONS[idx % len(SEASONS)]
+    return season, (idx + 1) * step
 
 
 def get_game_time(player=None, at_time=None):
@@ -692,7 +693,8 @@ def get_game_time(player=None, at_time=None):
         "season_end": season_end.isoformat(), "day": day, "season": season,
         "season_days_left": remaining.days,
         "season_hours_left": remaining.seconds // 3600,
-        "next_season": SEASONS[min(SEASONS.index(season) + 1, len(SEASONS) - 1)] if season != "زمستان" else "پایان بازی",
+        "next_season": SEASONS[(SEASONS.index(season) + 1) % len(SEASONS)] if season_end < game_end else "پایان بازی",
+        "season_seconds_left": int(remaining.total_seconds()),
         "season_hint": hint, "season_effects": effects,
         "game_started": True, "game_finished": finished or now >= game_end,
         "registration_open": registration_open, "game_started_at": started.isoformat(),
@@ -918,7 +920,9 @@ def compute_rates(player, _occ=True, at_time=None):
     time_info = get_game_time(player, at_time=at_time)
     season = time_info.get("season", "بهار")
     effects = SEASON_EFFECTS.get(season, SEASON_EFFECTS["بهار"])
+    income_before_season = income
     income *= max(0.0, 1 + effects["income_pct"] / 100.0)
+    season_income_loss = income_before_season - income
     manpower_production *= max(0.0, 1 + effects["manpower_production_pct"] / 100.0)
 
     # اثر منفی پاییز و زمستان بر بازده تولید همهٔ منابع.
@@ -954,16 +958,25 @@ def compute_rates(player, _occ=True, at_time=None):
                     resource_consumption[k] += a * n
                     res_units[k].append({"name": u.get("name", uid_), "count": n, "amount": a * n})
 
-    # افزایش مصرف غذا و نفت را فقط یک بار و روی مصرف واقعی اعمال می‌کنیم.
-    consumption_mult = max(0.0, 1 + effects["food_oil_consumption_pct"] / 100.0)
+    # افزایش مصرف غذا و نفت هر فصل را فقط یک بار و روی مصرف واقعی اعمال می‌کنیم.
+    season_consumption_extra = {}
     for key in ("food", "oil"):
-        resource_consumption[key] = int(round(resource_consumption[key] * consumption_mult))
+        pct = effects.get(f"{key}_consumption_pct", 0) + effects.get("food_oil_consumption_pct", 0)
+        base_use = resource_consumption[key]
+        new_use = int(round(base_use * max(0.0, 1 + pct / 100.0)))
+        season_consumption_extra[key] = new_use - int(round(base_use))
+        resource_consumption[key] = new_use
+    consumption_mult = {k: max(0.0, 1 + (effects.get(f"{k}_consumption_pct", 0) + effects.get("food_oil_consumption_pct", 0)) / 100.0) for k in ("food", "oil")}
 
     return {"gross_income": income, "income_before_welfare": income_before_welfare,
             "base_income": base_income, "economy_income": eco_income,
             "map_income": map_income, "strait_income": strait_income,
             "occupation_income": occupation_income,
             "welfare_extra_income": welfare_extra_income,
+            "season": season, "season_income_pct": effects["income_pct"],
+            "season_income_loss": season_income_loss,
+            "season_consumption_extra": season_consumption_extra,
+            "season_consumption_pct": {k: effects.get(f"{k}_consumption_pct", 0) + effects.get("food_oil_consumption_pct", 0) for k in ("food", "oil")},
             "net_income": income - upkeep, "daily_upkeep": upkeep,
             "power_capacity": power_capacity, "power_consumption": power_consumption,
             "manpower_production": manpower_production,
@@ -971,18 +984,13 @@ def compute_rates(player, _occ=True, at_time=None):
             "resource_consumption": resource_consumption,
             "resource_breakdown": {k: {"infra": res_infra[k], "sites": res_sites[k], "units": res_units[k],
                                        "prod_mult": production_mult,
-                                       "cons_mult": consumption_mult if k in ("food", "oil") else 1.0}
+                                       "cons_mult": consumption_mult.get(k, 1.0)}
                                    for k in RESOURCE_NAMES}}
 
 def _season_boundary_after(started, when):
     elapsed = max(0.0, (when - started).total_seconds() / 86400.0)
-    cursor = 0
-    for season in SEASONS:
-        cursor += SEASON_LENGTH_DAYS[season]
-        boundary = started + timedelta(days=cursor)
-        if boundary > when:
-            return boundary
-    return started + timedelta(days=GAME_TOTAL_DAYS)
+    _, boundary_day = _season_for_elapsed_days(elapsed)
+    return min(started + timedelta(days=boundary_day), started + timedelta(days=GAME_TOTAL_DAYS))
 
 
 def _resolve_wars_between(attacker_cid, defender_cid):
@@ -1450,6 +1458,9 @@ def serialize_player(player):
     data["power_consumption"] = rates["power_consumption"]
     data["manpower_production"] = rates["manpower_production"]
     data["daily_income"] = rates["net_income"]
+    data["season_income_loss"] = rates.get("season_income_loss", 0)
+    data["season_consumption_extra"] = rates.get("season_consumption_extra", {})
+    data["season_consumption_pct"] = rates.get("season_consumption_pct", {})
     data["daily_upkeep"] = rates["daily_upkeep"]
     data["infra"] = build_catalog_status(player, INFRASTRUCTURE)
     data["economy"] = build_catalog_status(player, ECONOMY)
@@ -2056,7 +2067,7 @@ async def admin_start_world(request):
     for p in active:
         p["started_at"] = now.isoformat()
         p["last_update"] = now.isoformat()
-    message = f"🚩 فصل بازی در دنیای {meta.get('name', active_world_id)} آغاز شد! روز اول برای همهٔ بازیکنان هم‌زمان است؛ بازی ۳۱ روز ادامه دارد. اثر بهار: درآمد، تولید منابع و نیروی انسانی و مصرف غذا/نفت بدون تغییر فصلی (۰٪)."
+    message = f"🚩 فصل بازی در دنیای {meta.get('name', active_world_id)} آغاز شد! روز اول برای همهٔ بازیکنان هم‌زمان است؛ بازی ۳۱ روز ادامه دارد. هر فصل ۲ روز است؛ بهار بدون اثر است."
     push_news("آغاز فصل", message, "success")
     push_war("season_started", message, [p.get("country") for p in active])
     await notify_world_players(message)
@@ -5810,6 +5821,10 @@ async def get_stats(request):
         "income_occupation": rates["occupation_income"],
         "income_before_welfare": rates["income_before_welfare"],
         "welfare_extra_income": rates["welfare_extra_income"],
+        "season": rates.get("season"), "season_income_pct": rates.get("season_income_pct", 0),
+        "season_income_loss": rates.get("season_income_loss", 0),
+        "season_consumption_extra": rates.get("season_consumption_extra", {}),
+        "season_consumption_pct": rates.get("season_consumption_pct", {}),
         "total_income": rates["gross_income"], "daily_upkeep": rates["daily_upkeep"],
         "net_income": rates["net_income"], "upkeep_items": upkeep_items,
         "risks": [WELFARE_EVENTS[k]["name"] for k in COUNTRY_RISKS.get(cid, [])],
@@ -6331,10 +6346,7 @@ async def _announce_season_transition_if_needed():
     effects = SEASON_EFFECTS.get(season, SEASON_EFFECTS["بهار"])
     message = (
         f"🌦️ فصل {season} آغاز شد (روز {info.get('day')}/{GAME_TOTAL_DAYS}). "
-        f"اثر فصل: درآمد روزانه {effects['income_pct']:+d}٪؛ "
-        f"مصرف غذا و نفت {effects['food_oil_consumption_pct']:+d}٪؛ "
-        f"تولید منابع {effects['resource_production_pct']:+d}٪؛ "
-        f"تولید نیروی انسانی {effects['manpower_production_pct']:+d}٪."
+        + SEASON_HINTS.get(season, "")
     )
     meta["last_announced_season"] = season
     push_news(f"آغاز فصل {season}", message, "warning" if season in ("پاییز", "زمستان") else "info")
