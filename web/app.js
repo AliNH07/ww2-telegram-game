@@ -2323,6 +2323,7 @@ function renderForcesTab() {
     const chips = [["all", "همهٔ مواضع"], ["home", "خانه"], ["resource", "سکوها و معادن"], ["strait", "تنگه‌ها"], ["port", "بندرهای من"], ["front", "جبهه‌های من"]];
     root.innerHTML = `
         <div class="wf-stats">${wfStat(homeN, "در خانه")}${wfStat(siteN, `در ${formatNumber(warForces.sites.length)} موضع`)}${wfStat(homeN + siteN, "کل نیروها")}</div>
+        ${incomingHtml()}
         ${transitsHtml()}
         <button class="wf-send-btn" id="wf-send-toggle">🧭 اعزام نیرو</button>
         <div class="wf-section"><span>مواضع</span><small>${formatNumber(locs.length)} مکان</small></div>
@@ -2369,10 +2370,29 @@ function transitsHtml() {
         </div>`;
     }).join("");
 }
+function incomingHtml() {
+    const list = warForces.incoming || [];
+    if (!list.length) return "";
+    return `<div class="wf-section"><span>🚨 نیروی دشمن در راه</span><small>${formatNumber(list.length)} گروه</small></div>` + list.map(t => `
+        <div class="wf-transit wf-incoming">
+            <div class="war-live-strip">🚨 ${flagInline(t.country, true)} ${escapeHtml(t.country_name || "")} به ${escapeHtml(t.to_name || "")} نیرو فرستاده است</div>
+            <div class="wf-tr-top"><small>${t.battle ? "درگیری در مسیر" : "زمان باقی‌مانده تا رسیدن نیروی دشمن"}</small></div>
+            <div class="wf-tr-bar"><i data-in-bar="${t.id}"></i></div>
+            <div class="wf-tr-bottom"><span>⏱ <b data-in-eta="${t.id}" dir="ltr">—</b></span></div>
+        </div>`).join("");
+}
 function tickTransits() {
     const list = warForces.transits || [];
     const now = Date.now() + transitSkew;
     let done = false;
+    (warForces.incoming || []).forEach(t => {
+        const etaAr = Date.parse(t.eta_arrive || t.arrive), st = Date.parse(t.start);
+        const left = etaAr - now, pct = Math.max(0, Math.min(100, ((now - st) / Math.max(1, etaAr - st)) * 100));
+        const e = document.querySelector(`[data-in-eta="${t.id}"]`), bar = document.querySelector(`[data-in-bar="${t.id}"]`);
+        if (e) e.textContent = left > 0 ? fmtEta(left) : "رسید";
+        if (bar) bar.style.width = pct + "%";
+        if (left <= -1500) done = true;
+    });
     list.forEach(t => {
         // نوار و شمارنده باید با هم باشند: هر دو از شروع کل سفر تا زمان رسیدن نهایی.
         const ar = Date.parse(t.arrive);
@@ -2388,7 +2408,7 @@ function tickTransits() {
 }
 function startTransitTicker() {
     clearInterval(transitTimer); transitTimer = null;
-    if (!(warForces.transits || []).length) return;
+    if (!(warForces.transits || []).length && !(warForces.incoming || []).length) return;
     tickTransits();
     transitTimer = setInterval(() => {
         if (document.getElementById("war")?.classList.contains("hidden")) return;
