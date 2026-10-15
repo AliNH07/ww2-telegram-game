@@ -1731,6 +1731,7 @@ async function upgradeEconomy(iid) {
 async function openArmyPage() {
     showGamePage("army");
     currentArmyTab = "land";
+    armyDetailGroup = null;
     document.querySelectorAll(".army-tab").forEach(t => t.classList.toggle("active", t.dataset.armyTab === "land"));
     await refreshPlayer();
     renderArmySummary();
@@ -1754,7 +1755,7 @@ document.querySelectorAll(".army-tab").forEach(tab => {
     tab.addEventListener("click", () => selectArmyTabAndReveal(tab.dataset.armyTab, false));
 });
 document.querySelectorAll("[data-army-jump]").forEach(card => {
-    const activate = () => selectArmyTabAndReveal(card.dataset.armyJump, true);
+    const activate = () => { armyDetailGroup = card.dataset.armyJump; renderArmyBaseDetail(); selectArmyTabAndReveal(card.dataset.armyJump, true); };
     card.addEventListener("click", activate);
     card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); } });
 });
@@ -1768,10 +1769,17 @@ function getGroupCapacity(group) {
     return t;
 }
 
+// موقعیت یگان: در خانه + بیرون از خانه (مواضع و در راه)
+function armyLoc(uid_) {
+    const l = player?.unit_locations?.[uid_];
+    if (l) return l;
+    const home = player?.units?.[uid_] ?? 0;
+    return { home, sites: [], transit: 0, away: 0, total: home };
+}
 function getGroupUsed(group) {
     let t = 0;
     Object.entries(ARMY_UNITS).forEach(([uid_, u]) => {
-        if (u.group === group) t += player?.units?.[uid_] ?? 0;
+        if (u.group === group) t += armyLoc(uid_).total;
     });
     // یگان‌های هنوز تحویل‌نشدهٔ صف کارخانه هم ظرفیت را اشغال می‌کنند
     (player?.factory_queues?.[group] || []).forEach(o => {
@@ -1784,6 +1792,35 @@ function renderArmySummary() {
     const el = document.getElementById("army-total-power");
     if (!el || !player) return;
     el.textContent = formatNumber(player.army);
+}
+
+let armyDetailGroup = null;
+const BASE_INFO = {
+    land: { name: "پادگان", icon: "🪖" }, air: { name: "فرودگاه", icon: "✈️" },
+    naval: { name: "بندر", icon: "⚓" }, missile: { name: "انبار موشک", icon: "🚀" },
+};
+// پنل جزئیات زیر ۴ باکس: هر یگان چقدر است، چقدر در خانه و چقدر بیرون از خانه (مأموریت)
+function renderArmyBaseDetail() {
+    const box = document.getElementById("army-base-detail");
+    if (!box) return;
+    document.querySelectorAll("[data-army-jump]").forEach(c => c.classList.toggle("active", c.dataset.armyJump === armyDetailGroup));
+    if (!armyDetailGroup || !player) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+    const info = BASE_INFO[armyDetailGroup] || { name: "", icon: "" };
+    let totHome = 0, totAway = 0;
+    const rows = Object.entries(ARMY_UNITS).filter(([, u]) => u.group === armyDetailGroup).map(([id, u]) => {
+        const l = armyLoc(id); totHome += l.home; totAway += l.away;
+        const where = [...l.sites.map(s => `${escapeHtml(s.name)}: ${formatNumber(s.count)}`), ...(l.transit ? [`در راه: ${formatNumber(l.transit)}`] : [])];
+        return `<div class="abd-row">
+            <div class="abd-top"><b>${escapeHtml(u.name)}</b><span>مجموع ${formatNumber(l.total)}</span></div>
+            <div class="abd-chips"><span class="abd-chip home">🏠 در خانه ${formatNumber(l.home)}</span><span class="abd-chip away">🧭 بیرون از خانه (مأموریت) ${formatNumber(l.away)}</span></div>
+            ${where.length ? `<small class="abd-where">${where.join(" · ")}</small>` : ""}
+        </div>`;
+    }).join("");
+    box.innerHTML = `<div class="abd-head"><span>${info.icon} ${info.name} — جزئیات یگان‌ها</span>
+            <small>در خانه ${formatNumber(totHome)} · بیرون ${formatNumber(totAway)}</small>
+            <button type="button" class="abd-close" data-abd-close aria-label="بستن">✕</button></div>${rows}`;
+    box.classList.remove("hidden");
+    box.querySelector("[data-abd-close]").onclick = () => { armyDetailGroup = null; renderArmyBaseDetail(); };
 }
 
 const BASES = [
@@ -1810,6 +1847,7 @@ function renderBaseCards() {
             v.textContent = "—"; m.textContent = "ساخته نشده"; f.style.width = "0%";
         }
     });
+    renderArmyBaseDetail();
 }
 
 function renderArmyTabsCounts() {
@@ -1849,7 +1887,7 @@ function renderArmyUnitsNew() {
     const used = getGroupUsed(group);
 
     unitsInGroup.forEach(([uid_, u]) => {
-        const count = player.units?.[uid_] ?? 0;
+        const count = armyLoc(uid_).total;
         const missing = missingReqs(u);
         const full = used >= cap;
         const totalPower = Math.round(count * (u.attack + u.defense * (player.def_mult?.[group] ?? 1)));
@@ -2125,10 +2163,31 @@ async function openWarPage(opts = {}) {
 function openDispatchTo(siteId) { openDispatch({ to: siteId }); }
 
 /* ---------- نیروها ---------- */
+const seenIncomingAlerts = new Set();
+function checkIncomingAlerts(f) {
+    (f?.incoming || []).forEach(t => {
+        if (!t.id || seenIncomingAlerts.has(t.id)) return;
+        seenIncomingAlerts.add(t.id);
+        showToast(`🚨 ${t.country_name || "دشمن"} به ${t.to_name || "یکی از مواضع شما"} نیرو فرستاده است`, "error", 6000);
+    });
+}
+// رفرش کلی خودکار: وقتی بازیکن در بخش جنگ نیست هم هشدار نیروی دشمن را زود ببیند
+setInterval(async () => {
+    try {
+        if (document.hidden || !player?.country) return;
+        const warPage = document.getElementById("war");
+        if (warPage && !warPage.classList.contains("hidden")) return; // خود بخش جنگ هر ۲٫۵ ثانیه رفرش می‌شود
+        const f = await apiGet("/api/war/forces");
+        if (f && f.home) {
+            warForces = f; if (f.now) transitSkew = Date.parse(f.now) - Date.now();
+            checkIncomingAlerts(f);
+        }
+    } catch (e) {}
+}, 10000);
 async function loadForces() {
     try {
         const [f, s] = await Promise.all([apiGet("/api/war/forces"), apiGet("/api/map-sites")]);
-        if (f && f.home) { warForces = f; if (f.now) transitSkew = Date.parse(f.now) - Date.now(); }
+        if (f && f.home) { warForces = f; if (f.now) transitSkew = Date.parse(f.now) - Date.now(); checkIncomingAlerts(f); }
         warSites = Array.isArray(s) ? s : [];
         if (player?.satellite_built) await loadScanState();
     } catch (e) { console.error(e); }
