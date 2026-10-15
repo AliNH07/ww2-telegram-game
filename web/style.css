@@ -3278,3 +3278,21 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .wf-incoming { border-color: rgba(248,113,113,.75) !important; box-shadow: 0 0 0 1px rgba(248,113,113,.12); }
 .wf-incoming .wf-tr-bar i { background: linear-gradient(90deg, #ef4444, #fb7185) !important; }
 .wf-incoming .war-live-strip { margin-bottom: 6px; }
+
+/* پنل جزئیات یگان‌ها زیر باکس‌های ارتش */
+#army .base-card.active { border-color: rgba(var(--brand-rgb), .8); background: rgba(var(--brand-rgb), .13); }
+.army-base-detail { margin: 0 0 12px; padding: 10px 11px; border-radius: 13px; border: 1px solid rgba(var(--brand-rgb), .35); background: rgba(36,21,52,.72); }
+.army-base-detail.hidden { display: none; }
+.abd-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.abd-head > span { font-size: 12.5px; font-weight: 800; color: #f4f6f9; flex: 1 1 auto; }
+.abd-head > small { font-size: 10px; color: #998BB1; }
+.abd-close { width: 24px; height: 24px; border-radius: 8px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: #C8C1D5; font-size: 11px; }
+.abd-row { padding: 8px 0; border-top: 1px solid rgba(255,255,255,.07); }
+.abd-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; }
+.abd-top b { color: #f4f6f9; font-weight: 700; }
+.abd-top span { color: #CCAFED; font-weight: 700; }
+.abd-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.abd-chip { font-size: 10.5px; padding: 3px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); color: #C8C1D5; }
+.abd-chip.home { background: rgba(80,200,120,.1); border-color: rgba(80,200,120,.3); }
+.abd-chip.away { background: rgba(var(--brand-rgb), .12); border-color: rgba(var(--brand-rgb), .35); }
+.abd-where { display: block; margin-top: 5px; font-size: 10px; color: #998BB1; line-height: 1.7; }
