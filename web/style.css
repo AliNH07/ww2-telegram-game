@@ -3268,3 +3268,4 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .rd-row.sub{opacity:.75;font-size:11px;padding-right:8px}
 .rd-row.up b{color:#5fd28a}.rd-row.down b{color:#ff7a7a}
 .rd-more{display:block;width:100%;margin:4px 0;padding:6px;background:rgba(255,255,255,.08);border:0;border-radius:8px;color:inherit;font-size:11px;cursor:pointer}
+.dispatch-sent-sheet .dispatch-sent-ok{box-sizing:border-box;width:calc(100% - 32px);max-width:none;margin:8px 16px 16px;display:block}
