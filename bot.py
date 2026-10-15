@@ -2940,8 +2940,23 @@ async def get_forces(request):
              "battle": bool(t.get("route_battle") or t.get("arrival_battle")), "from_ll": t.get("from_ll"), "to_ll": t.get("to_ll"),
              "trip_start": t.get("trip_start") or t["start"]}
             for t in transits if t["owner"] == cid]
+    # نیروهای دشمن که به مواضع من (سکو/تنگه/معدن/ماهیگیری) می‌روند؛ بدون تعداد و نوع یگان
+    incoming = []
+    if cid:
+        for t in transits:
+            if t["owner"] == cid or t.get("kind") != "go": continue
+            final = t.get("route_final_dst") or t.get("to")
+            if not isinstance(final, str) or final in ("home", "mid") or final.startswith(("country:", "sea:")): continue
+            if not site_meta(final) or site_owner(final) != cid: continue
+            in_battle = bool(t.get("route_battle") or t.get("arrival_battle"))
+            rtot = parse_dt(t.get("route_total_arrive"))
+            eta_arrive = t["arrive"] if (in_battle or not rtot or rtot <= utcnow()) else t.get("route_total_arrive")
+            incoming.append({"id": t["id"], "country": t["owner"], "country_name": cname(t["owner"]),
+                             "to": final, "to_name": loc_label(final), "battle": in_battle,
+                             "start": t.get("trip_start") or t["start"], "arrive": t["arrive"],
+                             "eta_arrive": eta_arrive})
     return web.json_response({"home": {k: n for k, n in p["units"].items() if n > 0}, "sites": sites,
-                              "transits": mine, "now": utcnow().isoformat()})
+                              "transits": mine, "incoming": incoming, "now": utcnow().isoformat()})
 
 # ---------------- زمان سفر نیروها ----------------
 # قانون یکسان زمان حرکت برای همهٔ جابه‌جایی‌های نقشه (نیرو، ناو، ناوگان تجاری، حمل کالا):
@@ -4143,11 +4158,14 @@ async def dispatch_forces(request):
             announce("send", "اعزام نیرو", f"{cname(cid)} {target} نیرو فرستاد.", [cid] + ([owner] if owner and owner != cid else []))
         else:
             announce("send", "اعزام نیرو", f"{cname(cid)} از {loc_label(src)} نیروهایش را {target} فرستاد.", [cid] + ([owner] if owner and owner != cid else []))
+    secs = max(0, int(math.ceil(total_minutes * 60)))
+    eta = fmt_duration_fa(secs)
+    # هشدار به صاحب موضع (سکو، تنگه، معدن، ماهیگیری): بدون ذکر تعداد و نوع نیرو
+    if dst != "home" and not target_country and owner and owner != cid:
+        notify_country(owner, f"🚨 هشدار: {cname(cid)} به {loc_label(dst)} نیرو فرستاده است و حدود {eta} دیگر به آنجا می‌رسد.")
     if minutes <= 0:
         process_transits()
     save_state()
-    secs = max(0, int(math.ceil(total_minutes * 60)))
-    eta = fmt_duration_fa(secs)
     if minutes <= 0:
         msg = "نیروها رسیدند؛ وضعیت عبور و درگیری بررسی شد."
     else:
