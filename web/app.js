@@ -797,12 +797,34 @@ document.getElementById("game-notification-button")?.addEventListener("click", o
 /* =========================================================
    Home
 ========================================================= */
-const SEASON_HINTS = {
-    "بهار":    "بهار: درآمد، مصرف غذا/نفت و تولید منابع و نیروی انسانی ۰٪ تغییر فصلی دارند.",
-    "تابستان": "تابستان: درآمد روزانه ۵٪ کمتر؛ سایر نرخ‌ها بدون تغییر فصلی.",
-    "پاییز":   "پاییز: درآمد ۱۵٪ کمتر؛ مصرف غذا و نفت ۲۵٪ بیشتر.",
-    "زمستان":  "زمستان: درآمد ۳۰٪ کمتر؛ مصرف غذا و نفت ۵۰٪ بیشتر؛ تولید منابع و نیروی انسانی ۲۵٪ کمتر.",
-};
+const SEASON_NEXT = { "بهار": "تابستان", "تابستان": "پاییز", "پاییز": "زمستان", "زمستان": "بهار" };
+let seasonClockOffset = 0;   // اختلاف ساعت سرور با دستگاه
+
+function seasonEffectText(player) {
+    const e = player?.season_effects || {};
+    const parts = [];
+    const sgn = n => (n > 0 ? "+" : "−") + formatNumber(Math.abs(n)) + "٪";
+    if (e.food_consumption_pct) parts.push(`مصرف غذا ${sgn(e.food_consumption_pct)}`);
+    if (e.oil_consumption_pct) parts.push(`مصرف نفت ${sgn(e.oil_consumption_pct)}`);
+    if (e.income_pct) parts.push(`درآمد ${sgn(e.income_pct)}`);
+    return parts.length ? parts.join(" · ") : "بدون اثر";
+}
+
+function renderSeasonCountdown() {
+    const cd = document.getElementById("home-season-countdown");
+    const dt = document.getElementById("home-season-detail");
+    if (!cd || !dt) return;
+    if (!player || !player.game_started || player.game_finished || !player.season_end) {
+        cd.textContent = ""; dt.textContent = ""; return;
+    }
+    const left = Math.max(0, Math.floor((new Date(player.season_end).getTime() - (Date.now() + seasonClockOffset)) / 1000));
+    const d = Math.floor(left / 86400), hr = Math.floor((left % 86400) / 3600), mi = Math.floor((left % 3600) / 60);
+    const next = player.next_season === "پایان بازی" ? "پایان بازی" : (player.next_season || SEASON_NEXT[player.season] || "");
+    const timeTxt = d > 0 ? `${formatNumber(d)} روز و ${formatNumber(hr)} ساعت` : (hr > 0 ? `${formatNumber(hr)} ساعت و ${formatNumber(mi)} دقیقه` : `${formatNumber(mi)} دقیقه و ${formatNumber(left % 60)} ثانیه`);
+    cd.textContent = `${timeTxt} تا ${next}`;
+    dt.innerHTML = `<b>${escapeHtml(player.season || "")}</b>: ${escapeHtml(seasonEffectText(player))}`;
+}
+setInterval(renderSeasonCountdown, 1000);
 
 function updateHomeStats() {
     if (!player) return;
@@ -833,13 +855,11 @@ function updateHomeStats() {
     document.getElementById("home-power").textContent = formatNumber(Math.max(0, pCap - pUse));   // برق آزاد = ظرفیت − مصرف
     document.getElementById("home-power-sub").textContent = `مصرف: ${formatNumber(pUse)} از ${formatNumber(pCap)}`;
     document.getElementById("home-army").textContent = formatNumber(player.army);
-    const season = player.season ?? "در انتظار شروع";
-    document.getElementById("home-season").textContent = season;
-    document.getElementById("home-season-end").textContent = player.game_started
-        ? (player.game_finished ? "بازی به پایان رسیده است" : `پایان فصل تا ${player.season_days_left ?? 0} روز و ${player.season_hours_left ?? 0} ساعت`)
-        : "تا شروع فرمانده منتظر بمان";
+    document.getElementById("home-season").textContent = player.season ?? "در انتظار شروع";
+    if (player.server_now) seasonClockOffset = new Date(player.server_now).getTime() - Date.now();
     const hint = document.getElementById("home-season-hint");
-    if (hint) hint.textContent = SEASON_HINTS[season] || player.season_hint || "";
+    if (hint) hint.textContent = "";
+    renderSeasonCountdown();
     updateSeasonGateBanner();
     const mm = document.getElementById("map-money");
     if (mm) mm.textContent = formatMoney(player.money);
@@ -5942,6 +5962,12 @@ function renderStats() {
         ? upkeepItems.map((x, i) => `<div class="st-cost-row st-upkeep-row ${i >= 2 ? `st-upkeep-extra ${upkeepExpanded ? "" : "hidden"}` : ""}"><span><i>${escapeHtml(x.icon || "🏗️")}</i><span><b>${escapeHtml(x.name || "ساختمان")}</b><small>${escapeHtml(x.group || "زیرساخت")}</small></span></span><strong>−${formatStatsAmount(x.amount)}</strong></div>`).join("")
         : `<p class="st-no-costs">هزینهٔ نگهداری روزانه‌ای برای ساختمان‌ها ثبت نشده است.</p>`;
     const net = Number(d.net_income ?? d.total_income ?? 0);
+    const sx = d.season_consumption_extra || {}, sp = d.season_consumption_pct || {};
+    const seasonLines = [];
+    if (Number(d.season_income_pct || 0) < 0) seasonLines.push(`<div class="st-line st-season-line"><span>کاهش درآمد به دلیل فصل ${escapeHtml(d.season || "")} (${formatNumber(Math.abs(d.season_income_pct))}٪)</span><b>−${formatStatsAmount(d.season_income_loss)}</b></div>`);
+    if (Number(sx.food || 0) > 0) seasonLines.push(`<div class="st-line st-season-line"><span>مصرف بیشتر غذا به دلیل فصل ${escapeHtml(d.season || "")} (+${formatNumber(sp.food || 0)}٪)</span><b>−${formatNumber(sx.food)} در روز</b></div>`);
+    if (Number(sx.oil || 0) > 0) seasonLines.push(`<div class="st-line st-season-line"><span>مصرف بیشتر نفت به دلیل فصل ${escapeHtml(d.season || "")} (+${formatNumber(sp.oil || 0)}٪)</span><b>−${formatNumber(sx.oil)} در روز</b></div>`);
+    const seasonStatsHtml = seasonLines.join("");
     body.innerHTML = `
         <div class="st-card st-finance-card">
             <div class="st-finance-head"><div><small>درآمد کل روزانه پیش از هزینه‌ها</small><strong>${formatStatsAmount(d.total_income)}</strong></div><span class="st-finance-icon">💰</span></div>
@@ -5949,6 +5975,7 @@ function renderStats() {
                 <div class="st-line"><span>درآمد پایهٔ کشور</span><b>${formatStatsAmount(d.income_base)}</b></div>
                 ${Number(d.income_economy || 0) ? `<div class="st-line"><span>سرمایه‌گذاری‌های اقتصادی</span><b>${formatStatsAmount(d.income_economy)}</b></div>` : ""}
                 ${Number(d.income_occupation || 0) ? `<div class="st-line"><span>کشورهای اشغال‌شده</span><b>${formatStatsAmount(d.income_occupation)}</b></div>` : ""}
+                ${seasonStatsHtml}
                 <div class="st-line st-income-bonus"><span>درآمد اضافهٔ رفاه (${fmt1(Number(d.bonus || 0))}٪)</span><b>+${formatStatsAmount(d.welfare_extra_income)}</b></div>
             </div>
             <div class="st-total-divider"></div>
