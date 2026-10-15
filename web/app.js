@@ -5107,6 +5107,23 @@ if (SOVIET_BLOC) MAP_1936_LINES.push(
      [27.45,52.1],[27.55,51.7],[27.2,51.3],[27.35,50.9],[27.1,50.6],[26.55,50.3],[26.2,49.85],[26.45,49.4],
      [26.55,48.95],[26.55,48.65],[26.6,48.4],[26.62,48.26]]);
 let mapClips = [], mapCustomBorders = null;
+// اسم مستعمره‌ها در ۱۹۳۶ (کلید: id عددی یا اسم فیچر). چند فیچر با اسم یکسان یک برچسب می‌گیرند.
+const MAP_COLONY_NAMES = {
+    356: "هند بریتانیا", 586: "هند بریتانیا", 50: "هند بریتانیا", 104: "برمه", 144: "سیلان", 458: "مالایا", 96: "برونئی",
+    702: "سنگاپور", 376: "فلسطین", 275: "فلسطین", 400: "شرق اردن", 196: "قبرس", "N. Cyprus": "قبرس",
+    729: "سودان", 728: "سودان", 404: "کنیا", 800: "اوگاندا", 834: "تانگانیکا", 566: "نیجریه", 288: "ساحل طلا",
+    694: "سیرالئون", 270: "گامبیا", 894: "رودزیای شمالی", 716: "رودزیای جنوبی", 454: "نیاسالند", 72: "بچوانالند",
+    426: "باسوتولند", 748: "سوازیلند", "Somaliland": "سومالی بریتانیا", 84: "بلیز", 328: "گویان بریتانیا",
+    388: "جامائیکا", 780: "ترینیداد", 44: "باهاما", 238: "فالکلند", 242: "فیجی",
+    12: "الجزایر", 788: "تونس", 504: "مراکش", 478: "موریتانی", 686: "سنگال", 466: "سودان فرانسه", 562: "نیجر",
+    148: "چاد", 854: "ولتای علیا", 324: "گینه", 384: "ساحل عاج", 204: "داهومی", 266: "گابن", 178: "کنگو فرانسه",
+    140: "اوبانگی‌شاری", 120: "کامرون", 768: "توگو", 450: "ماداگاسکار", 262: "سومالی فرانسه", 760: "سوریه", 422: "لبنان",
+    704: "هندوچین فرانسه", 418: "هندوچین فرانسه", 116: "هندوچین فرانسه", 540: "کالدونیای نو",
+    434: "لیبی", 231: "اتیوپی", 232: "اریتره", 706: "سومالی ایتالیا",
+    410: "کره", 408: "کره", 158: "تایوان", 608: "فیلیپین"
+};
+let mapLabelItems = [];
+
 
 function clipSourcePolys(ft, bb) {
     const g = ft.geometry; if (!g) return null;
@@ -5308,6 +5325,45 @@ async function initWorldMap() {
         m.label = node;
     });
 
+    // برچسب مستعمره‌ها: اسم مستعمره + «مستعمره کشور مادر»
+    mapLabelItems = mapFeatures.filter(m => m.label);
+    if (MAP_COLONIES) {
+        const mkText = (cls, txt) => labelG.append("text").attr("class", cls)
+            .attr("text-anchor", "middle").attr("dominant-baseline", "central")
+            .attr("font-size", 10).text(txt).node();
+        const widthOf = n => { let w = 0; try { w = n.getComputedTextLength(); } catch (e) {} return w > 0 ? w / 10 : 4; };
+        realms.forEach(r => {
+            const ownerKey = typeof r.rid === "number" ? keyById[r.rid] : null;
+            if (!ownerKey || !COUNTRY_NAMES[ownerKey]) return;
+            const groups = new Map();
+            r.feats.forEach(ft => {
+                const fid = (ft.id === undefined || ft.id === null) ? null : Number(ft.id);
+                if (fid === r.rid) return;   // خاک اصلی
+                const nm = (fid !== null && MAP_COLONY_NAMES[fid]) || MAP_COLONY_NAMES[ft.properties && ft.properties.name];
+                if (!nm) return;
+                if (!groups.has(nm)) groups.set(nm, []);
+                groups.get(nm).push(ft);
+            });
+            groups.forEach((fts, nm) => {
+                const f = fts.length === 1 ? fts[0] : combineFeatures(fts, r.rid);
+                const mf = mainLandFeature(f);
+                const bb = d3.geoBounds(mf);
+                let dLon = bb[1][0] - bb[0][0]; if (dLon < 0) dLon += 360;
+                const c = d3.geoCentroid(mf);
+                const sArea = Math.sqrt(d3.geoArea(mf)) * 1.7;
+                const n1 = mkText("map-country-label map-colony-label", nm);
+                const n2 = mkText("map-country-label map-colony-label map-colony-owner", "مستعمره " + COUNTRY_NAMES[ownerKey]);
+                n1.style.display = "none"; n2.style.display = "none";
+                mapLabelItems.push({
+                    c, label: n1, label2: n2, shown: false,
+                    tw: Math.max(widthOf(n1), widthOf(n2) * 0.8),
+                    sw: Math.min(dLon * R * Math.max(0.2, Math.cos(c[1] * R)), sArea),
+                    sh: Math.min((bb[1][1] - bb[0][1]) * R, sArea)
+                });
+            });
+        });
+    }
+
     mapRoutesSvg = mapSvg.append("g").attr("class", "map-routes-layer");
     mapSitesSvg = mapSvg.append("g").attr("class", "map-sites-layer");
 
@@ -5476,9 +5532,9 @@ function renderMapSites() {
             const big = d.type === "oil";
             // سکوی نفت دایره؛ معدن‌ها (آهن، اورانیوم، غذا) مربع
             if (big) s.append("circle").attr("class", "site-shape").attr("r", 10);
-            else s.append("rect").attr("class", "site-shape").attr("x", -7).attr("y", -7).attr("width", 14).attr("height", 14);
+            else s.append("rect").attr("class", "site-shape").attr("x", -10).attr("y", -10).attr("width", 20).attr("height", 20);
             s.append("text").attr("class", "site-emoji").attr("text-anchor", "middle")
-                .attr("dominant-baseline", "central").attr("font-size", big ? 8.5 : 5.8)
+                .attr("dominant-baseline", "central").attr("font-size", 8.5)
                 .text(RESOURCE_ICONS[d.type] || "📍");
         }
     });
@@ -5491,7 +5547,7 @@ function updateMapSitePositions() {
     const zoom = mapProjection.scale() / mapSize;
     // با دورشدن کوچک می‌شوند تا روی کشورهای کوچک نیفتند؛ با نزدیک‌شدن کمی بزرگ‌تر
     const kBig = Math.max(0.22, Math.min(1.5, 0.4 * Math.pow(zoom, 0.7)));   // نفت و تنگه
-    const kSmall = kBig * 0.75;                                                // معدن و غذا
+    const kSmall = kBig;                                                       // معدن و ماهیگیری هم‌اندازهٔ سکو
     const kMark = Math.max(0.5, Math.min(1.1, 0.7 * Math.pow(zoom, 0.5)));
     mapSitesSvg.selectAll(".map-mark").each(function (d) {
         const p = viewCos(d.lon, d.lat, rot) > 0.02 ? mapProjection([d.lon, d.lat]) : null;
@@ -5686,22 +5742,29 @@ function updateMapLabels() {
     const rot = mapProjection.rotate();
     const fs = Math.max(7, Math.min(13, 6.5 + zoom * 1.5));
 
-    // اسم کشور: فقط اگر روی خودِ کشور جا شود
-    for (const m of mapFeatures) {
+    // اسم کشور و مستعمره: فقط اگر روی خودِ آن جا شود
+    for (const m of mapLabelItems) {
         const node = m.label;
         if (!node) continue;
         let p = null;
         const z = viewCos(m.c[0], m.c[1], rot);
-        if (z > 0.25 && m.sw * scale * z >= m.tw * fs * 1.1 && m.sh * scale * z >= fs * 1.5) {
+        const lines = m.label2 ? 2.5 : 1.5;
+        if (z > 0.25 && m.sw * scale * z >= m.tw * fs * 1.1 && m.sh * scale * z >= fs * lines) {
             p = mapProjection(m.c);
             if (p && (p[0] < -20 || p[0] > mapW + 20 || p[1] < -20 || p[1] > mapH + 20)) p = null;
         }
         if (p) {
+            const y1 = m.label2 ? p[1] - fs * 0.6 : p[1];
             node.setAttribute("x", p[0].toFixed(1));
-            node.setAttribute("y", p[1].toFixed(1));
+            node.setAttribute("y", y1.toFixed(1));
             node.setAttribute("font-size", fs.toFixed(1));
-            if (!m.shown) { node.style.display = ""; m.shown = true; }
-        } else if (m.shown) { node.style.display = "none"; m.shown = false; }
+            if (m.label2) {
+                m.label2.setAttribute("x", p[0].toFixed(1));
+                m.label2.setAttribute("y", (p[1] + fs * 0.7).toFixed(1));
+                m.label2.setAttribute("font-size", (fs * 0.8).toFixed(1));
+            }
+            if (!m.shown) { node.style.display = ""; if (m.label2) m.label2.style.display = ""; m.shown = true; }
+        } else if (m.shown) { node.style.display = "none"; if (m.label2) m.label2.style.display = "none"; m.shown = false; }
     }
 
     // اسم اقیانوس‌ها و دریاها (هرکدام در بازه زوم خودش)
