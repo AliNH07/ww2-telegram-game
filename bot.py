@@ -3479,6 +3479,9 @@ def divert_transits(site_id, new_owner):
     now = utcnow()
     for t in list(transits):
         if t["to"] != site_id or t["kind"] != "go" or not t.get("dst_free") or t["owner"] == new_owner: continue
+        # ناوگانی که فقط از این تنگه عبور می‌کند (مقصدش جای دیگری است) برنمی‌گردد؛
+        # وقتی به تنگه رسید طبق وضعیت همان لحظه عمل می‌کند: تنگهٔ بسته = نبرد، تنگهٔ باز = پرداخت عوارض و عبور.
+        if t.get("passage"): continue
         _turn_back(t, now, f"{cname(new_owner)} {loc_label(site_id)} را گرفت")
 
 def _turn_back(t, now, reason=None):
@@ -4182,10 +4185,8 @@ async def dispatch_forces(request):
         policy = strait_policy(sid, cid)
         if sid_owner and sid_owner != cid and not policy["closed"]:
             toll_due += max(0, int(policy.get("toll", 0)))
-    if plan and plan.get("via_closed"):
-        closed_names = [loc_label(sid) for sid in route_straits
-                        if sid in STRAITS_DATA and strait_policy(sid, cid).get("closed")]
-        return _bad("مسیر دریایی وجود ندارد؛ تنگهٔ بسته: " + "، ".join(closed_names or ["نامشخص"]))
+    # تنگهٔ بسته مانع فرستادن نیرو نیست: اگر مسیر دیگری نباشد، نیرو همان مسیر را می‌رود و هنگام رسیدن به تنگه
+    # با نگهبانان آن می‌جنگد (_resolve_strait_passage): با پیروزی تنگه را می‌گیرد و به مسیر ادامه می‌دهد؛ با شکست نابود می‌شود.
     blocked_msg = _route_strait_blockers(cid, route_straits)
     if blocked_msg: return _bad(blocked_msg)
     if p.get("money", 0) < toll_due:
@@ -4971,7 +4972,7 @@ def _no_route_message(a, b, traveler, default):
         geo = _sea_geometry(a, "home", f"country:{b}", b, traveler)
         if geo and geo.get("via_closed"):
             names = [STRAITS_DATA[sid]["name"] for sid in geo["straits"] if strait_policy(sid, traveler).get("closed", False)]
-            return "مسیر دریایی وجود ندارد؛ تنگهٔ بسته: " + "، ".join(names or ["نامشخص"])
+            return "حمل دریایی ممکن نیست؛ تنگهٔ بسته: " + "، ".join(names or ["نامشخص"])
     return default
 
 
