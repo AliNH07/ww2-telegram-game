@@ -799,6 +799,7 @@
             <span class="sb-title">پنل مدیریت <small id="admin-current-world" class="admin-current-world hidden">دنیای ۱</small></span>
             <button id="admin-refresh" class="admin-refresh-btn" type="button" aria-label="تازه‌سازی" title="تازه‌سازی اطلاعات">⟳</button>
         </div>
+        <div id="admin-scroll" class="admin-scroll">
         <section class="admin-global" id="admin-global">
           <div class="admin-global-heading"><h2>اطلاعات کلی بازی</h2><span id="admin-last-refresh">به‌روزرسانی خودکار هر ۱۰ ثانیه</span></div>
           <div class="admin-global-grid" id="admin-global-stats"><div class="admin-empty">در حال دریافت آمار همه دنیاها…</div></div>
@@ -829,7 +830,6 @@
             <button class="admin-tab" type="button" data-admin-tab="economy">💰 اقتصاد</button>
             <button class="admin-tab" type="button" data-admin-tab="wars">⚔️ اعلان جنگ‌ها</button>
             <button class="admin-tab" type="button" data-admin-tab="complaints">📨 شکایت‌ها و پیام‌ها</button>
-            <button class="admin-tab" type="button" data-admin-tab="worlds">🌍 دنیاها</button>
             <button class="admin-tab" type="button" data-admin-tab="broadcast">📣 پیام‌ها</button>
             <button class="admin-tab" type="button" data-admin-tab="activity">🧾 گزارش عملیات</button>
         </div>
@@ -881,10 +881,6 @@
             <div id="admin-war-list" class="admin-war-list"><div class="admin-empty">در حال دریافت درخواست‌ها…</div></div>
         </section>
         <section id="admin-panel-complaints" class="admin-panel hidden"><div class="admin-section-head"><div><h3>پیام‌های خصوصی و شکایت‌ها</h3><p>پیام‌های خصوصی کشورهای همین دنیا؛ موارد حاوی واژه‌های شکایت برای بررسی جدا می‌شوند.</p></div></div><div id="admin-pm-list" class="admin-news-list"></div></section>
-        <section id="admin-panel-worlds" class="admin-panel hidden">
-            <div class="admin-section-head"><div><span class="admin-section-kicker">WORLD MANAGEMENT</span><h3>مرکز مدیریت دنیاها</h3><p>هر دنیا بازیکنان، کشورها، جنگ‌ها، بازار و منابع مستقل خودش را دارد. برای ساخت دنیای بعدی، نام آن را وارد کن.</p></div></div>
-            <div id="admin-world-list" class="admin-world-list"><div class="admin-empty">در حال دریافت دنیاها…</div></div>
-        </section>
         <section id="admin-panel-broadcast" class="admin-panel hidden">
             <div class="admin-section-head"><div><span class="admin-section-kicker">MESSAGES & NEWS</span><h3>خبر عمومی و اعلان</h3><p>خبر در بخش اخبار بازی ثبت می‌شود و به کاربران تلگرام هم ارسال خواهد شد.</p></div></div>
             <form id="admin-broadcast-form" class="admin-broadcast-form">
@@ -902,6 +898,7 @@
             <div id="admin-recent-news" class="admin-news-list"><div class="admin-empty">خبری برای نمایش نیست.</div></div>
         </section>
         </div><!-- admin-world-detail -->
+        </div><!-- admin-scroll -->
     </main>
 
     <!-- ==================== نوار پایین ==================== -->
