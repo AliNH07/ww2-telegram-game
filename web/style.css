@@ -3332,3 +3332,15 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 #guide-modal .guide-pane .guide-steps{flex:none;overflow:visible;margin-bottom:0}
 .guide-key{margin-bottom:10px;padding:10px 12px;border-radius:12px;font-size:11px;line-height:1.8;color:#f4f6f9;background:rgba(var(--brand-rgb),.12);border:1px solid rgba(var(--brand-rgb),.4)}
 @media(max-width:380px){.guide-tab{font-size:10px;padding:8px 2px}.guide-tab.guide-tab-main{font-size:11px}}
+
+
+/* ==================== اعلان جنگ: دلیل مدیر، مذاکره و صلح ==================== */
+.admin-war-official{display:flex;flex-direction:column;gap:6px;margin-top:10px;font-size:11px;color:#C8C1D5}
+.admin-war-official b{color:#f4f6f9;font-size:11.5px}
+.admin-war-official-input{width:100%;min-height:78px;resize:vertical;padding:10px 12px;border-radius:12px;border:1px solid rgba(var(--brand-rgb),.35);background:rgba(255,255,255,.04);color:#f4f6f9;font-family:inherit;font-size:12px;line-height:1.8}
+.admin-war-official-input:focus{outline:none;border-color:var(--brand)}
+.war-peace-btn{width:100%;min-height:40px;margin-top:6px;border-radius:12px;border:1px solid rgba(120,200,150,.5);background:rgba(120,200,150,.12);color:#9FE0B7;font:700 13px inherit;font-family:inherit;cursor:pointer}
+.war-peace-btn:active{transform:scale(.98)}
+.war-peace-btn.is-cancel{border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#C8C1D5}
+.war-peace-btn:disabled{opacity:.55}
+.war-peace-note{margin-top:6px;font-size:11px;line-height:1.8;color:#9FE0B7}
