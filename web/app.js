@@ -5275,7 +5275,7 @@ let mapTransits = [], mapRouteSkew = 0, mapRoutesVisible = true;
 try { mapRoutesVisible = localStorage.getItem("mapRoutes") !== "off"; } catch (e) {}
 let mapCanvas = null, mapCtx = null, mapDpr = 1, mapW = 320, mapH = 300;
 let mapFeatures = [], mapGroups = [], mapWaterItems = [], mapGraticule = null, mapRaf = 0;
-let mapBorders = null, mapCoast = null;
+let mapBorders = null, mapCoast = null, mapLand = null, mapCoastPts = null;
 
 async function initWorldMap() {
     const box = document.querySelector(".map-box");
@@ -5341,6 +5341,9 @@ async function initWorldMap() {
     mapClips = buildMapClips(land);
     mapCustomBorders = { type: "MultiLineString", coordinates: MAP_1936_LINES };
     mapCoast = topojson.mesh(world, world.objects.countries, (x, y) => x === y);
+    mapLand = land;
+    mapCoastPts = buildCoastPoints(mapCoast);
+    siteOffsetCache = {};   // با ساخت دوبارهٔ نقشه، فاصله از ساحل دوباره حساب شود
 
     // اطلاعات ثابت هر قلمرو یک‌بار محاسبه می‌شود (نه در هر فریم)
     mapFeatures = Array.from(realms.values()).map(r => {
@@ -5466,7 +5469,11 @@ async function loadMapRoutes() {
         const d = await apiGet("/api/map/transits");
         mapTransits = Array.isArray(d?.transits) ? d.transits : [];
         if (d?.now) mapRouteSkew = Date.parse(d.now) - Date.now();
-        mapTransits.forEach(t => { t.pathOffset = 0; });
+        mapTransits.forEach(t => {
+            t.pathOffset = 0;
+            t.from_ll = remapSiteLL(t.from_ll); t.to_ll = remapSiteLL(t.to_ll);
+            if (Array.isArray(t.path)) t.path = t.path.map(remapSiteLL);
+        });
     } catch (e) { mapTransits = []; }
     renderMapRoutes();
 }
@@ -5541,10 +5548,86 @@ setInterval(() => {
     if (mapInitialized && !document.getElementById("map")?.classList.contains("hidden")) refreshMapSites();
 }, 15000);
 
+/* ---------- فاصله‌دادن سکوها/معادن/ماهیگیری‌ها از ساحل ----------
+   مختصات سرور دست‌نخورده می‌ماند؛ فقط محل نمایش روی نقشه کمی به سمت دریای باز جابه‌جا می‌شود.
+   (تنگه‌ها جابه‌جا نمی‌شوند چون باید دقیقاً روی خود تنگه باشند.) */
+const SITE_CLEAR_TARGET = 3.0;   // درجه (~۳۳۰ کیلومتر) فاصلهٔ دلخواه از ساحل
+const SITE_MAX_MOVE = 3.0;       // حداکثر جابه‌جایی (درجه)
+let siteOffsetCache = {};
+function _degDist(lon1, lat1, lon2, lat2) {
+    let dl = Math.abs(lon1 - lon2); if (dl > 180) dl = 360 - dl;
+    const dla = lat1 - lat2, c = Math.cos((lat1 + lat2) * 0.5 * Math.PI / 180);
+    return Math.sqrt(dla * dla + dl * dl * c * c);
+}
+function buildCoastPoints(coast) {
+    const pts = [];
+    (coast && coast.coordinates || []).forEach(line => {
+        for (let i = 0; i < line.length; i++) {
+            const a = line[i];
+            pts.push(a);
+            const b = line[i + 1];
+            if (!b || Math.abs(a[0] - b[0]) > 180) continue;
+            const n = Math.floor(Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])) / 0.5);
+            for (let k = 1; k <= n; k++) pts.push([a[0] + (b[0] - a[0]) * k / (n + 1), a[1] + (b[1] - a[1]) * k / (n + 1)]);
+        }
+    });
+    return pts;
+}
+function _landAt(lon, lat) {
+    try { return mapLand ? d3.geoContains(mapLand, [lon, lat]) : false; } catch (e) { return false; }
+}
+function spreadSitesFromLand(sites) {
+    if (!mapCoastPts || !mapCoastPts.length || !mapLand) return;
+    sites.forEach(s => {
+        if (s.kind !== "resource" || typeof s.lon !== "number" || typeof s.lat !== "number") return;
+        s.lon0 = s.lon; s.lat0 = s.lat;
+        let off = siteOffsetCache[s.id];
+        if (!off) {
+            off = { lon: s.lon, lat: s.lat };
+            const near = mapCoastPts.filter(p => Math.abs(p[1] - s.lat) < SITE_CLEAR_TARGET + SITE_MAX_MOVE + 1 &&
+                _degDist(p[0], p[1], s.lon, s.lat) < SITE_CLEAR_TARGET + SITE_MAX_MOVE + 1);
+            const clear = (lo, la) => { let m = 99; for (const p of near) { const d = _degDist(p[0], p[1], lo, la); if (d < m) m = d; } return m; };
+            const c0 = clear(s.lon, s.lat);
+            if (near.length && c0 < SITE_CLEAR_TARGET) {
+                const cands = [];
+                for (let r = 0.5; r <= SITE_MAX_MOVE + 1e-9; r += 0.5) {
+                    for (let k = 0; k < 16; k++) {
+                        const ang = k * Math.PI / 8;
+                        const lo = s.lon + r * Math.sin(ang) / Math.max(0.3, Math.cos(s.lat * Math.PI / 180));
+                        const la = Math.max(-80, Math.min(80, s.lat + r * Math.cos(ang)));
+                        cands.push({ lo, la, r, c: clear(lo, la) });
+                    }
+                }
+                const good = cands.filter(x => x.c >= SITE_CLEAR_TARGET).sort((a, b) => a.r - b.r || b.c - a.c);
+                const rest = cands.filter(x => x.c < SITE_CLEAR_TARGET && x.c > c0 + 0.3).sort((a, b) => b.c - a.c || a.r - b.r);
+                const valid = x => {
+                    if (_landAt(x.lo, x.la)) return false;
+                    for (const f of [0.25, 0.5, 0.75]) if (_landAt(s.lon + (x.lo - s.lon) * f, s.lat + (x.la - s.lat) * f)) return false;
+                    return true;
+                };
+                const pick = good.slice(0, 12).find(valid) || rest.slice(0, 12).find(valid);
+                if (pick) off = { lon: pick.lo, lat: pick.la };
+            }
+            siteOffsetCache[s.id] = off;
+        }
+        s.lon = off.lon; s.lat = off.lat;
+    });
+}
+// مسیر ناوها/نیروها باید به محل نمایش‌داده‌شدهٔ سکو برسد، نه مختصات خام سرور
+function remapSiteLL(ll) {
+    if (!Array.isArray(ll) || ll.length < 2) return ll;
+    for (const id in siteOffsetCache) {
+        const s = (mapSites || []).find(x => x.id === id);
+        if (s && s.lon0 !== undefined && Math.abs(s.lon0 - ll[0]) < 1e-4 && Math.abs(s.lat0 - ll[1]) < 1e-4) return [s.lon, s.lat];
+    }
+    return ll;
+}
+
 async function loadMapSites() {
     try { mapSites = await apiGet("/api/map-sites"); }
     catch (e) { mapSites = []; }
     if (!Array.isArray(mapSites)) mapSites = [];
+    spreadSitesFromLand(mapSites);
 }
 
 const MAP_CAPITALS = {
@@ -5599,9 +5682,6 @@ function renderMapSites() {
             // سکوی نفت دایره؛ معدن‌ها (آهن، اورانیوم، غذا) مربع
             if (big) s.append("circle").attr("class", "site-shape").attr("r", 10);
             else s.append("rect").attr("class", "site-shape").attr("x", -10).attr("y", -10).attr("width", 20).attr("height", 20);
-            s.append("text").attr("class", "site-emoji").attr("text-anchor", "middle")
-                .attr("dominant-baseline", "central").attr("font-size", 8.5)
-                .text(RESOURCE_ICONS[d.type] || "📍");
         }
     });
 }
@@ -5612,7 +5692,7 @@ function updateMapSitePositions() {
     const rot = mapProjection.rotate();
     const zoom = mapProjection.scale() / mapSize;
     // با دورشدن کوچک می‌شوند تا روی کشورهای کوچک نیفتند؛ با نزدیک‌شدن کمی بزرگ‌تر
-    const kBig = Math.max(0.22, Math.min(1.5, 0.4 * Math.pow(zoom, 0.7)));   // نفت و تنگه
+    const kBig = Math.max(0.2, Math.min(1.35, 0.36 * Math.pow(zoom, 0.7)));   // نفت و تنگه
     const kSmall = kBig;                                                       // معدن و ماهیگیری هم‌اندازهٔ سکو
     const kMark = Math.max(0.5, Math.min(1.1, 0.7 * Math.pow(zoom, 0.5)));
     mapSitesSvg.selectAll(".map-mark").each(function (d) {
@@ -5871,6 +5951,38 @@ function updateMapColors() {
     if (mapSitesSvg) renderMapSites();
 }
 
+// دارایی‌های یک کشور روی نقشه: تنگه‌ها، سکوهای نفت، معادن و ماهیگیری‌هایی که در دست دارد
+const HOLDING_GROUPS = [
+    { title: "⚓ تنگه‌ها", match: s => s.kind === "strait" },
+    { title: "🛢️ سکوهای نفت", match: s => s.kind === "resource" && s.type === "oil" },
+    { title: "⛏️ معادن", match: s => s.kind === "resource" && (s.type === "steel" || s.type === "uranium") },
+    { title: "🎣 ماهیگیری", match: s => s.kind === "resource" && s.type === "food" }
+];
+function ensureHoldingsBox() {
+    let box = document.getElementById("map-info-holdings");
+    if (!box) {
+        box = document.createElement("div");
+        box.id = "map-info-holdings";
+        box.className = "map-info-holdings hidden";
+        const anchor = document.getElementById("map-info-strait-controls") || document.getElementById("map-info-desc");
+        anchor.insertAdjacentElement("afterend", box);
+    }
+    return box;
+}
+function renderCountryHoldings(key) {
+    const box = ensureHoldingsBox();
+    const mine = (Array.isArray(mapSites) ? mapSites : []).filter(s => s.owner === key);
+    let html = "";
+    HOLDING_GROUPS.forEach(g => {
+        const items = mine.filter(g.match);
+        if (!items.length) return;
+        html += `<div class="holding-group"><div class="holding-title">${g.title} <span>${items.length.toLocaleString("fa-IR")}</span></div>` +
+            `<div class="holding-list">${items.map(s => `<span class="holding-chip">${escapeHtml(s.name || s.id)}</span>`).join("")}</div></div>`;
+    });
+    box.innerHTML = html || `<div class="holding-empty">تنگه، سکو، معدن یا ماهیگیری در دست ندارد.</div>`;
+    box.classList.remove("hidden");
+}
+
 function showCountryInfo(feature) {
     const cid = Number(feature.id);
     const e = Object.entries(COUNTRY_IDS).find(([, id]) => id === cid);
@@ -5884,6 +5996,7 @@ function showCountryInfo(feature) {
     document.getElementById("map-info-scan")?.classList.add("hidden");
     document.getElementById("map-info-scan-btn")?.classList.add("hidden");
     const sc = document.getElementById("map-info-strait-controls"); if(sc){sc.classList.add("hidden");sc.innerHTML="";}
+    { const hb = document.getElementById("map-info-holdings"); if (hb) { hb.classList.add("hidden"); hb.innerHTML = ""; } }
 
     if (!e) {
         flagEl.textContent = "🏳️"; nameEl.textContent = "منطقه ناشناخته";
@@ -5910,6 +6023,13 @@ function showCountryInfo(feature) {
         actionBtn.onclick = async()=>{const d=await apiPost("/api/border/settings",{open:!open});if(!d.success){showToast(d.message||"خطا");return;}player.land_trade_open=d.open;showToast(d.open?"تجارت زمینی باز شد":"تجارت زمینی بسته شد");showCountryInfo(feature);};
     }
     panel.classList.remove("hidden");
+    // دارایی‌های کشور (فقط کشورهای بازیکن‌دار یا کشور خودم)؛ بعد از بارگیری تازهٔ نقشه دوباره رسم می‌شود
+    if (key === selectedCountry || info?.taken) {
+        renderCountryHoldings(key);
+        loadMapSites().then(() => {
+            if (!panel.classList.contains("hidden") && nameEl.textContent === COUNTRY_NAMES[key]) renderCountryHoldings(key);
+        }).catch(() => {});
+    }
 }
 
 function showSiteInfo(site) {
@@ -5928,6 +6048,7 @@ function showSiteInfo(site) {
         document.getElementById("map-info-desc")?.insertAdjacentElement("afterend", controls);
     }
     if (controls) { controls.classList.add("hidden"); controls.innerHTML = ""; }
+    { const hb = document.getElementById("map-info-holdings"); if (hb) { hb.classList.add("hidden"); hb.innerHTML = ""; } }
 
     if (site.kind === "strait") {
         flagEl.textContent = "⚓";
