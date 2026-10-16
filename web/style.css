@@ -3673,3 +3673,19 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .archive-rk-tabs{margin-bottom:12px}
 .archive-rank-score{font-size:10px;color:#B9A3D5;margin-right:auto;white-space:nowrap}
 @media(min-width:650px){.archive-weight-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* پیش‌نمایش تنگه‌های مسیر اعزام */
+.dp-straits{margin:10px 0;padding:10px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);text-align:right}
+.dp-straits-title{font-weight:700;margin-bottom:6px}
+.dp-strait{display:flex;justify-content:space-between;gap:8px;padding:4px 0;font-size:.92em}
+.dp-strait.closed b{color:#ff6b6b}
+.dp-strait.total{border-top:1px dashed rgba(255,255,255,.2);margin-top:4px;padding-top:6px;font-weight:700}
+.dp-strait-note{font-size:.8em;opacity:.8;line-height:1.7;padding:2px 0 4px}
+
+/* نیروهای مستقر در موضع خودی */
+.map-info-garrison{margin:10px 0;padding:10px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);text-align:right}
+.sg-title{font-weight:700;margin-bottom:6px}
+.sg-row{display:flex;justify-content:space-between;padding:3px 0;font-size:.92em}
+.sg-total{border-top:1px dashed rgba(255,255,255,.2);margin-top:4px;padding-top:6px}
+.sg-power{font-weight:700;color:#ffd166}
+.sg-empty{opacity:.8;font-size:.88em}
