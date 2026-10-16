@@ -7475,7 +7475,21 @@ document.getElementById("admin-shop-menu-button")?.addEventListener("click", eve
     menu.classList.toggle("hidden", !opening);
     document.getElementById("admin-shop-menu-button")?.setAttribute("aria-expanded", opening ? "true" : "false");
 });
+// «تنظیم قوانین بازی» از منوی سه‌خط: ویرایشگر قوانینِ دنیای انتخاب‌شده را باز می‌کند (قوانین برای هر دنیا جداست)
+async function openAdminRulesFromMenu() {
+    if (!isAdminAccount) { showToast("این بخش فقط برای مدیر اصلی است.", "error"); return; }
+    showAdminShopView("");   // منو بسته و صفحهٔ اصلی پنل نمایش داده می‌شود
+    if (adminCurrentDetailWorld === null) {
+        const known = (adminWorldsCache || []).map(w => String(w.id));
+        const wid = (selectedWorldId && known.includes(String(selectedWorldId))) ? String(selectedWorldId) : known[0];
+        if (!wid) { showToast("ابتدا یک دنیا بساز یا انتخاب کن.", "error"); return; }
+        try { await switchAdminWorld(wid); } catch { showToast("باز کردن دنیا ناموفق بود.", "error"); return; }
+    }
+    document.querySelector('[data-admin-tab="rules"]')?.click();
+    document.getElementById("admin-panel-rules")?.scrollIntoView({ block: "start" });
+}
 document.getElementById("admin-shop-menu")?.addEventListener("click", event => {
+    if (event.target.closest("[data-admin-rules-open]")) { openAdminRulesFromMenu(); return; }
     const item = event.target.closest("[data-admin-shop-view]");
     if (item) showAdminShopView(item.dataset.adminShopView);
 });
