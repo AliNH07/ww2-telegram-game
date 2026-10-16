@@ -150,6 +150,8 @@
 
     <div id="game-menu-panel" class="game-menu-panel hidden" role="menu" aria-label="منوی بازی">
         <button type="button" id="open-guide-menu" class="game-menu-item" role="menuitem">📖 <span>راهنمای بازی</span></button>
+        <button type="button" id="open-strait-menu" class="game-menu-item" role="menuitem">⚓ <span>مدیریت تنگه‌ها</span></button>
+        <button type="button" id="open-rules-menu" class="game-menu-item" role="menuitem">📜 <span>قوانین بازی</span></button>
         <button type="button" id="open-archive-menu" class="game-menu-item" role="menuitem">🗃️ <span>بایگانی</span></button>
     </div>
 
@@ -218,6 +220,42 @@
             </div>
             <button type="button" id="guide-close" class="guide-btn">متوجه شدم</button>
             <p class="guide-foot">هر وقت خواستی: منوی ☰ ← راهنمای بازی</p>
+        </div>
+    </div>
+
+    <!-- ==================== مدیریت تنگه‌ها ==================== -->
+    <div id="strait-manage-modal" class="guide-modal rules-modal hidden" role="dialog" aria-modal="true" aria-label="مدیریت تنگه‌ها">
+        <div class="guide-box">
+            <h2 class="sm-title">⚓ مدیریت تنگه‌ها <button type="button" id="sm-help-btn" class="sm-help-btn" aria-label="قوانین عبور از تنگه" aria-expanded="false">؟</button></h2>
+            <div id="sm-help" class="sm-help hidden">
+                <b>قوانین عبور از تنگه</b>
+                <ol>
+                    <li>سقف عوارض هر تنگه ۲۵۰,۰۰۰$ است.</li>
+                    <li>هنگام اعزام، عوارض همهٔ تنگه‌های بازِ سر راه همان لحظه از خزانهٔ عبورکننده کم می‌شود. اگر خزانه کافی نباشد اعزام انجام نمی‌شود.</li>
+                    <li>پول تا رد شدن ناوگان به صاحب تنگه نمی‌رسد؛ لحظه‌ای که ثانیه‌شمار به صفر می‌رسد و ناوگان از تنگه می‌گذرد، عوارض به خزانهٔ صاحب تنگه واریز می‌شود.</li>
+                    <li>تغییر عوارض بعد از اعزام روی ناوگان‌های در راه اثری ندارد؛ فقط برای اعزام‌های بعدی اعمال می‌شود.</li>
+                    <li>اگر صاحب تنگه پیش از رسیدن ناوگان آن را ببندد، عوارض پرداخت‌شده به عبورکننده برمی‌گردد و ناوگان در تنگه با نگهبانان می‌جنگد: با پیروزی تنگه را می‌گیرد و راهش را ادامه می‌دهد؛ با شکست ناوگان نابود می‌شود.</li>
+                    <li>اگر ناوگان پیش از رسیدن به تنگه از راه برگردد یا عبورش متوقف شود، عوارضی که هنوز به صاحب تنگه نرسیده به خزانه‌اش برمی‌گردد.</li>
+                    <li>تنگه‌ای که از قبل بسته است عوارض ندارد؛ ناوگان به‌جای پرداخت، در تنگه می‌جنگد و با پیروزی آن را می‌گیرد.</li>
+                    <li>با پیمان عدم تجاوز نمی‌توان از تنگهٔ بستهٔ طرف مقابل عبور کرد.</li>
+                    <li>صاحب تنگه همیشه رایگان و بدون محدودیت از تنگهٔ خودش عبور می‌کند.</li>
+                    <li>صاحب تنگه می‌تواند برای یک کشور خاص «استثنا» بگذارد (بستن، عوارض یا رایگان)؛ استثنا روی قانون عمومی اولویت دارد.</li>
+                </ol>
+            </div>
+            <div id="sm-body" class="sm-body"></div>
+            <button type="button" id="sm-close" class="guide-btn">بستن</button>
+        </div>
+    </div>
+
+    <!-- ==================== قوانین بازی ==================== -->
+    <div id="rules-modal" class="guide-modal rules-modal hidden" role="dialog" aria-modal="true" aria-label="قوانین بازی">
+        <div class="guide-box">
+            <h2>📜 قوانین بازی</h2>
+            <p class="guide-sub" id="rules-sub"></p>
+            <ol id="rules-list" class="rules-list"></ol>
+            <label id="rules-check-wrap" class="rules-check hidden"><input type="checkbox" id="rules-check"><span>قوانین را خواندم و می‌پذیرم</span></label>
+            <button type="button" id="rules-accept" class="guide-btn hidden" disabled>ادامه بازی</button>
+            <button type="button" id="rules-close" class="guide-btn hidden">بستن</button>
         </div>
     </div>
 
@@ -993,6 +1031,7 @@
             <button class="admin-tab" type="button" data-admin-tab="wars">⚔️ اعلان جنگ‌ها</button>
             <button class="admin-tab" type="button" data-admin-tab="un">🌐 سازمان ملل <span id="admin-un-tab-count" class="admin-count-pill hidden">۰</span></button>
             <button class="admin-tab" type="button" data-admin-tab="activity">🧾 گزارش عملیات</button>
+            <button class="admin-tab" type="button" data-admin-tab="rules">📜 قوانین</button>
         </div>
         <section id="admin-panel-players" class="admin-panel">
             <div class="admin-section-head"><div><span class="admin-section-kicker">PLAYER DIRECTORY</span><h3>فهرست و مدیریت بازیکنان</h3><p>نام، آیدی عددی و نام کاربری تلگرام کنار اطلاعات کشور دیده می‌شود.</p></div><span id="admin-player-count" class="admin-count-pill">۰</span></div>
@@ -1053,6 +1092,13 @@
                 <div id="admin-un-thread-msgs" class="admin-un-msgs"></div>
                 <div class="admin-direct-message"><textarea id="admin-un-reply-text" rows="3" maxlength="1000" placeholder="پاسخ به این کشور…"></textarea><button id="admin-un-reply-send" type="button" class="admin-primary-btn">📨 ارسال پاسخ</button></div>
             </div>
+        </section>
+        <section id="admin-panel-rules" class="admin-panel hidden">
+            <div class="admin-section-head"><div><span class="admin-section-kicker">GAME RULES</span><h3>قوانین بازی</h3><p>تعداد قوانین را مشخص کن و هر شماره را یک قانون بنویس. بازیکنان در اولین ورود باید بپذیرند؛ با هر تغییر، دوباره از آن‌ها پذیرش گرفته می‌شود.</p></div></div>
+            <label class="admin-rules-count">تعداد قوانین <input id="admin-rules-count" type="number" min="0" max="50" step="1" inputmode="numeric" value="0"></label>
+            <div id="admin-rules-fields" class="admin-rules-fields"></div>
+            <button type="button" id="admin-rules-save" class="admin-primary-btn">ذخیره قوانین</button>
+            <p class="admin-editor-note" id="admin-rules-status" role="status"></p>
         </section>
         <section id="admin-panel-activity" class="admin-panel hidden">
             <div class="admin-section-head"><div><span class="admin-section-kicker">AUDIT LOG</span><h3>گزارش عملیات مدیریت</h3><p>آخرین تغییرات مدیریتی برای بررسی و پیگیری ثبت می‌شوند.</p></div><span class="admin-count-pill">آخرین ۶۰ مورد</span></div>
