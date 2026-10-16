@@ -642,6 +642,7 @@ async function showGame() {
     } catch (e) { console.error(e); }
     await guideDecision;
     await waitGuideClosed();          // تا راهنما بسته نشده داشبورد پشتش نمایش داده نمی‌شود
+    try { await openRules(true); } catch (e) { console.error("rules:", e); }   // پذیرش قوانین (بار اول یا پس از تغییر قوانین)
     document.getElementById("game").classList.remove("booting");
     startStatsPolling(); refreshNotificationBadge();
 }
@@ -2529,11 +2530,13 @@ function renderForcesTab() {
         ${incomingHtml()}
         ${transitsHtml()}
         <button class="wf-send-btn" id="wf-send-toggle">🧭 اعزام نیرو</button>
+        <button class="wf-send-btn" id="wf-strait-manage">⚓ مدیریت تنگه‌ها</button>
         <div class="wf-section"><span>مواضع</span><small>${formatNumber(locs.length)} مکان</small></div>
         <div class="wf-chips">${chips.map(([k, l]) => `<button class="wf-fchip ${forcesFilter === k ? "active" : ""}" data-f="${k}">${l}</button>`).join("")}</div>
         <div>${shown.map(locCardHtml).join("")}</div>`;
 
     root.querySelector("#wf-send-toggle").onclick = () => openDispatch({});
+    root.querySelector("#wf-strait-manage").onclick = () => openStraitManage();
     root.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { forcesFilter = b.dataset.f; renderForcesTab(); });
     root.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
         openLocSheet(b.dataset.toggle);
@@ -2751,10 +2754,10 @@ function routePreviewHtml(rp) {
         : `<div class="dp-strait"><span>⚓ ${escapeHtml(s.name)} <small>(${escapeHtml(COUNTRY_NAMES[s.owner] || s.owner_name || s.owner)})</small></span><b>${s.toll ? formatMoney(s.toll) : "رایگان"}</b></div>`).join("");
     const tolls = rp.straits.filter(s => !s.closed && s.toll);
     const total = rp.toll_total > 0
-        ? `<div class="dp-strait total"><span>جمع عوارض مسیر (هنگام عبور خودکار پرداخت می‌شود)</span><b>${formatMoney(rp.toll_total)}</b></div>`
+        ? `<div class="dp-strait total"><span>جمع عوارض مسیر (همین الان پرداخت می‌شود)</span><b>${formatMoney(rp.toll_total)}</b></div>`
         : "";
     const short = rp.toll_total > rp.money ? `<div class="dp-error">⚠️ موجودی خزانه برای عوارض کافی نیست.</div>` : "";
-    const who = tolls.length ? `<div class="dp-strait-note">با تأیید، عوارض ${tolls.map(s => `${formatMoney(s.toll)} به ${escapeHtml(COUNTRY_NAMES[s.owner] || s.owner_name || s.owner)}`).join(" و ")} هنگام رد شدن از تنگه پرداخت می‌شود.</div>` : "";
+    const who = tolls.length ? `<div class="dp-strait-note">با تأیید، عوارض ${tolls.map(s => `${formatMoney(s.toll)} (${escapeHtml(COUNTRY_NAMES[s.owner] || s.owner_name || s.owner)})`).join(" و ")} همین الان از خزانه‌ات کسر می‌شود و مبلغ قفل می‌ماند؛ اگر صاحب تنگه بعداً عوارض را بالا ببرد روی این سفر اثری ندارد. اگر پیش از رسیدن تنگه را ببندد، پولت برمی‌گردد و در تنگه نبرد می‌کنی.</div>` : "";
     return `<div class="dp-straits"><div class="dp-straits-title">🌊 تنگه‌های سر راه</div>${rows}${total}${who}${short}</div>`;
 }
 function showDispatchConfirm(picked, rp) {
@@ -3211,6 +3214,153 @@ async function maybeShowGuide() {
 document.getElementById("guide-close")?.addEventListener("click", closeGuide);
 guideModal?.addEventListener("click", (event) => { if (event.target === guideModal) closeGuide(); });
 
+/* ---------- قوانین بازی ---------- */
+const rulesModal = document.getElementById("rules-modal");
+function renderRulesList(rules) {
+    const ol = document.getElementById("rules-list");
+    if (ol) ol.innerHTML = rules.map(r => `<li>${escapeHtml(r)}</li>`).join("");
+    const sub = document.getElementById("rules-sub");
+    if (sub) sub.textContent = `${formatNumber(rules.length)} قانون`;
+}
+async function openRules(mustAccept) {
+    let r = null;
+    try { r = await apiGet("/api/rules"); } catch (e) {}
+    if (!r?.success) { if (!mustAccept) showToast("دریافت قوانین ناموفق بود.", "error"); return true; }
+    if (!r.rules.length) { if (!mustAccept) showToast("هنوز قانونی ثبت نشده است.", undefined); return true; }
+    if (mustAccept && r.accepted) return true;
+    renderRulesList(r.rules);
+    const chk = document.getElementById("rules-check"), wrap = document.getElementById("rules-check-wrap");
+    const acc = document.getElementById("rules-accept"), cls = document.getElementById("rules-close");
+    chk.checked = false; acc.disabled = true;
+    wrap.classList.toggle("hidden", !mustAccept); acc.classList.toggle("hidden", !mustAccept); cls.classList.toggle("hidden", mustAccept);
+    rulesModal.classList.remove("hidden");
+    const ol = document.getElementById("rules-list"); if (ol) ol.scrollTop = 0;
+    return new Promise(resolve => {
+        chk.onchange = () => { acc.disabled = !chk.checked; };
+        cls.onclick = () => { rulesModal.classList.add("hidden"); resolve(true); };
+        acc.onclick = async () => {
+            if (!chk.checked) return;
+            acc.disabled = true;
+            try {
+                const d = await apiPost("/api/rules/accept", {});
+                if (!d?.success) { showToast("ثبت پذیرش انجام نشد؛ دوباره تلاش کن.", "error"); acc.disabled = false; return; }
+            } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); acc.disabled = false; return; }
+            rulesModal.classList.add("hidden"); resolve(true);
+        };
+    });
+}
+
+/* ---------- مدیریت تنگه‌ها ---------- */
+const smModal = document.getElementById("strait-manage-modal");
+let smData = null, smSkew = 0, smTimer = null, smReloadAt = 0;
+const SM_MAX_TOLL = 250000;
+function smFmt(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    const p = n => String(n).padStart(2, "0");
+    return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
+}
+function smModeText(toll, closed) { return closed ? "🔒 بسته" : (Number(toll) > 0 ? `💰 عوارض ${formatMoney(toll)}` : "🟢 رایگان"); }
+function smControlsHtml(sid, scope, toll, closed) {
+    const mode = closed ? "close" : (Number(toll) > 0 ? "toll" : "free");
+    const b = (act, label) => `<button type="button" class="${mode === act ? "active" : ""}" data-sm-act="${act}" data-sid="${sid}" data-scope="${scope}">${label}</button>`;
+    return `<div class="sm-seg">${b("close", "🔒 بستن")}${b("toll", "💰 عوارض")}${b("free", "🟢 رایگان")}</div>
+        <div class="sm-toll hidden" data-sm-tollbox="${sid}:${scope}"><input type="number" inputmode="numeric" min="1" max="${SM_MAX_TOLL}" step="1" placeholder="مبلغ عوارض (حداکثر ${formatNumber(SM_MAX_TOLL)})"><button type="button" class="wf-send-btn" data-sm-tollok="${sid}:${scope}">ثبت</button></div>`;
+}
+function smCardHtml(s) {
+    const countryOpts = Object.entries(COUNTRY_NAMES).filter(([id]) => id !== selectedCountry).map(([id, n]) => `<option value="${id}">${COUNTRY_FLAGS[id] || "🏳️"} ${escapeHtml(n)}</option>`).join("");
+    const rules = Object.entries(s.country_rules || {}).filter(([id]) => COUNTRY_NAMES[id]);
+    const passing = (s.passing || []).map(x => `<div class="sm-row"><span>🚢 ${escapeHtml(x.country_name || x.country)} · ${formatMoney(x.amount)}</span>${x.eta ? `<span class="sm-count" data-eta="${escapeHtml(x.eta)}">--:--</span>` : `<span class="sm-count">⚔️ در درگیری…</span>`}</div>`).join("");
+    const log = (s.log || []).map(x => `<div class="sm-row"><span>${escapeHtml(x.country_name || x.country)}</span><b>+${formatMoney(x.amount)}</b></div>`).join("");
+    const exc = rules.map(([id, r]) => `<div class="sm-exc"><span>${COUNTRY_FLAGS[id] || "🏳️"} ${escapeHtml(COUNTRY_NAMES[id])}: ${smModeText(r?.toll ?? s.toll, r?.closed ?? s.closed)}</span><button type="button" class="sp-clear" data-sm-clear="${s.id}" data-country="${id}">حذف</button></div>`).join("");
+    return `<div class="sm-card" data-sm-card="${s.id}">
+        <div class="sm-head"><span>⚓ ${escapeHtml(s.name)}</span><span class="sm-chip">${smModeText(s.toll, s.closed)}</span></div>
+        <div class="sm-sub">درآمد عوارض تا امروز: <b>${formatMoney(s.income_total || 0)}</b></div>
+        <div class="sm-sec">🚢 ناوگان‌های در حال عبور</div>
+        ${passing || `<div class="sm-sub">فعلاً ناوگانی در راه این تنگه نیست.</div>`}
+        <div class="sm-sec">⚙️ تنظیمات برای همه</div>
+        ${smControlsHtml(s.id, "global", s.toll, s.closed)}
+        <div class="sm-sec">🌐 استثنا برای یک کشور</div>
+        <select class="sm-select" data-sm-country="${s.id}"><option value="">انتخاب کشور…</option>${countryOpts}</select>
+        <div data-sm-countrybox="${s.id}" class="hidden">${smControlsHtml(s.id, "country", 0, false)}</div>
+        ${exc ? `<div class="sm-sub">استثناهای فعال:</div>${exc}` : ""}
+        ${log ? `<div class="sm-sec">💰 آخرین عوارض دریافتی</div>${log}` : ""}
+    </div>`;
+}
+function renderStraitManage() {
+    const body = document.getElementById("sm-body"); if (!body) return;
+    const list = smData?.straits || [];
+    body.innerHTML = list.length ? list.map(smCardHtml).join("") : `<div class="sm-empty">تنگه‌ای ندارید.</div>`;
+    body.querySelectorAll("[data-sm-countrybox]").forEach(el => el.classList.add("hidden"));
+    smTick();
+}
+function smTick() {
+    const now = Date.now() + smSkew; let anyDone = false;
+    document.querySelectorAll("#sm-body .sm-count[data-eta]").forEach(el => {
+        const left = (Date.parse(el.dataset.eta) - now) / 1000;
+        if (left > 0) { el.textContent = smFmt(left); el.classList.remove("done"); }
+        else { el.textContent = "✅ رد شد؛ واریز شد"; el.classList.add("done"); anyDone = true; }
+    });
+    if (anyDone && Date.now() - smReloadAt > 2500) { smReloadAt = Date.now(); setTimeout(() => loadStraitManage().catch(() => {}), 1500); }
+}
+async function loadStraitManage() {
+    const d = await apiGet("/api/strait/manage");
+    if (!d?.success) { showToast("دریافت اطلاعات تنگه‌ها ناموفق بود.", "error"); return; }
+    smData = d; smSkew = Date.parse(d.now) - Date.now();
+    if (!smModal.classList.contains("hidden")) renderStraitManage();
+}
+async function openStraitManage() {
+    smModal.classList.remove("hidden");
+    document.getElementById("sm-body").innerHTML = `<div class="sm-empty">در حال دریافت…</div>`;
+    try { await loadStraitManage(); } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+    clearInterval(smTimer); smTimer = setInterval(smTick, 1000);
+}
+function closeStraitManage() { smModal.classList.add("hidden"); document.getElementById("sm-help")?.classList.add("hidden"); document.getElementById("sm-help-btn")?.setAttribute("aria-expanded", "false"); clearInterval(smTimer); smTimer = null; }
+async function smSend(sid, scope, action, toll) {
+    const body = document.getElementById("sm-body");
+    const countryId = scope === "country" ? body.querySelector(`[data-sm-country="${sid}"]`)?.value : undefined;
+    if (scope === "country" && !countryId) { showToast("ابتدا کشور را انتخاب کنید.", "error"); return; }
+    const d = await apiPost("/api/strait/settings", { site_id: sid, action, ...(action === "toll" ? { toll } : {}), ...(countryId ? { country_id: countryId } : {}) });
+    if (!d?.success) { showToast(d?.message || "ذخیره تنظیمات انجام نشد.", "error"); return; }
+    showToast(d.message || "ذخیره شد.", d.changed === false ? undefined : "success");
+    await loadStraitManage(); loadMapSites().catch(() => {});
+}
+document.getElementById("sm-close")?.addEventListener("click", closeStraitManage);
+document.getElementById("sm-help-btn")?.addEventListener("click", e => {
+    const box = document.getElementById("sm-help"); if (!box) return;
+    const open = box.classList.toggle("hidden") === false;
+    e.currentTarget.setAttribute("aria-expanded", String(open));
+    if (open) box.scrollTop = 0;
+});
+smModal?.addEventListener("click", async e => {
+    if (e.target === smModal) { closeStraitManage(); return; }
+    const act = e.target.closest("[data-sm-act]");
+    if (act) {
+        const { smAct, sid, scope } = { smAct: act.dataset.smAct, sid: act.dataset.sid, scope: act.dataset.scope };
+        if (smAct === "toll") { document.querySelector(`[data-sm-tollbox="${sid}:${scope}"]`)?.classList.toggle("hidden"); return; }
+        await smSend(sid, scope, smAct); return;
+    }
+    const ok = e.target.closest("[data-sm-tollok]");
+    if (ok) {
+        const [sid, scope] = ok.dataset.smTollok.split(":");
+        const v = Math.floor(Number(document.querySelector(`[data-sm-tollbox="${sid}:${scope}"] input`)?.value));
+        if (!Number.isFinite(v) || v <= 0) { showToast("یک مبلغ عوارض معتبر (بزرگ‌تر از صفر) وارد کنید.", "error"); return; }
+        if (v > SM_MAX_TOLL) { showToast(`حداکثر عوارض هر تنگه ${formatNumber(SM_MAX_TOLL)}$ است.`, "error"); return; }
+        await smSend(sid, scope, "toll", v); return;
+    }
+    const clr = e.target.closest("[data-sm-clear]");
+    if (clr) {
+        const d = await apiPost("/api/strait/settings", { site_id: clr.dataset.smClear, country_id: clr.dataset.country, clear_country_rule: true });
+        if (!d?.success) { showToast(d?.message || "حذف استثنا انجام نشد.", "error"); return; }
+        showToast("استثنا حذف شد.", "success"); await loadStraitManage();
+    }
+});
+smModal?.addEventListener("change", e => {
+    const sel = e.target.closest("[data-sm-country]"); if (!sel) return;
+    const box = document.querySelector(`[data-sm-countrybox="${sel.dataset.smCountry}"]`);
+    box?.classList.toggle("hidden", !sel.value);
+});
+
 const gameMenuButton = document.getElementById("game-menu-button");
 const gameMenuPanel = document.getElementById("game-menu-panel");
 function closeGameMenu() { gameMenuPanel?.classList.add("hidden"); }
@@ -3220,10 +3370,12 @@ gameMenuButton?.addEventListener("click", (event) => {
     gameMenuPanel.classList.toggle("hidden");
 });
 gameMenuPanel?.addEventListener("click", async (event) => {
-    const item = event.target.closest("[data-menu-page], #open-guide-menu, #open-archive-menu");
+    const item = event.target.closest("[data-menu-page], #open-guide-menu, #open-archive-menu, #open-rules-menu, #open-strait-menu");
     if (!item) return;
     closeGameMenu();
     if (item.id === "open-guide-menu") { openGuide(); return; }
+    if (item.id === "open-rules-menu") { openRules(false); return; }
+    if (item.id === "open-strait-menu") { openStraitManage(); return; }
     if (item.id === "open-archive-menu") { openArchiveWorlds(); return; }
     // سازگاری با سایر ورودی‌های قدیمی منو، بدون نمایش آن‌ها در منوی سه‌خطی.
     const page = item.dataset.menuPage;
@@ -3811,6 +3963,36 @@ document.querySelectorAll("[data-admin-tab]").forEach(button => button.addEventL
     document.querySelectorAll("[data-admin-tab]").forEach(b => b.classList.toggle("active", b === button));
     document.querySelectorAll(".admin-panel").forEach(panel => panel.classList.toggle("hidden", panel.id !== `admin-panel-${tab}`));
 }));
+/* ----- مدیریت قوانین بازی ----- */
+function adminRulesRenderFields(values) {
+    const box = document.getElementById("admin-rules-fields"); if (!box) return;
+    box.innerHTML = values.map((v, i) => `<div class="admin-rule-row"><b>${i + 1}</b><textarea maxlength="700" placeholder="قانون ${i + 1} را بنویس…" data-rule-i="${i}">${escapeHtml(v)}</textarea></div>`).join("");
+}
+function adminRulesCurrent() { return Array.from(document.querySelectorAll("#admin-rules-fields textarea")).map(t => t.value); }
+async function loadAdminRules() {
+    const r = await apiGet("/api/admin/rules");
+    if (!r?.success) return;
+    document.getElementById("admin-rules-count").value = r.rules.length;
+    adminRulesRenderFields(r.rules);
+    const st = document.getElementById("admin-rules-status"); if (st) st.textContent = r.rules.length ? `${r.rules.length} قانون ثبت شده است.` : "هنوز قانونی ثبت نشده است.";
+}
+document.querySelector('[data-admin-tab="rules"]')?.addEventListener("click", () => loadAdminRules().catch(console.error));
+document.getElementById("admin-rules-count")?.addEventListener("input", e => {
+    let n = Math.floor(Number(e.target.value)); if (!Number.isFinite(n) || n < 0) n = 0; if (n > 50) n = 50;
+    const cur = adminRulesCurrent(); const next = cur.slice(0, n); while (next.length < n) next.push("");
+    adminRulesRenderFields(next);
+});
+document.getElementById("admin-rules-save")?.addEventListener("click", async () => {
+    const rules = adminRulesCurrent().map(x => x.trim()), st = document.getElementById("admin-rules-status"), btn = document.getElementById("admin-rules-save");
+    if (rules.some(x => !x)) { showToast("همهٔ قانون‌ها باید متن داشته باشند.", "error"); return; }
+    btn.disabled = true;
+    try {
+        const d = await apiPost("/api/admin/rules", { rules });
+        if (st) st.textContent = d?.message || "";
+        showToast(d?.success ? (d.message || "ذخیره شد.") : (d?.message || "ذخیره انجام نشد."), d?.success ? "success" : "error");
+    } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+    finally { btn.disabled = false; }
+});
 document.getElementById("admin-bulk-scope")?.addEventListener("change", event => document.getElementById("admin-bulk-country-wrap")?.classList.toggle("hidden", event.target.value !== "country"));
 document.getElementById("admin-jump-players")?.addEventListener("click", () => document.querySelector('[data-admin-tab="players"]')?.click());
 document.getElementById("admin-bulk-adjust-form")?.addEventListener("submit", async event => {
@@ -6352,7 +6534,7 @@ function showSiteInfo(site) {
         const segHtml = scope => Object.entries(MODES).map(([act, [ic, lb]]) =>
             `<button type="button" class="sp-btn" data-scope="${scope}" data-act="${act}"><i>${ic}</i><span>${lb}</span></button>`).join("");
         const tollBoxHtml = scope => `<div class="sp-toll hidden" data-toll-box="${scope}">
-            <input type="number" inputmode="numeric" min="1" step="1" placeholder="مبلغ عوارض ($)" data-toll-input="${scope}">
+            <input type="number" inputmode="numeric" min="1" max="250000" step="1" placeholder="مبلغ عوارض ($) · حداکثر 250,000" data-toll-input="${scope}">
             <button type="button" class="sp-ok" data-toll-ok="${scope}">ثبت</button></div>`;
         const exIds = Object.keys(rules).filter(k => COUNTRY_NAMES[k] && k !== selectedCountry);
         const countryOptions = Object.entries(COUNTRY_NAMES).filter(([id]) => id !== selectedCountry).map(([id, name]) =>
@@ -6429,6 +6611,7 @@ function showSiteInfo(site) {
         controls.querySelectorAll("[data-toll-ok]").forEach(b => b.onclick = () => {
             const scope = b.dataset.tollOk, v = Math.floor(Number($(`[data-toll-input="${scope}"]`).value));
             if (!Number.isFinite(v) || v <= 0) { showToast("یک مبلغ عوارض معتبر (بزرگ‌تر از صفر) وارد کنید.", "error"); return; }
+            if (v > 250000) { showToast("حداکثر عوارض هر تنگه 250,000$ است.", "error"); return; }
             act(scope, "toll", v);
         });
         controls.querySelectorAll("[data-toll-input]").forEach(i => i.addEventListener("keydown", ev => {
