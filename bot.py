@@ -1837,7 +1837,7 @@ _atexit.register(_db_flush)
 # =========================================================
 SHOP_ORDER_TTL_SECONDS = 15 * 60   # مهلت ارسال رسید؛ فقط زمان سرور معتبر است
 SHOP_PRODUCTS = {
-    "charge": {"name": "بسته ویژه شارژ", "price": 100_000, "charge_units": 10_000_000, "one_time": True},
+    "charge": {"name": "شارژ حساب ۱۰ میلیون دلار", "price": 100_000, "charge_units": 10_000_000, "one_time": True},
     "vip": {"name": "اشتراک VIP", "price": 210_000, "vip_days": 30},
 }
 SHOP_ACTIVE_STATUSES = ("awaiting_payment", "pending_review")
@@ -1902,6 +1902,53 @@ def _shop_public(o, now=None):
             "seconds_left": left, "server_now": now.isoformat(), "ttl_seconds": SHOP_ORDER_TTL_SECONDS,
             "card_number": shop_config.get("card_number", ""),
             "cardholder_name": shop_config.get("cardholder_name", "")}
+
+
+def _shop_charge_scope_key(world_id, country_id):
+    if not world_id or not country_id:
+        return ""
+    return f"{str(world_id)}:{str(country_id)}"
+
+
+def _shop_charge_scope_purchased(uid, world_id, country_id, exclude_order_id=None):
+    """A charge package is one-time per player's country instance (world + country)."""
+    scope_key = _shop_charge_scope_key(world_id, country_id)
+    if not scope_key:
+        return False
+    account = shop_accounts.get(str(uid), {}) or {}
+    scopes = account.get("charge_pack_purchases", {}) or {}
+    if bool(scopes.get(scope_key)):
+        return True
+    for existing in shop_orders.values():
+        if str(existing.get("id")) == str(exclude_order_id or ""):
+            continue
+        try:
+            same_user = int(existing.get("uid") or 0) == int(uid)
+        except (TypeError, ValueError):
+            same_user = False
+        if (same_user and existing.get("product") == "charge" and existing.get("status") == "approved"
+                and str(existing.get("world_id") or "") == str(world_id)
+                and str(existing.get("country_id") or "") == str(country_id)):
+            return True
+    return False
+
+
+def _shop_admin_public(order):
+    """Safe, compact order fields for the authenticated admin UI; never expose stored receipt bytes."""
+    return {
+        "id": str(order.get("id") or ""), "uid": int(order.get("uid") or 0),
+        "user_id": int(order.get("uid") or 0), "product": str(order.get("product") or ""),
+        "product_name": str(order.get("product_name") or "محصول فروشگاه"),
+        "amount": int(order.get("amount") or 0), "status": str(order.get("status") or ""),
+        "created_at": order.get("created_at"), "expires_at": order.get("expires_at"),
+        "receipt_sent_at": order.get("receipt_sent_at"), "receipt_type": order.get("receipt_type"),
+        "receipt_text": str(order.get("receipt_text") or "")[:1500],
+        "username": str(order.get("username") or ""), "full_name": str(order.get("full_name") or ""),
+        "world_id": str(order.get("world_id") or ""), "world_name": str(order.get("world_name") or ""),
+        "country_id": str(order.get("country_id") or ""), "country_name": str(order.get("country_name") or ""),
+        "review_note": str(order.get("review_note") or ""),
+        "charge_units": int(order.get("charge_units") or 0), "vip_days": int(order.get("vip_days") or 0),
+    }
 
 
 def _shop_player_details(uid, world_id):
@@ -1982,7 +2029,12 @@ def _shop_grant_order_locked(order):
             players_map[uid] = row
         row["money"] = max(0, int(row.get("money", STARTING_MONEY) or 0)) + int(order.get("charge_units") or 10_000_000)
         row["charge_pack_purchased"] = True
-        account["charge_pack_purchased"] = True
+        row["charge_pack_purchased_world_id"] = str(wid)
+        row["charge_pack_purchased_country_id"] = str(order.get("country_id") or "")
+        scope_key = _shop_charge_scope_key(wid, order.get("country_id"))
+        if scope_key:
+            account.setdefault("charge_pack_purchases", {})[scope_key] = True
+        order["purchase_scope"] = scope_key
         order["granted_world_id"] = str(wid)
         order["granted_units"] = int(order.get("charge_units") or 10_000_000)
     elif order.get("product") == "vip":
@@ -2045,20 +2097,23 @@ async def shop_create_order(request):
                 return web.json_response({"success": True, "existing": True, "order": _shop_public(active, now)})
             return web.json_response({"success": False, "error": "active_order_exists", "order": _shop_public(active, now),
                                       "message": "ابتدا سفارش فعال قبلی را کامل یا لغو کنید یا تا پایان مهلت آن صبر کنید."}, status=409)
-        if prod.get("one_time") and (shop_accounts.get(str(uid), {}).get("charge_pack_purchased") or any(
-                o.get("uid") == uid and o.get("product") == key and o.get("status") == "approved" for o in shop_orders.values())):
-            return web.json_response({"success": False, "error": "already_purchased", "message": "این بسته قبلاً برای حساب شما خریداری شده است."}, status=409)
+        requested_world = str(request.query.get("world_id") or active_world_id or "1")
+        identity = _shop_player_details(uid, requested_world)
+        if prod.get("one_time"):
+            if not identity.get("country_id"):
+                return web.json_response({"success": False, "error": "country_required", "message": "برای خرید بسته شارژ ابتدا یک کشور انتخاب کنید."}, status=409)
+            if _shop_charge_scope_purchased(uid, requested_world, identity.get("country_id")):
+                return web.json_response({"success": False, "error": "already_purchased", "message": "بسته شارژ برای این کشور قبلاً خریداری شده است."}, status=409)
         if not shop_config.get("card_number") or not shop_config.get("cardholder_name"):
             return web.json_response({"success": False, "error": "payment_not_configured",
                                       "message": "اطلاعات کارت پرداخت هنوز توسط مدیر تنظیم نشده است."}, status=503)
         shop_seq += 1
         oid = f"WW-{shop_seq:05d}"
-        requested_world = str(request.query.get("world_id") or active_world_id or "1")
-        identity = _shop_player_details(uid, requested_world)
         order = {"id": oid, "uid": uid, "product": key, "product_name": prod["name"], "amount": prod["price"],
                  "charge_units": prod.get("charge_units", 0), "vip_days": prod.get("vip_days", 0),
                  "status": "awaiting_payment", "created_at": now.isoformat(),
                  "expires_at": (now + timedelta(seconds=SHOP_ORDER_TTL_SECONDS)).isoformat(),
+                 "purchase_scope": _shop_charge_scope_key(requested_world, identity.get("country_id")) if key == "charge" else "",
                  **identity}
         shop_orders[oid] = order
         save_state()
@@ -2222,6 +2277,115 @@ async def shop_submit_receipt(request):
     except Exception:
         pass
     return web.json_response({"success": True, "message": "رسید برای بررسی مدیر ارسال شد.", "order": _shop_public(snapshot)})
+
+
+async def admin_shop_orders_get(request):
+    uid = get_auth_user_id(request)
+    if not uid or int(uid) != int(ADMIN_ID):
+        return web.json_response({"success": False, "error": "forbidden", "message": "دسترسی فقط برای مدیر اصلی است."}, status=403)
+    async with WORLD_SWITCH_LOCK:
+        if _shop_expire_due(utcnow()):
+            save_state()
+        orders = sorted(shop_orders.values(), key=lambda row: str(row.get("created_at") or ""), reverse=True)
+        return web.json_response({"success": True, "orders": [_shop_admin_public(o) for o in orders
+            if o.get("status") in ("pending_review", "approved", "rejected")]})
+
+
+async def admin_shop_message_send(request):
+    uid = get_auth_user_id(request)
+    if not uid or int(uid) != int(ADMIN_ID):
+        return web.json_response({"success": False, "error": "forbidden", "message": "دسترسی فقط برای مدیر اصلی است."}, status=403)
+    body = await read_json(request)
+    oid = str(body.get("order_id") or "").strip()
+    message_text = str(body.get("text") or "").strip()[:1000]
+    if not oid or not message_text:
+        return web.json_response({"success": False, "error": "missing_fields", "message": "شماره سفارش و متن پیام الزامی است."}, status=400)
+    async with WORLD_SWITCH_LOCK:
+        order = shop_orders.get(oid)
+        if not order:
+            return web.json_response({"success": False, "error": "order_not_found", "message": "سفارش پیدا نشد."}, status=404)
+        target_uid = int(order.get("uid") or 0)
+    if not target_uid:
+        return web.json_response({"success": False, "error": "user_not_found", "message": "شناسهٔ کاربر سفارش معتبر نیست."}, status=400)
+    try:
+        await bot.send_message(chat_id=target_uid, text=f"✉️ پیام مدیر درباره سفارش {oid}:\n\n{message_text}")
+    except Exception as exc:
+        logging.warning("admin shop direct message failed for %s: %s", oid, exc)
+        return web.json_response({"success": False, "error": "message_failed", "message": "ارسال پیام ناموفق بود؛ ممکن است کاربر ربات را شروع نکرده یا مسدود کرده باشد."}, status=502)
+    return web.json_response({"success": True, "message": "پیام مستقیم برای کاربر ارسال شد."})
+
+
+async def _shop_review_order(oid, action, reviewer_id):
+    """Shared review routine for the Telegram buttons and admin web page."""
+    notify_uid = None
+    notify_message = ""
+    async with WORLD_SWITCH_LOCK:
+        now = utcnow()
+        order = shop_orders.get(str(oid))
+        if not order:
+            return {"success": False, "message": "سفارش پیدا نشد."}
+        if order.get("status") != "pending_review":
+            return {"success": False, "message": "این سفارش قبلاً بررسی شده یا دیگر در انتظار بررسی نیست."}
+        if action not in ("approve", "reject"):
+            return {"success": False, "message": "عملیات بررسی معتبر نیست."}
+        if action == "approve":
+            if order.get("product") == "charge" and _shop_charge_scope_purchased(
+                    order.get("uid"), order.get("world_id"), order.get("country_id"), exclude_order_id=order.get("id")):
+                order["status"] = "rejected"
+                order["rejected_at"] = now.isoformat()
+                order["reviewed_by"] = int(reviewer_id)
+                order["review_note"] = "بسته شارژ قبلاً برای همین کشور اعمال شده بود."
+                notify_uid = int(order.get("uid") or 0)
+                notify_message = f"❌ سفارش {oid} رد شد؛ بسته شارژ قبلاً برای همین کشور استفاده شده است."
+                result_text = "این کشور قبلاً بسته شارژ را دریافت کرده؛ سفارش رد شد."
+            elif order.get("product") == "charge" and not order.get("country_id"):
+                order["status"] = "rejected"
+                order["rejected_at"] = now.isoformat()
+                order["reviewed_by"] = int(reviewer_id)
+                order["review_note"] = "کشور سفارش مشخص نیست."
+                notify_uid = int(order.get("uid") or 0)
+                notify_message = f"❌ سفارش {oid} رد شد؛ کشور مربوط به این سفارش مشخص نیست. لطفاً با پشتیبانی تماس بگیرید."
+                result_text = "کشور سفارش مشخص نیست؛ سفارش رد شد."
+            else:
+                _shop_grant_order_locked(order)
+                order["status"] = "approved"
+                order["approved_at"] = now.isoformat()
+                order["reviewed_by"] = int(reviewer_id)
+                result_text = f"سفارش {oid} تأیید شد."
+                notify_uid = int(order.get("uid") or 0)
+                notify_message = (f"✅ پرداخت شما تأیید شد. سفارش {oid}: {order.get('product_name')}. "
+                                  + ("۱۰٬۰۰۰٬۰۰۰ دلار به حساب کشور مربوط به سفارش اضافه شد."
+                                     if order.get("product") == "charge"
+                                     else f"اشتراک VIP شما فعال شد و تا {order.get('vip_until', '')} اعتبار دارد."))
+        else:
+            order["status"] = "rejected"
+            order["rejected_at"] = now.isoformat()
+            order["reviewed_by"] = int(reviewer_id)
+            order["review_note"] = "پرداخت توسط مدیر تأیید نشد."
+            result_text = f"سفارش {oid} رد شد."
+            notify_uid = int(order.get("uid") or 0)
+            notify_message = f"❌ پرداخت سفارش {oid} ({order.get('product_name')}) تأیید نشد. لطفاً اطلاعات پرداخت را بررسی کنید و در صورت نیاز سفارش تازه‌ای ثبت کنید."
+        save_state()
+        final_status = order.get("status")
+    if notify_uid and notify_message:
+        try:
+            await bot.send_message(chat_id=notify_uid, text=notify_message)
+        except Exception as exc:
+            logging.info("shop review user notification failed for %s: %s", oid, exc)
+    return {"success": True, "message": result_text, "status": final_status}
+
+
+async def admin_shop_review(request):
+    uid = get_auth_user_id(request)
+    if not uid or int(uid) != int(ADMIN_ID):
+        return web.json_response({"success": False, "error": "forbidden", "message": "دسترسی فقط برای مدیر اصلی است."}, status=403)
+    body = await read_json(request)
+    oid = str(body.get("order_id") or "").strip()
+    action = str(body.get("action") or "").strip()
+    if not oid or action not in ("approve", "reject"):
+        return web.json_response({"success": False, "error": "bad_request", "message": "شماره سفارش یا عملیات بررسی معتبر نیست."}, status=400)
+    result = await _shop_review_order(oid, action, int(uid))
+    return web.json_response(result, status=200 if result.get("success") else 409)
 
 
 async def admin_shop_config_get(request):
@@ -2665,49 +2829,13 @@ async def shop_review_cb(cb: types.CallbackQuery):
     if len(parts) != 3 or parts[1] not in ("approve", "reject"):
         await cb.answer("درخواست نامعتبر است.", show_alert=True); return
     _, action, oid = parts
-    result_text = ""
-    notify_uid = None
-    notify_message = ""
-    async with WORLD_SWITCH_LOCK:
-        now = utcnow()
-        order = shop_orders.get(oid)
-        if not order:
-            result_text = "سفارش پیدا نشد."
-        elif order.get("status") != "pending_review":
-            result_text = "این سفارش قبلاً بررسی شده یا دیگر در انتظار بررسی نیست."
-        elif action == "approve":
-            # محدودیت خرید یک‌باره حتی در برابر سفارش‌های هم‌زمان دوباره بررسی می‌شود.
-            if order.get("product") == "charge" and shop_accounts.get(str(order.get("uid")), {}).get("charge_pack_purchased"):
-                order["status"] = "rejected"
-                order["review_note"] = "بسته شارژ قبلاً برای این حساب اعمال شده بود."
-                result_text = "این حساب قبلاً بسته شارژ را دریافت کرده؛ سفارش رد شد."
-            else:
-                _shop_grant_order_locked(order)
-                order["status"] = "approved"
-                order["approved_at"] = now.isoformat()
-                order["reviewed_by"] = int(cb.from_user.id)
-                result_text = f"سفارش {oid} تأیید شد."
-                notify_uid = int(order["uid"])
-                notify_message = (f"✅ پرداخت شما تأیید شد. سفارش {oid}: {order.get('product_name')}. "
-                                  + ("۱۰٬۰۰۰٬۰۰۰ واحد به خزانه دنیای مربوط به سفارش اضافه شد." if order.get("product") == "charge"
-                                     else f"اشتراک VIP شما فعال شد و تا {order.get('vip_until', '')} اعتبار دارد."))
-        else:
-            order["status"] = "rejected"
-            order["rejected_at"] = now.isoformat()
-            order["reviewed_by"] = int(cb.from_user.id)
-            order["review_note"] = "پرداخت توسط مدیر تأیید نشد."
-            result_text = f"سفارش {oid} رد شد."
-            notify_uid = int(order["uid"])
-            notify_message = f"❌ پرداخت سفارش {oid} ({order.get('product_name')}) تأیید نشد. لطفاً اطلاعات پرداخت را بررسی کنید و در صورت نیاز سفارش تازه‌ای ثبت کنید."
-        save_state()
-    try:
-        await cb.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        pass
-    if notify_uid and notify_message:
-        try: await bot.send_message(chat_id=notify_uid, text=notify_message)
-        except Exception as exc: logging.info("shop user notification failed for %s: %s", notify_uid, exc)
-    await cb.answer(result_text, show_alert=True)
+    result = await _shop_review_order(oid, action, int(cb.from_user.id))
+    if result.get("success"):
+        try:
+            await cb.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+    await cb.answer(result.get("message") or "بررسی سفارش انجام نشد.", show_alert=True)
 
 
 class GameEntryButtonMiddleware(BaseRequestMiddleware):
@@ -2835,8 +2963,16 @@ async def get_player(request):
     if uid not in players: players[uid] = create_player(uid); save_state()
     data = serialize_player(players[uid])
     entitlement = shop_accounts.get(str(uid), {})
-    if entitlement.get("charge_pack_purchased"):
-        data["charge_pack_purchased"] = True
+    # شارژ یک‌بار برای هر کشور در هر دنیا است؛ این مقدار نباید به پرچم سراسری حساب وابسته باشد.
+    current_country_id = players[uid].get("country")
+    charge_world = str(active_world_id)
+    row_charge_world = str(players[uid].get("charge_pack_purchased_world_id") or "")
+    row_charge_country = str(players[uid].get("charge_pack_purchased_country_id") or "")
+    data["charge_pack_purchased"] = bool(
+        _shop_charge_scope_purchased(uid, charge_world, current_country_id)
+        or (bool(players[uid].get("charge_pack_purchased"))
+            and row_charge_world == charge_world and row_charge_country == str(current_country_id or ""))
+    )
     vip_until = parse_dt(entitlement.get("vip_until")) if entitlement.get("vip_until") else None
     if vip_until:
         data["vip_until"] = vip_until.isoformat()
@@ -7081,6 +7217,9 @@ async def create_web_app():
     app.router.add_post("/api/shop/cancel", shop_cancel_order)
     app.router.add_get("/api/admin/shop/config", admin_shop_config_get)
     app.router.add_post("/api/admin/shop/config", admin_shop_config_save)
+    app.router.add_get("/api/admin/shop/orders", admin_shop_orders_get)
+    app.router.add_post("/api/admin/shop/message", admin_shop_message_send)
+    app.router.add_post("/api/admin/shop/review", admin_shop_review)
     app.router.add_post("/api/admin/world/start", world_scoped(admin_start_world))
     app.router.add_post("/api/admin/world/registration", world_scoped(admin_set_world_registration))
 
