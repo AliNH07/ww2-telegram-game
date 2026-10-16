@@ -786,6 +786,7 @@
     <!-- ==================== اشتراک ==================== -->
     <main id="subscription" class="game-page hidden">
         <div class="page-title"><span>امکانات ویژه</span><h1>اشتراک</h1></div>
+        <button type="button" class="shop-active hidden" id="shop-active-banner"><span id="shop-active-text"></span><b>ادامه ←</b></button>
         <div class="shop-list">
             <article class="shop-card shop-charge" id="shop-card-charge">
                 <div class="shop-badge" id="shop-charge-badge">یک‌بار خرید</div>
@@ -868,9 +869,20 @@
     <main id="shop-pay" class="game-page hidden">
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="subscription" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">💳</span>پرداخت</span></div>
         <section class="shop-detail" id="shop-pay-box">
+            <div class="shop-pay-status" id="shop-pay-status">در انتظار پرداخت و ارسال رسید</div>
             <h2 id="shop-pay-name"></h2>
-            <div class="shop-facts"><div><span>مبلغ قابل پرداخت</span><b id="shop-pay-amount"></b></div></div>
-            <p class="shop-desc">ثبت سفارش، شمارش معکوس، اطلاعات کارت و ارسال رسید در مرحلهٔ بعد اضافه می‌شود.</p>
+            <div class="shop-facts">
+                <div><span>مبلغ قابل پرداخت</span><b id="shop-pay-amount"></b></div>
+                <div><span>شمارهٔ سفارش</span><b id="shop-pay-order" dir="ltr"></b></div>
+                <div><span>شروع مهلت پرداخت</span><b id="shop-pay-start"></b></div>
+            </div>
+            <div class="shop-timer" id="shop-pay-timer">
+                <span>مهلت ارسال رسید پرداخت:</span>
+                <strong id="shop-pay-countdown" dir="ltr">۱۵:۰۰</strong>
+            </div>
+            <p class="shop-desc shop-pay-msg hidden" id="shop-pay-msg"></p>
+            <button type="button" class="shop-btn ghost hidden" id="shop-pay-new">بازگشت به اشتراک و ثبت سفارش جدید</button>
+            <p class="shop-desc" id="shop-pay-next">اطلاعات کارت و ارسال رسید در مرحلهٔ بعد اضافه می‌شود.</p>
         </section>
     </main>
 
