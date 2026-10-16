@@ -3353,6 +3353,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .war-peace-btn:active{transform:scale(.98)}
 .war-peace-btn.is-cancel{border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#C8C1D5}
 .war-peace-btn:disabled{opacity:.55}
+/* وقتی یکی از دو طرف صلح را زده، دکمهٔ صلح برای هر دو طرف سبزِ پررنگ می‌شود */
+.war-peace-btn.is-active, .war-peace-btn.is-active.is-cancel{border-color:#22c55e;background:#22c55e;color:#04210e;box-shadow:0 0 0 3px rgba(34,197,94,.22)}
 .war-peace-note{margin-top:6px;font-size:11px;line-height:1.8;color:#9FE0B7}
 
 
