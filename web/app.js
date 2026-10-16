@@ -2736,7 +2736,28 @@ function openPlaceSheet(mode) {
 }
 
 // صفحهٔ تأیید نهایی: مبدا، مقصد و تعداد دقیق نیروها
-function showDispatchConfirm(picked) {
+async function fetchRoutePreview(picked) {
+    try {
+        const { from, to } = dispatchSel;
+        const d = await apiPost("/api/war/route-preview", { from, to, units: picked });
+        return d && d.success ? d : null;
+    } catch (e) { return null; }
+}
+function routePreviewHtml(rp) {
+    if (!rp || !rp.straits || !rp.straits.length) return "";
+    const rows = rp.straits.map(s => s.closed
+        ? `<div class="dp-strait closed"><span>⚔️ ${escapeHtml(s.name)} <small>(${escapeHtml(COUNTRY_NAMES[s.owner] || s.owner_name || s.owner)})</small></span><b>بسته است</b></div>
+           <div class="dp-strait-note">چون تنگه بسته است، نیروها در راه با نگهبانان دشمن می‌جنگند؛ در صورت پیروزی تنگه را می‌گیرند و ادامه می‌دهند، وگرنه شکست می‌خورند.</div>`
+        : `<div class="dp-strait"><span>⚓ ${escapeHtml(s.name)} <small>(${escapeHtml(COUNTRY_NAMES[s.owner] || s.owner_name || s.owner)})</small></span><b>${s.toll ? formatMoney(s.toll) : "رایگان"}</b></div>`).join("");
+    const tolls = rp.straits.filter(s => !s.closed && s.toll);
+    const total = rp.toll_total > 0
+        ? `<div class="dp-strait total"><span>جمع عوارض مسیر (هنگام عبور خودکار پرداخت می‌شود)</span><b>${formatMoney(rp.toll_total)}</b></div>`
+        : "";
+    const short = rp.toll_total > rp.money ? `<div class="dp-error">⚠️ موجودی خزانه برای عوارض کافی نیست.</div>` : "";
+    const who = tolls.length ? `<div class="dp-strait-note">با تأیید، عوارض ${tolls.map(s => `${formatMoney(s.toll)} به ${escapeHtml(COUNTRY_NAMES[s.owner] || s.owner_name || s.owner)}`).join(" و ")} هنگام رد شدن از تنگه پرداخت می‌شود.</div>` : "";
+    return `<div class="dp-straits"><div class="dp-straits-title">🌊 تنگه‌های سر راه</div>${rows}${total}${who}${short}</div>`;
+}
+function showDispatchConfirm(picked, rp) {
     return new Promise(resolve => {
         const { from, to } = dispatchSel, total = sumVals(picked);
         const dst = warSites.find(s => s.id === to);
@@ -2750,6 +2771,7 @@ function showDispatchConfirm(picked) {
             <div class="is-rows">${rows}</div>
             <div class="dp-confirm-total">جمع: <b>${formatNumber(total)}</b> یگان اعزام می‌شود</div>
             <div class="gs-dialog-msg ${hostile ? "dp-error" : ""}">${escapeHtml(dispatchKindText())}</div>
+            ${routePreviewHtml(rp)}
             <div class="gs-dialog-actions">
                 <button type="button" class="gs-dbtn ${hostile ? "danger" : "ok"}" data-r="1">تأیید و اعزام</button>
                 <button type="button" class="gs-dbtn cancel" data-r="0">بازگشت</button></div></div>`;
@@ -2777,7 +2799,8 @@ async function sendDispatch() {
     if (!from || !to) { showToast("مبدا و مقصد را انتخاب کن.", "error"); return; }
     const picked = Object.fromEntries(Object.entries(dispatchSel.units).filter(([, v]) => v > 0));
     if (!Object.keys(picked).length) { showToast("حداقل یک یگان انتخاب کن.", "error"); return; }
-    if (!(await showDispatchConfirm(picked))) return;
+    const rp = await fetchRoutePreview(picked);
+    if (!(await showDispatchConfirm(picked, rp))) return;
     const btn = document.getElementById("dp-go"); if (btn) btn.disabled = true;
     try {
         const d = await apiPost("/api/war/dispatch", { from, to, units: picked });
@@ -6421,7 +6444,39 @@ function showSiteInfo(site) {
         refreshGlobal(); refreshCountry();
     }
     renderSiteScan(site);
+    renderSiteGarrison(site);
     panel.classList.remove("hidden");
+}
+
+// نیروهای مستقر در سکو/تنگهٔ خودی + قدرت کل (حمله + دفاع، با ضریب دفاعی خودم)
+function siteGarrisonHtml(site) {
+    const s = (warForces.sites || []).find(x => x.id === site.id);
+    const units = Object.entries(s?.units || {}).filter(([, n]) => n > 0);
+    const total = units.reduce((a, [, n]) => a + n, 0);
+    const rows = units.map(([k, n]) => `<div class="sg-row"><span>${escapeHtml(unitName(k))}</span><b>${formatNumber(n)}</b></div>`).join("");
+    return `<div class="sg-title">🛡️ نیروهای داخل ${escapeHtml(site.name || "")}</div>`
+        + (units.length
+            ? `${rows}<div class="sg-row sg-total"><span>جمع یگان‌ها</span><b>${formatNumber(total)}</b></div>
+               <div class="sg-row sg-power"><span>⚡ قدرت کل</span><b>${formatNumber(s?.power || 0)}</b></div>`
+            : `<div class="sg-empty">هیچ نیرویی اینجا مستقر نیست؛ موضع بدون دفاع است.</div>`);
+}
+async function renderSiteGarrison(site) {
+    let box = document.getElementById("map-info-garrison");
+    if (!box) {
+        box = document.createElement("div");
+        box.id = "map-info-garrison"; box.className = "map-info-garrison hidden";
+        const anchor = document.getElementById("map-info-strait-controls") || document.getElementById("map-info-desc");
+        anchor?.insertAdjacentElement("afterend", box);
+    }
+    box.classList.add("hidden"); box.innerHTML = "";
+    if (!site || site.owner !== selectedCountry) return;
+    const paint = () => {
+        if (document.getElementById("map-info-panel")?.classList.contains("hidden")) return;
+        box.innerHTML = siteGarrisonHtml(site); box.classList.remove("hidden");
+    };
+    paint();
+    try { await loadForces(); } catch (e) {}
+    paint();
 }
 
 async function renderSiteScan(site) {
