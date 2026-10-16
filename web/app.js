@@ -3162,20 +3162,10 @@ async function loadAdminPanel() {
     const list = document.getElementById("admin-player-list");
     if (list && !adminOverviewCache) list.innerHTML = `<div class="admin-empty"><span class="admin-loader"></span>در حال دریافت اطلاعات بازی…</div>`;
     try {
-        const [data, warsData, globalData, unData, shopConfigData] = await Promise.all([
+        const [data, warsData, globalData, unData] = await Promise.all([
             apiGet("/api/admin/overview"), apiGet("/api/admin/wars"), apiGet("/api/admin/global"),
-            adminCurrentDetailWorld !== null ? apiGet("/api/admin/un-messages") : Promise.resolve(null),
-            apiGet("/api/admin/shop/config")
+            adminCurrentDetailWorld !== null ? apiGet("/api/admin/un-messages") : Promise.resolve(null)
         ]);
-        if (shopConfigData?.success && shopConfigData.config && !adminShopConfigLoaded) {
-            const card = document.getElementById("admin-shop-card-number");
-            const holder = document.getElementById("admin-shop-cardholder");
-            if (card) card.value = shopConfigData.config.card_number || "";
-            if (holder) holder.value = shopConfigData.config.cardholder_name || "";
-            const status = document.getElementById("admin-shop-config-status");
-            if (status) status.textContent = shopConfigData.config.configured ? "اطلاعات کارت پرداخت تنظیم شده است." : "برای فعال شدن پرداخت، شماره کارت و نام صاحب کارت را ثبت کن.";
-            adminShopConfigLoaded = true;
-        }
         if (requestWorldId !== String(selectedWorldId)) return;
         adminWarsCache = warsData?.wars || [];
         adminWorldsCache = globalData?.worlds || [];
@@ -6677,7 +6667,7 @@ document.getElementById("map-home-btn")?.addEventListener("click", () => {
 
 /* ==================== تکمیل پرداخت فروشگاه اشتراک ==================== */
 const SHOP_PRODUCTS = {
-    charge: { name: "بسته ویژه شارژ", price: 100000 },
+    charge: { name: "شارژ حساب ۱۰ میلیون دلار", price: 100000 },
     vip: { name: "اشتراک VIP", price: 210000 }
 };
 const toFaDigits = s => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
@@ -6690,25 +6680,24 @@ function renderSubscription() {
     const cBtn = document.getElementById("shop-charge-open"), cBadge = document.getElementById("shop-charge-badge");
     const cNote = document.getElementById("shop-charge-note"), cBuy = document.getElementById("shop-charge-buy");
     if (cBtn) {
-        cBadge.textContent = bought ? "خریداری‌شده" : "یک‌بار خرید";
-        cBadge.classList.toggle("done", bought);
-        cNote.textContent = bought ? "این بسته قبلاً برای حساب شما خریداری شده است." : "هر حساب کاربری فقط یک بار می‌تواند این بسته را بخرد.";
+        if (cBadge) { cBadge.textContent = bought ? "خریداری‌شده" : "یک‌بار برای هر کشور"; cBadge.classList.toggle("done", bought); }
+        if (cNote) cNote.textContent = bought ? "این بسته قبلاً برای این کشور خریداری شده است." : "این بسته برای هر کشور یک بار قابل خرید است.";
+        cBtn.textContent = bought ? "مشاهده بسته" : "مشاهده و خرید";
         if (cBuy) cBuy.disabled = bought;
     }
     const vBadge = document.getElementById("shop-vip-badge"), vNote = document.getElementById("shop-vip-note");
     const until = player?.vip_until ? new Date(player.vip_until) : null;
     const active = !!player?.vip && (!until || until > new Date());
     if (vBadge) {
-        if (active) {
-            vBadge.textContent = "VIP فعال"; vBadge.classList.add("done");
-            if (until) {
-                const days = Math.max(0, Math.ceil((until - new Date()) / 86400000));
-                vNote.textContent = `${toFaDigits(days)} روز باقی‌مانده · پایان: ${until.toLocaleDateString("fa-IR")} ${until.toLocaleTimeString("fa-IR", {hour:"2-digit", minute:"2-digit"})}`;
-            } else vNote.textContent = "اشتراک VIP روی حساب شما فعال است.";
-        } else {
-            vBadge.textContent = "۳۰ روز اعتبار"; vBadge.classList.remove("done");
-            vNote.textContent = "اعتبار ۳۰ روز از زمان فعال‌سازی موفق اشتراک.";
-        }
+        vBadge.textContent = active ? "VIP فعال" : "۳۰ روز اعتبار";
+        vBadge.classList.toggle("done", active);
+    }
+    if (vNote) {
+        if (active && until) {
+            const days = Math.max(0, Math.ceil((until - new Date()) / 86400000));
+            vNote.textContent = `${toFaDigits(days)} روز باقی‌مانده · پایان: ${until.toLocaleDateString("fa-IR")} ${until.toLocaleTimeString("fa-IR", {hour:"2-digit", minute:"2-digit"})}`;
+        } else if (active) vNote.textContent = "اشتراک VIP روی حساب شما فعال است.";
+        else vNote.textContent = "۳۰ روز اعتبار و کاهش ۲۲٪ زمان‌های مشمول.";
     }
 }
 
@@ -6764,7 +6753,7 @@ function renderShopPay() {
     const msgText = o.status === "expired" ? "مهلت پرداخت به پایان رسید و سفارش به‌صورت خودکار لغو شد. برای خرید دوباره سفارش جدید بسازید."
         : o.status === "cancelled" ? "این سفارش لغو شده است. در صورت نیاز می‌توانید سفارش جدیدی ثبت کنید."
         : o.status === "rejected" ? "پرداخت این سفارش توسط مدیر تأیید نشد. اطلاعات را بررسی کنید و در صورت نیاز سفارش جدیدی بسازید."
-        : o.status === "approved" ? (o.product === "vip" ? "پرداخت تأیید شد و اشتراک VIP شما فعال شده است." : "پرداخت تأیید شد و شارژ به خزانهٔ دنیای مربوط به سفارش اضافه شد.")
+        : o.status === "approved" ? (o.product === "vip" ? "پرداخت تأیید شد و اشتراک VIP شما فعال شده است." : "پرداخت تأیید شد و ۱۰ میلیون دلار به حساب کشور مربوط به سفارش اضافه شد.")
         : pending ? "رسید برای مدیر ارسال شد. تا پایان بررسی، سفارش دیگری برای این حساب ایجاد نمی‌شود."
         : "";
     setShopMessage(msgText, o.status === "approved" ? "success" : "info");
@@ -6839,7 +6828,7 @@ function showShopOrder(order) {
 
 async function openShopPay(key) {
     const prod = SHOP_PRODUCTS[key]; if (!prod || shopOrderBusy) return;
-    if (key === "charge" && player?.charge_pack_purchased) { showToast("این بسته قبلاً برای حساب شما خریداری شده است.", "error"); return; }
+    if (key === "charge" && player?.charge_pack_purchased) { showToast("این بسته قبلاً برای این کشور خریداری شده است.", "error"); return; }
     shopOrderBusy = true;
     document.querySelectorAll("#shop-charge-buy, #shop-vip-buy").forEach(b => b.disabled = true);
     try {
@@ -7024,3 +7013,138 @@ document.getElementById("admin-shop-config-form")?.addEventListener("submit", as
         showToast("ارتباط با سرور برقرار نشد.", "error");
     } finally { if (btn) { btn.disabled = false; btn.textContent = "ذخیره اطلاعات کارت"; } }
 });
+
+
+/* ===== صفحات مستقل مدیریت فروشگاه؛ جدا از نمای اصلی پنل ===== */
+let adminShopOrdersPoll = null;
+let adminShopView = "";
+function showAdminShopView(view) {
+    if (!isAdminAccount) { showToast("این بخش فقط برای مدیر اصلی است.", "error"); return; }
+    adminShopView = view || "";
+    document.getElementById("admin-shop-menu")?.classList.add("hidden");
+    document.getElementById("admin-shop-menu-button")?.setAttribute("aria-expanded", "false");
+    document.getElementById("admin-scroll")?.classList.toggle("hidden", !!adminShopView);
+    document.getElementById("admin-shop-settings-view")?.classList.toggle("hidden", adminShopView !== "settings");
+    document.getElementById("admin-shop-orders-view")?.classList.toggle("hidden", adminShopView !== "orders");
+    if (adminShopOrdersPoll) { clearInterval(adminShopOrdersPoll); adminShopOrdersPoll = null; }
+    if (adminShopView === "settings") loadAdminShopConfig();
+    if (adminShopView === "orders") {
+        loadAdminShopOrders();
+        adminShopOrdersPoll = setInterval(() => {
+            const page = document.getElementById("admin-shop-orders-view");
+            if (adminShopView === "orders" && page && !page.classList.contains("hidden") && !document.hidden
+                && !page.querySelector("textarea:focus, input:focus")) loadAdminShopOrders();
+        }, 15000);
+    }
+}
+
+document.getElementById("admin-shop-menu-button")?.addEventListener("click", event => {
+    event.stopPropagation();
+    if (!isAdminAccount) { showToast("این بخش فقط برای مدیر اصلی است.", "error"); return; }
+    const menu = document.getElementById("admin-shop-menu");
+    if (!menu) return;
+    const opening = menu.classList.contains("hidden");
+    menu.classList.toggle("hidden", !opening);
+    document.getElementById("admin-shop-menu-button")?.setAttribute("aria-expanded", opening ? "true" : "false");
+});
+document.getElementById("admin-shop-menu")?.addEventListener("click", event => {
+    const item = event.target.closest("[data-admin-shop-view]");
+    if (item) showAdminShopView(item.dataset.adminShopView);
+});
+document.addEventListener("click", event => {
+    const menu = document.getElementById("admin-shop-menu"), btn = document.getElementById("admin-shop-menu-button");
+    if (menu && !menu.classList.contains("hidden") && !menu.contains(event.target) && event.target !== btn) {
+        menu.classList.add("hidden"); btn?.setAttribute("aria-expanded", "false");
+    }
+});
+document.querySelectorAll("[data-admin-shop-back]").forEach(btn => btn.addEventListener("click", () => showAdminShopView("")));
+document.getElementById("admin-shop-orders-refresh")?.addEventListener("click", loadAdminShopOrders);
+
+function adminShopFa(value) { return Number(value || 0).toLocaleString("fa-IR"); }
+function adminShopDate(value) {
+    if (!value) return "ثبت نشده";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "ثبت نشده" : date.toLocaleString("fa-IR");
+}
+function adminShopStatusLabel(status) {
+    return status === "approved" ? "تأییدشده" : status === "rejected" ? "ردشده" : "در حال بررسی";
+}
+function renderAdminShopOrder(order) {
+    const id = String(order.id || "");
+    const identity = [
+        `<span>نام: <b>${escapeHtml(order.full_name || "ثبت نشده")}</b></span>`,
+        `<span>نام کاربری: <b>${order.username ? "@" + escapeHtml(order.username) : "ثبت نشده"}</b></span>`,
+        `<span>شناسه حساب: <b dir="ltr">${escapeHtml(order.user_id || "—")}</b></span>`,
+        `<span>دنیا: <b>${escapeHtml(order.world_name || "ثبت نشده")}</b></span>`,
+        `<span>کشور: <b>${escapeHtml(order.country_name || "ثبت نشده")}</b></span>`,
+        `<span>روش رسید: <b>${order.receipt_type === "image" ? "تصویر" : order.receipt_type === "text" ? "متن" : "ارسال نشده"}</b></span>`,
+        `<span>زمان ارسال رسید: <b>${escapeHtml(adminShopDate(order.receipt_sent_at))}</b></span>`
+    ].join("");
+    const receipt = order.receipt_type === "text" && order.receipt_text
+        ? `<div class="admin-shop-receipt-detail">${escapeHtml(order.receipt_text)}</div>`
+        : order.receipt_type === "image"
+            ? `<div class="admin-shop-receipt-detail">تصویر رسید به پیام خصوصی مدیر در تلگرام ارسال شده است.</div>`
+            : `<div class="admin-shop-receipt-detail">برای این سفارش رسیدی ثبت نشده است.</div>`;
+    const decision = order.status === "pending_review" ? `<div class="admin-shop-order-actions"><button type="button" class="admin-shop-approve" data-shop-order-review="approve" data-order-id="${escapeHtml(id)}">✅ تأیید پرداخت</button><button type="button" class="admin-shop-reject" data-shop-order-review="reject" data-order-id="${escapeHtml(id)}">❌ رد پرداخت</button></div>` : "";
+    const reviewNote = order.review_note ? `<div class="admin-shop-receipt-detail">یادداشت بررسی: ${escapeHtml(order.review_note)}</div>` : "";
+    const messageForm = `<form class="admin-shop-message-form" data-shop-message-form data-order-id="${escapeHtml(id)}"><textarea rows="2" maxlength="1000" data-shop-message-text placeholder="پیام مستقیم برای ${escapeHtml(order.full_name || order.username || String(order.user_id || "این کاربر"))}…"></textarea><button type="submit">✉️ ارسال پیام مستقیم به کاربر</button></form>`;
+    return `<article class="admin-shop-order-card" data-shop-order-card="${escapeHtml(id)}"><div class="admin-shop-order-head"><div><strong>${escapeHtml(order.product_name || "محصول فروشگاه")} · ${escapeHtml(id)}</strong><small>مبلغ: ${adminShopFa(order.amount)} تومان · ثبت: ${escapeHtml(adminShopDate(order.created_at))}</small></div><span class="admin-shop-order-status ${order.status === "approved" ? "approved" : order.status === "rejected" ? "rejected" : ""}">${adminShopStatusLabel(order.status)}</span></div><div class="admin-shop-order-meta">${identity}</div>${receipt}${reviewNote}${decision}${messageForm}</article>`;
+}
+async function loadAdminShopOrders() {
+    if (!isAdminAccount) return;
+    const r = await apiGet("/api/admin/shop/orders");
+    if (!r?.success || !Array.isArray(r.orders)) {
+        const msg = r?.message || "دریافت سفارش‌های فروشگاه ناموفق بود.";
+        ["admin-shop-orders-pending", "admin-shop-orders-approved", "admin-shop-orders-rejected"].forEach(id => {
+            const el = document.getElementById(id); if (el) el.innerHTML = `<div class="admin-shop-empty">${escapeHtml(msg)}</div>`;
+        });
+        return;
+    }
+    const groups = {
+        pending_review: ["admin-shop-orders-pending", "admin-shop-pending-count"],
+        approved: ["admin-shop-orders-approved", "admin-shop-approved-count"],
+        rejected: ["admin-shop-orders-rejected", "admin-shop-rejected-count"]
+    };
+    Object.entries(groups).forEach(([status, [listId, countId]]) => {
+        const orders = r.orders.filter(order => order.status === status);
+        const list = document.getElementById(listId), count = document.getElementById(countId);
+        if (count) count.textContent = adminShopFa(orders.length);
+        if (list) list.innerHTML = orders.length ? orders.map(renderAdminShopOrder).join("") : `<div class="admin-shop-empty">${status === "pending_review" ? "سفارشی در انتظار بررسی نیست." : status === "approved" ? "هنوز سفارشی تأیید نشده است." : "سفارشی رد نشده است."}</div>`;
+    });
+}
+
+document.getElementById("admin-shop-orders-view")?.addEventListener("click", async event => {
+    const button = event.target.closest("[data-shop-order-review]");
+    if (!button) return;
+    if (!confirm(button.dataset.shopOrderReview === "approve" ? "این سفارش تأیید و مزایای آن اعمال شود؟" : "این سفارش رد شود؟")) return;
+    button.disabled = true;
+    try {
+        const r = await apiPost("/api/admin/shop/review", { order_id: button.dataset.orderId, action: button.dataset.shopOrderReview });
+        if (!r?.success) { showToast(r?.message || "بررسی سفارش انجام نشد.", "error"); button.disabled = false; return; }
+        showToast(r.message || "وضعیت سفارش تغییر کرد.", "success");
+        await loadAdminShopOrders();
+    } catch (_) { showToast("ارتباط با سرور برقرار نشد.", "error"); button.disabled = false; }
+});
+document.getElementById("admin-shop-orders-view")?.addEventListener("submit", async event => {
+    const form = event.target.closest("[data-shop-message-form]");
+    if (!form) return;
+    event.preventDefault();
+    const text = form.querySelector("[data-shop-message-text]")?.value?.trim() || "";
+    if (!text) { showToast("متن پیام را وارد کنید.", "error"); return; }
+    const button = form.querySelector("button[type=submit]");
+    if (button) { button.disabled = true; button.textContent = "در حال ارسال…"; }
+    try {
+        const r = await apiPost("/api/admin/shop/message", { order_id: form.dataset.orderId, text });
+        if (!r?.success) showToast(r?.message || "ارسال پیام ناموفق بود.", "error");
+        else { showToast(r.message || "پیام برای کاربر ارسال شد.", "success"); form.querySelector("textarea")?.value && (form.querySelector("textarea").value = ""); }
+    } catch (_) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+    finally { if (button) { button.disabled = false; button.textContent = "✉️ ارسال پیام مستقیم به کاربر"; } }
+});
+
+// در صورت خروج از پنل مدیریت، وضعیت زیرصفحه فروشگاه را پاک کن تا ورود بعدی به پنل به نمای اصلی برگردد.
+document.querySelector('#admin .admin-back-bar [data-back-to="home"]')?.addEventListener("click", () => {
+    if (adminShopView) showAdminShopView("");
+});
+document.querySelectorAll(".nav-item").forEach(item => item.addEventListener("click", () => {
+    if (item.dataset.page !== "admin" && adminShopView) showAdminShopView("");
+}));
