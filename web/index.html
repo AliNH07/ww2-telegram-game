@@ -985,6 +985,7 @@
             <div id="admin-shop-menu" class="admin-shop-menu hidden" role="menu">
               <button type="button" data-admin-shop-view="settings" role="menuitem">⚙️ تنظیمات فروشگاه</button>
               <button type="button" data-admin-shop-view="orders" role="menuitem">🛍️ مدیریت فروشگاه</button>
+              <button type="button" data-admin-shop-view="rules" role="menuitem">📜 تنظیم قوانین بازی</button>
             </div>
         </div>
         <div id="admin-scroll" class="admin-scroll">
@@ -1032,7 +1033,6 @@
             <button class="admin-tab" type="button" data-admin-tab="wars">⚔️ اعلان جنگ‌ها</button>
             <button class="admin-tab" type="button" data-admin-tab="un">🌐 سازمان ملل <span id="admin-un-tab-count" class="admin-count-pill hidden">۰</span></button>
             <button class="admin-tab" type="button" data-admin-tab="activity">🧾 گزارش عملیات</button>
-            <button class="admin-tab" type="button" data-admin-tab="rules">📜 قوانین</button>
         </div>
         <section id="admin-panel-players" class="admin-panel">
             <div class="admin-section-head"><div><span class="admin-section-kicker">PLAYER DIRECTORY</span><h3>فهرست و مدیریت بازیکنان</h3><p>نام، آیدی عددی و نام کاربری تلگرام کنار اطلاعات کشور دیده می‌شود.</p></div><span id="admin-player-count" class="admin-count-pill">۰</span></div>
@@ -1094,13 +1094,6 @@
                 <div class="admin-direct-message"><textarea id="admin-un-reply-text" rows="3" maxlength="1000" placeholder="پاسخ به این کشور…"></textarea><button id="admin-un-reply-send" type="button" class="admin-primary-btn">📨 ارسال پاسخ</button></div>
             </div>
         </section>
-        <section id="admin-panel-rules" class="admin-panel hidden">
-            <div class="admin-section-head"><div><span class="admin-section-kicker">GAME RULES</span><h3>قوانین بازی</h3><p>تعداد قوانین را مشخص کن و هر شماره را یک قانون بنویس. بازیکنان در اولین ورود باید بپذیرند؛ با هر تغییر، دوباره از آن‌ها پذیرش گرفته می‌شود.</p></div></div>
-            <label class="admin-rules-count">تعداد قوانین <input id="admin-rules-count" type="number" min="0" max="50" step="1" inputmode="numeric" value="0"></label>
-            <div id="admin-rules-fields" class="admin-rules-fields"></div>
-            <button type="button" id="admin-rules-save" class="admin-primary-btn">ذخیره قوانین</button>
-            <p class="admin-editor-note" id="admin-rules-status" role="status"></p>
-        </section>
         <section id="admin-panel-activity" class="admin-panel hidden">
             <div class="admin-section-head"><div><span class="admin-section-kicker">AUDIT LOG</span><h3>گزارش عملیات مدیریت</h3><p>آخرین تغییرات مدیریتی برای بررسی و پیگیری ثبت می‌شوند.</p></div><span class="admin-count-pill">آخرین ۶۰ مورد</span></div>
             <div id="admin-audit-list" class="admin-news-list"><div class="admin-empty">هنوز عملیاتی ثبت نشده است.</div></div>
@@ -1109,6 +1102,14 @@
         </section>
         </div><!-- admin-world-detail -->
         </div><!-- admin-scroll -->
+        <section id="admin-rules-view" class="admin-shop-subview hidden">
+            <button type="button" class="admin-shop-back" data-admin-shop-back>← بازگشت به پنل مدیریت</button>
+            <div class="admin-section-head"><div><span class="admin-section-kicker">GAME RULES</span><h3>قوانین بازی</h3><p>این قوانین برای همهٔ دنیاها یکی است. تعداد قوانین را مشخص کن و هر شماره را یک قانون بنویس. بازیکنان در اولین ورود باید بپذیرند؛ با هر تغییر، دوباره از آن‌ها پذیرش گرفته می‌شود.</p></div></div>
+            <label class="admin-rules-count">تعداد قوانین <input id="admin-rules-count" type="number" min="0" max="50" step="1" inputmode="numeric" value="0"></label>
+            <div id="admin-rules-fields" class="admin-rules-fields"></div>
+            <button type="button" id="admin-rules-save" class="admin-primary-btn">ذخیره قوانین</button>
+            <p class="admin-editor-note" id="admin-rules-status" role="status"></p>
+        </section>
         <section id="admin-shop-settings-view" class="admin-shop-subview hidden">
           <div class="admin-shop-subview-head">
             <button type="button" class="admin-shop-back" data-admin-shop-back>← بازگشت به پنل مدیریت</button>
