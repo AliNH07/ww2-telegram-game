@@ -1,11 +1,11 @@
-import threading, os, json, hmac, hashlib, uuid, logging, asyncio, random, math, copy, time, contextlib, contextvars, re
+import threading, os, json, hmac, hashlib, uuid, logging, asyncio, random, math, copy, time, contextlib, contextvars, re, base64
 from datetime import datetime, timezone, timedelta
 from urllib.parse import parse_qsl
 
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp, BufferedInputFile
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.methods import SendMessage
 from aiogram.client.default import DefaultBotProperties
@@ -1843,15 +1843,33 @@ SHOP_PRODUCTS = {
 SHOP_ACTIVE_STATUSES = ("awaiting_payment", "pending_review")
 shop_orders = {}   # شمارهٔ سفارش -> سفارش
 shop_seq = 0
+# اطلاعات مقصد پرداخت از پنل مدیر تنظیم می‌شوند؛ مقادیر پیش‌فرض عمداً خالی‌اند.
+SHOP_DIGIT_TRANSLATION = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+shop_config = {
+    "card_number": re.sub(r"\D", "", str(os.getenv("SHOP_CARD_NUMBER", "")).translate(SHOP_DIGIT_TRANSLATION)),
+    "cardholder_name": str(os.getenv("SHOP_CARDHOLDER_NAME", "") or "").strip()[:100],
+}
+# مزایای وابسته به حساب (مستقل از دنیای فعال)
+shop_accounts = {}
 
 
 def _load_shop_state(data):
-    global shop_orders, shop_seq
-    if isinstance(data, dict) and isinstance(data.get("orders"), dict):
+    global shop_orders, shop_seq, shop_config, shop_accounts
+    if not isinstance(data, dict):
+        return
+    if isinstance(data.get("orders"), dict):
         shop_orders = data["orders"]
-        try: shop_seq = int(data.get("seq") or 0)
-        except (TypeError, ValueError): shop_seq = 0
-        shop_seq = max(shop_seq, len(shop_orders))
+    try: shop_seq = int(data.get("seq") or 0)
+    except (TypeError, ValueError): shop_seq = 0
+    shop_seq = max(shop_seq, len(shop_orders))
+    if isinstance(data.get("config"), dict):
+        cfg = data["config"]
+        shop_config = {
+            "card_number": re.sub(r"\D", "", str(cfg.get("card_number") or "").translate(SHOP_DIGIT_TRANSLATION))[:16],
+            "cardholder_name": str(cfg.get("cardholder_name") or "").strip()[:100],
+        }
+    if isinstance(data.get("accounts"), dict):
+        shop_accounts = {str(k): (v if isinstance(v, dict) else {}) for k, v in data["accounts"].items()}
 
 
 def _shop_expire_due(now=None):
@@ -1881,7 +1899,113 @@ def _shop_public(o, now=None):
         if exp: left = max(0, int((exp - now).total_seconds() + 0.999))
     return {"id": o["id"], "product": o["product"], "product_name": o["product_name"], "amount": o["amount"],
             "status": o["status"], "created_at": o["created_at"], "expires_at": o["expires_at"],
-            "seconds_left": left, "server_now": now.isoformat(), "ttl_seconds": SHOP_ORDER_TTL_SECONDS}
+            "seconds_left": left, "server_now": now.isoformat(), "ttl_seconds": SHOP_ORDER_TTL_SECONDS,
+            "card_number": shop_config.get("card_number", ""),
+            "cardholder_name": shop_config.get("cardholder_name", "")}
+
+
+def _shop_player_details(uid, world_id):
+    """Read account display details without changing the active world."""
+    uid_int = int(uid)
+    _persist_active_world_memory()
+    preferred = str(world_id or active_world_id or "1")
+    found = None
+    found_wid = preferred
+    for wid in [preferred] + [str(x) for x in worlds_registry if str(x) != preferred]:
+        state = world_states.get(str(wid), {}) or {}
+        players_map = state.get("players", {}) or {}
+        row = players_map.get(uid_int) or players_map.get(str(uid_int))
+        if row:
+            if found is None or str(wid) == preferred:
+                found, found_wid = row, str(wid)
+            if str(wid) == preferred:
+                break
+    row = found or {}
+    first = str(row.get("telegram_first_name") or "").strip()
+    last = str(row.get("telegram_last_name") or "").strip()
+    name = (first + " " + last).strip()
+    country_id = row.get("country")
+    selected_row = (world_states.get(preferred, {}) or {}).get("players", {}) or {}
+    selected_row = selected_row.get(uid_int) or selected_row.get(str(uid_int))
+    selected_country_id = selected_row.get("country") if selected_row else None
+    selected_world_name = str((worlds_registry.get(preferred) or {}).get("name") or f"دنیای {preferred}")
+    return {
+        "user_id": uid_int,
+        "username": str(row.get("telegram_username") or "").strip(),
+        "full_name": name,
+        "world_id": preferred,
+        "world_name": selected_world_name,
+        "country_id": selected_country_id if selected_country_id in COUNTRIES else None,
+        "country_name": COUNTRIES.get(selected_country_id, {}).get("name") if selected_country_id in COUNTRIES else None,
+    }
+
+
+def _shop_find_player(uid, preferred_world=None, create_if_missing=False):
+    """Find a player's per-world record, preferring the world where the order was placed."""
+    uid_int = int(uid)
+    _persist_active_world_memory()
+    order = []
+    if preferred_world is not None:
+        order.append(str(preferred_world))
+    order.extend(str(w) for w in worlds_registry if str(w) not in order)
+    for wid in order:
+        state = world_states.get(wid)
+        if not isinstance(state, dict):
+            continue
+        ps = state.setdefault("players", {})
+        row = ps.get(uid_int) or ps.get(str(uid_int))
+        if row is not None:
+            return wid, ps, row
+    if create_if_missing:
+        wid = str(preferred_world) if str(preferred_world) in worlds_registry else str(active_world_id)
+        state = world_states.setdefault(wid, _fresh_world_state())
+        ps = state.setdefault("players", {})
+        row = create_player(uid_int)
+        ps[uid_int] = row
+        return wid, ps, row
+    return None, None, None
+
+
+def _shop_grant_order_locked(order):
+    """Apply approved entitlements exactly once. Caller holds WORLD_SWITCH_LOCK."""
+    uid = int(order["uid"])
+    account = shop_accounts.setdefault(str(uid), {})
+    _persist_active_world_memory()
+    if order.get("product") == "charge":
+        wid = str(order.get("world_id") or active_world_id)
+        if wid not in worlds_registry: wid = str(active_world_id)
+        target_state = world_states.setdefault(wid, _fresh_world_state())
+        players_map = target_state.setdefault("players", {})
+        row = players_map.get(uid) or players_map.get(str(uid))
+        if row is None:
+            row = create_player(uid)
+            players_map[uid] = row
+        row["money"] = max(0, int(row.get("money", STARTING_MONEY) or 0)) + int(order.get("charge_units") or 10_000_000)
+        row["charge_pack_purchased"] = True
+        account["charge_pack_purchased"] = True
+        order["granted_world_id"] = str(wid)
+        order["granted_units"] = int(order.get("charge_units") or 10_000_000)
+    elif order.get("product") == "vip":
+        now = utcnow()
+        old_until = parse_dt(account.get("vip_until"))
+        start = old_until if old_until and old_until > now else now
+        until = start + timedelta(days=int(order.get("vip_days") or 30))
+        account["vip_until"] = until.isoformat()
+        # Update every existing per-world profile for this Telegram account.
+        for wid, state in world_states.items():
+            ps = (state or {}).get("players", {}) or {}
+            row = ps.get(uid) or ps.get(str(uid))
+            if row is not None:
+                row["vip"] = True
+                row["vip_until"] = until.isoformat()
+        # If the account has no profile yet, ensure it has a record in the order world.
+        _shop_find_player(uid, order.get("world_id"), create_if_missing=True)
+        _, _, row = _shop_find_player(uid, order.get("world_id"), create_if_missing=False)
+        if row is not None:
+            row["vip"] = True
+            row["vip_until"] = until.isoformat()
+        order["vip_until"] = until.isoformat()
+    order["grant_applied"] = True
 
 
 async def shop_get_order(request):
@@ -1897,6 +2021,9 @@ async def shop_get_order(request):
                 return web.json_response({"success": False, "error": "order_not_found", "message": "سفارش پیدا نشد."}, status=404)
         else:
             o = _shop_user_active(uid)
+            if o is None:
+                rows = [row for row in shop_orders.values() if row.get("uid") == uid]
+                o = max(rows, key=lambda row: row.get("created_at") or "") if rows else None
         return web.json_response({"success": True, "order": _shop_public(o, now) if o else None})
 
 
@@ -1918,18 +2045,223 @@ async def shop_create_order(request):
                 return web.json_response({"success": True, "existing": True, "order": _shop_public(active, now)})
             return web.json_response({"success": False, "error": "active_order_exists", "order": _shop_public(active, now),
                                       "message": "ابتدا سفارش فعال قبلی را کامل یا لغو کنید یا تا پایان مهلت آن صبر کنید."}, status=409)
-        if prod.get("one_time") and any(o.get("uid") == uid and o.get("product") == key and o.get("status") == "approved" for o in shop_orders.values()):
+        if prod.get("one_time") and (shop_accounts.get(str(uid), {}).get("charge_pack_purchased") or any(
+                o.get("uid") == uid and o.get("product") == key and o.get("status") == "approved" for o in shop_orders.values())):
             return web.json_response({"success": False, "error": "already_purchased", "message": "این بسته قبلاً برای حساب شما خریداری شده است."}, status=409)
+        if not shop_config.get("card_number") or not shop_config.get("cardholder_name"):
+            return web.json_response({"success": False, "error": "payment_not_configured",
+                                      "message": "اطلاعات کارت پرداخت هنوز توسط مدیر تنظیم نشده است."}, status=503)
         shop_seq += 1
         oid = f"WW-{shop_seq:05d}"
+        requested_world = str(request.query.get("world_id") or active_world_id or "1")
+        identity = _shop_player_details(uid, requested_world)
         order = {"id": oid, "uid": uid, "product": key, "product_name": prod["name"], "amount": prod["price"],
                  "charge_units": prod.get("charge_units", 0), "vip_days": prod.get("vip_days", 0),
                  "status": "awaiting_payment", "created_at": now.isoformat(),
                  "expires_at": (now + timedelta(seconds=SHOP_ORDER_TTL_SECONDS)).isoformat(),
-                 "world_id": str(request.query.get("world_id") or "")}
+                 **identity}
         shop_orders[oid] = order
         save_state()
         return web.json_response({"success": True, "existing": False, "order": _shop_public(order, now)})
+
+
+async def shop_cancel_order(request):
+    uid = get_auth_user_id(request)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized", "message": "ابتدا وارد حساب خود شوید."}, status=401)
+    body = await read_json(request)
+    oid = str(body.get("order_id") or "")
+    async with WORLD_SWITCH_LOCK:
+        now = utcnow()
+        if _shop_expire_due(now): save_state()
+        order = shop_orders.get(oid)
+        if not order or int(order.get("uid", -1)) != int(uid):
+            return web.json_response({"success": False, "error": "order_not_found", "message": "سفارش پیدا نشد."}, status=404)
+        if order.get("status") != "awaiting_payment":
+            return web.json_response({"success": False, "error": "order_not_cancellable", "message": "این سفارش در وضعیت فعلی قابل لغو نیست.",
+                                      "order": _shop_public(order, now)}, status=409)
+        order["status"] = "cancelled"
+        order["cancelled_at"] = now.isoformat()
+        save_state()
+        return web.json_response({"success": True, "message": "سفارش لغو شد.", "order": _shop_public(order, now)})
+
+
+def _shop_receipt_admin_message(order):
+    user_name = order.get("full_name") or "ثبت نشده"
+    username = ("@" + order["username"]) if order.get("username") else "ثبت نشده"
+    world = order.get("world_name") or f"دنیای {order.get('world_id') or 'نامشخص'}"
+    country = order.get("country_name") or "ثبت نشده"
+    receipt_kind = "تصویر رسید" if order.get("receipt_type") == "image" else "رسید متنی"
+    text = (
+        "🧾 سفارش جدید برای بررسی پرداخت\n\n"
+        f"شماره سفارش: {order.get('id')}\n"
+        f"محصول: {order.get('product_name')}\n"
+        f"مبلغ: {int(order.get('amount') or 0):,} تومان\n"
+        f"شناسه کاربر: {order.get('uid')}\n"
+        f"نام: {user_name}\nنام کاربری: {username}\n"
+        f"دنیا: {world}\nکشور: {country}\n"
+        f"روش رسید: {receipt_kind}\n"
+        f"زمان سفارش: {order.get('created_at')}\n"
+        f"زمان ارسال رسید: {order.get('receipt_sent_at')}"
+    )
+    if order.get("receipt_type") == "text":
+        text += "\n\nجزئیات رسید:\n" + str(order.get("receipt_text") or "")[:1200]
+    if order.get("product") == "charge":
+        text += f"\nشارژ پس از تأیید: {int(order.get('charge_units') or 10_000_000):,} واحد"
+    elif order.get("product") == "vip":
+        text += f"\nمدت VIP پس از تأیید: {int(order.get('vip_days') or 30)} روز"
+    return text
+
+
+def _shop_review_keyboard(order_id):
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ تأیید پرداخت", callback_data=f"shop:approve:{order_id}"),
+        InlineKeyboardButton(text="❌ رد پرداخت", callback_data=f"shop:reject:{order_id}"),
+    ]])
+
+
+async def shop_submit_receipt(request):
+    uid = get_auth_user_id(request)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized", "message": "ابتدا وارد حساب خود شوید."}, status=401)
+    body = await read_json(request)
+    oid = str(body.get("order_id") or "")
+    kind = str(body.get("receipt_type") or "")
+    if kind not in ("image", "text"):
+        return web.json_response({"success": False, "error": "bad_receipt_type", "message": "روش ارسال رسید معتبر نیست."}, status=400)
+
+    image_bytes = None
+    image_name = "receipt.jpg"
+    image_mime = "image/jpeg"
+    receipt_text = ""
+    if kind == "image":
+        raw_image = str(body.get("receipt_image") or "")
+        if not raw_image.startswith("data:image/") or "," not in raw_image:
+            return web.json_response({"success": False, "error": "missing_image", "message": "ابتدا تصویر رسید را انتخاب کنید."}, status=400)
+        header, encoded = raw_image.split(",", 1)
+        mime = header[5:].split(";", 1)[0].lower()
+        if mime not in ("image/jpeg", "image/png", "image/webp"):
+            return web.json_response({"success": False, "error": "bad_image_type", "message": "فرمت تصویر باید JPG، PNG یا WebP باشد."}, status=400)
+        try: image_bytes = base64.b64decode(encoded, validate=True)
+        except Exception:
+            return web.json_response({"success": False, "error": "bad_image", "message": "تصویر رسید معتبر نیست."}, status=400)
+        if not image_bytes or len(image_bytes) > 1_100_000:
+            return web.json_response({"success": False, "error": "image_too_large", "message": "حجم تصویر رسید باید کمتر از ۱٫۱ مگابایت باشد."}, status=413)
+        image_mime = mime
+        image_name = "receipt.png" if mime == "image/png" else ("receipt.webp" if mime == "image/webp" else "receipt.jpg")
+    else:
+        trace = str(body.get("trace_number") or "").strip()[:120]
+        paid_raw = str(body.get("paid_amount") or "").strip().translate(SHOP_DIGIT_TRANSLATION).replace(",", "").replace("٬", "").replace("،", "")
+        note = str(body.get("receipt_note") or "").strip()[:1000]
+        try: paid_amount = int(paid_raw)
+        except (TypeError, ValueError): paid_amount = 0
+        if not trace:
+            return web.json_response({"success": False, "error": "missing_trace", "message": "شماره پیگیری رسید را وارد کنید."}, status=400)
+        receipt_text = f"شماره پیگیری: {trace}\nمبلغ پرداختی: {paid_amount:,} تومان"
+        if note: receipt_text += "\nتوضیحات: " + note
+
+    async with WORLD_SWITCH_LOCK:
+        now = utcnow()
+        if _shop_expire_due(now): save_state()
+        order = shop_orders.get(oid)
+        if not order or int(order.get("uid", -1)) != int(uid):
+            return web.json_response({"success": False, "error": "order_not_found", "message": "سفارش پیدا نشد."}, status=404)
+        if order.get("status") != "awaiting_payment":
+            return web.json_response({"success": False, "error": "order_not_open", "message": "این سفارش دیگر برای ارسال رسید باز نیست.",
+                                      "order": _shop_public(order, now)}, status=409)
+        if now >= (parse_dt(order.get("expires_at")) or now):
+            order["status"] = "expired"; order["expired_at"] = now.isoformat(); save_state()
+            return web.json_response({"success": False, "error": "order_expired", "message": "مهلت پرداخت تمام شده است.",
+                                      "order": _shop_public(order, now)}, status=409)
+        if kind == "text" and paid_amount != int(order.get("amount") or 0):
+            return web.json_response({"success": False, "error": "amount_mismatch", "message": "مبلغ رسید باید با مبلغ سفارش برابر باشد."}, status=400)
+        order["receipt_type"] = kind
+        order["receipt_text"] = receipt_text if kind == "text" else ""
+        order["receipt_image"] = base64.b64encode(image_bytes).decode("ascii") if image_bytes is not None else ""
+        order["receipt_mime"] = image_mime if image_bytes is not None else ""
+        order["receipt_filename"] = image_name if image_bytes is not None else ""
+        order["receipt_sent_at"] = now.isoformat()
+        order["status"] = "pending_review"
+        order.pop("notification_error", None)
+        snapshot = copy.deepcopy(order)
+        save_state()
+
+    admin_text = _shop_receipt_admin_message(snapshot)
+    keyboard = _shop_review_keyboard(snapshot["id"])
+    try:
+        if snapshot.get("receipt_type") == "image" and snapshot.get("receipt_image"):
+            payload = base64.b64decode(snapshot["receipt_image"])
+            await bot.send_photo(chat_id=ADMIN_ID, photo=BufferedInputFile(payload, filename=snapshot.get("receipt_filename") or "receipt.jpg"),
+                                 caption=admin_text[:1000], reply_markup=keyboard)
+        else:
+            await bot.send_message(chat_id=ADMIN_ID, text=admin_text[:3900], reply_markup=keyboard)
+    except Exception as exc:
+        logging.warning("shop order admin notification failed for %s: %s", oid, exc)
+        async with WORLD_SWITCH_LOCK:
+            current = shop_orders.get(oid)
+            # اگر مدیر در پیام دریافتی سفارش را بررسی کرده باشد، وضعیت نهایی را بازنویسی نکن.
+            if current and current.get("status") == "pending_review" and current.get("receipt_sent_at") == snapshot.get("receipt_sent_at"):
+                current["status"] = "awaiting_payment"
+                current["notification_error"] = str(exc)[:300]
+                save_state()
+        current_order = shop_orders.get(oid)
+        return web.json_response({"success": False, "error": "admin_notification_failed",
+                                  "message": "ارسال رسید برای مدیر انجام نشد. اتصال ربات را بررسی کنید و دوباره تلاش کنید.",
+                                  "order": _shop_public(current_order) if current_order else None}, status=502)
+
+    # پس از تحویل موفق تصویر به تلگرام مدیر، نسخهٔ base64 از پایگاه وضعیت حذف می‌شود تا ذخیرهٔ بازی بی‌جهت بزرگ نشود.
+    if snapshot.get("receipt_type") == "image":
+        async with WORLD_SWITCH_LOCK:
+            current = shop_orders.get(oid)
+            if current and current.get("status") == "pending_review" and current.get("receipt_sent_at") == snapshot.get("receipt_sent_at"):
+                current.pop("receipt_image", None)
+                current["receipt_delivered_to_admin"] = True
+                save_state()
+    try:
+        await bot.send_message(chat_id=int(uid), text=f"✅ رسید سفارش {oid} دریافت شد و برای بررسی مدیر ارسال شد. نتیجه پس از بررسی اعلام می‌شود.")
+    except Exception:
+        pass
+    return web.json_response({"success": True, "message": "رسید برای بررسی مدیر ارسال شد.", "order": _shop_public(snapshot)})
+
+
+async def admin_shop_config_get(request):
+    uid = get_auth_user_id(request)
+    if not uid or int(uid) != int(ADMIN_ID):
+        return web.json_response({"success": False, "error": "forbidden", "message": "دسترسی فقط برای مدیر اصلی است."}, status=403)
+    return web.json_response({"success": True, "config": {
+        "card_number": shop_config.get("card_number", ""),
+        "cardholder_name": shop_config.get("cardholder_name", ""),
+        "configured": bool(shop_config.get("card_number") and shop_config.get("cardholder_name")),
+    }})
+
+
+async def admin_shop_config_save(request):
+    uid = get_auth_user_id(request)
+    if not uid or int(uid) != int(ADMIN_ID):
+        return web.json_response({"success": False, "error": "forbidden", "message": "دسترسی فقط برای مدیر اصلی است."}, status=403)
+    body = await read_json(request)
+    raw_card = str(body.get("card_number") or "").strip().translate(SHOP_DIGIT_TRANSLATION)
+    card_number = re.sub(r"\D", "", raw_card)
+    holder = re.sub(r"\s+", " ", str(body.get("cardholder_name") or "").strip())[:100]
+    if card_number and len(card_number) != 16:
+        return web.json_response({"success": False, "error": "invalid_card", "message": "شماره کارت باید دقیقاً ۱۶ رقم باشد."}, status=400)
+    if bool(card_number) != bool(holder):
+        return web.json_response({"success": False, "error": "incomplete_card", "message": "برای تنظیم کارت، شماره کارت و نام کامل صاحب کارت را هر دو وارد کنید؛ برای حذف اطلاعات هر دو را خالی بگذارید."}, status=400)
+    async with WORLD_SWITCH_LOCK:
+        shop_config["card_number"] = card_number
+        shop_config["cardholder_name"] = holder
+        save_state()
+    return web.json_response({"success": True, "message": "اطلاعات کارت پرداخت ذخیره شد.", "configured": bool(card_number and holder)})
+
+
+async def shop_expiry_loop():
+    while True:
+        await asyncio.sleep(5)
+        try:
+            async with WORLD_SWITCH_LOCK:
+                if _shop_expire_due(utcnow()): save_state()
+        except Exception as exc:
+            logging.warning("shop expiry tick failed: %s", exc)
 
 
 def save_state():
@@ -1940,7 +2272,7 @@ def save_state():
             "version": 2,
             "worlds": worlds_registry,
             "world_states": {str(wid): payload for wid, payload in world_states.items()},
-            "shop": {"orders": shop_orders, "seq": shop_seq},
+            "shop": {"orders": shop_orders, "seq": shop_seq, "config": shop_config, "accounts": shop_accounts},
         }
         text = json.dumps(state, ensure_ascii=False)
         tmp = STATE_FILE + ".tmp"
@@ -2324,6 +2656,60 @@ async def cors_middleware(request, handler):
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=None))
 dp = Dispatcher()
 
+@dp.callback_query(F.data.startswith("shop:"))
+async def shop_review_cb(cb: types.CallbackQuery):
+    if int(cb.from_user.id) != int(ADMIN_ID):
+        await cb.answer("فقط مدیر اصلی می‌تواند سفارش را بررسی کند.", show_alert=True)
+        return
+    parts = (cb.data or "").split(":")
+    if len(parts) != 3 or parts[1] not in ("approve", "reject"):
+        await cb.answer("درخواست نامعتبر است.", show_alert=True); return
+    _, action, oid = parts
+    result_text = ""
+    notify_uid = None
+    notify_message = ""
+    async with WORLD_SWITCH_LOCK:
+        now = utcnow()
+        order = shop_orders.get(oid)
+        if not order:
+            result_text = "سفارش پیدا نشد."
+        elif order.get("status") != "pending_review":
+            result_text = "این سفارش قبلاً بررسی شده یا دیگر در انتظار بررسی نیست."
+        elif action == "approve":
+            # محدودیت خرید یک‌باره حتی در برابر سفارش‌های هم‌زمان دوباره بررسی می‌شود.
+            if order.get("product") == "charge" and shop_accounts.get(str(order.get("uid")), {}).get("charge_pack_purchased"):
+                order["status"] = "rejected"
+                order["review_note"] = "بسته شارژ قبلاً برای این حساب اعمال شده بود."
+                result_text = "این حساب قبلاً بسته شارژ را دریافت کرده؛ سفارش رد شد."
+            else:
+                _shop_grant_order_locked(order)
+                order["status"] = "approved"
+                order["approved_at"] = now.isoformat()
+                order["reviewed_by"] = int(cb.from_user.id)
+                result_text = f"سفارش {oid} تأیید شد."
+                notify_uid = int(order["uid"])
+                notify_message = (f"✅ پرداخت شما تأیید شد. سفارش {oid}: {order.get('product_name')}. "
+                                  + ("۱۰٬۰۰۰٬۰۰۰ واحد به خزانه دنیای مربوط به سفارش اضافه شد." if order.get("product") == "charge"
+                                     else f"اشتراک VIP شما فعال شد و تا {order.get('vip_until', '')} اعتبار دارد."))
+        else:
+            order["status"] = "rejected"
+            order["rejected_at"] = now.isoformat()
+            order["reviewed_by"] = int(cb.from_user.id)
+            order["review_note"] = "پرداخت توسط مدیر تأیید نشد."
+            result_text = f"سفارش {oid} رد شد."
+            notify_uid = int(order["uid"])
+            notify_message = f"❌ پرداخت سفارش {oid} ({order.get('product_name')}) تأیید نشد. لطفاً اطلاعات پرداخت را بررسی کنید و در صورت نیاز سفارش تازه‌ای ثبت کنید."
+        save_state()
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    if notify_uid and notify_message:
+        try: await bot.send_message(chat_id=notify_uid, text=notify_message)
+        except Exception as exc: logging.info("shop user notification failed for %s: %s", notify_uid, exc)
+    await cb.answer(result_text, show_alert=True)
+
+
 class GameEntryButtonMiddleware(BaseRequestMiddleware):
     """Append a persistent WebApp entry button to every message sent by the bot."""
     async def __call__(self, make_request, bot, method):
@@ -2448,6 +2834,13 @@ async def get_player(request):
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
     if uid not in players: players[uid] = create_player(uid); save_state()
     data = serialize_player(players[uid])
+    entitlement = shop_accounts.get(str(uid), {})
+    if entitlement.get("charge_pack_purchased"):
+        data["charge_pack_purchased"] = True
+    vip_until = parse_dt(entitlement.get("vip_until")) if entitlement.get("vip_until") else None
+    if vip_until:
+        data["vip_until"] = vip_until.isoformat()
+        data["vip"] = vip_until > utcnow()
     data["guide_seen"] = bool(players[uid].get("guide_seen"))
     note = reset_notices.pop(str(uid), None)
     if note:
@@ -5779,7 +6172,18 @@ def loan_lending_open():
         return False, "وام‌دهی بسته شده است؛ جنگ جهانی نزدیک است."
     return True, ""
 
-def _is_vip(p): return bool(p and p.get("vip"))
+def _is_vip(p):
+    if not p:
+        return False
+    uid = p.get("user_id")
+    account = shop_accounts.get(str(uid), {}) if uid is not None else {}
+    account_until = parse_dt(account.get("vip_until")) if account.get("vip_until") else None
+    if account_until:
+        return account_until > utcnow()
+    player_until = parse_dt(p.get("vip_until")) if p.get("vip_until") else None
+    if player_until:
+        return player_until > utcnow()
+    return bool(p.get("vip"))
 
 def _active_debt(cid):
     for l in loans.values():
@@ -6224,7 +6628,7 @@ async def admin_overview(request):
     return web.json_response({"success": True, "world_id": int(active_world_id), "world_name": worlds_registry.get(str(active_world_id), {}).get("name", f"دنیای {active_world_id}"), "players": rows, "countries_taken": taken,
                               "total_money": total_money,
                               "total_daily_income": sum(int(r.get("daily_income", 0) or 0) for r in rows),
-                              "vip_count": sum(1 for r in rows if r.get("vip")),
+                              "vip_count": sum(1 for r in rows if _is_vip(r)),
                               "eliminated_count": sum(1 for r in rows if r.get("is_eliminated")),
                               "countryless_count": sum(1 for r in rows if not r.get("country")),
                               "active_count": active_count,
@@ -6619,7 +7023,7 @@ async def style(request): return web.FileResponse(os.path.join(WEB_DIR, "style.c
 async def app_js(request): return web.FileResponse(os.path.join(WEB_DIR, "app.js"), headers=NO_CACHE)
 
 async def create_web_app():
-    app = web.Application(middlewares=[cors_middleware])
+    app = web.Application(middlewares=[cors_middleware], client_max_size=3 * 1024 * 1024)
     app.router.add_get("/", index)
     app.router.add_get("/style.css", style)
     app.router.add_get("/app.js", app_js)
@@ -6673,6 +7077,10 @@ async def create_web_app():
     app.router.add_post("/api/admin/broadcast-global", admin_broadcast_global)
     app.router.add_get("/api/shop/order", shop_get_order)
     app.router.add_post("/api/shop/order", shop_create_order)
+    app.router.add_post("/api/shop/submit", shop_submit_receipt)
+    app.router.add_post("/api/shop/cancel", shop_cancel_order)
+    app.router.add_get("/api/admin/shop/config", admin_shop_config_get)
+    app.router.add_post("/api/admin/shop/config", admin_shop_config_save)
     app.router.add_post("/api/admin/world/start", world_scoped(admin_start_world))
     app.router.add_post("/api/admin/world/registration", world_scoped(admin_set_world_registration))
 
@@ -6902,6 +7310,7 @@ async def main():
     asyncio.create_task(war_tick_loop())
     asyncio.create_task(transit_loop())
     asyncio.create_task(activity_loop())
+    asyncio.create_task(shop_expiry_loop())
     await start_web_server()
     await bot.delete_webhook(drop_pending_updates=True)
     try:
