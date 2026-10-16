@@ -65,14 +65,14 @@ const OCEAN_LABELS = [
     [-145, 5, "اقیانوس آرام", 0, 3.2], [172, 8, "اقیانوس آرام", 0, 3.2],
     [78, -18, "اقیانوس هند", 0, 3.2],
     [20, -62, "اقیانوس منجمد جنوبی", 0, 3.2], [60, 82, "اقیانوس منجمد شمالی", 0, 3.2],
-    [18, 34.5, "دریای مدیترانه", 1.4, 9], [34, 43.3, "دریای سیاه", 1.4, 9],
-    [65, 15, "دریای عرب", 1.4, 9], [88, 14, "خلیج بنگال", 1.4, 9],
-    [3, 56, "دریای شمال", 1.4, 9], [19.5, 58.5, "دریای بالتیک", 1.4, 9],
-    [-74, 15, "دریای کارائیب", 1.4, 9], [-90, 25, "خلیج مکزیک", 1.4, 9],
-    [114, 13, "دریای چین جنوبی", 1.4, 9], [134, 40, "دریای ژاپن", 1.4, 9],
-    [38.5, 20.5, "دریای سرخ", 1.4, 9], [40, 73, "دریای بارنتس", 1.4, 9],
-    [52, 27.2, "خلیج فارس", 1.4, 9], [2, 68, "دریای نروژ", 1.4, 9],
-    [160, -38, "دریای تاسمان", 1.4, 9]
+    [18, 34.5, "دریای مدیترانه", 2.7, 12], [34, 43.3, "دریای سیاه", 2.7, 12],
+    [65, 15, "دریای عرب", 2.7, 12], [88, 14, "خلیج بنگال", 2.7, 12],
+    [3, 56, "دریای شمال", 2.7, 12], [19.5, 58.5, "دریای بالتیک", 2.7, 12],
+    [-74, 15, "دریای کارائیب", 2.7, 12], [-90, 25, "خلیج مکزیک", 2.7, 12],
+    [114, 13, "دریای چین جنوبی", 2.7, 12], [134, 40, "دریای ژاپن", 2.7, 12],
+    [38.5, 20.5, "دریای سرخ", 2.7, 12], [40, 73, "دریای بارنتس", 2.7, 12],
+    [52, 27.2, "خلیج فارس", 2.7, 12], [2, 68, "دریای نروژ", 2.7, 12],
+    [160, -38, "دریای تاسمان", 2.7, 12]
 ];
 
 /* =========================================================
@@ -5551,8 +5551,9 @@ setInterval(() => {
 /* ---------- فاصله‌دادن سکوها/معادن/ماهیگیری‌ها از ساحل ----------
    مختصات سرور دست‌نخورده می‌ماند؛ فقط محل نمایش روی نقشه کمی به سمت دریای باز جابه‌جا می‌شود.
    (تنگه‌ها جابه‌جا نمی‌شوند چون باید دقیقاً روی خود تنگه باشند.) */
-const SITE_CLEAR_TARGET = 3.0;   // درجه (~۳۳۰ کیلومتر) فاصلهٔ دلخواه از ساحل
-const SITE_MAX_MOVE = 3.0;       // حداکثر جابه‌جایی (درجه)
+const SITE_CLEAR_TARGET = 4.0;   // درجه (~۴۴۰ کیلومتر) فاصلهٔ دلخواه از ساحل
+const SITE_MAX_MOVE = 4.0;       // حداکثر جابه‌جایی (درجه)
+const SITE_MIN_SEP = 3.4;        // حداقل فاصلهٔ دو نشانگر از هم (درجه) تا روی هم نیفتند
 let siteOffsetCache = {};
 function _degDist(lon1, lat1, lon2, lat2) {
     let dl = Math.abs(lon1 - lon2); if (dl > 180) dl = 360 - dl;
@@ -5578,39 +5579,48 @@ function _landAt(lon, lat) {
 }
 function spreadSitesFromLand(sites) {
     if (!mapCoastPts || !mapCoastPts.length || !mapLand) return;
-    sites.forEach(s => {
-        if (s.kind !== "resource" || typeof s.lon !== "number" || typeof s.lat !== "number") return;
-        s.lon0 = s.lon; s.lat0 = s.lat;
-        let off = siteOffsetCache[s.id];
-        if (!off) {
-            off = { lon: s.lon, lat: s.lat };
-            const near = mapCoastPts.filter(p => Math.abs(p[1] - s.lat) < SITE_CLEAR_TARGET + SITE_MAX_MOVE + 1 &&
-                _degDist(p[0], p[1], s.lon, s.lat) < SITE_CLEAR_TARGET + SITE_MAX_MOVE + 1);
+    const movable = sites.filter(s => s.kind === "resource" && typeof s.lon === "number" && typeof s.lat === "number");
+    movable.forEach(s => { s.lon0 = s.lon; s.lat0 = s.lat; });
+    const needCompute = movable.some(s => !siteOffsetCache[s.id]);
+    if (needCompute) {
+        // نشانگرهای ثابت (تنگه‌ها) جابه‌جا نمی‌شوند ولی سکوها از آن‌ها هم فاصله می‌گیرند
+        const placed = sites.filter(s => s.kind === "strait" && typeof s.lon === "number")
+            .map(s => ({ lon: s.lon, lat: s.lat }));
+        const order = movable.slice().sort((a, b) => (a.id < b.id ? -1 : 1));
+        const R = SITE_CLEAR_TARGET + SITE_MAX_MOVE + 1;
+        order.forEach(s => {
+            const near = mapCoastPts.filter(p => Math.abs(p[1] - s.lat) < R && _degDist(p[0], p[1], s.lon, s.lat) < R);
             const clear = (lo, la) => { let m = 99; for (const p of near) { const d = _degDist(p[0], p[1], lo, la); if (d < m) m = d; } return m; };
-            const c0 = clear(s.lon, s.lat);
-            if (near.length && c0 < SITE_CLEAR_TARGET) {
-                const cands = [];
-                for (let r = 0.5; r <= SITE_MAX_MOVE + 1e-9; r += 0.5) {
-                    for (let k = 0; k < 16; k++) {
-                        const ang = k * Math.PI / 8;
-                        const lo = s.lon + r * Math.sin(ang) / Math.max(0.3, Math.cos(s.lat * Math.PI / 180));
-                        const la = Math.max(-80, Math.min(80, s.lat + r * Math.cos(ang)));
-                        cands.push({ lo, la, r, c: clear(lo, la) });
-                    }
+            const cost = (lo, la, r) => {
+                let c = Math.max(0, SITE_CLEAR_TARGET - clear(lo, la)) * 2 + r * 0.12;
+                for (const q of placed) c += Math.max(0, SITE_MIN_SEP - _degDist(lo, la, q.lon, q.lat)) * 3;
+                return c;
+            };
+            const cands = [{ lo: s.lon, la: s.lat, r: 0, c: cost(s.lon, s.lat, 0) }];
+            for (let r = 0.5; r <= SITE_MAX_MOVE + 1e-9; r += 0.5) {
+                const n = r < 2 ? 16 : 24;
+                for (let k = 0; k < n; k++) {
+                    const ang = k * 2 * Math.PI / n;
+                    const lo = s.lon + r * Math.sin(ang) / Math.max(0.3, Math.cos(s.lat * Math.PI / 180));
+                    const la = Math.max(-80, Math.min(80, s.lat + r * Math.cos(ang)));
+                    cands.push({ lo, la, r, c: cost(lo, la, r) });
                 }
-                const good = cands.filter(x => x.c >= SITE_CLEAR_TARGET).sort((a, b) => a.r - b.r || b.c - a.c);
-                const rest = cands.filter(x => x.c < SITE_CLEAR_TARGET && x.c > c0 + 0.3).sort((a, b) => b.c - a.c || a.r - b.r);
-                const valid = x => {
-                    if (_landAt(x.lo, x.la)) return false;
-                    for (const f of [0.25, 0.5, 0.75]) if (_landAt(s.lon + (x.lo - s.lon) * f, s.lat + (x.la - s.lat) * f)) return false;
-                    return true;
-                };
-                const pick = good.slice(0, 12).find(valid) || rest.slice(0, 12).find(valid);
-                if (pick) off = { lon: pick.lo, lat: pick.la };
             }
-            siteOffsetCache[s.id] = off;
-        }
-        s.lon = off.lon; s.lat = off.lat;
+            cands.sort((x, y) => x.c - y.c || x.r - y.r);
+            const valid = x => {
+                if (x.r === 0) return true;
+                if (_landAt(x.lo, x.la)) return false;
+                for (const f of [0.25, 0.5, 0.75]) if (_landAt(s.lon + (x.lo - s.lon) * f, s.lat + (x.la - s.lat) * f)) return false;
+                return true;
+            };
+            const pick = cands.slice(0, 40).find(valid) || cands[0];
+            siteOffsetCache[s.id] = { lon: pick.lo, lat: pick.la };
+            placed.push({ lon: pick.lo, lat: pick.la });
+        });
+    }
+    movable.forEach(s => {
+        const off = siteOffsetCache[s.id];
+        if (off) { s.lon = off.lon; s.lat = off.lat; }
     });
 }
 // مسیر ناوها/نیروها باید به محل نمایش‌داده‌شدهٔ سکو برسد، نه مختصات خام سرور
@@ -5680,8 +5690,8 @@ function renderMapSites() {
         else {
             const big = d.type === "oil";
             // سکوی نفت دایره؛ معدن‌ها (آهن، اورانیوم، غذا) مربع
-            if (big) s.append("circle").attr("class", "site-shape").attr("r", 10);
-            else s.append("rect").attr("class", "site-shape").attr("x", -10).attr("y", -10).attr("width", 20).attr("height", 20);
+            if (big) s.append("circle").attr("class", "site-shape").attr("r", 9);
+            else s.append("rect").attr("class", "site-shape").attr("x", -8).attr("y", -8).attr("width", 16).attr("height", 16);
         }
     });
 }
@@ -5692,7 +5702,7 @@ function updateMapSitePositions() {
     const rot = mapProjection.rotate();
     const zoom = mapProjection.scale() / mapSize;
     // با دورشدن کوچک می‌شوند تا روی کشورهای کوچک نیفتند؛ با نزدیک‌شدن کمی بزرگ‌تر
-    const kBig = Math.max(0.2, Math.min(1.35, 0.36 * Math.pow(zoom, 0.7)));   // نفت و تنگه
+    const kBig = Math.max(0.18, Math.min(1.2, 0.32 * Math.pow(zoom, 0.7)));   // نفت و تنگه
     const kSmall = kBig;                                                       // معدن و ماهیگیری هم‌اندازهٔ سکو
     const kMark = Math.max(0.5, Math.min(1.1, 0.7 * Math.pow(zoom, 0.5)));
     mapSitesSvg.selectAll(".map-mark").each(function (d) {
