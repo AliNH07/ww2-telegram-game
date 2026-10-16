@@ -619,14 +619,19 @@ function showDashboardShell() {
 
 async function showGame() {
     showDashboardShell();
-    updateGameHeader(); updateHomeStats();
-    const t0 = Date.now();
-    await preloadHomeAssets();
-    const el = Date.now() - t0;
-    if (el < 600) await sleep(600 - el);
+    // راهنما در اولین ورود، همین ابتدا و پیش از نمایش داشبورد باز می‌شود (فقط یک بار برای هر بازیکن).
+    const guideDecision = maybeShowGuide().catch(e => console.error("guide:", e));
+    try {
+        updateGameHeader(); updateHomeStats();
+        const t0 = Date.now();
+        await preloadHomeAssets();
+        const el = Date.now() - t0;
+        if (el < 600) await sleep(600 - el);
+    } catch (e) { console.error(e); }
+    await guideDecision;
+    await waitGuideClosed();          // تا راهنما بسته نشده داشبورد پشتش نمایش داده نمی‌شود
     document.getElementById("game").classList.remove("booting");
     startStatsPolling(); refreshNotificationBadge();
-    maybeShowGuide();
 }
 
 function updateGameHeader() {
@@ -3021,19 +3026,28 @@ function showGuideTab(name) {
 }
 function openGuide(tab = "logic") { guideModal?.classList.remove("hidden"); showGuideTab(tab); }
 guideModal?.querySelectorAll(".guide-tab").forEach(b => b.addEventListener("click", () => showGuideTab(b.dataset.guideTab)));
+const guideCloseWaiters = [];
+function waitGuideClosed() {
+    if (!guideModal || guideModal.classList.contains("hidden")) return Promise.resolve();
+    return new Promise(resolve => guideCloseWaiters.push(resolve));
+}
 function closeGuide() {
     guideModal?.classList.add("hidden");
     try { localStorage.setItem(guideSeenKey(), "1"); } catch (e) {}
+    guideCloseWaiters.splice(0).forEach(resolve => resolve());
 }
 async function maybeShowGuide() {
-    // فقط بار اولِ ورود به داشبورد؛ هم در مرورگر و هم روی سرور ثبت می‌شود.
-    let seen = false;
-    try { seen = localStorage.getItem(guideSeenKey()) === "1"; } catch (e) {}
-    if (seen) return;
+    // سرور تعیین‌کننده است: اگر این بازیکن (در این دنیا) راهنما را ندیده، همین حالا نشان بده.
+    // پرچم مرورگر فقط وقتی استفاده می‌شود که سرور در دسترس نباشد.
+    let serverSeen = null;
     try {
         const me = await apiGet("/api/player");
-        if (me && me.guide_seen) { try { localStorage.setItem(guideSeenKey(), "1"); } catch (e) {} return; }
+        if (me && typeof me === "object" && !me.error) serverSeen = !!me.guide_seen;
     } catch (e) {}
+    if (serverSeen === null) {
+        try { serverSeen = localStorage.getItem(guideSeenKey()) === "1"; } catch (e) { serverSeen = false; }
+    }
+    if (serverSeen) return;
     openGuide();
     try { localStorage.setItem(guideSeenKey(), "1"); } catch (e) {}
     try { await apiPost("/api/guide/seen", {}); } catch (e) {}
