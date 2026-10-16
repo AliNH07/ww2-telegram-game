@@ -562,7 +562,7 @@ for _uid, _sec in UNIT_BUILD_SECONDS.items():
     ARMY_UNITS[_uid]["build_seconds"] = _sec
 assert all(u.get("build_seconds", 0) > 0 for u in ARMY_UNITS.values()), "every army unit needs build_seconds"
 
-REMOVED_MAP_SITES = ("food_safrica", "food_ukraine")
+REMOVED_MAP_SITES = ("food_safrica", "food_ukraine", "steel_blacksea")
 
 MAP_RESOURCES = {
     # همهٔ سکوها و معدن‌ها در دریا هستند (روی خشکی کشور فعال نمی‌افتند) — zone: sea
@@ -592,7 +592,6 @@ MAP_RESOURCES = {
     "steel_arabian": {"type": "steel", "zone": "sea", "name": "معدن آهن هند", "lon": 71.0, "lat": 15.0, "production": 3_000_000},
     "steel_biscay": {"type": "steel", "zone": "sea", "name": "معدن آهن فرانسه", "lon": -6.0, "lat": 45.5, "production": 3_000_000},
     "oil_blacksea": {"type": "oil", "zone": "sea", "name": "سکوی ترکیه (دریای سیاه)", "lon": 34.5, "lat": 43.0, "production": 3_000_000},
-    "steel_blacksea": {"type": "steel", "zone": "sea", "name": "معدن آهن بلغارستان (دریای سیاه)", "lon": 37.5, "lat": 43.8, "production": 3_000_000},
     # ---------- اورانیوم ----------
     "uranium_kazakh": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم یونان (آیونی)", "lon": 18.0, "lat": 35.5, "production": 2_500_000},
     "uranium_canada": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم کانادا", "lon": -85.0, "lat": 59.5, "production": 2_000_000},
@@ -2706,9 +2705,9 @@ async def declare_war(request):
     await notify_admin(
         f"⚔️ درخواست اعلان جنگ جدید در دنیای {worlds_registry.get(str(active_world_id), {}).get('name', active_world_id)}\n"
         f"{COUNTRIES[attacker]['name']} ← {COUNTRIES[target]['name']}\n"
-        f"دلیل بازیکن: {reason}\nبرای خواندن دلیل، نوشتن دلیل رسمی خودتان و تأیید یا رد، به بخش «بررسی جنگ‌ها» در پنل مدیریت بروید. پس از تأیید ۲۴ ساعت فاز مذاکره شروع می‌شود و بعد از آن جنگ آغاز می‌شود.")
+        f"دلیل بازیکن: {reason}\nبرای خواندن دلیل، نوشتن دلیل رسمی خودتان و تأیید یا رد، به بخش «بررسی جنگ‌ها» در پنل مدیریت بروید. در هنگام تأیید، ساعت شروع جنگ را هم خودتان تعیین کنید.")
     save_state()
-    return web.json_response({"success": True, "message": "درخواست اعلان جنگ برای بررسی سازمان ملل ارسال شد؛ در صورت تأیید، ۲۴ ساعت فاز مذاکره شروع می‌شود و سپس جنگ آغاز می‌شود."})
+    return web.json_response({"success": True, "message": "درخواست اعلان جنگ برای بررسی سازمان ملل ارسال شد؛ در صورت تأیید، مدیر زمان شروع جنگ را تعیین می‌کند."})
 
 async def get_wars(request):
     uid = get_auth_user_id(request)
@@ -2822,14 +2821,21 @@ async def admin_review_war(request):
         admin_reason = str(data.get("admin_reason", "")).strip()[:1000]
         if not admin_reason:
             return web.json_response({"success": False, "message": "دلیل رسمی خودتان را بنویسید؛ این دلیل برای همهٔ بازیکنان ارسال می‌شود."}, status=400)
+        # ساعت شروع جنگ را مدیر تعیین می‌کند (چند ساعت بعد از تأیید)؛ پیش‌فرض ۲۴ ساعت.
+        try: start_hours = float(data.get("start_hours", NEGOTIATION_HOURS))
+        except (TypeError, ValueError): start_hours = float("nan")
+        if start_hours != start_hours or not (0 <= start_hours <= 720):
+            return web.json_response({"success": False, "message": "ساعت شروع جنگ باید عددی بین ۰ تا ۷۲۰ ساعت باشد."}, status=400)
         now_ = utcnow()
         w["status"] = "negotiation"
         w["admin_reason"] = admin_reason
         w["approved_at"] = now_.isoformat()
-        w["negotiation_ends"] = (now_ + timedelta(hours=NEGOTIATION_HOURS)).isoformat()
+        w["negotiation_hours"] = start_hours
+        w["negotiation_ends"] = (now_ + timedelta(hours=start_hours)).isoformat()
+        when_txt = "جنگ همین الان آغاز می‌شود." if start_hours == 0 else f"هر دو کشور {start_hours:g} ساعت وقت دارند وارد فاز مذاکره شوند؛ پس از آن جنگ آغاز می‌شود."
         msg = (f"⚔️ {attacker_name} به {defender_name} اعلان جنگ کرد.\n"
                f"📜 دلیل: {admin_reason}\n"
-               f"🤝 هر دو کشور {NEGOTIATION_HOURS} ساعت وقت دارند وارد فاز مذاکره شوند؛ پس از آن جنگ آغاز می‌شود.")
+               f"🤝 {when_txt}")
         push_news("اعلان جنگ", msg, "warning", countries=[w["attacker"], w["defender"]])
         push_war("war_declared", msg, [w["attacker"], w["defender"]])
         await notify_world_players(msg)
