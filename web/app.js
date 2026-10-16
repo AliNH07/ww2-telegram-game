@@ -3162,10 +3162,20 @@ async function loadAdminPanel() {
     const list = document.getElementById("admin-player-list");
     if (list && !adminOverviewCache) list.innerHTML = `<div class="admin-empty"><span class="admin-loader"></span>در حال دریافت اطلاعات بازی…</div>`;
     try {
-        const [data, warsData, globalData, unData] = await Promise.all([
+        const [data, warsData, globalData, unData, shopConfigData] = await Promise.all([
             apiGet("/api/admin/overview"), apiGet("/api/admin/wars"), apiGet("/api/admin/global"),
-            adminCurrentDetailWorld !== null ? apiGet("/api/admin/un-messages") : Promise.resolve(null)
+            adminCurrentDetailWorld !== null ? apiGet("/api/admin/un-messages") : Promise.resolve(null),
+            apiGet("/api/admin/shop/config")
         ]);
+        if (shopConfigData?.success && shopConfigData.config && !adminShopConfigLoaded) {
+            const card = document.getElementById("admin-shop-card-number");
+            const holder = document.getElementById("admin-shop-cardholder");
+            if (card) card.value = shopConfigData.config.card_number || "";
+            if (holder) holder.value = shopConfigData.config.cardholder_name || "";
+            const status = document.getElementById("admin-shop-config-status");
+            if (status) status.textContent = shopConfigData.config.configured ? "اطلاعات کارت پرداخت تنظیم شده است." : "برای فعال شدن پرداخت، شماره کارت و نام صاحب کارت را ثبت کن.";
+            adminShopConfigLoaded = true;
+        }
         if (requestWorldId !== String(selectedWorldId)) return;
         adminWarsCache = warsData?.wars || [];
         adminWorldsCache = globalData?.worlds || [];
@@ -6665,17 +6675,17 @@ document.getElementById("map-home-btn")?.addEventListener("click", () => {
     redrawMap();
 });
 
-/* ==================== فروشگاه اشتراک (بخش ۱ و ۲) ==================== */
+/* ==================== تکمیل پرداخت فروشگاه اشتراک ==================== */
 const SHOP_PRODUCTS = {
     charge: { name: "بسته ویژه شارژ", price: 100000 },
     vip: { name: "اشتراک VIP", price: 210000 }
 };
 const toFaDigits = s => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
 const shopPrice = n => toFaDigits(Number(n).toLocaleString("en-US").replace(/,/g, "٬")) + " تومان";
+const shopCardFormat = n => String(n || "").replace(/\D/g, "").replace(/(.{4})/g, "$1 ").trim();
 
 function renderSubscription() {
     refreshShopBanner();
-    // وضعیت‌ها از سرور می‌آیند (charge_pack_purchased / vip_until)؛ تا آماده‌شدن سرور، حالت پیش‌فرض نمایش داده می‌شود.
     const bought = !!player?.charge_pack_purchased;
     const cBtn = document.getElementById("shop-charge-open"), cBadge = document.getElementById("shop-charge-badge");
     const cNote = document.getElementById("shop-charge-note"), cBuy = document.getElementById("shop-charge-buy");
@@ -6702,37 +6712,67 @@ function renderSubscription() {
     }
 }
 
-/* ---- سفارش و صفحهٔ پرداخت (بخش ۳): زمان فقط از سرور می‌آید؛ شمارنده با ساعت یکنواخت مرورگر (performance.now) کار می‌کند تا تغییر ساعت دستگاه اثری نداشته باشد ---- */
 const SHOP_STATUS_TEXT = {
     awaiting_payment: "در انتظار پرداخت و ارسال رسید", pending_review: "در انتظار بررسی مدیر", approved: "تأییدشده",
     rejected: "ردشده", cancelled: "لغوشده توسط کاربر", expired: "منقضی‌شده به دلیل پایان مهلت"
 };
 let shopOrder = null, shopDeadline = 0, shopTick = null, shopOrderBusy = false, shopExpiryChecking = false;
+let shopReceiptBusy = false, shopReceiptDataUrl = "", shopStatusPoll = null;
+let adminShopConfigLoaded = false;
 
 const shopClock = secs => {
     secs = Math.max(0, Math.ceil(secs));
     return toFaDigits(String(Math.floor(secs / 60)).padStart(2, "0") + ":" + String(secs % 60).padStart(2, "0"));
 };
 
+function setShopMessage(text, kind = "info") {
+    const msg = document.getElementById("shop-pay-msg");
+    if (!msg) return;
+    msg.textContent = text || "";
+    msg.dataset.kind = kind;
+    msg.classList.toggle("hidden", !text);
+}
+
 function renderShopPay() {
     const o = shopOrder; if (!o) return;
     const live = o.status === "awaiting_payment";
-    document.getElementById("shop-pay-name").textContent = o.product_name;
+    const pending = o.status === "pending_review";
+    const configured = !!(o.card_number && o.cardholder_name);
+    document.getElementById("shop-pay-name").textContent = o.product_name || "سفارش فروشگاه";
     document.getElementById("shop-pay-amount").textContent = shopPrice(o.amount);
     document.getElementById("shop-pay-order").textContent = o.id;
     const start = new Date(o.created_at);
-    document.getElementById("shop-pay-start").textContent = start.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    document.getElementById("shop-pay-start").textContent = Number.isNaN(start.getTime()) ? "—" : start.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     const st = document.getElementById("shop-pay-status");
     st.textContent = SHOP_STATUS_TEXT[o.status] || o.status;
     st.dataset.status = o.status;
-    const msg = document.getElementById("shop-pay-msg");
-    const text = o.status === "expired" ? "مهلت پرداخت به پایان رسید و سفارش به‌صورت خودکار لغو شد."
-        : o.status === "cancelled" ? "این سفارش لغو شده است." : "";
-    msg.textContent = text; msg.classList.toggle("hidden", !text);
+    const card = document.getElementById("shop-destination-card");
+    const holder = document.getElementById("shop-destination-holder");
+    const copyBtn = document.getElementById("shop-copy-card");
+    if (card) card.textContent = configured ? shopCardFormat(o.card_number) : "شماره کارت هنوز تنظیم نشده است";
+    if (holder) holder.textContent = configured ? o.cardholder_name : "—";
+    if (copyBtn) copyBtn.disabled = !configured || !live;
+    document.getElementById("shop-card-config-warning")?.classList.toggle("hidden", configured || !live);
+    document.getElementById("shop-receipt-area")?.classList.toggle("hidden", !live);
+    document.getElementById("shop-pay-next")?.classList.toggle("hidden", !live);
     document.getElementById("shop-pay-timer").classList.toggle("hidden", !live && o.status !== "expired");
     document.getElementById("shop-pay-timer").classList.toggle("ended", !live);
-    document.getElementById("shop-pay-new").classList.toggle("hidden", live || o.status === "pending_review");
-    document.getElementById("shop-pay-next").classList.toggle("hidden", !live);
+    document.getElementById("shop-pay-cancel").classList.toggle("hidden", !live);
+    document.getElementById("shop-pay-new").classList.toggle("hidden", live || pending);
+    const submit = document.getElementById("shop-pay-submit");
+    if (submit) submit.disabled = !live || !configured || shopReceiptBusy;
+    const msgText = o.status === "expired" ? "مهلت پرداخت به پایان رسید و سفارش به‌صورت خودکار لغو شد. برای خرید دوباره سفارش جدید بسازید."
+        : o.status === "cancelled" ? "این سفارش لغو شده است. در صورت نیاز می‌توانید سفارش جدیدی ثبت کنید."
+        : o.status === "rejected" ? "پرداخت این سفارش توسط مدیر تأیید نشد. اطلاعات را بررسی کنید و در صورت نیاز سفارش جدیدی بسازید."
+        : o.status === "approved" ? (o.product === "vip" ? "پرداخت تأیید شد و اشتراک VIP شما فعال شده است." : "پرداخت تأیید شد و شارژ به خزانهٔ دنیای مربوط به سفارش اضافه شد.")
+        : pending ? "رسید برای مدیر ارسال شد. تا پایان بررسی، سفارش دیگری برای این حساب ایجاد نمی‌شود."
+        : "";
+    setShopMessage(msgText, o.status === "approved" ? "success" : "info");
+    if (live) {
+        document.getElementById("shop-pay-next").textContent = configured
+            ? "مبلغ سفارش را به کارت مقصد واریز کنید و سپس رسید را تا پایان مهلت در همین صفحه بفرستید."
+            : "مدیر هنوز اطلاعات کارت مقصد را تنظیم نکرده است؛ تا نمایش اطلاعات معتبر، وجهی واریز نکنید.";
+    }
     tickShopCountdown();
 }
 
@@ -6745,7 +6785,7 @@ function tickShopCountdown() {
     }
     const left = (shopDeadline - performance.now()) / 1000;
     document.getElementById("shop-pay-countdown").textContent = shopClock(left);
-    if (left <= 0) { checkShopExpiry(); }
+    if (left <= 0) checkShopExpiry();
 }
 
 async function checkShopExpiry() {
@@ -6754,25 +6794,47 @@ async function checkShopExpiry() {
     try {
         const r = await apiGet("/api/shop/order", { order_id: shopOrder.id });
         if (r?.success && r.order) {
-            if (r.order.status === "awaiting_payment") {
-                // سرور هنوز مهلت را تمام‌شده نمی‌داند؛ زمان باقی‌مانده را با سرور هم‌گام می‌کنیم.
-                shopDeadline = performance.now() + r.order.seconds_left * 1000;
-            } else {
-                shopOrder = r.order;
-            }
+            shopOrder = r.order;
+            if (shopOrder.status === "awaiting_payment") shopDeadline = performance.now() + (Number(shopOrder.seconds_left) || 0) * 1000;
             renderShopPay();
+            refreshShopBanner();
         }
     } catch (e) { /* در تیک بعدی دوباره تلاش می‌شود */ }
     finally { shopExpiryChecking = false; }
 }
 
+async function pollShopOrder() {
+    if (!shopOrder || !["awaiting_payment", "pending_review"].includes(shopOrder.status)) return;
+    if (document.hidden && shopOrder.status === "awaiting_payment") return;
+    const previousStatus = shopOrder.status;
+    try {
+        const r = await apiGet("/api/shop/order", { order_id: shopOrder.id });
+        if (!r?.success || !r.order) return;
+        shopOrder = r.order;
+        if (shopOrder.status === "awaiting_payment") shopDeadline = performance.now() + (Number(shopOrder.seconds_left) || 0) * 1000;
+        renderShopPay();
+        refreshShopBanner();
+        if (previousStatus !== shopOrder.status && shopOrder.status === "approved") {
+            try { await refreshPlayer(); renderSubscription(); } catch (_) {}
+            showToast("پرداخت تأیید شد.", "success");
+        } else if (previousStatus !== shopOrder.status && shopOrder.status === "rejected") {
+            showToast("پرداخت سفارش تأیید نشد.", "error");
+        }
+    } catch (_) {}
+}
+
 function showShopOrder(order) {
+    if (!order) return;
+    const changedOrder = shopOrder?.id !== order.id;
     shopOrder = order;
+    if (changedOrder) shopReceiptDataUrl = "";
     shopDeadline = performance.now() + (Number(order.seconds_left) || 0) * 1000;
+    try { sessionStorage.setItem("fl93_shop_last_order", String(order.id)); } catch (_) {}
     showGamePage("shop-pay");
     renderShopPay();
     clearInterval(shopTick);
     shopTick = setInterval(tickShopCountdown, 250);
+    if (!shopStatusPoll) shopStatusPoll = setInterval(pollShopOrder, 5000);
 }
 
 async function openShopPay(key) {
@@ -6795,23 +6857,170 @@ async function openShopPay(key) {
     }
 }
 
-// سفارش فعال بعد از رفرش یا ورود دوباره، در صفحهٔ اشتراک نمایش داده می‌شود.
+async function compressShopReceipt(file) {
+    if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type || "")) throw new Error("فقط تصویر JPG، PNG یا WebP قابل ارسال است.");
+    if (file.size > 12 * 1024 * 1024) throw new Error("حجم تصویر اولیه نباید بیشتر از ۱۲ مگابایت باشد.");
+    let bitmap;
+    if (window.createImageBitmap) bitmap = await createImageBitmap(file);
+    else bitmap = await new Promise((resolve, reject) => {
+        const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error("خواندن تصویر ناموفق بود."));
+        img.src = URL.createObjectURL(file);
+    });
+    const w = bitmap.width || bitmap.naturalWidth, h = bitmap.height || bitmap.naturalHeight;
+    if (!w || !h) throw new Error("تصویر انتخاب‌شده معتبر نیست.");
+    const scale = Math.min(1, 1400 / Math.max(w, h));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(w * scale)); canvas.height = Math.max(1, Math.round(h * scale));
+    const ctx = canvas.getContext("2d"); ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    if (bitmap.close) bitmap.close();
+    let blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.82));
+    if (!blob) throw new Error("بهینه‌سازی تصویر ناموفق بود.");
+    if (blob.size > 1000 * 1024) blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.68));
+    if (!blob || blob.size > 1000 * 1024) throw new Error("حجم تصویر پس از فشرده‌سازی هنوز زیاد است؛ تصویر کوچک‌تری انتخاب کنید.");
+    return await new Promise((resolve, reject) => {
+        const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("خواندن فایل ناموفق بود.")); reader.readAsDataURL(blob);
+    });
+}
+
+async function submitShopReceipt() {
+    if (!shopOrder || shopOrder.status !== "awaiting_payment" || shopReceiptBusy) return;
+    const mode = document.querySelector('input[name="shop-receipt-method"]:checked')?.value || "image";
+    const payload = { order_id: shopOrder.id, receipt_type: mode };
+    if (mode === "image") {
+        if (!shopReceiptDataUrl) { showToast("ابتدا تصویر رسید را انتخاب کنید.", "error"); return; }
+        payload.receipt_image = shopReceiptDataUrl;
+    } else {
+        payload.trace_number = document.getElementById("shop-receipt-trace")?.value?.trim() || "";
+        payload.paid_amount = document.getElementById("shop-receipt-paid-amount")?.value || "";
+        payload.receipt_note = document.getElementById("shop-receipt-note")?.value || "";
+        if (!payload.trace_number || !payload.paid_amount) { showToast("شماره پیگیری و مبلغ پرداختی را وارد کنید.", "error"); return; }
+    }
+    shopReceiptBusy = true;
+    const btn = document.getElementById("shop-pay-submit"); if (btn) { btn.disabled = true; btn.textContent = "در حال ارسال رسید…"; }
+    try {
+        const r = await apiPost("/api/shop/submit", payload);
+        if (r?.success && r.order) {
+            showShopOrder(r.order);
+            setShopMessage(r.message || "رسید برای بررسی مدیر ارسال شد.", "success");
+            showToast("رسید برای بررسی مدیر ارسال شد.", "success");
+        } else {
+            if (r?.order) showShopOrder(r.order);
+            showToast(r?.message || "ارسال رسید انجام نشد. دوباره تلاش کنید.", "error");
+        }
+    } catch (_) { showToast("ارتباط با سرور برقرار نشد. دوباره تلاش کنید.", "error"); }
+    finally {
+        shopReceiptBusy = false;
+        if (btn) { btn.textContent = "ارسال رسید برای بررسی"; btn.disabled = !(shopOrder?.status === "awaiting_payment" && shopOrder?.card_number && shopOrder?.cardholder_name); }
+    }
+}
+
+async function cancelShopOrder() {
+    if (!shopOrder || shopOrder.status !== "awaiting_payment") return;
+    if (!confirm("سفارش لغو شود؟ پس از لغو، امکان ارسال رسید برای همین سفارش وجود ندارد.")) return;
+    const btn = document.getElementById("shop-pay-cancel"); if (btn) btn.disabled = true;
+    try {
+        const r = await apiPost("/api/shop/cancel", { order_id: shopOrder.id });
+        if (r?.success && r.order) {
+            showShopOrder(r.order); showToast("سفارش لغو شد.", "success"); refreshShopBanner();
+        } else { if (r?.order) showShopOrder(r.order); showToast(r?.message || "لغو سفارش انجام نشد.", "error"); }
+    } catch (_) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+    finally { if (btn) btn.disabled = shopOrder?.status !== "awaiting_payment"; }
+}
+
+async function copyShopCard() {
+    const card = String(shopOrder?.card_number || "").replace(/\D/g, "");
+    if (!card) return;
+    try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(card);
+        else {
+            const input = document.createElement("textarea"); input.value = card; input.style.position = "fixed"; input.style.opacity = "0";
+            document.body.appendChild(input); input.select(); const ok = document.execCommand("copy"); input.remove();
+            if (!ok) throw new Error("copy failed");
+        }
+        showToast("شماره کارت کپی شد.", "success");
+    } catch (_) { showToast("کپی خودکار ممکن نشد؛ شماره کارت را به‌صورت دستی کپی کنید.", "error"); }
+}
+
+// سفارش فعال یا آخرین وضعیت سفارش پس از رفرش نیز قابل پیگیری است.
 async function refreshShopBanner() {
     const banner = document.getElementById("shop-active-banner"); if (!banner) return;
     try {
         const r = await apiGet("/api/shop/order");
         const o = r?.success ? r.order : null;
         if (!o) { banner.classList.add("hidden"); banner.onclick = null; return; }
-        document.getElementById("shop-active-text").textContent = o.status === "awaiting_payment"
-            ? `سفارش ${o.product_name} در انتظار پرداخت است · ${shopClock(o.seconds_left)}`
-            : `سفارش ${o.product_name} در انتظار بررسی مدیر است`;
-        banner.classList.remove("hidden");
-        banner.onclick = () => showShopOrder(o);
+        const statusLabel = o.status === "awaiting_payment" ? `در انتظار ارسال رسید · ${shopClock(o.seconds_left)}`
+            : o.status === "pending_review" ? "رسید ارسال شده؛ در انتظار بررسی مدیر"
+            : o.status === "approved" ? "پرداخت تأیید شد"
+            : o.status === "rejected" ? "پرداخت تأیید نشد"
+            : o.status === "cancelled" ? "سفارش لغو شد" : "مهلت سفارش تمام شد";
+        document.getElementById("shop-active-text").textContent = `سفارش ${o.product_name} · ${statusLabel}`;
+        banner.classList.remove("hidden"); banner.onclick = () => showShopOrder(o);
     } catch (e) { banner.classList.add("hidden"); }
 }
+
+function resetShopReceiptImage() {
+    shopReceiptDataUrl = "";
+    const input = document.getElementById("shop-receipt-file"); if (input) input.value = "";
+    document.getElementById("shop-receipt-preview-wrap")?.classList.add("hidden");
+    const img = document.getElementById("shop-receipt-preview"); if (img) img.removeAttribute("src");
+}
+
 document.getElementById("shop-pay-new")?.addEventListener("click", () => showGamePage("subscription"));
-document.addEventListener("visibilitychange", () => { if (!document.hidden && shopOrder?.status === "awaiting_payment" && !document.getElementById("shop-pay")?.classList.contains("hidden")) checkShopExpiry(); });
+document.getElementById("shop-pay-submit")?.addEventListener("click", submitShopReceipt);
+document.getElementById("shop-pay-cancel")?.addEventListener("click", cancelShopOrder);
+document.getElementById("shop-copy-card")?.addEventListener("click", copyShopCard);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && shopOrder && ["awaiting_payment", "pending_review"].includes(shopOrder.status)) pollShopOrder(); });
 document.getElementById("shop-charge-open")?.addEventListener("click", () => showGamePage("shop-charge-detail"));
 document.getElementById("shop-vip-open")?.addEventListener("click", () => showGamePage("shop-vip-detail"));
 document.getElementById("shop-charge-buy")?.addEventListener("click", () => openShopPay("charge"));
 document.getElementById("shop-vip-buy")?.addEventListener("click", () => openShopPay("vip"));
+document.querySelectorAll('input[name="shop-receipt-method"]').forEach(input => input.addEventListener("change", () => {
+    const isImage = document.querySelector('input[name="shop-receipt-method"]:checked')?.value !== "text";
+    document.getElementById("shop-receipt-image-wrap")?.classList.toggle("hidden", !isImage);
+    document.getElementById("shop-receipt-text-wrap")?.classList.toggle("hidden", isImage);
+}));
+document.getElementById("shop-receipt-file")?.addEventListener("change", async event => {
+    const file = event.target.files?.[0]; if (!file) return;
+    try {
+        showToast("در حال آماده‌سازی تصویر رسید…", "info");
+        shopReceiptDataUrl = await compressShopReceipt(file);
+        const img = document.getElementById("shop-receipt-preview"); if (img) img.src = shopReceiptDataUrl;
+        document.getElementById("shop-receipt-preview-wrap")?.classList.remove("hidden");
+        showToast("تصویر رسید آماده ارسال است.", "success");
+    } catch (error) {
+        resetShopReceiptImage(); showToast(error?.message || "خواندن تصویر ناموفق بود.", "error");
+    }
+});
+document.getElementById("shop-receipt-remove")?.addEventListener("click", resetShopReceiptImage);
+
+// تنظیمات کارت پرداخت فقط در بخش مدیریت قابل تغییر است.
+async function loadAdminShopConfig() {
+    const r = await apiGet("/api/admin/shop/config");
+    if (!r?.success || !r.config) return;
+    if (!adminShopConfigLoaded) {
+        const card = document.getElementById("admin-shop-card-number");
+        const holder = document.getElementById("admin-shop-cardholder");
+        if (card) card.value = r.config.card_number || "";
+        if (holder) holder.value = r.config.cardholder_name || "";
+        const status = document.getElementById("admin-shop-config-status");
+        if (status) status.textContent = r.config.configured ? "اطلاعات کارت پرداخت تنظیم شده است." : "برای فعال شدن پرداخت، شماره کارت و نام صاحب کارت را ثبت کن.";
+        adminShopConfigLoaded = true;
+    }
+}
+document.getElementById("admin-shop-config-form")?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const card = document.getElementById("admin-shop-card-number")?.value || "";
+    const holder = document.getElementById("admin-shop-cardholder")?.value?.trim() || "";
+    const btn = document.getElementById("admin-shop-config-save"), status = document.getElementById("admin-shop-config-status");
+    if (btn) { btn.disabled = true; btn.textContent = "در حال ذخیره…"; }
+    try {
+        const r = await apiPost("/api/admin/shop/config", { card_number: card, cardholder_name: holder });
+        if (status) status.textContent = r?.message || (r?.success ? "ذخیره شد." : "ذخیره اطلاعات انجام نشد.");
+        if (r?.success) { adminShopConfigLoaded = true; showToast("اطلاعات کارت ذخیره شد.", "success"); }
+        else showToast(r?.message || "ذخیره اطلاعات انجام نشد.", "error");
+    } catch (_) {
+        if (status) status.textContent = "ارتباط با سرور برقرار نشد.";
+        showToast("ارتباط با سرور برقرار نشد.", "error");
+    } finally { if (btn) { btn.disabled = false; btn.textContent = "ذخیره اطلاعات کارت"; } }
+});
