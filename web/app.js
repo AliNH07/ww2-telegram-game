@@ -3252,7 +3252,7 @@ async function openRules(mustAccept) {
 
 /* ---------- مدیریت تنگه‌ها ---------- */
 const smModal = document.getElementById("strait-manage-modal");
-let smData = null, smSkew = 0, smTimer = null, smReloadAt = 0;
+let smData = null, smSkew = 0, smTimer = null, smReloadAt = 0, smTicks = 0, smBusy = false;
 const SM_MAX_TOLL = 250000;
 function smFmt(sec) {
     sec = Math.max(0, Math.floor(sec));
@@ -3260,70 +3260,118 @@ function smFmt(sec) {
     const p = n => String(n).padStart(2, "0");
     return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
 }
+function smModeOf(toll, closed) { return closed ? "close" : (Number(toll) > 0 ? "toll" : "free"); }
 function smModeText(toll, closed) { return closed ? "🔒 بسته" : (Number(toll) > 0 ? `💰 عوارض ${formatMoney(toll)}` : "🟢 رایگان"); }
 function smControlsHtml(sid, scope, toll, closed) {
-    const mode = closed ? "close" : (Number(toll) > 0 ? "toll" : "free");
+    const mode = scope === "global" ? smModeOf(toll, closed) : "";
     const b = (act, label) => `<button type="button" class="${mode === act ? "active" : ""}" data-sm-act="${act}" data-sid="${sid}" data-scope="${scope}">${label}</button>`;
+    const pre = scope === "global" && Number(toll) > 0 ? ` value="${Math.floor(toll)}"` : "";
     return `<div class="sm-seg">${b("close", "🔒 بستن")}${b("toll", "💰 عوارض")}${b("free", "🟢 رایگان")}</div>
-        <div class="sm-toll hidden" data-sm-tollbox="${sid}:${scope}"><input type="number" inputmode="numeric" min="1" max="${SM_MAX_TOLL}" step="1" placeholder="مبلغ عوارض (حداکثر ${formatNumber(SM_MAX_TOLL)})"><button type="button" class="wf-send-btn" data-sm-tollok="${sid}:${scope}">ثبت</button></div>`;
+        <div class="sm-toll hidden" data-sm-tollbox="${sid}:${scope}"><input type="number" inputmode="numeric" min="1" max="${SM_MAX_TOLL}" step="1"${pre} placeholder="مبلغ عوارض (حداکثر ${formatNumber(SM_MAX_TOLL)})"><button type="button" class="wf-send-btn" data-sm-tollok="${sid}:${scope}">ثبت</button></div>`;
+}
+function smPassingHtml(s) {
+    const rows = (s.passing || []).map(x => `<div class="sm-row"><span>🚢 ${escapeHtml(x.country_name || x.country)} · ${formatMoney(x.amount)}</span>${x.eta ? `<span class="sm-count" data-eta="${escapeHtml(x.eta)}">--:--</span>` : `<span class="sm-count">⚔️ در درگیری…</span>`}</div>`).join("");
+    return rows || `<div class="sm-sub">فعلاً ناوگانی در راه این تنگه نیست.</div>`;
+}
+function smLogHtml(s) {
+    const rows = (s.log || []).map(x => `<div class="sm-row"><span>${escapeHtml(x.country_name || x.country)}</span><b>+${formatMoney(x.amount)}</b></div>`).join("");
+    return rows ? `<div class="sm-sec">💰 آخرین عوارض دریافتی</div>${rows}` : "";
+}
+function smExcHtml(s) {
+    const rules = Object.entries(s.country_rules || {}).filter(([id]) => COUNTRY_NAMES[id]);
+    if (!rules.length) return "";
+    return `<div class="sm-sub">استثناهای فعال:</div>` + rules.map(([id, r]) => `<div class="sm-exc"><span>${COUNTRY_FLAGS[id] || "🏳️"} ${escapeHtml(COUNTRY_NAMES[id])}: ${smModeText(r?.toll ?? s.toll, r?.closed ?? s.closed)}</span><button type="button" class="sp-clear" data-sm-clear="${s.id}" data-country="${id}">حذف</button></div>`).join("");
 }
 function smCardHtml(s) {
     const countryOpts = Object.entries(COUNTRY_NAMES).filter(([id]) => id !== selectedCountry).map(([id, n]) => `<option value="${id}">${COUNTRY_FLAGS[id] || "🏳️"} ${escapeHtml(n)}</option>`).join("");
-    const rules = Object.entries(s.country_rules || {}).filter(([id]) => COUNTRY_NAMES[id]);
-    const passing = (s.passing || []).map(x => `<div class="sm-row"><span>🚢 ${escapeHtml(x.country_name || x.country)} · ${formatMoney(x.amount)}</span>${x.eta ? `<span class="sm-count" data-eta="${escapeHtml(x.eta)}">--:--</span>` : `<span class="sm-count">⚔️ در درگیری…</span>`}</div>`).join("");
-    const log = (s.log || []).map(x => `<div class="sm-row"><span>${escapeHtml(x.country_name || x.country)}</span><b>+${formatMoney(x.amount)}</b></div>`).join("");
-    const exc = rules.map(([id, r]) => `<div class="sm-exc"><span>${COUNTRY_FLAGS[id] || "🏳️"} ${escapeHtml(COUNTRY_NAMES[id])}: ${smModeText(r?.toll ?? s.toll, r?.closed ?? s.closed)}</span><button type="button" class="sp-clear" data-sm-clear="${s.id}" data-country="${id}">حذف</button></div>`).join("");
     return `<div class="sm-card" data-sm-card="${s.id}">
-        <div class="sm-head"><span>⚓ ${escapeHtml(s.name)}</span><span class="sm-chip">${smModeText(s.toll, s.closed)}</span></div>
-        <div class="sm-sub">درآمد عوارض تا امروز: <b>${formatMoney(s.income_total || 0)}</b></div>
+        <div class="sm-head"><span>⚓ ${escapeHtml(s.name)}</span><span class="sm-chip" data-sm-chip>${smModeText(s.toll, s.closed)}</span></div>
+        <div class="sm-sub">درآمد عوارض تا امروز: <b data-sm-income>${formatMoney(s.income_total || 0)}</b></div>
         <div class="sm-sec">🚢 ناوگان‌های در حال عبور</div>
-        ${passing || `<div class="sm-sub">فعلاً ناوگانی در راه این تنگه نیست.</div>`}
+        <div data-sm-passing>${smPassingHtml(s)}</div>
         <div class="sm-sec">⚙️ تنظیمات برای همه</div>
         ${smControlsHtml(s.id, "global", s.toll, s.closed)}
         <div class="sm-sec">🌐 استثنا برای یک کشور</div>
         <select class="sm-select" data-sm-country="${s.id}"><option value="">انتخاب کشور…</option>${countryOpts}</select>
         <div data-sm-countrybox="${s.id}" class="hidden">${smControlsHtml(s.id, "country", 0, false)}</div>
-        ${exc ? `<div class="sm-sub">استثناهای فعال:</div>${exc}` : ""}
-        ${log ? `<div class="sm-sec">💰 آخرین عوارض دریافتی</div>${log}` : ""}
+        <div data-sm-exc>${smExcHtml(s)}</div>
+        <div data-sm-log>${smLogHtml(s)}</div>
     </div>`;
 }
 function renderStraitManage() {
     const body = document.getElementById("sm-body"); if (!body) return;
     const list = smData?.straits || [];
     body.innerHTML = list.length ? list.map(smCardHtml).join("") : `<div class="sm-empty">تنگه‌ای ندارید.</div>`;
-    body.querySelectorAll("[data-sm-countrybox]").forEach(el => el.classList.add("hidden"));
-    smTick();
+    smTick(true);
 }
-function smTick() {
-    const now = Date.now() + smSkew; let anyDone = false;
+// به‌روزرسانی بدون بازسازی کادرها (ورودی‌های نیمه‌نوشته پاک نشوند)
+function smUpdateDynamic() {
+    (smData?.straits || []).forEach(s => {
+        const card = document.querySelector(`#sm-body [data-sm-card="${s.id}"]`); if (!card) return;
+        card.querySelector("[data-sm-chip]").textContent = smModeText(s.toll, s.closed);
+        card.querySelector("[data-sm-income]").textContent = formatMoney(s.income_total || 0);
+        card.querySelector("[data-sm-passing]").innerHTML = smPassingHtml(s);
+        card.querySelector("[data-sm-exc]").innerHTML = smExcHtml(s);
+        card.querySelector("[data-sm-log]").innerHTML = smLogHtml(s);
+        const mode = smModeOf(s.toll, s.closed);
+        card.querySelectorAll('.sm-seg button[data-scope="global"]').forEach(b => b.classList.toggle("active", b.dataset.smAct === mode));
+    });
+    smTick(true);
+}
+function smTick(noPoll) {
+    const now = Date.now() + smSkew; let due = false;
     document.querySelectorAll("#sm-body .sm-count[data-eta]").forEach(el => {
         const left = (Date.parse(el.dataset.eta) - now) / 1000;
         if (left > 0) { el.textContent = smFmt(left); el.classList.remove("done"); }
-        else { el.textContent = "✅ رد شد؛ واریز شد"; el.classList.add("done"); anyDone = true; }
+        else { el.textContent = "⏳ در حال عبور…"; due = true; }
     });
-    if (anyDone && Date.now() - smReloadAt > 2500) { smReloadAt = Date.now(); setTimeout(() => loadStraitManage().catch(() => {}), 1500); }
+    if (noPoll === true) return;
+    smTicks++;
+    // وقتی شمارنده‌ای به صفر رسید یا هر ۱۰ ثانیه، وضعیت از سرور تازه می‌شود
+    if ((due && Date.now() - smReloadAt > 2000) || smTicks % 10 === 0) { smReloadAt = Date.now(); loadStraitManage().catch(() => {}); }
 }
-async function loadStraitManage() {
-    const d = await apiGet("/api/strait/manage");
-    if (!d?.success) { showToast("دریافت اطلاعات تنگه‌ها ناموفق بود.", "error"); return; }
-    smData = d; smSkew = Date.parse(d.now) - Date.now();
-    if (!smModal.classList.contains("hidden")) renderStraitManage();
+async function loadStraitManage(forceFull) {
+    if (smBusy) return; smBusy = true;
+    try {
+        const d = await apiGet("/api/strait/manage");
+        if (!d?.success) { showToast("دریافت اطلاعات تنگه‌ها ناموفق بود.", "error"); return; }
+        const prev = smData; smData = d; smSkew = Date.parse(d.now) - Date.now();
+        if (smModal.classList.contains("hidden")) return;
+        const ids = x => (x?.straits || []).map(s => s.id).join(",");
+        // پیام واریز: اگر درآمد تنگه‌ای نسبت به دفعهٔ قبل بالا رفته باشد
+        if (prev) (d.straits || []).forEach(s => {
+            const o = (prev.straits || []).find(x => x.id === s.id);
+            if (o && s.income_total > o.income_total) showToast(`✅ ناوگانی از ${s.name} رد شد؛ ${formatMoney(s.income_total - o.income_total)} به خزانه‌ات واریز شد.`, "success");
+        });
+        if (forceFull === true || !prev || ids(prev) !== ids(d) || !document.querySelector("#sm-body [data-sm-card]") && (d.straits || []).length) renderStraitManage();
+        else smUpdateDynamic();
+    } finally { smBusy = false; }
 }
 async function openStraitManage() {
-    smModal.classList.remove("hidden");
+    smModal.classList.remove("hidden"); smData = null; smTicks = 0;
     document.getElementById("sm-body").innerHTML = `<div class="sm-empty">در حال دریافت…</div>`;
-    try { await loadStraitManage(); } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+    try { await loadStraitManage(true); } catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
     clearInterval(smTimer); smTimer = setInterval(smTick, 1000);
 }
-function closeStraitManage() { smModal.classList.add("hidden"); document.getElementById("sm-help")?.classList.add("hidden"); document.getElementById("sm-help-btn")?.setAttribute("aria-expanded", "false"); clearInterval(smTimer); smTimer = null; }
+function closeStraitManage() {
+    smModal.classList.add("hidden"); clearInterval(smTimer); smTimer = null;
+    document.getElementById("sm-help")?.classList.add("hidden");
+    document.getElementById("sm-help-btn")?.setAttribute("aria-expanded", "false");
+}
 async function smSend(sid, scope, action, toll) {
     const body = document.getElementById("sm-body");
     const countryId = scope === "country" ? body.querySelector(`[data-sm-country="${sid}"]`)?.value : undefined;
     if (scope === "country" && !countryId) { showToast("ابتدا کشور را انتخاب کنید.", "error"); return; }
-    const d = await apiPost("/api/strait/settings", { site_id: sid, action, ...(action === "toll" ? { toll } : {}), ...(countryId ? { country_id: countryId } : {}) });
+    let d;
+    try { d = await apiPost("/api/strait/settings", { site_id: sid, action, ...(action === "toll" ? { toll } : {}), ...(countryId ? { country_id: countryId } : {}) }); }
+    catch (e) { showToast("ارتباط با سرور برقرار نشد.", "error"); return; }
     if (!d?.success) { showToast(d?.message || "ذخیره تنظیمات انجام نشد.", "error"); return; }
     showToast(d.message || "ذخیره شد.", d.changed === false ? undefined : "success");
-    await loadStraitManage(); loadMapSites().catch(() => {});
+    smBusy = false; await loadStraitManage(true); loadMapSites().catch(() => {});
+    if (countryId) {   // انتخاب کشور بعد از بازسازی حفظ شود
+        const sel = document.querySelector(`#sm-body [data-sm-country="${sid}"]`);
+        if (sel) { sel.value = countryId; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+    }
 }
 document.getElementById("sm-close")?.addEventListener("click", closeStraitManage);
 document.getElementById("sm-help-btn")?.addEventListener("click", e => {
@@ -3336,9 +3384,9 @@ smModal?.addEventListener("click", async e => {
     if (e.target === smModal) { closeStraitManage(); return; }
     const act = e.target.closest("[data-sm-act]");
     if (act) {
-        const { smAct, sid, scope } = { smAct: act.dataset.smAct, sid: act.dataset.sid, scope: act.dataset.scope };
-        if (smAct === "toll") { document.querySelector(`[data-sm-tollbox="${sid}:${scope}"]`)?.classList.toggle("hidden"); return; }
-        await smSend(sid, scope, smAct); return;
+        const kind = act.dataset.smAct, sid = act.dataset.sid, scope = act.dataset.scope;
+        if (kind === "toll") { document.querySelector(`[data-sm-tollbox="${sid}:${scope}"]`)?.classList.toggle("hidden"); return; }
+        await smSend(sid, scope, kind); return;
     }
     const ok = e.target.closest("[data-sm-tollok]");
     if (ok) {
@@ -3350,15 +3398,23 @@ smModal?.addEventListener("click", async e => {
     }
     const clr = e.target.closest("[data-sm-clear]");
     if (clr) {
-        const d = await apiPost("/api/strait/settings", { site_id: clr.dataset.smClear, country_id: clr.dataset.country, clear_country_rule: true });
+        let d;
+        try { d = await apiPost("/api/strait/settings", { site_id: clr.dataset.smClear, country_id: clr.dataset.country, clear_country_rule: true }); }
+        catch (err) { showToast("ارتباط با سرور برقرار نشد.", "error"); return; }
         if (!d?.success) { showToast(d?.message || "حذف استثنا انجام نشد.", "error"); return; }
-        showToast("استثنا حذف شد.", "success"); await loadStraitManage();
+        showToast("استثنا حذف شد.", "success"); smBusy = false; await loadStraitManage(true);
     }
 });
 smModal?.addEventListener("change", e => {
     const sel = e.target.closest("[data-sm-country]"); if (!sel) return;
-    const box = document.querySelector(`[data-sm-countrybox="${sel.dataset.smCountry}"]`);
+    const sid = sel.dataset.smCountry, box = document.querySelector(`[data-sm-countrybox="${sid}"]`);
     box?.classList.toggle("hidden", !sel.value);
+    if (!sel.value || !box) return;
+    // وضعیت مؤثر آن کشور (استثنا یا قانون عمومی) روی دکمه‌ها نشان داده شود
+    const s = (smData?.straits || []).find(x => x.id === sid); if (!s) return;
+    const r = (s.country_rules || {})[sel.value];
+    const mode = smModeOf(r?.toll ?? s.toll, r?.closed ?? s.closed);
+    box.querySelectorAll(".sm-seg button").forEach(b => b.classList.toggle("active", b.dataset.smAct === mode));
 });
 
 const gameMenuButton = document.getElementById("game-menu-button");
@@ -5489,7 +5545,8 @@ async function loadMyListings() {
 const MAP_COLORS = {
     own: "#2ecc71",        // کشور من و تصرف‌های من (تنگه، سکو، معدن) → سبز
     other: "#9fd8ff",      // بازیکنان فعال و منابع/تنگه‌های آزاد → آبی کمرنگ
-    taken: "#ff9f1a",      // تصرف‌شده توسط بازیکن دیگر → نارنجی
+    taken: "#ff9f1a",      // تنگه/سکو/معدنِ تصرف‌شده توسط بازیکن دیگر → نارنجی
+    occupied: "#7851a9",   // کشورِ اشغال‌شده → بنفش سلطنتی (برای اشغالگر خودش: سبز)
     inactive: "#2a2e35",   // در بازی هست ولی بازیکنی ندارد → سیاهِ مایل به طوسی
     nogame: "#6e7683"      // هنوز به بازی اضافه نشده → طوسی ساده، بدون خط‌کشی
 };
@@ -6381,7 +6438,8 @@ function updateMapLabels() {
 function mapFillFor(m) {
     if (!m.key) return MAP_COLORS.nogame;   // هنوز به بازی اضافه نشده → طوسی ساده
     const info = countries[m.key];
-    if (info?.occupier) return mapFillFor({ key: info.occupier });   // رنگ اشغالگر
+    // کشور اشغال‌شده: برای خودِ اشغالگر سبز (مال خودش)، برای بقیه بنفش سلطنتی
+    if (info?.occupier) return info.occupier === selectedCountry ? MAP_COLORS.own : MAP_COLORS.occupied;
     if (m.key === selectedCountry) return MAP_COLORS.own;
     if (info?.taken) return MAP_COLORS.other;
     return MAP_COLORS.inactive;
