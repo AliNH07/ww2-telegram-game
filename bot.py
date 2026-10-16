@@ -2031,7 +2031,7 @@ async def admin_global(request):
                         if isinstance(m, dict): message_keys.add((m.get("from"), m.get("to"), m.get("text"), m.get("at")))
             result.append({"id": int(wid), "name": meta.get("name", f"دنیای {wid}"),
                 "created_at": meta.get("created_at"), "players": len(country_set),
-                "total_players": len(rows), "countries_taken": len(country_set),
+                "total_players": len(rows), "countries_taken": len(country_set), "total_countries": len(COUNTRIES),
                 "active_players": sum(1 for r in rows if (t := parse_dt(r.get("last_seen_at"))) and (now-t).total_seconds() <= 900),
                 "pending_wars": sum(1 for w in (state.get("war_declarations") or {}).values() if isinstance(w, dict) and w.get("status") == "pending_admin"),
                 "private_message_count": len(message_keys), "un_message_count": len(state.get("un_messages") or []),
@@ -2121,6 +2121,23 @@ async def admin_create_world(request):
         log_admin_action("ساخت دنیای جدید", None, f"world_id={next_id}; name={name}")
         save_state()
         return web.json_response({"success": True, "world": worlds_registry[str(next_id)]})
+
+async def admin_rename_world(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    wid = str(data.get("world_id", "")).strip()
+    name = str(data.get("name", "")).strip()[:50]
+    async with WORLD_SWITCH_LOCK:
+        if wid not in worlds_registry:
+            return web.json_response({"success": False, "message": "این دنیا وجود ندارد."}, status=404)
+        if not name:
+            return web.json_response({"success": False, "message": "نام دنیا نمی‌تواند خالی باشد."}, status=400)
+        old = worlds_registry[wid].get("name", wid)
+        worlds_registry[wid]["name"] = name
+        log_admin_action("ویرایش نام دنیا", None, f"world_id={wid}; {old} -> {name}")
+        save_state()
+    return web.json_response({"success": True, "message": f"نام دنیا به «{name}» تغییر کرد.", "name": name})
 
 async def admin_delete_world(request):
     denied = _admin_denied(request)
@@ -6493,6 +6510,7 @@ async def create_web_app():
         app.router.add_post(path, world_scoped(h))
     app.router.add_post("/api/admin/worlds/create", admin_create_world)
     app.router.add_post("/api/admin/worlds/delete", admin_delete_world)
+    app.router.add_post("/api/admin/worlds/rename", admin_rename_world)
     app.router.add_post("/api/admin/world/start", world_scoped(admin_start_world))
     app.router.add_post("/api/admin/world/registration", world_scoped(admin_set_world_registration))
 
