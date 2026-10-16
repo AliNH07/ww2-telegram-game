@@ -1605,7 +1605,7 @@ def push_news(title, text, kind="info", countries=None):
         if c in COUNTRIES and c not in rel: rel.append(c)
     if rel: row["countries"] = rel[:3]
     news_feed.append(row)
-    if len(news_feed) > 200: del news_feed[:50]
+    if len(news_feed) > 300: del news_feed[:len(news_feed) - 300]   # سقف ۳۰۰ خبر
 
 # هر دنیا نسخهٔ مستقل خود از داده‌های بازی را دارد. هنگام هر درخواست، وضعیت دنیای مربوط
 # به درخواست فعال می‌شود و پیش از بازگرداندن وضعیت قبلی ذخیره می‌گردد.
@@ -3008,12 +3008,12 @@ def units_power(units, owner_player, key=None):
 def push_war(kind, text, countries=()):
     war_events.append({"id": str(uuid.uuid4()), "kind": kind, "text": text,
                        "countries": list(countries), "at": utcnow().isoformat()})
-    if len(war_events) > 300: del war_events[:100]
+    if len(war_events) > 300: del war_events[:len(war_events) - 300]   # سقف ۳۰۰ خبر نظامی
 
 def push_history(kind, title, attacker, defender, winner, detail=""):
     war_history.append({"id": str(uuid.uuid4()), "kind": kind, "title": title, "attacker": attacker,
                         "defender": defender, "winner": winner, "detail": detail, "at": utcnow().isoformat()})
-    if len(war_history) > 300: del war_history[:100]
+    if len(war_history) > 300: del war_history[:len(war_history) - 300]   # سقف ۳۰۰ تاریخچه
 
 def _me(uid):
     if uid not in players: players[uid] = create_player(uid)
@@ -4417,7 +4417,7 @@ async def get_war_log(request):
     mine = [h for h in war_history if h.get("attacker") == cid or h.get("defender") == cid]
     wins = sum(1 for h in mine if (h["winner"] == "attacker" and h["attacker"] == cid)
                or (h["winner"] == "defender" and h["defender"] == cid))
-    return web.json_response({"events": list(reversed(war_events[-80:])), "history": list(reversed(mine[-80:])),
+    return web.json_response({"events": list(reversed(war_events)), "history": list(reversed(mine)),
                               "stats": {"fights": len(mine), "wins": wins, "losses": len(mine) - wins}})
 
 def active_scans(p):
@@ -5557,7 +5557,7 @@ async def set_border_settings(request):
 async def get_news(request):
     # برای ردیف‌های قدیمی بیانیه نیز متن قبلی را از خبر/اعلان پنهان می‌کنیم.
     rows = []
-    for item in reversed(news_feed[-30:]):
+    for item in reversed(news_feed):
         row = dict(item)
         title = str(row.get("title", ""))
         if "بیانیه" in title:
