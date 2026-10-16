@@ -658,7 +658,7 @@ document.querySelector(".header-flag-box")?.addEventListener("click", () => {   
     loadRankings();
 });
 
-const seenNewsKey = () => `fl93_seen_news_${userId || "guest"}`;
+const seenNewsKey = () => `fl93_seen_news_${userId || "guest"}_w${selectedWorldId || "1"}`;
 function getSeenNews() {
     try { return new Set(JSON.parse(localStorage.getItem(seenNewsKey()) || "[]")); }
     catch (e) { return new Set(); }
@@ -685,7 +685,7 @@ function syncNewsBadges() {
     if (el) { el.textContent = badgeText(newsUnseenCount); el.classList.toggle("hidden", !(newsUnseenCount > 0)); }
     updateFooterCommBadge();
 }
-const dismissedNotifsKey = () => `fl93_dismissed_notifications_${userId || "guest"}`;
+const dismissedNotifsKey = () => `fl93_dismissed_notifications_${userId || "guest"}_w${selectedWorldId || "1"}`;
 function getDismissedNotifications() {
     try { return new Set(JSON.parse(localStorage.getItem(dismissedNotifsKey()) || "[]")); }
     catch (e) { return new Set(); }
@@ -3018,7 +3018,7 @@ const isAdminAccount = Number(userId) === ADMIN_TELEGRAM_ID;
 
 /* راهنمای شروع: فقط بار اول خودکار نمایش داده می‌شود */
 const guideModal = document.getElementById("guide-modal");
-const guideSeenKey = () => `fl93_guide_seen_${userId || "guest"}`;
+const guideSeenKey = () => `fl93_guide_seen_${userId || "guest"}_w${selectedWorldId || "1"}`;
 function showGuideTab(name) {
     guideModal?.querySelectorAll(".guide-tab").forEach(b => b.classList.toggle("active", b.dataset.guideTab === name));
     guideModal?.querySelectorAll(".guide-pane").forEach(p => p.classList.toggle("active", p.id === `guide-pane-${name}`));
