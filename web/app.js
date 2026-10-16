@@ -3161,18 +3161,16 @@ async function loadAdminPanel() {
     const list = document.getElementById("admin-player-list");
     if (list && !adminOverviewCache) list.innerHTML = `<div class="admin-empty"><span class="admin-loader"></span>در حال دریافت اطلاعات بازی…</div>`;
     try {
-        const [data, warsData, globalData, communicationsData, unData] = await Promise.all([
-            apiGet("/api/admin/overview"), apiGet("/api/admin/wars"), apiGet("/api/admin/global"), apiGet("/api/admin/communications"),
-            apiGet("/api/admin/un-messages")
+        const [data, warsData, globalData, unData] = await Promise.all([
+            apiGet("/api/admin/overview"), apiGet("/api/admin/wars"), apiGet("/api/admin/global"),
+            adminCurrentDetailWorld !== null ? apiGet("/api/admin/un-messages") : Promise.resolve(null)
         ]);
         if (requestWorldId !== String(selectedWorldId)) return;
         adminWarsCache = warsData?.wars || [];
         adminWorldsCache = globalData?.worlds || [];
-        adminPrivateMessagesCache = communicationsData?.messages || [];
-        adminUnMessagesCache = unData?.messages || [];
+        if (unData) adminUnMessagesCache = unData?.messages || [];
         renderAdminGlobal();
         renderAdminUnMessages();
-        renderAdminCommunications();
         if (!data?.success) {
             if (error) { error.textContent = data?.message || (data?.error === "forbidden" ? "دسترسی به پنل مدیریت رد شد." : "احراز هویت تلگرام تأیید نشد؛ بازی را از داخل تلگرام باز کن."); error.classList.remove("hidden"); }
             if (list) list.innerHTML = `<div class="admin-empty">اطلاعات مدیریت دریافت نشد.</div>`;
@@ -3223,6 +3221,8 @@ async function switchAdminWorld(worldId) {
     adminSelectedPlayerId = null; adminSelectedPlayerDetailOpen = false;
     // مدیریت دنیا نباید حساب مدیر را به‌عنوان بازیکن به دنیای انتخاب‌شده اضافه کند.
     player = null; selectedCountry = null;
+    adminBroadcastOpen = false;
+    adminUnMessagesCache = []; adminUnCountry = null;
     adminCurrentDetailWorld = String(worldId);
     adminOverviewCache = null;
     renderAdminNavigation();
@@ -3233,7 +3233,8 @@ async function switchAdminWorld(worldId) {
 function renderAdminNavigation() {
     const inside = adminCurrentDetailWorld !== null;
     document.getElementById("admin-world-detail")?.classList.toggle("hidden", !inside);
-    document.getElementById("admin-global")?.classList.toggle("hidden", inside);
+    document.getElementById("admin-global")?.classList.toggle("hidden", inside || adminBroadcastOpen);
+    document.getElementById("admin-broadcast-view")?.classList.toggle("hidden", inside || !adminBroadcastOpen);
     document.getElementById("admin-current-world")?.classList.toggle("hidden", !inside);
     if (inside) {
         const w = adminWorldsCache.find(x => String(x.id) === String(adminCurrentDetailWorld));
@@ -3272,13 +3273,6 @@ function renderAdminWorldPicker() {
         </div>` : "";
         return `<div class="admin-world-item ${open ? "open" : ""}"><button type="button" class="admin-pick-world" data-pick-world="${id}" aria-expanded="${open}"><span><b>🌐 ${escapeHtml(name)}</b>${info}</span><span class="admin-pick-chevron">${open ? "⌃" : "⌄"}</span></button>${panel}</div>`;
     }).join("");
-}
-function renderAdminCommunications() {
-    const root = document.getElementById("admin-pm-list"); if (!root) return;
-    const messages = adminPrivateMessagesCache || [];
-    const flagged = messages.filter(m => /شکایت|اعتراض|سازمان ملل|گزارش تخلف|complaint|report/i.test(m.text || ""));
-    const renderItem = m => `<article class="admin-news-row"><div><b>${escapeHtml(COUNTRY_NAMES[m.from] || m.from || "نامشخص")} ← ${escapeHtml(COUNTRY_NAMES[m.to] || m.to || "نامشخص")}</b><p>${escapeHtml(m.text || "")}</p><small>${escapeHtml(m.at ? new Date(m.at).toLocaleString("fa-IR") : "")}</small></div></article>`;
-    root.innerHTML = `<h4>📋 پیام‌های دارای نشانه شکایت (${flagged.length})</h4>${flagged.length ? flagged.map(renderItem).join("") : '<div class="admin-empty">شکایتی از متن پیام‌ها شناسایی نشد.</div>'}<h4 style="margin-top:20px">💬 پیام‌های خصوصی اخیر (${messages.length})</h4>${messages.length ? messages.map(renderItem).join("") : '<div class="admin-empty">پیامی در این دنیا ثبت نشده است.</div>'}`;
 }
 document.getElementById("admin-add-world-btn")?.addEventListener("click", () => {
     const form = document.getElementById("admin-create-world-form");
@@ -3502,16 +3496,84 @@ async function adminAdjustSelectedPlayer(operation) {
     } catch (e) { showToast("خطا در تغییر موجودی.", "error"); }
 }
 
+let adminUnCountry = null;
+function adminUnThreads() {
+    const map = new Map();
+    (adminUnMessagesCache || []).forEach(m => {
+        if (!m.country) return;
+        if (!map.has(m.country)) map.set(m.country, []);
+        map.get(m.country).push(m);
+    });
+    return [...map.entries()].map(([country, msgs]) => ({ country, msgs, last: msgs[msgs.length - 1] }))
+        .sort((x, y) => String(y.last.at || "").localeCompare(String(x.last.at || "")));
+}
 function renderAdminUnMessages() {
     const root = document.getElementById("admin-un-list"); if (!root) return;
-    const rows = adminUnMessagesCache || [];
-    const pill = document.getElementById("admin-un-count"); if (pill) pill.textContent = adminFormatNumber(rows.length);
-    if (!rows.length) { root.innerHTML = `<div class="admin-empty">هنوز پیامی به سازمان ملل ارسال نشده است.</div>`; return; }
-    root.innerHTML = rows.map(m => {
-        const who = [m.user_name, m.username ? "@" + m.username : ""].filter(Boolean).join(" · ") || "نام ثبت نشده";
-        return `<article class="admin-news-row"><span class="admin-news-dot"></span><div><b>🌍 ${escapeHtml(m.world_name || ("دنیای " + m.world_id))} · ${escapeHtml(COUNTRY_FLAGS[m.country] || "")} ${escapeHtml(m.country_name || COUNTRY_NAMES[m.country] || m.country || "—")}</b><p>${escapeHtml(m.text || "")}</p><small class="admin-un-meta">👤 ${escapeHtml(who)} · آیدی تلگرام: ${escapeHtml(String(m.user_id))}<br>${escapeHtml(m.at ? new Date(m.at).toLocaleString("fa-IR") : "")}</small></div></article>`;
+    const threads = adminUnThreads();
+    const pill = document.getElementById("admin-un-count"); if (pill) pill.textContent = adminFormatNumber(threads.length);
+    const tabPill = document.getElementById("admin-un-tab-count");
+    if (tabPill) { tabPill.textContent = adminFormatNumber(threads.length); tabPill.classList.toggle("hidden", !threads.length); }
+    const sel = document.getElementById("admin-un-new-country");
+    if (sel && document.activeElement !== sel) {
+        const ids = [...new Set((adminOverviewCache?.players || []).map(p => p.country).filter(Boolean))];
+        const prev = sel.value;
+        sel.innerHTML = ids.length ? ids.map(id => `<option value="${escapeHtml(id)}">${escapeHtml(COUNTRY_FLAGS[id] || "")} ${escapeHtml(COUNTRY_NAMES[id] || id)}</option>`).join("") : `<option value="">کشوری با بازیکن نیست</option>`;
+        if (prev && ids.includes(prev)) sel.value = prev;
+    }
+    if (!threads.length) root.innerHTML = `<div class="admin-empty">هنوز هیچ کشوری در این دنیا به سازمان ملل پیام نداده است.</div>`;
+    else root.innerHTML = threads.map(t => {
+        const fromPlayer = t.msgs.filter(m => m.from !== "admin").length;
+        const when = t.last.at ? new Date(t.last.at).toLocaleString("fa-IR") : "";
+        return `<article class="admin-news-row"><button type="button" class="admin-un-country" data-un-country="${escapeHtml(t.country)}"><span style="font-size:22px">${escapeHtml(COUNTRY_FLAGS[t.country] || "🏳️")}</span><div><b>${escapeHtml(COUNTRY_NAMES[t.country] || t.last.country_name || t.country)} <small>(${adminFormatNumber(fromPlayer)} پیام)</small></b><p>${t.last.from === "admin" ? "↩️ " : ""}${escapeHtml(t.last.text || "")}</p><small>${escapeHtml(when)}</small></div><span>←</span></button></article>`;
     }).join("");
+    renderAdminUnThread();
 }
+function renderAdminUnThread() {
+    const home = document.getElementById("admin-un-home"), th = document.getElementById("admin-un-thread");
+    if (!home || !th) return;
+    const open = adminUnCountry !== null;
+    home.classList.toggle("hidden", open); th.classList.toggle("hidden", !open);
+    if (!open) return;
+    document.getElementById("admin-un-thread-title").textContent = `${COUNTRY_FLAGS[adminUnCountry] || ""} ${COUNTRY_NAMES[adminUnCountry] || adminUnCountry}`;
+    const box = document.getElementById("admin-un-thread-msgs");
+    const msgs = (adminUnMessagesCache || []).filter(m => m.country === adminUnCountry);
+    const sig = msgs.map(m => m.id).join(",");
+    if (box.dataset.sig === sig) return;
+    box.dataset.sig = sig;
+    box.innerHTML = msgs.length ? msgs.map(m => {
+        const mine = m.from === "admin";
+        const who = mine ? "سازمان ملل (شما)" : ([m.user_name, m.username ? "@" + m.username : ""].filter(Boolean).join(" · ") || "بازیکن");
+        return `<div class="admin-un-msg ${mine ? "admin" : ""}">${escapeHtml(m.text || "")}<small>${escapeHtml(who)} · ${m.at ? escapeHtml(new Date(m.at).toLocaleString("fa-IR")) : ""}</small></div>`;
+    }).join("") : `<div class="admin-empty">هنوز پیامی نیست؛ اولین پیام را بفرست.</div>`;
+    box.scrollTop = box.scrollHeight;
+}
+document.getElementById("admin-un-list")?.addEventListener("click", e => {
+    const b = e.target.closest("[data-un-country]"); if (!b) return;
+    adminUnCountry = b.dataset.unCountry; renderAdminUnThread();
+});
+document.getElementById("admin-un-new-btn")?.addEventListener("click", () => {
+    const v = document.getElementById("admin-un-new-country")?.value;
+    if (!v) { showToast("کشوری انتخاب نشده است.", "error"); return; }
+    adminUnCountry = v; renderAdminUnThread(); document.getElementById("admin-un-reply-text")?.focus();
+});
+document.getElementById("admin-un-back")?.addEventListener("click", () => { adminUnCountry = null; renderAdminUnThread(); });
+document.getElementById("admin-un-reply-send")?.addEventListener("click", async e => {
+    const btn = e.currentTarget, ta = document.getElementById("admin-un-reply-text");
+    const text = (ta?.value || "").trim();
+    if (!adminUnCountry || !text) { showToast("متن پیام را بنویس.", "error"); return; }
+    btn.disabled = true;
+    try {
+        const r = await apiPost("/api/admin/un/reply", { country: adminUnCountry, text });
+        showToast(r.message || (r.success ? "ارسال شد." : "ارسال نشد."), r.success ? "success" : "error");
+        if (r.success) {
+            ta.value = "";
+            if (r.item) adminUnMessagesCache.push({ ...r.item, from: "admin" });
+            const box = document.getElementById("admin-un-thread-msgs"); if (box) box.dataset.sig = "";
+            renderAdminUnMessages();
+        }
+    } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+    finally { btn.disabled = false; }
+});
 
 async function adminResetPlayer(uid) {
     const p = adminOverviewCache?.players?.find(x => Number(x.user_id) === Number(uid));
@@ -3654,20 +3716,46 @@ function renderAdminBroadcastPreview() {
 }
 document.getElementById("admin-broadcast-title")?.addEventListener("input", renderAdminBroadcastPreview);
 document.getElementById("admin-broadcast-text")?.addEventListener("input", renderAdminBroadcastPreview);
+let adminBroadcastOpen = false;
+function setAdminBroadcastView(open) {
+    adminBroadcastOpen = open;
+    renderAdminNavigation();
+    if (open) {
+        const sel = document.getElementById("admin-bc-world");
+        if (sel) sel.innerHTML = (adminWorldsCache || []).map(w => `<option value="${Number(w.id)}">${escapeHtml(w.name || `دنیای ${w.id}`)}</option>`).join("");
+        renderAdminBroadcastPreview();
+    }
+    document.getElementById("admin-scroll")?.scrollTo(0, 0);
+}
+document.getElementById("admin-open-broadcast")?.addEventListener("click", () => setAdminBroadcastView(true));
+document.getElementById("admin-broadcast-back")?.addEventListener("click", () => setAdminBroadcastView(false));
+document.querySelectorAll('input[name="admin-bc-scope"]').forEach(r => r.addEventListener("change", () => {
+    const scope = document.querySelector('input[name="admin-bc-scope"]:checked')?.value;
+    document.getElementById("admin-bc-world-wrap")?.classList.toggle("hidden", scope !== "world");
+}));
 document.getElementById("admin-broadcast-form")?.addEventListener("submit", async event => {
     event.preventDefault(); if (!isAdminAccount) return;
+    const form = event.currentTarget;
     const title = document.getElementById("admin-broadcast-title")?.value?.trim() || "";
     const text = document.getElementById("admin-broadcast-text")?.value?.trim() || "";
-    if (!title || !text) { showToast("عنوان و متن خبر را وارد کن.", "error"); return; }
-    if (!confirm("خبر برای همهٔ بازیکنان ارسال شود؟")) return;
-    const button = event.currentTarget.querySelector("[type=submit]");
+    if (!title || !text) { showToast("عنوان و توضیحات را وارد کن.", "error"); return; }
+    const scope = document.querySelector('input[name="admin-bc-scope"]:checked')?.value || "all";
+    const worldId = document.getElementById("admin-bc-world")?.value || "";
+    if (scope === "world" && !worldId) { showToast("یک دنیا انتخاب کن.", "error"); return; }
+    const worldName = (adminWorldsCache || []).find(w => String(w.id) === String(worldId))?.name || `دنیای ${worldId}`;
+    if (!confirm(scope === "all" ? "پیام برای همهٔ بازیکنان در همهٔ دنیاها ارسال شود؟" : `پیام برای بازیکنان «${worldName}» ارسال شود؟`)) return;
+    const button = form.querySelector("[type=submit]");
     if (button) { button.disabled = true; button.textContent = "در حال ارسال…"; }
     try {
-        const result = await apiPost("/api/admin/broadcast", { title, text });
-        if (!result?.success) showToast(result?.message || "خبر ارسال نشد.", "error");
-        else { showToast(`خبر ثبت شد؛ ارسال موفق: ${result.sent}، ناموفق: ${result.failed}`, result.failed ? "error" : "success"); event.currentTarget.reset(); renderAdminBroadcastPreview(); await loadAdminPanel(); document.querySelector('[data-admin-tab="activity"]')?.click(); }
-    } catch (e) { showToast("خطا در ارسال خبر.", "error"); }
-    finally { if (button) { button.disabled = false; button.textContent = "📣 ارسال به همهٔ بازیکنان"; } }
+        const result = await apiPost("/api/admin/broadcast-global", { title, text, scope, world_id: scope === "world" ? worldId : undefined });
+        if (!result?.success) showToast(result?.message || "پیام ارسال نشد.", "error");
+        else {
+            showToast(`پیام ارسال شد؛ موفق: ${result.sent}، ناموفق: ${result.failed}`, result.failed ? "error" : "success");
+            form.reset(); document.getElementById("admin-bc-world-wrap")?.classList.add("hidden");
+            renderAdminBroadcastPreview(); setAdminBroadcastView(false);
+        }
+    } catch (e) { showToast("خطا در ارسال پیام.", "error"); }
+    finally { if (button) { button.disabled = false; button.textContent = "📣 ارسال پیام"; } }
 });
 
 // هدر همراه اسکرول صفحه به‌آرامی از قاب خارج می‌شود؛ بدون تأخیر و جمع‌شدن ناگهانی.
@@ -4615,10 +4703,11 @@ let unPmLocalMessages = [];
 function renderUnitedNationsPMMessages() {
     const box = document.getElementById("pm-messages");
     box.innerHTML = `<div class="un-pm-placeholder"><span>🌐</span><strong>گفت‌وگوی سازمان ملل</strong><p>پیام شما برای مدیریت سازمان ملل ارسال می‌شود و فقط مدیر آن را می‌بیند.</p></div>`;
-    unPmLocalMessages.forEach(text => {
+    unPmLocalMessages.forEach(item => {
+        const m = typeof item === "string" ? { text: item, from: "me" } : item;
         const bubble = document.createElement("div");
-        bubble.className = "pm-msg pm-mine un-pm-local-msg";
-        bubble.textContent = text;
+        bubble.className = "pm-msg un-pm-local-msg " + (m.from === "admin" ? "pm-other" : "pm-mine");
+        bubble.textContent = m.text;
         box.appendChild(bubble);
     });
     box.scrollTop = box.scrollHeight;
@@ -4637,7 +4726,7 @@ function openUnitedNationsPM() {
     document.getElementById("pm-conversation").classList.remove("un-pm-readonly", "hidden");
     apiGet("/api/un/mine").then(d => {
         if (Array.isArray(d?.messages)) {
-            unPmLocalMessages = d.messages.map(m => m.text);
+            unPmLocalMessages = d.messages.map(m => ({ text: m.text, from: m.from }));
             if (currentPMTarget === UN_PM_TARGET) renderUnitedNationsPMMessages();
         }
     }).catch(() => {});
@@ -4678,7 +4767,7 @@ async function sendPM() {
         try {
             const r = await apiPost("/api/un/send", { text });
             if (!r.success) { ta.value = text; showToast(r.message || "ارسال پیام ناموفق بود.", "error"); return; }
-            unPmLocalMessages.push(text);
+            unPmLocalMessages.push({ text, from: "me" });
             renderUnitedNationsPMMessages();
             showToast("پیام برای مدیریت سازمان ملل ارسال شد.", "success");
         } catch { ta.value = text; showToast("ارتباط با سرور برقرار نشد.", "error"); }
