@@ -2615,6 +2615,13 @@ input, textarea, button { -webkit-touch-callout:none; }
 #home .hm-card { min-height: 118px; border-radius: 20px; box-shadow: 0 6px 16px rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.08); }
 #home .hm-card:hover { transform: none; }
 #home .hm-card:active { transform: scale(.97); }
+/* رفع خط صاف پایین باکس‌های صفحهٔ اصلی: لایهٔ تصویر ۸ پیکسل از هر طرف بزرگ‌تر می‌شود و لبه‌ها (خط پایین) توسط overflow:hidden بریده می‌شوند */
+#home .hm-card { background-clip: padding-box; isolation: isolate; }
+#home .hm-card::before {
+    content: ""; position: absolute; inset: -8px; z-index: -1; pointer-events: none;
+    background: inherit; background-size: cover; background-position: center;
+}
+#home .hm-card .action-overlay { z-index: 1; }
 #home .hm-card .action-overlay {
     padding: 14px; background: linear-gradient(180deg, rgba(26,13,42,.1) 0%, rgba(26,13,42,0) 35%, rgba(26,13,42,.85) 100%);
 }
