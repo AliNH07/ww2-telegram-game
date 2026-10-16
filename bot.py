@@ -1,4 +1,4 @@
-import threading, os, json, hmac, hashlib, uuid, logging, asyncio, random, math, copy, time, contextlib, contextvars
+import threading, os, json, hmac, hashlib, uuid, logging, asyncio, random, math, copy, time, contextlib, contextvars, re
 from datetime import datetime, timezone, timedelta
 from urllib.parse import parse_qsl
 
@@ -27,6 +27,9 @@ COUNTRIES = {
     "ussr": {"name": "شوروی", "flag": "☭"}, "usa": {"name": "آمریکا", "flag": "🇺🇸"},
     "france": {"name": "فرانسه", "flag": "🇫🇷"}, "italy": {"name": "ایتالیا", "flag": "🇮🇹"},
     "china": {"name": "چین", "flag": "🇨🇳"}, "japan": {"name": "ژاپن", "flag": "🇯🇵"},
+    "saudi": {"name": "عربستان", "flag": "🇸🇦"}, "iran": {"name": "ایران", "flag": "🇮🇷"},
+    "turkey": {"name": "ترکیه", "flag": "🇹🇷"}, "venezuela": {"name": "ونزوئلا", "flag": "🇻🇪"},
+    "egypt": {"name": "مصر", "flag": "🇪🇬"},
 }
 
 STARTING_MONEY = 10_000_000
@@ -813,7 +816,9 @@ WELFARE_EVENTS = {
 }
 COUNTRY_RISKS = {"germany": ["crime"], "britain": ["pandemic"], "ussr": ["famine", "drought"],
                  "usa": ["crime", "earthquake"], "france": ["drought"], "italy": ["earthquake"],
-                 "china": ["pandemic", "earthquake"], "japan": ["earthquake"]}
+                 "china": ["pandemic", "earthquake"], "japan": ["earthquake"],
+                 "saudi": ["drought"], "iran": ["earthquake"], "turkey": ["earthquake"],
+                 "venezuela": ["crime"], "egypt": ["drought"]}
 
 def welfare_gross(player):
     total = 0
@@ -1589,8 +1594,9 @@ def _detect_news_countries(title, text):
         s = s.replace(n, " ")
     found = []
     for cid, c in COUNTRIES.items():
-        pos = s.find(c["name"])
-        if pos >= 0: found.append((pos, cid))
+        # نام کشور باید کلمهٔ مستقل باشد (مثلاً «مصر» داخل «مصرف» نباشد)
+        m = re.search(r"(?<![\u0600-\u06FF\u200c])" + re.escape(c["name"]) + r"(?![\u0600-\u06FF\u200c])", s)
+        if m: found.append((m.start(), cid))
     return [cid for _, cid in sorted(found)][:3]
 
 def push_news(title, text, kind="info", countries=None):
@@ -3099,6 +3105,8 @@ COUNTRY_PORT_COORDS = {
     "germany": (8.15, 53.53), "britain": (-1.10, 50.80), "ussr": (30.20, 59.93),
     "usa": (-76.30, 36.90), "france": (-4.49, 48.39), "italy": (14.27, 40.85),
     "china": (121.50, 31.23), "japan": (139.65, 35.45),
+    "saudi": (39.17, 21.49), "iran": (56.27, 27.18), "turkey": (28.98, 41.00),
+    "venezuela": (-66.93, 10.60), "egypt": (29.92, 31.20),
 }
 NAVAL_WAYPOINTS = {
     "sea:north": (3.0, 57.0), "sea:channel": (-3.8, 50.0), "sea:biscay": (-12.0, 45.0),
@@ -5030,12 +5038,18 @@ TRADE_COUNTRY_COORDS = {  # پایتخت هر کشور (نقطهٔ خانه بر
     "germany": (13.40, 52.52), "france": (2.35, 48.86), "italy": (12.50, 41.90),
     "britain": (-0.13, 51.51), "ussr": (37.62, 55.75), "usa": (-77.04, 38.90),
     "china": (116.40, 39.90), "japan": (139.69, 35.69),
+    "saudi": (46.72, 24.63), "iran": (51.39, 35.69), "turkey": (32.86, 39.93),
+    "venezuela": (-66.90, 10.48), "egypt": (31.24, 30.04),
 }
 # فقط همسایهٔ مستقیم؛ کشور واسطه برای تجارت زمینی استفاده نمی‌شود.
 LAND_NEIGHBORS = {
     frozenset(("germany", "france")), frozenset(("germany", "ussr")),
     frozenset(("germany", "italy")), frozenset(("france", "italy")),
     frozenset(("ussr", "china")),
+    # همسایگی زمینی ۱۹۳۶ کشورهای جدید (با قلمروهای مستعمراتی بریتانیا/فرانسه/ایتالیا)
+    frozenset(("turkey", "ussr")), frozenset(("iran", "ussr")), frozenset(("turkey", "iran")),
+    frozenset(("turkey", "france")), frozenset(("egypt", "britain")), frozenset(("egypt", "italy")),
+    frozenset(("saudi", "britain")), frozenset(("iran", "britain")), frozenset(("venezuela", "britain")),
 }
 # مسیرهای دریایی ساده‌شدهٔ بازی. [] یعنی مسیر مستقیم و بدون تنگه.
 SEA_ROUTE_HINTS = {
