@@ -39,14 +39,18 @@ let unionChatSignature = "";
 let unionDataCache = null;
 
 const COUNTRY_IMAGE_EXT = { germany: "png", britain: "jfif", ussr: "jfif", usa: "jfif",
-    france: "jfif", italy: "jfif", china: "jfif", japan: "jfif" };
+    france: "jfif", italy: "jfif", china: "jfif", japan: "jfif",
+    saudi: "jpg", iran: "jpg", turkey: "jpg", venezuela: "jpg", egypt: "jpg" };
 const COUNTRY_FLAGS = { germany: "🇩🇪", britain: "🇬🇧", ussr: "☭", usa: "🇺🇸",
-    france: "🇫🇷", italy: "🇮🇹", china: "🇨🇳", japan: "🇯🇵" };
+    france: "🇫🇷", italy: "🇮🇹", china: "🇨🇳", japan: "🇯🇵",
+    saudi: "🇸🇦", iran: "🇮🇷", turkey: "🇹🇷", venezuela: "🇻🇪", egypt: "🇪🇬" };
 const TREATY_TYPE_NAMES = { alliance: "پیمان اتحاد", non_aggression: "پیمان عدم تجاوز" };
 const COUNTRY_NAMES = { germany: "آلمان", britain: "بریتانیا", ussr: "شوروی", usa: "آمریکا",
-    france: "فرانسه", italy: "ایتالیا", china: "چین", japan: "ژاپن" };
+    france: "فرانسه", italy: "ایتالیا", china: "چین", japan: "ژاپن",
+    saudi: "عربستان", iran: "ایران", turkey: "ترکیه", venezuela: "ونزوئلا", egypt: "مصر" };
 const COUNTRY_IDS = { germany: 276, britain: 826, ussr: 643, usa: 840,
-    france: 250, italy: 380, china: 156, japan: 392 };
+    france: 250, italy: 380, china: 156, japan: 392,
+    saudi: 682, iran: 364, turkey: 792, venezuela: 862, egypt: 818 };
 
 let ARMY_UNITS = {};
 
@@ -3038,7 +3042,7 @@ let adminPanelLoading = false;
 let adminPrivateMessagesCache = [];
 let adminSelectedPlayerId = null;
 let adminSelectedPlayerDetailOpen = false;
-const adminCountryLabels = {germany:"آلمان",britain:"بریتانیا",ussr:"شوروی",usa:"آمریکا",france:"فرانسه",italy:"ایتالیا",china:"چین",japan:"ژاپن"};
+const adminCountryLabels = {germany:"آلمان",britain:"بریتانیا",ussr:"شوروی",usa:"آمریکا",france:"فرانسه",italy:"ایتالیا",china:"چین",japan:"ژاپن",saudi:"عربستان",iran:"ایران",turkey:"ترکیه",venezuela:"ونزوئلا",egypt:"مصر"};
 const isAdminAccount = Number(userId) === ADMIN_TELEGRAM_ID;
 
 /* راهنمای شروع: فقط بار اول خودکار نمایش داده می‌شود */
@@ -5545,11 +5549,13 @@ async function loadMapSites() {
 
 const MAP_CAPITALS = {
     germany: [13.40, 52.52], britain: [-0.13, 51.51], ussr: [37.62, 55.75], usa: [-77.04, 38.90],
-    france: [2.35, 48.86], italy: [12.50, 41.90], china: [116.40, 39.90], japan: [139.69, 35.69]
+    france: [2.35, 48.86], italy: [12.50, 41.90], china: [116.40, 39.90], japan: [139.69, 35.69],
+    saudi: [46.72, 24.63], iran: [51.39, 35.69], turkey: [32.86, 39.93], venezuela: [-66.90, 10.48], egypt: [31.24, 30.04]
 };
 const MAP_PORTS = {
     germany: [8.15, 53.53], britain: [-1.10, 50.80], ussr: [30.20, 59.93], usa: [-76.30, 36.90],
-    france: [-4.49, 48.39], italy: [14.27, 40.85], china: [121.50, 31.23], japan: [139.65, 35.45]
+    france: [-4.49, 48.39], italy: [14.27, 40.85], china: [121.50, 31.23], japan: [139.65, 35.45],
+    saudi: [39.17, 21.49], iran: [56.27, 27.18], turkey: [28.98, 41.00], venezuela: [-66.93, 10.60], egypt: [29.92, 31.20]
 };
 function renderMapSites() {
     if (!mapSitesSvg) return;
