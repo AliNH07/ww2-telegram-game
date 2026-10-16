@@ -803,15 +803,28 @@
         <section class="admin-global" id="admin-global">
           <div class="admin-global-heading"><h2>اطلاعات کلی بازی</h2><span id="admin-last-refresh">به‌روزرسانی خودکار هر ۱۰ ثانیه</span></div>
           <div class="admin-global-grid" id="admin-global-stats"><div class="admin-empty">در حال دریافت آمار همه دنیاها…</div></div>
+          <button type="button" id="admin-open-broadcast" class="admin-broadcast-entry"><span>📣 ارسال سراسری پیام</span><span>←</span></button>
           <section class="admin-global-block">
             <div class="admin-global-heading"><h2>🌍 مدیریت دنیاها</h2><button type="button" id="admin-add-world-btn" class="admin-add-world">＋ افزودن دنیا</button></div>
             <form id="admin-create-world-form" class="admin-world-create hidden"><label for="admin-new-world-name">نام دنیا (اختیاری)</label><input id="admin-new-world-name" maxlength="50" placeholder="مثلاً دنیای ۲"><button type="submit" class="admin-primary-btn">ساخت دنیا</button></form>
             <div id="admin-world-picker" class="admin-world-picker"><div class="admin-empty">در حال دریافت دنیاها…</div></div>
           </section>
-          <section class="admin-global-block">
-            <div class="admin-global-heading"><h2>📨 پیام‌ها (سازمان ملل)</h2><span id="admin-un-count" class="admin-count-pill">۰</span></div>
-            <div id="admin-un-list" class="admin-news-list"><div class="admin-empty">در حال دریافت پیام‌ها…</div></div>
-          </section>
+        </section>
+        <section id="admin-broadcast-view" class="admin-broadcast-view hidden">
+          <button type="button" id="admin-broadcast-back" class="admin-broadcast-back">→ بازگشت</button>
+          <div class="admin-broadcast-head"><h2>📣 ارسال سراسری پیام</h2><p>پیام هم در بخش اخبار بازی ثبت می‌شود و هم در تلگرام به صورت پیام خصوصی برای بازیکنان فرستاده می‌شود.</p></div>
+          <form id="admin-broadcast-form" class="admin-broadcast-form">
+            <label>عنوان پیام<input id="admin-broadcast-title" maxlength="100" required placeholder="مثلاً: رویداد تازه آغاز شد"></label>
+            <label>توضیحات<textarea id="admin-broadcast-text" maxlength="1200" rows="6" required placeholder="متن پیام را واضح و کوتاه بنویس…"></textarea></label>
+            <div class="admin-bc-options" role="radiogroup" aria-label="مقصد پیام">
+              <label class="admin-bc-option"><input type="radio" name="admin-bc-scope" value="all" checked><span>🌍 ارسال به کل بازیکنان در همهٔ دنیاها</span></label>
+              <label class="admin-bc-option"><input type="radio" name="admin-bc-scope" value="world"><span>🎯 ارسال به یک دنیای خاص</span></label>
+              <label id="admin-bc-world-wrap" class="admin-bc-world hidden">انتخاب دنیا<select id="admin-bc-world"></select></label>
+            </div>
+            <div class="admin-message-preview"><b>پیش‌نمایش پیام</b><strong id="admin-broadcast-preview-title">عنوان پیام اینجا نمایش داده می‌شود</strong><p id="admin-broadcast-preview-text">متن پیام را وارد کن تا پیش‌نمایش دیده شود.</p></div>
+            <button type="submit" class="admin-primary-btn">📣 ارسال پیام</button>
+            <p class="admin-editor-note">ارسال به حساب‌هایی که ربات را مسدود کرده‌اند ممکن است ناموفق باشد؛ تعداد موفق و ناموفق گزارش می‌شود. بازیکنی که در چند دنیا باشد فقط یک پیام تلگرام می‌گیرد.</p>
+          </form>
         </section>
         <div id="admin-world-detail" class="hidden">
           <div class="admin-world-detail-head"><button type="button" id="admin-back-worlds">→ بازگشت به دنیاها</button><h2 id="admin-world-detail-title">مدیریت دنیا</h2><p>تمام تنظیمات و اطلاعات فقط مربوط به همین دنیاست.</p></div>
@@ -829,8 +842,7 @@
             <button class="admin-tab active" type="button" data-admin-tab="players">👥 بازیکنان</button>
             <button class="admin-tab" type="button" data-admin-tab="economy">💰 اقتصاد</button>
             <button class="admin-tab" type="button" data-admin-tab="wars">⚔️ اعلان جنگ‌ها</button>
-            <button class="admin-tab" type="button" data-admin-tab="complaints">📨 شکایت‌ها و پیام‌ها</button>
-            <button class="admin-tab" type="button" data-admin-tab="broadcast">📣 پیام‌ها</button>
+            <button class="admin-tab" type="button" data-admin-tab="un">🌐 سازمان ملل <span id="admin-un-tab-count" class="admin-count-pill hidden">۰</span></button>
             <button class="admin-tab" type="button" data-admin-tab="activity">🧾 گزارش عملیات</button>
         </div>
         <section id="admin-panel-players" class="admin-panel">
@@ -880,16 +892,18 @@
             <div class="admin-section-head"><div><span class="admin-section-kicker">UNITED NATIONS REVIEW</span><h3>بررسی درخواست‌های اعلان جنگ</h3><p>با بازکردن هر درخواست، دلیل کامل دیده می‌شود. با تأیید، جنگ بلافاصله آغاز و به بازیکنان همان دنیا اطلاع داده می‌شود.</p></div><button type="button" id="admin-wars-refresh" class="admin-refresh-btn" aria-label="تازه‌سازی درخواست‌های جنگ">⟳</button></div>
             <div id="admin-war-list" class="admin-war-list"><div class="admin-empty">در حال دریافت درخواست‌ها…</div></div>
         </section>
-        <section id="admin-panel-complaints" class="admin-panel hidden"><div class="admin-section-head"><div><h3>پیام‌های خصوصی و شکایت‌ها</h3><p>پیام‌های خصوصی کشورهای همین دنیا؛ موارد حاوی واژه‌های شکایت برای بررسی جدا می‌شوند.</p></div></div><div id="admin-pm-list" class="admin-news-list"></div></section>
-        <section id="admin-panel-broadcast" class="admin-panel hidden">
-            <div class="admin-section-head"><div><span class="admin-section-kicker">MESSAGES & NEWS</span><h3>خبر عمومی و اعلان</h3><p>خبر در بخش اخبار بازی ثبت می‌شود و به کاربران تلگرام هم ارسال خواهد شد.</p></div></div>
-            <form id="admin-broadcast-form" class="admin-broadcast-form">
-                <label>عنوان خبر<input id="admin-broadcast-title" maxlength="100" required placeholder="مثلاً: رویداد تازه آغاز شد"></label>
-                <label>متن پیام<textarea id="admin-broadcast-text" maxlength="1200" rows="5" required placeholder="متن پیام را واضح و کوتاه بنویس…"></textarea></label>
-                <div class="admin-message-preview"><b>پیش‌نمایش پیام</b><strong id="admin-broadcast-preview-title">عنوان خبر اینجا نمایش داده می‌شود</strong><p id="admin-broadcast-preview-text">متن پیام را وارد کن تا پیش‌نمایش دیده شود.</p><small>دکمهٔ ورود به بازی به پیام تلگرام اضافه می‌شود.</small></div>
-                <button type="submit" class="admin-primary-btn">📣 ارسال به همهٔ بازیکنان</button>
-                <p class="admin-editor-note">ارسال به حساب‌هایی که ربات را مسدود کرده‌اند ممکن است ناموفق باشد؛ تعداد موفق و ناموفق گزارش می‌شود.</p>
-            </form>
+        <section id="admin-panel-un" class="admin-panel hidden">
+            <div id="admin-un-home">
+                <div class="admin-section-head"><div><span class="admin-section-kicker">UNITED NATIONS</span><h3>پیام‌های سازمان ملل</h3><p>کشورهایی که از همین دنیا به سازمان ملل پیام داده‌اند. روی هر کشور بزن تا گفتگو را ببینی و پاسخ بدهی.</p></div><span id="admin-un-count" class="admin-count-pill">۰</span></div>
+                <div class="admin-un-new"><select id="admin-un-new-country" aria-label="کشور"></select><button type="button" id="admin-un-new-btn" class="admin-primary-btn">✉️ پیام جدید به این کشور</button></div>
+                <div id="admin-un-list" class="admin-news-list"><div class="admin-empty">در حال دریافت پیام‌ها…</div></div>
+            </div>
+            <div id="admin-un-thread" class="admin-un-thread hidden">
+                <button type="button" id="admin-un-back" class="admin-player-detail-back">← بازگشت به فهرست کشورها</button>
+                <h3 id="admin-un-thread-title">گفتگو</h3>
+                <div id="admin-un-thread-msgs" class="admin-un-msgs"></div>
+                <div class="admin-direct-message"><textarea id="admin-un-reply-text" rows="3" maxlength="1000" placeholder="پاسخ به این کشور…"></textarea><button id="admin-un-reply-send" type="button" class="admin-primary-btn">📨 ارسال پاسخ</button></div>
+            </div>
         </section>
         <section id="admin-panel-activity" class="admin-panel hidden">
             <div class="admin-section-head"><div><span class="admin-section-kicker">AUDIT LOG</span><h3>گزارش عملیات مدیریت</h3><p>آخرین تغییرات مدیریتی برای بررسی و پیگیری ثبت می‌شوند.</p></div><span class="admin-count-pill">آخرین ۶۰ مورد</span></div>
