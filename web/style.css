@@ -3392,3 +3392,13 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .tr-actions .modal-cancel{flex:1;min-height:48px;border-radius:14px}
 .tr-actions .modal-ok{flex:2;min-height:48px;border-radius:14px;font-weight:800}
 @media(max-width:360px){.tr-grid{grid-template-columns:1fr}.tr-total b{font-size:18px}}
+
+/* ارتفاع کمتر ردیف‌های وسط صفحهٔ ارتش */
+.unit-card-new { padding: 10px 12px; gap: 6px; }
+.unit-card-new-info { gap: 4px; }
+.unit-card-new-info span { padding: 2px 7px; }
+#army .fq-section { padding: 8px 12px; margin-bottom: 8px; }
+#army .fq-head { margin-bottom: 4px; }
+#army .fq-row + .fq-row { margin-top: 6px; padding-top: 6px; }
+#army .fq-stats { margin-top: 3px; gap: 4px 12px; }
+#army .base-card { padding: 8px 12px !important; gap: 6px !important; }
