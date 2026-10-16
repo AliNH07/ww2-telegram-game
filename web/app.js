@@ -6674,6 +6674,7 @@ const toFaDigits = s => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d])
 const shopPrice = n => toFaDigits(Number(n).toLocaleString("en-US").replace(/,/g, "٬")) + " تومان";
 
 function renderSubscription() {
+    refreshShopBanner();
     // وضعیت‌ها از سرور می‌آیند (charge_pack_purchased / vip_until)؛ تا آماده‌شدن سرور، حالت پیش‌فرض نمایش داده می‌شود.
     const bought = !!player?.charge_pack_purchased;
     const cBtn = document.getElementById("shop-charge-open"), cBadge = document.getElementById("shop-charge-badge");
@@ -6701,13 +6702,115 @@ function renderSubscription() {
     }
 }
 
-function openShopPay(key) {
-    const prod = SHOP_PRODUCTS[key]; if (!prod) return;
-    if (key === "charge" && player?.charge_pack_purchased) { showToast("این بسته قبلاً برای حساب شما خریداری شده است.", "error"); return; }
-    document.getElementById("shop-pay-name").textContent = prod.name;
-    document.getElementById("shop-pay-amount").textContent = shopPrice(prod.price);
-    showGamePage("shop-pay");
+/* ---- سفارش و صفحهٔ پرداخت (بخش ۳): زمان فقط از سرور می‌آید؛ شمارنده با ساعت یکنواخت مرورگر (performance.now) کار می‌کند تا تغییر ساعت دستگاه اثری نداشته باشد ---- */
+const SHOP_STATUS_TEXT = {
+    awaiting_payment: "در انتظار پرداخت و ارسال رسید", pending_review: "در انتظار بررسی مدیر", approved: "تأییدشده",
+    rejected: "ردشده", cancelled: "لغوشده توسط کاربر", expired: "منقضی‌شده به دلیل پایان مهلت"
+};
+let shopOrder = null, shopDeadline = 0, shopTick = null, shopOrderBusy = false, shopExpiryChecking = false;
+
+const shopClock = secs => {
+    secs = Math.max(0, Math.ceil(secs));
+    return toFaDigits(String(Math.floor(secs / 60)).padStart(2, "0") + ":" + String(secs % 60).padStart(2, "0"));
+};
+
+function renderShopPay() {
+    const o = shopOrder; if (!o) return;
+    const live = o.status === "awaiting_payment";
+    document.getElementById("shop-pay-name").textContent = o.product_name;
+    document.getElementById("shop-pay-amount").textContent = shopPrice(o.amount);
+    document.getElementById("shop-pay-order").textContent = o.id;
+    const start = new Date(o.created_at);
+    document.getElementById("shop-pay-start").textContent = start.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const st = document.getElementById("shop-pay-status");
+    st.textContent = SHOP_STATUS_TEXT[o.status] || o.status;
+    st.dataset.status = o.status;
+    const msg = document.getElementById("shop-pay-msg");
+    const text = o.status === "expired" ? "مهلت پرداخت به پایان رسید و سفارش به‌صورت خودکار لغو شد."
+        : o.status === "cancelled" ? "این سفارش لغو شده است." : "";
+    msg.textContent = text; msg.classList.toggle("hidden", !text);
+    document.getElementById("shop-pay-timer").classList.toggle("hidden", !live && o.status !== "expired");
+    document.getElementById("shop-pay-timer").classList.toggle("ended", !live);
+    document.getElementById("shop-pay-new").classList.toggle("hidden", live || o.status === "pending_review");
+    document.getElementById("shop-pay-next").classList.toggle("hidden", !live);
+    tickShopCountdown();
 }
+
+function tickShopCountdown() {
+    const page = document.getElementById("shop-pay");
+    if (!shopOrder || !page || page.classList.contains("hidden")) { clearInterval(shopTick); shopTick = null; return; }
+    if (shopOrder.status !== "awaiting_payment") {
+        document.getElementById("shop-pay-countdown").textContent = shopClock(0);
+        clearInterval(shopTick); shopTick = null; return;
+    }
+    const left = (shopDeadline - performance.now()) / 1000;
+    document.getElementById("shop-pay-countdown").textContent = shopClock(left);
+    if (left <= 0) { checkShopExpiry(); }
+}
+
+async function checkShopExpiry() {
+    if (shopExpiryChecking || !shopOrder) return;
+    shopExpiryChecking = true;
+    try {
+        const r = await apiGet("/api/shop/order", { order_id: shopOrder.id });
+        if (r?.success && r.order) {
+            if (r.order.status === "awaiting_payment") {
+                // سرور هنوز مهلت را تمام‌شده نمی‌داند؛ زمان باقی‌مانده را با سرور هم‌گام می‌کنیم.
+                shopDeadline = performance.now() + r.order.seconds_left * 1000;
+            } else {
+                shopOrder = r.order;
+            }
+            renderShopPay();
+        }
+    } catch (e) { /* در تیک بعدی دوباره تلاش می‌شود */ }
+    finally { shopExpiryChecking = false; }
+}
+
+function showShopOrder(order) {
+    shopOrder = order;
+    shopDeadline = performance.now() + (Number(order.seconds_left) || 0) * 1000;
+    showGamePage("shop-pay");
+    renderShopPay();
+    clearInterval(shopTick);
+    shopTick = setInterval(tickShopCountdown, 250);
+}
+
+async function openShopPay(key) {
+    const prod = SHOP_PRODUCTS[key]; if (!prod || shopOrderBusy) return;
+    if (key === "charge" && player?.charge_pack_purchased) { showToast("این بسته قبلاً برای حساب شما خریداری شده است.", "error"); return; }
+    shopOrderBusy = true;
+    document.querySelectorAll("#shop-charge-buy, #shop-vip-buy").forEach(b => b.disabled = true);
+    try {
+        const r = await apiPost("/api/shop/order", { product: key });
+        if (r?.order && (r.success || r.error === "active_order_exists")) {
+            if (r.success && r.existing) showToast("سفارش فعال شما ادامه پیدا کرد.", "success");
+            if (!r.success) showToast(r.message || "یک سفارش فعال دارید.", "error");
+            showShopOrder(r.order);
+        } else showToast(r?.message || "ثبت سفارش انجام نشد. دوباره تلاش کنید.", "error");
+    } catch (e) {
+        showToast("ارتباط با سرور برقرار نشد. دوباره تلاش کنید.", "error");
+    } finally {
+        shopOrderBusy = false;
+        document.querySelectorAll("#shop-charge-buy, #shop-vip-buy").forEach(b => { b.disabled = (b.id === "shop-charge-buy" && !!player?.charge_pack_purchased); });
+    }
+}
+
+// سفارش فعال بعد از رفرش یا ورود دوباره، در صفحهٔ اشتراک نمایش داده می‌شود.
+async function refreshShopBanner() {
+    const banner = document.getElementById("shop-active-banner"); if (!banner) return;
+    try {
+        const r = await apiGet("/api/shop/order");
+        const o = r?.success ? r.order : null;
+        if (!o) { banner.classList.add("hidden"); banner.onclick = null; return; }
+        document.getElementById("shop-active-text").textContent = o.status === "awaiting_payment"
+            ? `سفارش ${o.product_name} در انتظار پرداخت است · ${shopClock(o.seconds_left)}`
+            : `سفارش ${o.product_name} در انتظار بررسی مدیر است`;
+        banner.classList.remove("hidden");
+        banner.onclick = () => showShopOrder(o);
+    } catch (e) { banner.classList.add("hidden"); }
+}
+document.getElementById("shop-pay-new")?.addEventListener("click", () => showGamePage("subscription"));
+document.addEventListener("visibilitychange", () => { if (!document.hidden && shopOrder?.status === "awaiting_payment" && !document.getElementById("shop-pay")?.classList.contains("hidden")) checkShopExpiry(); });
 document.getElementById("shop-charge-open")?.addEventListener("click", () => showGamePage("shop-charge-detail"));
 document.getElementById("shop-vip-open")?.addEventListener("click", () => showGamePage("shop-vip-detail"));
 document.getElementById("shop-charge-buy")?.addEventListener("click", () => openShopPay("charge"));
