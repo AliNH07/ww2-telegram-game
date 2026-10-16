@@ -2726,7 +2726,7 @@ async function askWarReason(target) {
         ov.innerHTML = `<section class="modal-box war-reason-dialog" role="dialog" aria-modal="true" aria-labelledby="war-reason-title">
             <div class="ann-modal-head"><div><span class="ann-modal-kicker">درخواست رسمی</span><h2 class="modal-title" id="war-reason-title">اعلان جنگ به ${escapeHtml(COUNTRY_NAMES[target] || target)}</h2></div><button type="button" class="ann-modal-close" aria-label="بستن">×</button></div>
             <p>دلیل اعلان جنگ شما به کشور انتخابی چیست؟ این دلیل فقط برای سازمان ملل ارسال می‌شود؛ سازمان ملل دلیل رسمی خودش را برای همهٔ بازیکنان اعلام می‌کند.</p>
-            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید سازمان ملل، ۲۴ ساعت فاز مذاکره شروع می‌شود و بعد از آن جنگ آغاز می‌شود؛ سپس نیروها را از روی نقشه اعزام کن.</small>
+            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید سازمان ملل، زمان شروع جنگ را مدیر مشخص می‌کند و تا آن موقع فاز مذاکره است؛ سپس نیروها را از روی نقشه اعزام کن.</small>
             <div class="ann-modal-actions"><button type="button" class="modal-cancel" data-war-reason-cancel>انصراف</button><button type="button" class="ann-publish-button" data-war-reason-submit>ارسال به سازمان ملل</button></div>
         </section>`;
         document.body.appendChild(ov); const input = ov.querySelector("#war-reason-input");
@@ -3184,23 +3184,27 @@ function renderAdminWars() {
     const pending = (adminWarsCache || []).filter(w => ["pending_admin", "negotiation", "battle", "peace", "rejected", "resolved"].includes(w.status));
     if (!pending.length) { root.innerHTML = `<div class="admin-empty">درخواست جنگی برای این دنیا ثبت نشده است.</div>`; return; }
     root.innerHTML = pending.map(w => {
-        const status = w.status === "pending_admin" ? "در انتظار بررسی مدیر" : w.status === "negotiation" ? "فاز مذاکره (۲۴ ساعته)" : w.status === "battle" ? "جنگ آغاز شده" : w.status === "peace" ? "صلح برقرار شد" : w.status === "resolved" ? "مختومه" : "رد شده";
+        const status = w.status === "pending_admin" ? "در انتظار بررسی مدیر" : w.status === "negotiation" ? "فاز مذاکره" : w.status === "battle" ? "جنگ آغاز شده" : w.status === "peace" ? "صلح برقرار شد" : w.status === "resolved" ? "مختومه" : "رد شده";
         const end = w.status === "negotiation" && w.negotiation_ends ? `پایان مذاکره و شروع جنگ: ${new Date(w.negotiation_ends).toLocaleString("fa-IR")}` : "";
         const officialReason = w.admin_reason ? `<div class="admin-war-reason"><b>دلیل رسمی شما (ارسال‌شده برای همه)</b><p>${escapeHtml(w.admin_reason)}</p></div>` : "";
-        return `<article class="admin-war-card"><div class="admin-war-card-head"><div><b>${escapeHtml(w.attacker_name || COUNTRY_NAMES[w.attacker] || w.attacker)} ← ${escapeHtml(w.defender_name || COUNTRY_NAMES[w.defender] || w.defender)}</b><small>${escapeHtml(status)} · ${escapeHtml(w.created_at ? new Date(w.created_at).toLocaleString("fa-IR") : "")}</small></div><span class="admin-war-status">${escapeHtml(w.status)}</span></div><details class="admin-war-detail"><summary>👁️ بازکردن جزئیات و دلیل اعلان جنگ</summary><div class="admin-war-reason"><b>دلیل بازیکن</b><p>${escapeHtml(w.reason || "دلیلی ثبت نشده است.")}</p></div>${officialReason}${end ? `<small class="admin-war-meta">${escapeHtml(end)}</small>` : ""}</details>${w.status === "pending_admin" ? `<label class="admin-war-official"><b>✍️ دلیل رسمی شما (برای همهٔ بازیکنان ارسال می‌شود)</b><textarea class="admin-war-official-input" data-war-reason-for="${escapeHtml(w.id)}" maxlength="1000" placeholder="دلیل اعلان جنگ را اینجا بنویسید…"></textarea></label><div class="admin-war-actions"><button type="button" data-war-review="approve" data-war-id="${escapeHtml(w.id)}">✅ تأیید و شروع مهلت ۲۴ ساعته</button><button type="button" data-war-review="reject" data-war-id="${escapeHtml(w.id)}">✕ رد درخواست</button></div>` : ""}</article>`;
+        return `<article class="admin-war-card"><div class="admin-war-card-head"><div><b>${escapeHtml(w.attacker_name || COUNTRY_NAMES[w.attacker] || w.attacker)} ← ${escapeHtml(w.defender_name || COUNTRY_NAMES[w.defender] || w.defender)}</b><small>${escapeHtml(status)} · ${escapeHtml(w.created_at ? new Date(w.created_at).toLocaleString("fa-IR") : "")}</small></div><span class="admin-war-status">${escapeHtml(w.status)}</span></div><details class="admin-war-detail"><summary>👁️ بازکردن جزئیات و دلیل اعلان جنگ</summary><div class="admin-war-reason"><b>دلیل بازیکن</b><p>${escapeHtml(w.reason || "دلیلی ثبت نشده است.")}</p></div>${officialReason}${end ? `<small class="admin-war-meta">${escapeHtml(end)}</small>` : ""}</details>${w.status === "pending_admin" ? `<label class="admin-war-official"><b>✍️ دلیل رسمی شما (برای همهٔ بازیکنان ارسال می‌شود)</b><textarea class="admin-war-official-input" data-war-reason-for="${escapeHtml(w.id)}" maxlength="1000" placeholder="دلیل اعلان جنگ را اینجا بنویسید…"></textarea></label><label class="admin-war-official"><b>⏰ ساعت شروع جنگ (چند ساعت بعد از تأیید؟)</b><input type="number" class="admin-war-hours-input" data-war-hours-for="${escapeHtml(w.id)}" min="0" max="720" step="0.5" value="24" inputmode="decimal"><small>مثلاً ۲ یعنی دو ساعت بعد از تأیید، جنگ شروع می‌شود؛ ۰ یعنی همین الان.</small></label><div class="admin-war-actions"><button type="button" data-war-review="approve" data-war-id="${escapeHtml(w.id)}">✅ تأیید و اعلان جنگ</button><button type="button" data-war-review="reject" data-war-id="${escapeHtml(w.id)}">✕ رد درخواست</button></div>` : ""}</article>`;
     }).join("");
     root.querySelectorAll("[data-war-review]").forEach(button => button.addEventListener("click", async () => {
         const action = button.dataset.warReview, warId = button.dataset.warId;
-        let adminReason = "";
+        let adminReason = "", startHours = 24;
         if (action === "approve") {
             const box = root.querySelector(`[data-war-reason-for="${CSS.escape(warId)}"]`);
             adminReason = (box?.value || "").trim();
             if (!adminReason) { showToast("اول دلیل رسمی خودتان را بنویسید.", "error"); box?.focus(); return; }
-            if (!confirm("تأیید می‌کنی؟ به همهٔ بازیکنان پیام می‌رود که این کشور به آن کشور اعلان جنگ کرد (با دلیل تو) و ۲۴ ساعت فرصت مذاکره دارند؛ بعد از آن جنگ شروع می‌شود.")) return;
+            const hoursBox = root.querySelector(`[data-war-hours-for="${CSS.escape(warId)}"]`);
+            startHours = Number(String(hoursBox?.value ?? "").replace(",", "."));
+            if (hoursBox?.value === "" || !Number.isFinite(startHours) || startHours < 0 || startHours > 720) { showToast("ساعت شروع جنگ باید عددی بین ۰ تا ۷۲۰ باشد.", "error"); hoursBox?.focus(); return; }
+            const whenTxt = startHours === 0 ? "جنگ همین الان شروع می‌شود" : `${startHours} ساعت فرصت مذاکره دارند و بعد از آن جنگ شروع می‌شود`;
+            if (!confirm(`تأیید می‌کنی؟ به همهٔ بازیکنان پیام می‌رود که این کشور به آن کشور اعلان جنگ کرد (با دلیل تو)؛ ${whenTxt}.`)) return;
         }
         button.disabled = true;
         try {
-            const result = await apiPost("/api/admin/war/review", { war_id: warId, action, admin_reason: adminReason });
+            const result = await apiPost("/api/admin/war/review", { war_id: warId, action, admin_reason: adminReason, start_hours: startHours });
             showToast(result.message || (result.success ? "بررسی انجام شد." : "خطا"), result.success ? "success" : "error");
             if (result.success) await loadAdminPanel(); else button.disabled = false;
         } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); button.disabled = false; }
