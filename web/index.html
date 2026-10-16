@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1936</title>
-<link rel="stylesheet" href="/style.css?v=20261016shop3">
+<link rel="stylesheet" href="/style.css?v=20261016shop4">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -786,7 +786,10 @@
     <!-- ==================== اشتراک ==================== -->
     <main id="subscription" class="game-page hidden">
         <div class="page-title"><span>امکانات ویژه</span><h1>اشتراک</h1></div>
-        <button type="button" class="shop-active hidden" id="shop-active-banner"><span id="shop-active-text"></span><b>ادامه ←</b></button>
+        <section class="shop-active shop-history hidden" id="shop-active-banner" aria-label="تاریخچه سفارش‌ها">
+            <div class="shop-history-heading"><h2>تاریخچه سفارش‌ها</h2><button type="button" id="shop-history-refresh">به‌روزرسانی</button></div>
+            <div class="shop-history-list" id="shop-history-list"><div class="shop-history-empty">در حال دریافت تاریخچه سفارش‌ها…</div></div>
+        </section>
         <div class="shop-list">
             <article class="shop-card shop-charge" id="shop-card-charge">
                 <h2>شارژ حساب ۱۰ میلیون دلار</h2>
@@ -864,7 +867,7 @@
             </div>
             <div class="shop-timer" id="shop-pay-timer">
                 <span>مهلت ارسال رسید پرداخت:</span>
-                <strong id="shop-pay-countdown" dir="ltr">۱۵:۰۰</strong>
+                <strong id="shop-pay-countdown" dir="ltr">۳۰:۰۰</strong>
             </div>
             <p class="shop-desc shop-pay-msg hidden" id="shop-pay-msg"></p>
             <p class="shop-desc" id="shop-pay-next">مبلغ سفارش را به کارت مقصد واریز کنید و سپس رسید را در همین صفحه بفرستید.</p>
@@ -879,19 +882,22 @@
               </div>
               <h3>ارسال رسید پرداخت</h3>
               <div class="shop-receipt-options" role="radiogroup" aria-label="روش ارسال رسید">
-                <label><input type="radio" name="shop-receipt-method" value="image" checked><span>🖼️ تصویر رسید</span></label>
-                <label><input type="radio" name="shop-receipt-method" value="text"><span>✍️ اطلاعات متنی</span></label>
+                <label><input type="radio" name="shop-receipt-method" value="image" checked><span>ارسال تصویر</span></label>
+                <label><input type="radio" name="shop-receipt-method" value="text"><span>ارسال متن</span></label>
               </div>
               <div id="shop-receipt-image-wrap" class="shop-receipt-field">
-                <label for="shop-receipt-file" class="shop-upload-label">انتخاب تصویر رسید بانکی</label>
-                <input id="shop-receipt-file" type="file" accept="image/jpeg,image/png,image/webp">
-                <div class="shop-receipt-preview hidden" id="shop-receipt-preview-wrap"><img id="shop-receipt-preview" alt="پیش‌نمایش رسید"><button type="button" id="shop-receipt-remove">حذف تصویر</button></div>
-                <small>فرمت‌های JPG، PNG و WebP. تصویر برای ارسال به مدیر بهینه می‌شود.</small>
+                <label for="shop-receipt-file" class="shop-upload-box">
+                    <strong>برای بارگذاری تصویر رسید اینجا کلیک کنید</strong>
+                    <small>فایل اصلی برای مدیر ارسال می‌شود.</small>
+                    <span id="shop-receipt-file-name">هنوز فایلی انتخاب نشده است</span>
+                </label>
+                <input id="shop-receipt-file" class="shop-receipt-file-input" type="file">
+                <div class="shop-receipt-preview hidden" id="shop-receipt-preview-wrap"><img id="shop-receipt-preview" class="hidden" alt="پیش‌نمایش رسید"><button type="button" id="shop-receipt-remove">حذف فایل</button></div>
+                <label class="shop-payer-field">نام و نام خانوادگی پرداخت‌کننده<input id="shop-payer-name-image" type="text" maxlength="120" autocomplete="name" placeholder="نام و نام خانوادگی فردی که وجه را واریز کرده است"></label>
               </div>
               <div id="shop-receipt-text-wrap" class="shop-receipt-field hidden">
-                <label>شماره پیگیری<input id="shop-receipt-trace" type="text" maxlength="120" placeholder="شماره پیگیری بانکی"></label>
-                <label>مبلغ پرداختی (تومان)<input id="shop-receipt-paid-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="مبلغ دقیق سفارش"></label>
-                <label>توضیحات اختیاری<textarea id="shop-receipt-note" rows="3" maxlength="1000" placeholder="توضیحات تکمیلی، در صورت نیاز"></textarea></label>
+                <label>متن رسید یا توضیحات پرداخت<textarea id="shop-receipt-note" rows="4" maxlength="3000" placeholder="متن خود را بنویسید..."></textarea></label>
+                <label class="shop-payer-field">نام و نام خانوادگی پرداخت‌کننده<input id="shop-payer-name-text" type="text" maxlength="120" autocomplete="name" placeholder="نام و نام خانوادگی فردی که وجه را واریز کرده است"></label>
               </div>
               <button type="button" class="shop-btn" id="shop-pay-submit">ارسال رسید برای بررسی</button>
               <button type="button" class="shop-btn shop-cancel-order" id="shop-pay-cancel">لغو سفارش</button>
@@ -1106,6 +1112,6 @@
 
 </section>
 
-<script src="/app.js?v=20261016shop3"></script>
+<script src="/app.js?v=20261016shop4"></script>
 </body>
 </html>
