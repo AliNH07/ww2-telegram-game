@@ -2705,10 +2705,10 @@ async def declare_war(request):
         "reason": reason, "peace_votes": [], "status": "pending_admin", "created_at": utcnow().isoformat(), "negotiation_ends": None}
     await notify_admin(
         f"⚔️ درخواست اعلان جنگ جدید در دنیای {worlds_registry.get(str(active_world_id), {}).get('name', active_world_id)}\n"
-        f"{COUNTRIES[attacker]['name']} → {COUNTRIES[target]['name']}\n"
+        f"{COUNTRIES[attacker]['name']} ← {COUNTRIES[target]['name']}\n"
         f"دلیل بازیکن: {reason}\nبرای خواندن دلیل، نوشتن دلیل رسمی خودتان و تأیید یا رد، به بخش «بررسی جنگ‌ها» در پنل مدیریت بروید. پس از تأیید ۲۴ ساعت فاز مذاکره شروع می‌شود و بعد از آن جنگ آغاز می‌شود.")
     save_state()
-    return web.json_response({"success": True, "message": "درخواست اعلان جنگ برای بررسی مدیر ارسال شد؛ در صورت تأیید، ۲۴ ساعت فاز مذاکره شروع می‌شود و سپس جنگ آغاز می‌شود."})
+    return web.json_response({"success": True, "message": "درخواست اعلان جنگ برای بررسی سازمان ملل ارسال شد؛ در صورت تأیید، ۲۴ ساعت فاز مذاکره شروع می‌شود و سپس جنگ آغاز می‌شود."})
 
 async def get_wars(request):
     uid = get_auth_user_id(request)
