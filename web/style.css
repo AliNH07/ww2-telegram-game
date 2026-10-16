@@ -3619,3 +3619,35 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 #subscription .shop-card .shop-price strong{font-size:18px}
 #subscription .shop-card .shop-note{font-size:9px;line-height:1.55;min-height:0;margin:0 0 5px}
 #subscription .shop-card .shop-btn{padding:6px 5px;font-size:9px;line-height:1.5}
+
+
+/* اصلاح‌های تکمیلی محدود به فروشگاه: کارت‌ها زیر هم و تاریخچهٔ همهٔ سفارش‌ها */
+#subscription .shop-list{display:grid;grid-template-columns:minmax(0,1fr)!important;gap:10px;align-items:stretch}
+#subscription .shop-card{width:100%;height:auto;min-height:0;padding:11px 13px;gap:3px;text-align:right}
+#subscription .shop-card h2{font-size:13px;line-height:1.65;min-height:0}
+#subscription .shop-card .shop-note{font-size:10px;line-height:1.7;min-height:0}
+#subscription .shop-card .shop-btn{margin-top:4px;padding:8px 10px;font-size:11px}
+.shop-history{display:block;width:100%;margin:0 0 14px;padding:12px;border:1px solid rgba(201,168,246,.2);border-radius:14px;background:rgba(26,14,41,.75);color:#E9DFF5}
+.shop-history.hidden{display:none!important}
+.shop-history-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.shop-history-heading h2{font-size:13px;font-weight:900;margin:0}
+.shop-history-heading button{padding:6px 9px;border-radius:8px;background:rgba(201,168,246,.09);border:1px solid rgba(201,168,246,.2);color:#DCC9F4;font:inherit;font-size:10px;font-weight:800}
+.shop-history-list{display:grid;gap:7px}
+.shop-history-row{display:flex;align-items:center;justify-content:space-between;gap:9px;width:100%;padding:10px;border-radius:10px;border:1px solid rgba(201,168,246,.12);background:rgba(0,0,0,.15);color:#EEE5F8;text-align:right;font:inherit;cursor:pointer}
+.shop-history-row>span:first-child{display:grid;gap:3px;min-width:0}
+.shop-history-row strong{font-size:11px;line-height:1.65;overflow-wrap:anywhere}
+.shop-history-row small{font-size:9px;line-height:1.7;color:#A99BBC}
+.shop-history-status{flex:0 0 auto;max-width:45%;padding:4px 7px;border-radius:7px;font-size:9px;line-height:1.5;background:rgba(255,200,87,.1);color:#FFD479;white-space:normal;text-align:center}
+.shop-history-status.approved{background:rgba(74,222,128,.1);color:#91E5AC}
+.shop-history-status.rejected,.shop-history-status.cancelled,.shop-history-status.expired{background:rgba(248,113,113,.1);color:#FFB2B2}
+.shop-history-empty{padding:10px;text-align:center;font-size:10px;color:#9F91B4}
+.shop-upload-box{display:grid;gap:7px;min-height:112px;padding:22px 14px;place-content:center;text-align:center;border:1px dashed rgba(201,168,246,.55);border-radius:13px;background:rgba(201,168,246,.055);cursor:pointer;transition:background .18s,border-color .18s}
+.shop-upload-box:active{background:rgba(201,168,246,.12);border-color:#C9A8F6}
+.shop-upload-box strong{font-size:12px;color:#EDE2FB}
+.shop-upload-box small,.shop-upload-box span{font-size:10px;line-height:1.8;color:#A99DBD;overflow-wrap:anywhere}
+.shop-receipt-file-input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;overflow:hidden!important;pointer-events:none!important}
+.shop-receipt-field .shop-payer-field{display:grid;gap:7px;font-size:11px;color:#CFC1E2;font-weight:800}
+.shop-payer-field input{width:100%;min-width:0;padding:11px;border-radius:10px;border:1px solid rgba(201,168,246,.22);background:rgba(14,7,23,.9);color:#F4F6F9;font:inherit;font-size:12px}
+.shop-receipt-preview{align-items:center;flex-wrap:wrap}
+.shop-receipt-preview img{max-width:100%;max-height:280px}
+@media(max-width:520px){#subscription .shop-list{grid-template-columns:minmax(0,1fr)!important}.shop-history-row strong{font-size:10px}.shop-upload-box{min-height:100px}}
