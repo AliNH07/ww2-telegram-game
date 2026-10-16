@@ -5073,6 +5073,7 @@ SEA_ROUTE_HINTS = {
     frozenset(("usa", "ussr")): [["panama", "gibraltar"], ["panama", "suez"], []],
 }
 TRADE_COST_PER_1000KM_PER_1000_UNITS = {"land": 900, "sea": 1500, "air": 4200}
+TRADE_SEA_COST_PER_KM = 100   # کرایهٔ حمل دریایی: هر کیلومتر مسیر واقعی دریایی ۱۰۰ دلار (مستقل از مقدار کالا)
 
 
 def _trade_distance_km(a, b):
@@ -5153,7 +5154,10 @@ def _price_route(a, b, amount, traveler, r):
     else:
         km = max(100.0, _trade_distance_km(a, b)); seconds = travel_seconds_for_km(km); straits = []
     km = max(100.0, km)
-    freight = int(round((max(1, amount) / 1000.0) * (km / 1000.0) * TRADE_COST_PER_1000KM_PER_1000_UNITS[mode]))
+    if mode == "sea":
+        freight = int(round(km * TRADE_SEA_COST_PER_KM))
+    else:
+        freight = int(round((max(1, amount) / 1000.0) * (km / 1000.0) * TRADE_COST_PER_1000KM_PER_1000_UNITS[mode]))
     items = []
     for sid in straits:
         if sid not in STRAITS_DATA: continue
@@ -5720,7 +5724,14 @@ def loan_garnish(player, available):
     if not l or l["status"] != "overdue": return 0
     return _apply_payment(l, available)
 
+def _purge_cancelled_loans():
+    """وام‌های لغوشده (cancelled و cancelled_*) کلاً از حافظه و دفتر حذف می‌شوند."""
+    dead = [k for k, l in loans.items() if str(l.get("status", "")).startswith("cancelled")]
+    for k in dead: del loans[k]
+    return bool(dead)
+
 def loan_tick():
+    if _purge_cancelled_loans(): save_state()
     meta = _world_meta()
     started = parse_dt(meta.get("game_started_at"))
     if not started or meta.get("game_finished") or utcnow() >= started + timedelta(days=GAME_TOTAL_DAYS):
@@ -5841,7 +5852,7 @@ async def cancel_loan(request):
     l = loans.get(data.get("loan_id"))
     if not l or l["status"] != "pending": return _bad("پیشنهاد معتبر نیست.", 404)
     if l["lender"] != cid: return _bad("این پیشنهاد مال شما نیست.", 403)
-    l["status"] = "cancelled"; l["closed_at"] = utcnow().isoformat(); save_state()
+    del loans[l["id"]]; save_state()
     return web.json_response({"success": True, "message": "پیشنهاد لغو شد."})
 
 async def repay_loan(request):
