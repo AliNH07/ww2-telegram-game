@@ -2467,6 +2467,63 @@ async def shop_expiry_loop():
             logging.warning("shop expiry tick failed: %s", exc)
 
 
+# ---------------- قوانین بازی (سراسری؛ از پنل مدیر نوشته می‌شود) ----------------
+RULES_MAX_COUNT = 50
+RULE_MAX_LEN = 700
+game_rules = {"rules": [], "accepted": {}}   # accepted: uid -> نسخهٔ قوانینی که پذیرفته
+
+def _rules_version():
+    return hashlib.sha1("\n".join(game_rules.get("rules", [])).encode("utf-8")).hexdigest()[:12]
+
+def _load_rules_state(data):
+    if not isinstance(data, dict): return
+    rules = [str(x).strip()[:RULE_MAX_LEN] for x in (data.get("rules") or []) if str(x).strip()][:RULES_MAX_COUNT]
+    acc = data.get("accepted") if isinstance(data.get("accepted"), dict) else {}
+    game_rules["rules"] = rules
+    game_rules["accepted"] = {str(k): str(v) for k, v in acc.items()}
+
+async def get_rules(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    ver = _rules_version()
+    rules = list(game_rules.get("rules", []))
+    return web.json_response({"success": True, "rules": rules, "count": len(rules), "version": ver,
+                              "accepted": (not rules) or game_rules["accepted"].get(str(uid)) == ver})
+
+async def accept_rules(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    async with WORLD_SWITCH_LOCK:
+        game_rules["accepted"][str(uid)] = _rules_version()
+        save_state()
+    return web.json_response({"success": True})
+
+async def admin_rules_get(request):
+    uid = get_auth_user_id(request)
+    if not uid or int(uid) != int(ADMIN_ID):
+        return web.json_response({"success": False, "error": "forbidden", "message": "دسترسی فقط برای مدیر اصلی است."}, status=403)
+    return web.json_response({"success": True, "rules": list(game_rules.get("rules", [])), "max": RULES_MAX_COUNT})
+
+async def admin_rules_save(request):
+    uid = get_auth_user_id(request)
+    if not uid or int(uid) != int(ADMIN_ID):
+        return web.json_response({"success": False, "error": "forbidden", "message": "دسترسی فقط برای مدیر اصلی است."}, status=403)
+    body = await read_json(request)
+    raw = body.get("rules")
+    if not isinstance(raw, list):
+        return web.json_response({"success": False, "message": "فهرست قوانین نامعتبر است."}, status=400)
+    if len(raw) > RULES_MAX_COUNT:
+        return web.json_response({"success": False, "message": f"حداکثر {RULES_MAX_COUNT} قانون مجاز است."}, status=400)
+    rules = [str(x or "").strip()[:RULE_MAX_LEN] for x in raw]
+    if any(not r for r in rules):
+        return web.json_response({"success": False, "message": "همهٔ قانون‌ها باید متن داشته باشند؛ اگر قانونی لازم نیست تعداد را کم کنید."}, status=400)
+    async with WORLD_SWITCH_LOCK:
+        changed = rules != game_rules.get("rules", [])
+        game_rules["rules"] = rules
+        if changed: game_rules["accepted"] = {}   # با تغییر قوانین، همه دوباره باید بپذیرند
+        save_state()
+    return web.json_response({"success": True, "count": len(rules), "message": f"{len(rules)} قانون ذخیره شد." + (" بازیکنان در ورود بعدی باید دوباره بپذیرند." if changed and rules else "")})
+
 def save_state():
     try:
         _persist_active_world_memory()
@@ -2476,6 +2533,7 @@ def save_state():
             "worlds": worlds_registry,
             "world_states": {str(wid): payload for wid, payload in world_states.items()},
             "shop": {"orders": shop_orders, "seq": shop_seq, "config": shop_config, "accounts": shop_accounts},
+            "rules": game_rules,
         }
         text = json.dumps(state, ensure_ascii=False)
         tmp = STATE_FILE + ".tmp"
@@ -2506,6 +2564,7 @@ def load_state():
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f: saved = json.load(f)
         _load_shop_state(saved.get("shop"))
+        _load_rules_state(saved.get("rules"))
         if isinstance(saved.get("world_states"), dict):
             worlds_registry = {str(k): v for k, v in (saved.get("worlds") or {}).items()}
             worlds_registry.setdefault("1", {"id": 1, "name": "دنیای ۱", "created_at": None})
@@ -3549,7 +3608,7 @@ async def get_map_sites(request):
         sites.append({"id": k, "kind": "strait", "type": "strait", "name": info["name"],
                       "lon": info["lon"], "lat": info["lat"],
                       "zone": "sea", "owner": strait_holdings.get(k),
-                      "toll": int(info.get("toll", 0) or 0), "closed": bool(info.get("closed", False)),
+                      "toll": min(STRAIT_TOLL_MAX, int(info.get("toll", 0) or 0)), "closed": bool(info.get("closed", False)),
                       "country_rules": info.get("country_rules", {}) if isinstance(info.get("country_rules", {}), dict) else {}})
     for sid, g in site_forces.items():
         if not isinstance(sid, str) or not sid.startswith(("port:", "front:")): continue
@@ -3652,6 +3711,8 @@ def set_site_owner(site_id, cid):
     if cid: d[site_id] = cid
     else: d.pop(site_id, None)
 
+STRAIT_TOLL_MAX = 250_000   # سقف عوارض هر تنگه
+
 def strait_policy(site_id, country_id=None):
     """Effective toll/closure for one traveler. The owner always crosses its own strait freely."""
     info = STRAITS_DATA.get(site_id, {})
@@ -3660,13 +3721,13 @@ def strait_policy(site_id, country_id=None):
         return {"toll": 0, "closed": False, "custom": False}
     if country_id and country_id == owner:
         return {"toll": 0, "closed": False, "custom": False}
-    base_toll = max(0, int(info.get("toll", 0) or 0))
+    base_toll = min(STRAIT_TOLL_MAX, max(0, int(info.get("toll", 0) or 0)))
     base_closed = bool(info.get("closed", False))
     rules = info.get("country_rules", {})
     rule = rules.get(country_id, {}) if country_id and isinstance(rules, dict) else {}
     if not isinstance(rule, dict): rule = {}
     return {
-        "toll": max(0, int(rule.get("toll", base_toll) or 0)),
+        "toll": min(STRAIT_TOLL_MAX, max(0, int(rule.get("toll", base_toll) or 0))),
         "closed": bool(rule.get("closed", base_closed)),
         "custom": bool(rule),
     }
@@ -4271,8 +4332,21 @@ def divert_transits(site_id, new_owner):
         if t.get("passage"): continue
         _turn_back(t, now, f"{cname(new_owner)} {loc_label(site_id)} را گرفت")
 
+def _refund_toll_escrow(t, only=None, reason=""):
+    """عوارضی که هنگام اعزام پرداخت شده و هنوز به صاحب تنگه نرسیده، به خزانهٔ پرداخت‌کننده برمی‌گردد."""
+    esc = t.get("toll_escrow") or {}
+    if not esc: return
+    cid = t.get("owner"); _, pl = get_player_by_country(cid)
+    for sid in ([only] if only else list(esc)):
+        e = esc.pop(sid, None)
+        if not e: continue
+        amt = int(e.get("amount", 0) or 0)
+        if pl and amt > 0:
+            pl["money"] = pl.get("money", 0) + amt
+
 def _turn_back(t, now, reason=None):
     """نیرو از همان نقطهٔ میانهٔ راه برمی‌گردد؛ زمان بازگشت = زمانی که تا اینجا رفته است."""
+    _refund_toll_escrow(t, reason=" چون نیروها برگشتند")
     st, ar = parse_dt(t["start"]), parse_dt(t["arrive"])
     elapsed = max(0.0, (now - st).total_seconds() / 60) if st else 0.0
     cid = t["owner"]; dst_name = loc_label(t["to"])
@@ -4318,22 +4392,32 @@ def _continue_strait_passage(t, units):
         minutes = max(1.0 / 60.0, km_left * sea_seconds_per_km() * _leg_share(cid, current, next_dst, remaining, final_dst) / 60.0)
         total_end = utcnow() + timedelta(minutes=(km_left * sea_seconds_per_km()) / 60.0)
     next_owner = site_owner(next_dst) if next_dst != "home" else None
-    start_transit(cid, current, next_dst, units, minutes, "go",
+    nt = start_transit(cid, current, next_dst, units, minutes, "go",
                   dst_free=(next_dst != "home" and not next_owner), origin=t.get("origin") or t.get("from"),
                   passage=passage, route_final_dst=final_dst if passage else None,
                   route_remaining_straits=remaining if passage else None, route_total_arrive=total_end.isoformat(),
                   full_path=t.get("full_path"), leg=int(t.get("leg") or 0) + 1, trip_start=t.get("trip_start") or t.get("start"))
+    if t.get("toll_escrow"): nt["toll_escrow"] = dict(t["toll_escrow"])
 
 def _resolve_strait_passage(t, player):
     cid, units, sid = t["owner"], dict(t["units"]), t["to"]
     owner = site_owner(sid)
     policy = strait_policy(sid, cid)
     origin = t.get("origin") or t.get("from")
+    # عوارضِ از پیش پرداخت‌شدهٔ همین تنگه (اعزام): تغییر بعدی عوارض روی این سفر اثری ندارد.
+    paid = (t.get("toll_escrow") or {}).pop(sid, None)
+    if paid and not (owner and owner != cid and not policy["closed"]):
+        # تنگه تا رسیدن ناوگان بسته شد (یا مالکش عوض/حذف شد): عوارض به پرداخت‌کننده برمی‌گردد.
+        amt = int(paid.get("amount", 0) or 0)
+        player["money"] = player.get("money", 0) + amt
+        if policy["closed"] and owner and owner != cid:   # فقط این رویداد مهم پیام دارد
+            notify_country(cid, f"↩️ تنگه بسته شد؛ عوارض {amt:,}$ برای {loc_label(sid)} به خزانهٔ شما برگشت و ناوگان با نگهبانان تنگه درگیر می‌شود.")
 
     # A closed hostile strait is a combat checkpoint. A defeated fleet is lost;
     # a victor captures the strait and continues toward the original destination.
     if owner and owner != cid and policy["closed"]:
         if have_treaty(cid, owner, "non_aggression"):
+            _refund_toll_escrow(t, reason=" چون عبور ممکن نبود")
             start_transit(cid, sid, origin, units, travel_minutes(cid, sid, origin, units), "back", origin=origin)
             msg = f"عبور {cname(cid)} از {loc_label(sid)} به‌دلیل پیمان عدم تجاوز با {cname(owner)} متوقف شد؛ نیروها بازمی‌گردند."
             announce("turnback", "عبور از تنگه متوقف شد", msg, [cid, owner])
@@ -4354,6 +4438,7 @@ def _resolve_strait_passage(t, player):
             if f["survivors"]:
                 _continue_strait_passage(t, f["survivors"])
         else:
+            _refund_toll_escrow(t, reason=" چون ناوگان در نبرد تنگه شکست خورد")
             guards.clear(); guards.update(f["garrison_after"])
             result_line = f"{d_name} عبور {a_name} از تنگهٔ بستهٔ {_strait_bare(sid)} را دفع کرد؛ تنگه بسته ماند."
             _site_battle_report(cid, owner, f, duration, result_line, result_line, "دفاع از تنگه",
@@ -4362,21 +4447,30 @@ def _resolve_strait_passage(t, player):
 
     # Open passage: collect a fixed toll once, credit the strait owner, then continue.
     if owner and owner != cid:
-        toll = max(0, int(policy.get("toll", 0)))
-        if toll and player.get("money", 0) < toll:
+        prepaid = bool(paid)
+        toll = int(paid.get("amount", 0) or 0) if prepaid else max(0, int(policy.get("toll", 0)))
+        if toll and not prepaid and player.get("money", 0) < toll:
+            _refund_toll_escrow(t, reason=" چون عبور متوقف شد")
             start_transit(cid, sid, origin, units, travel_minutes(cid, sid, origin, units), "back", origin=origin)
             msg = f"عبور {cname(cid)} از {loc_label(sid)} به‌دلیل کمبود خزانه برای عوارض {toll:,}$ متوقف شد؛ نیروها بازمی‌گردند."
             announce("turnback", "عبور از تنگه متوقف شد", msg, [cid, owner])
             notify_country(cid, f"⛔ خزانه برای عوارض {loc_label(sid)} کافی نبود؛ نیروها بازمی‌گردند.")
             return
         if toll:
-            player["money"] = player.get("money", 0) - toll
+            if not prepaid: player["money"] = player.get("money", 0) - toll
             _, owner_player = get_player_by_country(owner)
             if owner_player:
                 owner_player["money"] = owner_player.get("money", 0) + toll
             push_news("پرداخت عوارض تنگه", f"{cname(cid)} برای عبور از {loc_label(sid)} مبلغ {toll:,}$ به {cname(owner)} پرداخت کرد.")
-            notify_country(owner, f"💰 {cname(cid)} برای عبور از {loc_label(sid)} مبلغ {toll:,}$ عوارض پرداخت کرد و به خزانهٔ شما واریز شد.")
-            notify_country(cid, f"💸 عوارض عبور از {loc_label(sid)} به مبلغ {toll:,}$ به {cname(owner)} پرداخت شد.")
+            # ثبت در «مدیریت تنگه‌ها» (بدون پیام تلگرام تا پیام تکراری نیاید)
+            info_s = STRAITS_DATA.get(sid)
+            if info_s is not None:
+                if info_s.get("toll_owner") != owner:
+                    info_s["toll_owner"] = owner; info_s["toll_total"] = 0; info_s["toll_log"] = []
+                info_s["toll_total"] = int(info_s.get("toll_total", 0) or 0) + toll
+                lg = info_s.setdefault("toll_log", [])
+                lg.append({"at": utcnow().isoformat(), "country": cid, "amount": toll})
+                if len(lg) > 30: del lg[:len(lg) - 30]
     _continue_strait_passage(t, units)
 
 def _unit_group_subset(units, group):
@@ -4704,6 +4798,7 @@ def resolve_arrival(t):
     _, p = get_player_by_country(cid)
     if not p: return False
     ensure_player_fields(p)
+    if not t.get("passage") and t.get("toll_escrow"): _refund_toll_escrow(t)
     if (t.get("arrival_battle") or {}).get("phase") == "land":
         resolve_ground_arrival_battle(t); return False
     if (t.get("arrival_battle") or {}).get("phase") == "site":
@@ -4843,6 +4938,7 @@ def _finish_route_battle(battle_id, now):
     winner_units = {k: max(1, int(n * 0.75)) for k, n in winner.get("units", {}).items() if n > 0}
     winner["units"] = {k:n for k,n in winner_units.items() if n > 0}
     loser_country = loser.get("owner"); winner_country = winner.get("owner")
+    _refund_toll_escrow(loser, reason=" چون ناوگان در نبرد دریایی نابود شد")
     transits.remove(loser)
     resume = winner["route_battle"].get("resume") or {}
     for key, val in resume.items(): winner[key] = val
@@ -4968,6 +5064,55 @@ def _route_strait_blockers(cid, route_nodes):
             return f"{loc_label(sid)} بسته است و به‌دلیل پیمان عدم تجاوز با {cname(owner)} نمی‌توانید از آن عبور کنید."
     return None
 
+def _transit_eta_to_node(t, sid):
+    """زمان تقریبی رسیدن (عبور) ناوگان از یک تنگهٔ مسیرش؛ در نبرد یا نامشخص: None."""
+    now = utcnow()
+    arrive = parse_dt(t.get("arrive"))
+    if not arrive or t.get("route_battle") or t.get("arrival_battle"): return None
+    if t.get("to") == sid: return arrive
+    seq = [t.get("to")] + list(t.get("route_remaining_straits") or [])
+    if sid not in seq: return None
+    fp = t.get("full_path"); leg = int(t.get("leg") or 0)
+    if not fp: return None
+    def km(i): return _great_circle_km(fp[i], fp[i + 1]) if 0 <= i and i + 1 < len(fp) else 0.0
+    st = parse_dt(t.get("start"))
+    rate = sea_seconds_per_km()
+    if st and km(leg) > 1e-6 and (arrive - st).total_seconds() > 0:
+        rate = (arrive - st).total_seconds() / km(leg)
+    j = seq.index(sid)
+    extra = sum(km(leg + m) for m in range(1, j + 1))
+    return now + timedelta(seconds=max(0.0, (arrive - now).total_seconds()) + extra * rate)
+
+async def strait_manage(request):
+    """باکس «مدیریت تنگه‌ها»: تنگه‌های من، تنظیمات، ناوگان‌های در حال عبور (با زمان)، و درآمد عوارض."""
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    process_transits()
+    p = _me(uid); cid = p.get("country")
+    out = []
+    if cid:
+        for sid, owner in strait_holdings.items():
+            if owner != cid or sid not in STRAITS_DATA: continue
+            info = STRAITS_DATA[sid]
+            passing = []
+            for t in transits:
+                if t.get("kind") != "go" or t.get("owner") == cid: continue
+                e = (t.get("toll_escrow") or {}).get(sid)
+                if not e: continue
+                eta = _transit_eta_to_node(t, sid)
+                passing.append({"id": t["id"], "country": t["owner"], "country_name": cname(t["owner"]),
+                                "amount": int(e.get("amount", 0) or 0), "eta": eta.isoformat() if eta else None})
+            passing.sort(key=lambda x: x["eta"] or "9")
+            rules = info.get("country_rules", {}) if isinstance(info.get("country_rules"), dict) else {}
+            same_owner = info.get("toll_owner") == cid
+            out.append({"id": sid, "name": info.get("name", sid),
+                        "toll": min(STRAIT_TOLL_MAX, int(info.get("toll", 0) or 0)), "closed": bool(info.get("closed", False)),
+                        "country_rules": rules, "passing": passing,
+                        "income_total": int(info.get("toll_total", 0) or 0) if same_owner else 0,
+                        "log": [{"at": x.get("at"), "country": x.get("country"), "country_name": cname(x.get("country")), "amount": x.get("amount")}
+                                for x in (info.get("toll_log", []) if same_owner else [])[-10:]][::-1]})
+    return web.json_response({"success": True, "straits": out, "max_toll": STRAIT_TOLL_MAX, "now": utcnow().isoformat()})
+
 async def route_preview(request):
     """پیش‌نمایش مسیر اعزام: تنگه‌های سر راه، عوارض هرکدام و تنگه‌های بسته (نبرد در مسیر). چیزی کم یا ثبت نمی‌شود."""
     uid = get_auth_user_id(request)
@@ -5060,12 +5205,16 @@ async def dispatch_forces(request):
     plan = plan_sea_voyage(cid, src, dst, target_country) if naval else None
     route_straits = list(plan["nodes"]) if plan else []
     toll_due = 0
+    escrow = {}   # عوارض همین الان پرداخت می‌شود و تا عبور یا برگشت نزد سامانه نگه داشته می‌شود
     for sid in route_straits:
-        if sid in NAVAL_WAYPOINTS: continue
+        if sid in NAVAL_WAYPOINTS or sid in escrow: continue
         sid_owner = site_owner(sid)
         policy = strait_policy(sid, cid)
         if sid_owner and sid_owner != cid and not policy["closed"]:
-            toll_due += max(0, int(policy.get("toll", 0)))
+            amt = max(0, int(policy.get("toll", 0)))
+            if amt:
+                escrow[sid] = {"amount": amt, "owner": sid_owner}
+                toll_due += amt
     # تنگهٔ بسته مانع فرستادن نیرو نیست: اگر مسیر دیگری نباشد، نیرو همان مسیر را می‌رود و هنگام رسیدن به تنگه
     # با نگهبانان آن می‌جنگد (_resolve_strait_passage): با پیروزی تنگه را می‌گیرد و به مسیر ادامه می‌دهد؛ با شکست نابود می‌شود.
     blocked_msg = _route_strait_blockers(cid, route_straits)
@@ -5074,6 +5223,7 @@ async def dispatch_forces(request):
         return _bad(f"برای عوارض مسیر دریایی خزانه کافی نیست؛ عوارض موردنیاز {toll_due:,}$ و موجودی شما {p.get('money', 0):,}$ است.")
 
     for k, n in units.items(): pool[k] -= n
+    if toll_due: p["money"] = p.get("money", 0) - toll_due
     # ناوها از روی گذرگاه‌ها و تنگه‌های واقعی مسیر دریایی می‌روند؛ هر مرحله به نسبت طولش زمان می‌گیرد.
     first_target = route_straits[0] if route_straits else dst
     passage = bool(route_straits)
@@ -5084,12 +5234,13 @@ async def dispatch_forces(request):
         minutes = total_minutes
     total_arrive = (utcnow() + timedelta(minutes=total_minutes)).isoformat()
     full_path = plan["points"] if (plan and passage) else None
-    start_transit(cid, src, first_target, units, minutes, "go",
+    t0 = start_transit(cid, src, first_target, units, minutes, "go",
                   dst_free=(first_target != "home" and not site_owner(first_target)), origin=src,
                   passage=passage, route_final_dst=dst if passage else None,
                   route_remaining_straits=route_straits[1:] if passage else None,
                   route_total_arrive=total_arrive if passage else None,
                   full_path=full_path, leg=0)
+    if escrow: t0["toll_escrow"] = escrow
     if dst == "home":
         announce("return", "بازگشت نیرو", f"{cname(cid)} از {loc_label(src)} نیروهایش را به خانه فرستاد.", [cid])
     else:
@@ -5113,6 +5264,7 @@ async def dispatch_forces(request):
         msg = "نیروها رسیدند؛ وضعیت عبور و درگیری بررسی شد."
     else:
         msg = f"نیروها به راه افتادند؛ زمان رسیدن: حدود {eta}."
+    if toll_due: msg += f" عوارض مسیر {toll_due:,}$ همین الان پرداخت شد."
     return web.json_response({"success": True, "outcome": "sent", "message": msg,
                               "eta_seconds": secs, "eta_text": eta,
                               "player": serialize_player(p)})
@@ -6198,6 +6350,9 @@ async def set_strait_settings(request):
             if amount <= 0:
                 return web.json_response({"success": False, "error": "invalid_toll",
                                           "message": "مبلغ عوارض باید عدد صحیح و بزرگ‌تر از صفر باشد."}, status=400)
+            if amount > STRAIT_TOLL_MAX:
+                return web.json_response({"success": False, "error": "toll_too_high",
+                                          "message": f"حداکثر عوارض هر تنگه {STRAIT_TOLL_MAX:,}$ است."}, status=400)
 
         def _after(old_toll, old_closed):
             if action == "close": return old_toll, True
@@ -6206,7 +6361,7 @@ async def set_strait_settings(request):
 
         def _reply(msg, changed):
             return web.json_response({"success": True, "changed": changed, "message": msg,
-                                      "toll": int(info.get("toll", 0) or 0), "closed": bool(info.get("closed", False)),
+                                      "toll": min(STRAIT_TOLL_MAX, int(info.get("toll", 0) or 0)), "closed": bool(info.get("closed", False)),
                                       "country_rules": rules})
 
         if country_id:
@@ -6231,7 +6386,7 @@ async def set_strait_settings(request):
                 text = f"کشور {owner_name} عوارض عبور کشور {cn} از {sname} را {amount:,}$ تعیین کرد."
             push_news("قانون ویژهٔ تنگه", text)
         else:
-            old_toll, old_closed = int(info.get("toll", 0) or 0), bool(info.get("closed", False))
+            old_toll, old_closed = min(STRAIT_TOLL_MAX, int(info.get("toll", 0) or 0)), bool(info.get("closed", False))
             new_toll, new_closed = _after(old_toll, old_closed)
             if (new_toll, new_closed) == (old_toll, old_closed):
                 return _reply("این وضعیت از قبل فعال است.", False)
@@ -6254,17 +6409,19 @@ async def set_strait_settings(request):
             return web.json_response({"success":False,"error":"invalid_country","message":"کشور انتخاب‌شده معتبر نیست."}, status=400)
         existed = rules.pop(country_id, None)
         if existed is None:
-            return web.json_response({"success":True,"toll":int(info.get("toll",0) or 0),"closed":bool(info.get("closed",False)),"country_rules":rules,"message":"برای این کشور استثنایی ثبت نشده بود."})
+            return web.json_response({"success":True,"toll":min(STRAIT_TOLL_MAX, int(info.get("toll",0) or 0)),"closed":bool(info.get("closed",False)),"country_rules":rules,"message":"برای این کشور استثنایی ثبت نشده بود."})
         text = f"{COUNTRIES[cid]['name']} قانون ویژهٔ عبور از {info['name']} برای {COUNTRIES[country_id]['name']} را حذف کرد؛ قانون عمومی دوباره اعمال می‌شود."
         push_news("تغییر عوارض تنگه", text)
         _schedule_strait_broadcast(text)
         save_state()
-        return web.json_response({"success":True,"toll":int(info.get("toll",0) or 0),"closed":bool(info.get("closed",False)),"country_rules":rules})
+        return web.json_response({"success":True,"toll":min(STRAIT_TOLL_MAX, int(info.get("toll",0) or 0)),"closed":bool(info.get("closed",False)),"country_rules":rules})
 
     try:
         toll = max(0, int(data.get("toll", info.get("toll", 0)) or 0))
     except (TypeError, ValueError):
         return web.json_response({"success":False,"error":"invalid_toll","message":"مبلغ عوارض باید عدد صحیح و غیرمنفی باشد."}, status=400)
+    if toll > STRAIT_TOLL_MAX:
+        return web.json_response({"success":False,"error":"toll_too_high","message":f"حداکثر عوارض هر تنگه {STRAIT_TOLL_MAX:,}$ است."}, status=400)
     closed = bool(data.get("closed", info.get("closed", False)))
 
     if country_id:
@@ -6282,7 +6439,7 @@ async def set_strait_settings(request):
         push_news("قانون ویژهٔ تنگه", text)
         _schedule_strait_broadcast(text)
     else:
-        old_toll, old_closed = int(info.get("toll", 0) or 0), bool(info.get("closed", False))
+        old_toll, old_closed = min(STRAIT_TOLL_MAX, int(info.get("toll", 0) or 0)), bool(info.get("closed", False))
         info["toll"] = toll; info["closed"] = closed
         phrases = []
         if old_toll != toll:
@@ -6295,7 +6452,7 @@ async def set_strait_settings(request):
         _schedule_strait_broadcast(text)
 
     save_state()
-    return web.json_response({"success":True,"toll":int(info.get("toll",0) or 0),"closed":bool(info.get("closed",False)),"country_rules":rules})
+    return web.json_response({"success":True,"toll":min(STRAIT_TOLL_MAX, int(info.get("toll",0) or 0)),"closed":bool(info.get("closed",False)),"country_rules":rules})
 
 async def set_border_settings(request):
     uid = get_auth_user_id(request)
@@ -6799,7 +6956,7 @@ def _admin_player_row(uid, p):
         "owned_sites": [{"id": sid, "name": info.get("name", sid), "type": info.get("type", "resource"),
                           "production": int(info.get("production", 0) or 0)}
                          for sid, info in MAP_RESOURCES.items() if map_holdings.get(sid) == cid],
-        "owned_straits": [{"id": sid, "name": info.get("name", sid), "toll": int(info.get("toll", 0) or 0)}
+        "owned_straits": [{"id": sid, "name": info.get("name", sid), "toll": min(STRAIT_TOLL_MAX, int(info.get("toll", 0) or 0))}
                            for sid, info in STRAITS_DATA.items() if strait_holdings.get(sid) == cid],
         "garrisons": [{"id": sid, "name": (MAP_RESOURCES.get(sid) or STRAITS_DATA.get(sid) or {}).get("name", sid),
                        "units": dict((garrison_data or {}).get("units", {}) or {}),
@@ -7259,7 +7416,7 @@ async def create_web_app():
         ("/api/announcements", get_announcements), ("/api/announcements/status", get_announcement_status), ("/api/announcements/images", get_announcement_images), ("/api/announcement", get_announcement_detail),
         ("/api/union", get_union), ("/api/pm", get_pm), ("/api/market", get_market), ("/api/market/shipments", get_market_shipments),
         ("/api/diplomacy", get_diplomacy), ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
-        ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
+        ("/api/war/forces", get_forces), ("/api/strait/manage", strait_manage), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
         ("/api/admin/overview", admin_overview),
         ("/api/admin/wars", admin_wars), ("/api/admin/communications", admin_communications), ("/api/admin/un-messages", admin_un_messages), ("/api/un/mine", get_un_mine), ("/health", health)]:
         app.router.add_get(path, h if path == "/health" else world_scoped(h))
@@ -7302,6 +7459,10 @@ async def create_web_app():
     app.router.add_post("/api/shop/cancel", shop_cancel_order)
     app.router.add_get("/api/admin/shop/config", admin_shop_config_get)
     app.router.add_post("/api/admin/shop/config", admin_shop_config_save)
+    app.router.add_get("/api/rules", get_rules)
+    app.router.add_post("/api/rules/accept", accept_rules)
+    app.router.add_get("/api/admin/rules", admin_rules_get)
+    app.router.add_post("/api/admin/rules", admin_rules_save)
     app.router.add_get("/api/admin/shop/orders", admin_shop_orders_get)
     app.router.add_post("/api/admin/shop/message", admin_shop_message_send)
     app.router.add_post("/api/admin/shop/review", admin_shop_review)
