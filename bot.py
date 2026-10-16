@@ -5073,7 +5073,7 @@ SEA_ROUTE_HINTS = {
     frozenset(("usa", "ussr")): [["panama", "gibraltar"], ["panama", "suez"], []],
 }
 TRADE_COST_PER_1000KM_PER_1000_UNITS = {"land": 900, "sea": 1500, "air": 4200}
-TRADE_SEA_COST_PER_KM = 100   # کرایهٔ حمل دریایی: هر کیلومتر مسیر واقعی دریایی ۱۰۰ دلار (مستقل از مقدار کالا)
+TRADE_SEA_COST_PER_KM = 10    # کرایهٔ حمل دریایی: هر کیلومتر مسیر واقعی دریایی ۱۰ دلار (مستقل از مقدار کالا)
 
 
 def _trade_distance_km(a, b):
