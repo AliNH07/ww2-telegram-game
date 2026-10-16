@@ -1115,6 +1115,102 @@ async function loadRankings() {
     } catch (e) { console.error(e); }
 }
 
+/* بایگانی: نمایش دنیاها و رتبه‌بندی هر دنیا، بدون تغییر دنیای فعال بازیکن */
+let archiveWorldRows = [];
+let archiveSelectedWorldId = null;
+let archiveRankRows = [];
+let archiveRankTab = "overall";
+
+async function openArchiveWorlds() {
+    showGamePage("archive-worlds");
+    const list = document.getElementById("archive-world-list");
+    if (list) list.innerHTML = `<div class="world-empty">در حال دریافت فهرست دنیاها…</div>`;
+    try {
+        const result = await apiGet("/api/worlds");
+        archiveWorldRows = Array.isArray(result?.worlds) ? result.worlds : [];
+        renderArchiveWorlds();
+    } catch (error) {
+        console.error("Archive worlds:", error);
+        if (list) list.innerHTML = `<div class="world-empty">دریافت دنیاها ناموفق بود. دوباره وارد بایگانی شو.</div>`;
+    }
+}
+
+function renderArchiveWorlds() {
+    const list = document.getElementById("archive-world-list");
+    if (!list) return;
+    if (!archiveWorldRows.length) {
+        list.innerHTML = `<div class="world-empty">هنوز دنیایی برای نمایش وجود ندارد.</div>`;
+        return;
+    }
+    list.innerHTML = archiveWorldRows.map(world => {
+        const wid = String(world.id);
+        const name = escapeHtml(world.name || `دنیای ${wid}`);
+        const status = world.game_finished
+            ? `پایان‌یافته${world.winner?.name ? ` · برنده: ${escapeHtml(world.winner.name)}` : ""}`
+            : world.game_started ? `در حال برگزاری · روز ${formatNumber(world.day || 1)} از ۳۱`
+            : (world.registration_open ? "هنوز شروع نشده · ثبت‌نام باز" : "هنوز شروع نشده · ثبت‌نام بسته");
+        return `<button type="button" class="archive-world-card" data-archive-world="${escapeHtml(wid)}">
+            <span class="archive-world-icon">🌍</span>
+            <span class="archive-world-copy"><b>${name}</b><small>${formatNumber(world.players || 0)} بازیکن · ${formatNumber(world.countries_taken || 0)} کشور</small><small>${status}</small></span>
+            <span class="archive-world-arrow">مشاهده رتبه‌ها ←</span>
+        </button>`;
+    }).join("");
+    list.querySelectorAll("[data-archive-world]").forEach(button => {
+        button.addEventListener("click", () => openArchiveRankings(button.dataset.archiveWorld));
+    });
+}
+
+async function openArchiveRankings(worldId) {
+    archiveSelectedWorldId = String(worldId);
+    archiveRankTab = "overall";
+    const meta = archiveWorldRows.find(row => String(row.id) === archiveSelectedWorldId);
+    const title = document.getElementById("archive-ranking-title");
+    if (title) title.textContent = `رتبه‌بندی · ${meta?.name || `دنیای ${archiveSelectedWorldId}`}`;
+    showGamePage("archive-rankings");
+    const box = document.getElementById("archive-rankings-list");
+    if (box) box.innerHTML = `<div class="world-empty">در حال دریافت رتبه‌بندی این دنیا…</div>`;
+    try {
+        // شناسه دنیا فقط برای این درخواست فرستاده می‌شود؛ دنیای جاری کاربر تغییر نمی‌کند.
+        const rows = await apiGet("/api/rankings", { world_id: archiveSelectedWorldId });
+        archiveRankRows = Array.isArray(rows) ? rows : [];
+        renderArchiveRankings();
+    } catch (error) {
+        console.error("Archive rankings:", error);
+        if (box) box.innerHTML = `<div class="world-empty">دریافت رتبه‌بندی ناموفق بود. دوباره دنیا را انتخاب کن.</div>`;
+    }
+}
+
+function renderArchiveRankings() {
+    const tabs = document.getElementById("archive-rk-tabs");
+    const box = document.getElementById("archive-rankings-list");
+    if (!tabs || !box) return;
+    tabs.innerHTML = "";
+    RK_TABS.forEach(tab => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "rk-tab" + (tab.id === archiveRankTab ? " active" : "");
+        button.textContent = tab.label;
+        button.addEventListener("click", () => { archiveRankTab = tab.id; renderArchiveRankings(); });
+        tabs.appendChild(button);
+    });
+    const current = RK_TABS.find(tab => tab.id === archiveRankTab) || RK_TABS[0];
+    if (!archiveRankRows.length) {
+        box.innerHTML = `<div class="diplomacy-item-empty">در این دنیا هنوز رتبه‌ای برای نمایش ثبت نشده است.</div>`;
+        return;
+    }
+    box.innerHTML = "";
+    [...archiveRankRows].sort((a, b) => Number(b[current.key] || 0) - Number(a[current.key] || 0)).forEach((row, index) => {
+        const position = index + 1;
+        const el = document.createElement("div");
+        el.className = `rk-row ${row.is_eliminated ? "rk-elim" : ""}`;
+        el.innerHTML = `<span class="rk-medal rk-m${position <= 3 ? position : 0}">${position}</span>${flagInline(row.country)}<span class="rk-name">${escapeHtml(row.name || COUNTRY_NAMES[row.country] || row.country || "کشور نامشخص")}</span><span class="archive-rank-score">${formatNumber(row[current.key] || 0)} امتیاز</span>`;
+        box.appendChild(el);
+    });
+}
+
+document.getElementById("archive-worlds-back")?.addEventListener("click", () => { showGamePage("home"); updateHomeStats(); });
+document.getElementById("archive-ranking-back")?.addEventListener("click", () => showGamePage("archive-worlds"));
+
 
 document.getElementById("rk-help-btn")?.addEventListener("click", () => {
     document.getElementById("rk-help-sheet")?.remove();
@@ -3101,11 +3197,14 @@ gameMenuButton?.addEventListener("click", (event) => {
     gameMenuPanel.classList.toggle("hidden");
 });
 gameMenuPanel?.addEventListener("click", async (event) => {
-    const item = event.target.closest("[data-menu-page], #open-guide-menu");
+    const item = event.target.closest("[data-menu-page], #open-guide-menu, #open-archive-menu");
     if (!item) return;
     closeGameMenu();
     if (item.id === "open-guide-menu") { openGuide(); return; }
+    if (item.id === "open-archive-menu") { openArchiveWorlds(); return; }
+    // سازگاری با سایر ورودی‌های قدیمی منو، بدون نمایش آن‌ها در منوی سه‌خطی.
     const page = item.dataset.menuPage;
+    if (!page) return;
     showGamePage(page);
     if (page === "map") setTimeout(() => initWorldMap(), 30);
     else if (page === "communications") {
