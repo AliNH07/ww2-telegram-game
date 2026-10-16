@@ -1832,6 +1832,106 @@ def _db_flush():
 import atexit as _atexit
 _atexit.register(_db_flush)
 
+# =========================================================
+# فروشگاه اشتراک: سفارش‌ها (سطح حساب کاربری، مستقل از دنیا و کشور)
+# =========================================================
+SHOP_ORDER_TTL_SECONDS = 15 * 60   # مهلت ارسال رسید؛ فقط زمان سرور معتبر است
+SHOP_PRODUCTS = {
+    "charge": {"name": "بسته ویژه شارژ", "price": 100_000, "charge_units": 10_000_000, "one_time": True},
+    "vip": {"name": "اشتراک VIP", "price": 210_000, "vip_days": 30},
+}
+SHOP_ACTIVE_STATUSES = ("awaiting_payment", "pending_review")
+shop_orders = {}   # شمارهٔ سفارش -> سفارش
+shop_seq = 0
+
+
+def _load_shop_state(data):
+    global shop_orders, shop_seq
+    if isinstance(data, dict) and isinstance(data.get("orders"), dict):
+        shop_orders = data["orders"]
+        try: shop_seq = int(data.get("seq") or 0)
+        except (TypeError, ValueError): shop_seq = 0
+        shop_seq = max(shop_seq, len(shop_orders))
+
+
+def _shop_expire_due(now=None):
+    """سفارش‌های بدون رسیدِ گذشته از مهلت را منقضی می‌کند. اگر چیزی تغییر کرد True برمی‌گرداند."""
+    now = now or utcnow()
+    changed = False
+    for o in shop_orders.values():
+        if o.get("status") != "awaiting_payment": continue
+        exp = parse_dt(o.get("expires_at"))
+        if exp is None or exp <= now:
+            o["status"] = "expired"
+            o["expired_at"] = now.isoformat()
+            changed = True
+    return changed
+
+
+def _shop_user_active(uid):
+    rows = [o for o in shop_orders.values() if o.get("uid") == uid and o.get("status") in SHOP_ACTIVE_STATUSES]
+    return max(rows, key=lambda o: o.get("created_at") or "") if rows else None
+
+
+def _shop_public(o, now=None):
+    now = now or utcnow()
+    left = 0
+    if o.get("status") == "awaiting_payment":
+        exp = parse_dt(o.get("expires_at"))
+        if exp: left = max(0, int((exp - now).total_seconds() + 0.999))
+    return {"id": o["id"], "product": o["product"], "product_name": o["product_name"], "amount": o["amount"],
+            "status": o["status"], "created_at": o["created_at"], "expires_at": o["expires_at"],
+            "seconds_left": left, "server_now": now.isoformat(), "ttl_seconds": SHOP_ORDER_TTL_SECONDS}
+
+
+async def shop_get_order(request):
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized", "message": "ابتدا وارد حساب خود شوید."}, status=401)
+    async with WORLD_SWITCH_LOCK:
+        now = utcnow()
+        if _shop_expire_due(now): save_state()
+        wanted = str(request.query.get("order_id") or "")
+        if wanted:
+            o = shop_orders.get(wanted)
+            if not o or o.get("uid") != uid:
+                return web.json_response({"success": False, "error": "order_not_found", "message": "سفارش پیدا نشد."}, status=404)
+        else:
+            o = _shop_user_active(uid)
+        return web.json_response({"success": True, "order": _shop_public(o, now) if o else None})
+
+
+async def shop_create_order(request):
+    global shop_seq
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized", "message": "ابتدا وارد حساب خود شوید."}, status=401)
+    body = await read_json(request)
+    key = str(body.get("product") or "")
+    prod = SHOP_PRODUCTS.get(key)   # قیمت و محصول فقط از سرور خوانده می‌شود، نه از کلاینت
+    if not prod: return web.json_response({"success": False, "error": "bad_product", "message": "محصول نامعتبر است."}, status=400)
+    async with WORLD_SWITCH_LOCK:
+        now = utcnow()
+        _shop_expire_due(now)
+        active = _shop_user_active(uid)
+        if active:
+            if active["product"] == key:   # کلیک/درخواست تکراری: همان سفارش فعال برگردانده می‌شود
+                save_state()
+                return web.json_response({"success": True, "existing": True, "order": _shop_public(active, now)})
+            return web.json_response({"success": False, "error": "active_order_exists", "order": _shop_public(active, now),
+                                      "message": "ابتدا سفارش فعال قبلی را کامل یا لغو کنید یا تا پایان مهلت آن صبر کنید."}, status=409)
+        if prod.get("one_time") and any(o.get("uid") == uid and o.get("product") == key and o.get("status") == "approved" for o in shop_orders.values()):
+            return web.json_response({"success": False, "error": "already_purchased", "message": "این بسته قبلاً برای حساب شما خریداری شده است."}, status=409)
+        shop_seq += 1
+        oid = f"WW-{shop_seq:05d}"
+        order = {"id": oid, "uid": uid, "product": key, "product_name": prod["name"], "amount": prod["price"],
+                 "charge_units": prod.get("charge_units", 0), "vip_days": prod.get("vip_days", 0),
+                 "status": "awaiting_payment", "created_at": now.isoformat(),
+                 "expires_at": (now + timedelta(seconds=SHOP_ORDER_TTL_SECONDS)).isoformat(),
+                 "world_id": str(request.query.get("world_id") or "")}
+        shop_orders[oid] = order
+        save_state()
+        return web.json_response({"success": True, "existing": False, "order": _shop_public(order, now)})
+
+
 def save_state():
     try:
         _persist_active_world_memory()
@@ -1840,6 +1940,7 @@ def save_state():
             "version": 2,
             "worlds": worlds_registry,
             "world_states": {str(wid): payload for wid, payload in world_states.items()},
+            "shop": {"orders": shop_orders, "seq": shop_seq},
         }
         text = json.dumps(state, ensure_ascii=False)
         tmp = STATE_FILE + ".tmp"
@@ -1869,6 +1970,7 @@ def load_state():
         return
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f: saved = json.load(f)
+        _load_shop_state(saved.get("shop"))
         if isinstance(saved.get("world_states"), dict):
             worlds_registry = {str(k): v for k, v in (saved.get("worlds") or {}).items()}
             worlds_registry.setdefault("1", {"id": 1, "name": "دنیای ۱", "created_at": None})
@@ -6569,6 +6671,8 @@ async def create_web_app():
     app.router.add_post("/api/admin/worlds/delete", admin_delete_world)
     app.router.add_post("/api/admin/worlds/rename", admin_rename_world)
     app.router.add_post("/api/admin/broadcast-global", admin_broadcast_global)
+    app.router.add_get("/api/shop/order", shop_get_order)
+    app.router.add_post("/api/shop/order", shop_create_order)
     app.router.add_post("/api/admin/world/start", world_scoped(admin_start_world))
     app.router.add_post("/api/admin/world/registration", world_scoped(admin_set_world_registration))
 
