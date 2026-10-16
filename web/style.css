@@ -3519,3 +3519,42 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .shop-active{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin-bottom:14px;padding:12px 14px;border-radius:14px;border:1px solid rgba(255,200,87,.5);background:rgba(255,200,87,.1);color:#FFD479;font:inherit;font-size:12px;font-weight:700;text-align:right;cursor:pointer}
 .shop-active.hidden{display:none}
 @media (max-width:380px){.shop-timer strong{font-size:28px}.shop-facts div{flex-direction:column;align-items:flex-start;gap:2px}}
+
+/* ==================== تکمیل پرداخت فروشگاه اشتراک ==================== */
+.shop-receipt-area{margin-top:14px;text-align:right;display:grid;gap:12px}
+.shop-receipt-area h3{color:#f4f6f9;font-size:14px;margin:5px 0 0}
+.shop-payment-card{padding:14px;border-radius:16px;border:1px solid rgba(201,168,246,.34);background:linear-gradient(145deg,rgba(21,12,38,.92),rgba(47,27,69,.8));display:grid;gap:11px}
+.shop-payment-card-title{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#E7D8FB;font-size:12px;font-weight:900}
+.shop-payment-card-title small{font-size:10px;color:#A99DBD;font-weight:500}
+.shop-card-value{display:grid;gap:4px;padding:10px 11px;border-radius:11px;background:rgba(0,0,0,.22);min-width:0}
+.shop-card-value span{font-size:10px;color:#A99DBD}
+.shop-card-value strong{font-size:13px;color:#fff;word-break:break-word;unicode-bidi:plaintext}
+#shop-destination-card{letter-spacing:1px;font-variant-numeric:tabular-nums;text-align:left}
+.shop-copy-card{padding:10px;border:1px solid rgba(201,168,246,.28);border-radius:10px;background:rgba(201,168,246,.12);color:#E9D9FF;font:inherit;font-size:12px;font-weight:900}
+.shop-copy-card:disabled{opacity:.45;cursor:not-allowed}
+.shop-config-warning{font-size:11px;line-height:1.9;color:#ffb6b6;padding:9px 10px;border:1px solid rgba(248,113,113,.3);border-radius:10px;background:rgba(248,113,113,.07)}
+.shop-receipt-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.shop-receipt-options label{cursor:pointer;display:flex;align-items:center;gap:7px;padding:11px 10px;border-radius:11px;border:1px solid rgba(201,168,246,.25);background:rgba(0,0,0,.14);font-size:11px;font-weight:800;color:#E1D6EF}
+.shop-receipt-options input{accent-color:#C9A8F6;margin:0;flex-shrink:0}
+.shop-receipt-field{display:grid;gap:9px;padding:12px;border-radius:13px;border:1px solid rgba(201,168,246,.2);background:rgba(0,0,0,.14)}
+.shop-upload-label,.shop-receipt-field label{display:grid;gap:6px;font-size:11px;color:#CFC1E2;font-weight:800}
+.shop-receipt-field input[type="text"],.shop-receipt-field input[type="number"],.shop-receipt-field textarea,.shop-receipt-field input[type="file"]{width:100%;min-width:0;padding:10px;border-radius:10px;border:1px solid rgba(201,168,246,.22);background:rgba(14,7,23,.9);color:#F4F6F9;font:inherit;font-size:12px}
+.shop-receipt-field input[type="file"]{font-size:10px;direction:ltr}
+.shop-receipt-field textarea{resize:vertical;line-height:1.8}
+.shop-receipt-field small{font-size:10px;line-height:1.8;color:#A99DBD}
+.shop-receipt-preview{display:flex;align-items:flex-start;gap:10px}
+.shop-receipt-preview img{display:block;width:min(180px,65%);max-height:220px;object-fit:contain;border:1px solid rgba(201,168,246,.22);border-radius:10px;background:#120a1c}
+.shop-receipt-preview button{padding:8px 10px;border-radius:9px;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:#ffbaba;font:inherit;font-size:10px}
+.shop-receipt-disclaimer{font-size:10px;line-height:1.9;color:#cbbddd;margin:0}
+.shop-cancel-order{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:#ffbaba;margin-top:0!important}
+.shop-pay-msg[data-kind="success"]{color:#8ce7b0}
+.shop-pay-status[data-status="pending_review"]{background:rgba(255,200,87,.15);color:#FFD479}
+.shop-pay-status[data-status="cancelled"]{background:rgba(248,113,113,.12);color:#ffbaba}
+#admin-shop-config{margin:14px 0 18px;padding:15px;border-radius:16px;border:1px solid rgba(201,168,246,.28);background:linear-gradient(150deg,rgba(43,24,69,.56),rgba(15,8,24,.85));}
+.admin-shop-config-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.admin-shop-config-form label{display:grid;gap:6px;font-size:11px;color:#D7CBE7;font-weight:800;min-width:0}
+.admin-shop-config-form input{width:100%;min-width:0;padding:11px;border:1px solid rgba(201,168,246,.22);border-radius:10px;background:#160c23;color:#f4f6f9;font:inherit;font-size:12px}
+.admin-shop-config-form input[dir="ltr"]{text-align:left;unicode-bidi:plaintext}
+.admin-shop-config-form .admin-primary-btn{grid-column:1/-1;margin:0}
+.admin-shop-config-form .admin-editor-note{grid-column:1/-1;margin:0;line-height:1.8}
+@media(max-width:520px){.admin-shop-config-form{grid-template-columns:1fr}.shop-receipt-options{grid-template-columns:1fr 1fr}.shop-card-value strong{font-size:12px}}
