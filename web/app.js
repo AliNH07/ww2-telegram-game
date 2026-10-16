@@ -664,7 +664,7 @@ function getSeenNews() {
     catch (e) { return new Set(); }
 }
 function saveSeenNews(set) {
-    try { localStorage.setItem(seenNewsKey(), JSON.stringify([...set].slice(-300))); } catch (e) {}
+    try { localStorage.setItem(seenNewsKey(), JSON.stringify([...set].slice(-20000))); } catch (e) {}
     syncNewsBadges();
 }
 let knownNewsIds = [];
@@ -691,7 +691,7 @@ function getDismissedNotifications() {
     catch (e) { return new Set(); }
 }
 function saveDismissedNotifications(set) {
-    try { localStorage.setItem(dismissedNotifsKey(), JSON.stringify([...set].slice(-500))); } catch (e) {}
+    try { localStorage.setItem(dismissedNotifsKey(), JSON.stringify([...set].slice(-20000))); } catch (e) {}
 }
 function setNotifBadge(count) {
     const badge = document.getElementById("notif-badge");
@@ -2045,7 +2045,6 @@ function openTrainSheet(uid_) {
                     <div class="tr-pills">
                         <span>⚔️ حمله <b>${formatNumber(u.attack)}</b></span>
                         <span>🛡️ دفاع <b>${formatNumber(Math.round(u.defense * (player.def_mult?.[u.group] ?? 1)))}</b></span>
-                        <span>📦 ظرفیت آزاد <b>${formatNumber(capLeft)}</b></span>
                     </div>
                 </div>
                 <button class="is-close" aria-label="بستن">✕</button>
@@ -2820,7 +2819,7 @@ function renderWarNews() {
     const box = document.getElementById("war-news-list");
     if (!box) return;
     const list = warLog.events.filter(e =>
-        (!newsCountry || (e.countries || []).includes(newsCountry)) && (!newsQ || e.text.includes(newsQ)));
+        (!newsCountry || (e.countries || []).includes(newsCountry)) && (!newsQ || e.text.includes(newsQ))).slice(0, 200);
     if (!list.length) { box.innerHTML = `<div class="diplomacy-item-empty">خبری نیست.</div>`; return; }
     box.innerHTML = list.map(e => `
         <div class="wn-item"><div class="wn-ic">${WAR_EVENT_ICONS[e.kind] || "⚔️"}</div>
@@ -4451,7 +4450,7 @@ let newsNewIds = new Set();
 function renderNewsList() {
     const c = document.getElementById("news-list");
     if (!c) return;
-    const list = currentNewsFilter === "all" ? newsItemsCache : newsItemsCache.filter(item => inferNewsCategory(item) === currentNewsFilter);
+    const list = (currentNewsFilter === "all" ? newsItemsCache : newsItemsCache.filter(item => inferNewsCategory(item) === currentNewsFilter)).slice(0, 120);
     c.innerHTML = "";
     if (!list.length) {
         c.innerHTML = `<div class="diplomacy-item-empty">در این دسته‌بندی خبری وجود ندارد.</div>`;
