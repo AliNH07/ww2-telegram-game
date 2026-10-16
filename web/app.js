@@ -6706,7 +6706,7 @@ const SHOP_STATUS_TEXT = {
     rejected: "ردشده", cancelled: "لغوشده توسط کاربر", expired: "منقضی‌شده به دلیل پایان مهلت"
 };
 let shopOrder = null, shopDeadline = 0, shopTick = null, shopOrderBusy = false, shopExpiryChecking = false;
-let shopReceiptBusy = false, shopReceiptDataUrl = "", shopStatusPoll = null;
+let shopReceiptBusy = false, shopReceiptFile = null, shopReceiptPreviewUrl = "", shopStatusPoll = null;
 let adminShopConfigLoaded = false;
 
 const shopClock = secs => {
@@ -6816,7 +6816,7 @@ function showShopOrder(order) {
     if (!order) return;
     const changedOrder = shopOrder?.id !== order.id;
     shopOrder = order;
-    if (changedOrder) shopReceiptDataUrl = "";
+    if (changedOrder) resetShopReceiptImage();
     shopDeadline = performance.now() + (Number(order.seconds_left) || 0) * 1000;
     try { sessionStorage.setItem("fl93_shop_last_order", String(order.id)); } catch (_) {}
     showGamePage("shop-pay");
@@ -6824,6 +6824,7 @@ function showShopOrder(order) {
     clearInterval(shopTick);
     shopTick = setInterval(tickShopCountdown, 250);
     if (!shopStatusPoll) shopStatusPoll = setInterval(pollShopOrder, 5000);
+    refreshShopBanner();
 }
 
 async function openShopPay(key) {
@@ -6846,53 +6847,54 @@ async function openShopPay(key) {
     }
 }
 
-async function compressShopReceipt(file) {
-    if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type || "")) throw new Error("فقط تصویر JPG، PNG یا WebP قابل ارسال است.");
-    if (file.size > 12 * 1024 * 1024) throw new Error("حجم تصویر اولیه نباید بیشتر از ۱۲ مگابایت باشد.");
-    let bitmap;
-    if (window.createImageBitmap) bitmap = await createImageBitmap(file);
-    else bitmap = await new Promise((resolve, reject) => {
-        const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error("خواندن تصویر ناموفق بود."));
-        img.src = URL.createObjectURL(file);
-    });
-    const w = bitmap.width || bitmap.naturalWidth, h = bitmap.height || bitmap.naturalHeight;
-    if (!w || !h) throw new Error("تصویر انتخاب‌شده معتبر نیست.");
-    const scale = Math.min(1, 1400 / Math.max(w, h));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(w * scale)); canvas.height = Math.max(1, Math.round(h * scale));
-    const ctx = canvas.getContext("2d"); ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    if (bitmap.close) bitmap.close();
-    let blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.82));
-    if (!blob) throw new Error("بهینه‌سازی تصویر ناموفق بود.");
-    if (blob.size > 1000 * 1024) blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.68));
-    if (!blob || blob.size > 1000 * 1024) throw new Error("حجم تصویر پس از فشرده‌سازی هنوز زیاد است؛ تصویر کوچک‌تری انتخاب کنید.");
-    return await new Promise((resolve, reject) => {
-        const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = () => reject(new Error("خواندن فایل ناموفق بود.")); reader.readAsDataURL(blob);
-    });
+async function apiPostForm(path, formData) {
+    const url = getApiUrl(path);
+    const headers = {};
+    if (initData) headers["X-Telegram-Init-Data"] = initData;
+    const controller = new AbortController();
+    const to = setTimeout(() => controller.abort(), 120000);
+    try {
+        const response = await fetch(url, { method: "POST", headers, body: formData, signal: controller.signal });
+        const raw = await response.text();
+        try { return JSON.parse(raw); }
+        catch { return { success: false, error: "invalid_json", message: response.status === 413 ? "فایل از حد مجاز سرور بزرگ‌تر است." : "پاسخ سرور معتبر نیست." }; }
+    } finally { clearTimeout(to); }
 }
 
 async function submitShopReceipt() {
     if (!shopOrder || shopOrder.status !== "awaiting_payment" || shopReceiptBusy) return;
     const mode = document.querySelector('input[name="shop-receipt-method"]:checked')?.value || "image";
-    const payload = { order_id: shopOrder.id, receipt_type: mode };
+    const payerInput = document.getElementById(mode === "image" ? "shop-payer-name-image" : "shop-payer-name-text");
+    const payerName = String(payerInput?.value || "").trim().replace(/\s+/g, " ");
+    if (payerName.split(" ").filter(Boolean).length < 2) {
+        showToast("نام و نام خانوادگی پرداخت‌کننده را کامل وارد کنید.", "error");
+        payerInput?.focus(); return;
+    }
+    let payload;
     if (mode === "image") {
-        if (!shopReceiptDataUrl) { showToast("ابتدا تصویر رسید را انتخاب کنید.", "error"); return; }
-        payload.receipt_image = shopReceiptDataUrl;
+        const input = document.getElementById("shop-receipt-file");
+        const file = shopReceiptFile || input?.files?.[0];
+        if (!file) { showToast("ابتدا داخل باکس بارگذاری کلیک و تصویر رسید را انتخاب کنید.", "error"); return; }
+        const form = new FormData();
+        form.append("order_id", shopOrder.id);
+        form.append("receipt_type", "image");
+        form.append("payer_name", payerName);
+        form.append("receipt_image", file, file.name || "receipt-image");
+        payload = form;
     } else {
-        payload.trace_number = document.getElementById("shop-receipt-trace")?.value?.trim() || "";
-        payload.paid_amount = document.getElementById("shop-receipt-paid-amount")?.value || "";
-        payload.receipt_note = document.getElementById("shop-receipt-note")?.value || "";
-        if (!payload.trace_number || !payload.paid_amount) { showToast("شماره پیگیری و مبلغ پرداختی را وارد کنید.", "error"); return; }
+        const text = document.getElementById("shop-receipt-note")?.value?.trim() || "";
+        if (!text) { showToast("متن رسید یا توضیحات پرداخت را وارد کنید.", "error"); return; }
+        payload = { order_id: shopOrder.id, receipt_type: "text", payer_name: payerName, receipt_text: text };
     }
     shopReceiptBusy = true;
     const btn = document.getElementById("shop-pay-submit"); if (btn) { btn.disabled = true; btn.textContent = "در حال ارسال رسید…"; }
     try {
-        const r = await apiPost("/api/shop/submit", payload);
+        const r = mode === "image" ? await apiPostForm("/api/shop/submit", payload) : await apiPost("/api/shop/submit", payload);
         if (r?.success && r.order) {
             showShopOrder(r.order);
-            setShopMessage(r.message || "رسید برای بررسی مدیر ارسال شد.", "success");
-            showToast("رسید برای بررسی مدیر ارسال شد.", "success");
+            resetShopReceiptImage();
+            showToast(r.message || "رسید برای بررسی مدیر ارسال شد.", "success");
+            refreshShopBanner();
         } else {
             if (r?.order) showShopOrder(r.order);
             showToast(r?.message || "ارسال رسید انجام نشد. دوباره تلاش کنید.", "error");
@@ -6931,28 +6933,43 @@ async function copyShopCard() {
     } catch (_) { showToast("کپی خودکار ممکن نشد؛ شماره کارت را به‌صورت دستی کپی کنید.", "error"); }
 }
 
-// سفارش فعال یا آخرین وضعیت سفارش پس از رفرش نیز قابل پیگیری است.
+// همهٔ سفارش‌های کاربر، نه فقط آخرین سفارش، در تاریخچه نمایش داده می‌شوند.
+function shopHistoryStatusLabel(order) {
+    const labels = { awaiting_payment: "در انتظار پرداخت", pending_review: "در حال بررسی",
+        approved: "تأییدشده", rejected: "ردشده", cancelled: "لغوشده", expired: "منقضی‌شده" };
+    return labels[order.status] || "نامشخص";
+}
+function shopHistoryDate(value) {
+    const date = new Date(value || "");
+    return Number.isNaN(date.getTime()) ? "تاریخ نامشخص" : date.toLocaleString("fa-IR", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+function renderShopHistory(orders) {
+    const banner = document.getElementById("shop-active-banner");
+    const list = document.getElementById("shop-history-list");
+    if (!banner || !list) return;
+    if (!orders.length) { banner.classList.add("hidden"); list.innerHTML = '<div class="shop-history-empty">هنوز سفارشی ثبت نشده است.</div>'; return; }
+    banner.classList.remove("hidden");
+    list.innerHTML = orders.map(order => {
+        const statusClass = ["approved", "rejected", "cancelled", "expired"].includes(order.status) ? order.status : "";
+        return `<button type="button" class="shop-history-row" data-shop-history-order="${escapeHtml(order.id)}"><span><strong>${escapeHtml(order.product_name || "سفارش فروشگاه")} · ${escapeHtml(order.id)}</strong><small>${shopPrice(order.amount)} · ${escapeHtml(shopHistoryDate(order.created_at))}</small></span><span class="shop-history-status ${statusClass}">${escapeHtml(shopHistoryStatusLabel(order))}</span></button>`;
+    }).join("");
+}
 async function refreshShopBanner() {
     const banner = document.getElementById("shop-active-banner"); if (!banner) return;
     try {
-        const r = await apiGet("/api/shop/order");
-        const o = r?.success ? r.order : null;
-        if (!o) { banner.classList.add("hidden"); banner.onclick = null; return; }
-        const statusLabel = o.status === "awaiting_payment" ? `در انتظار ارسال رسید · ${shopClock(o.seconds_left)}`
-            : o.status === "pending_review" ? "رسید ارسال شده؛ در انتظار بررسی مدیر"
-            : o.status === "approved" ? "پرداخت تأیید شد"
-            : o.status === "rejected" ? "پرداخت تأیید نشد"
-            : o.status === "cancelled" ? "سفارش لغو شد" : "مهلت سفارش تمام شد";
-        document.getElementById("shop-active-text").textContent = `سفارش ${o.product_name} · ${statusLabel}`;
-        banner.classList.remove("hidden"); banner.onclick = () => showShopOrder(o);
-    } catch (e) { banner.classList.add("hidden"); }
+        const r = await apiGet("/api/shop/orders");
+        renderShopHistory(r?.success && Array.isArray(r.orders) ? r.orders : []);
+    } catch (_) { /* تاریخچه در بارگذاری بعدی دوباره دریافت می‌شود */ }
 }
 
 function resetShopReceiptImage() {
-    shopReceiptDataUrl = "";
+    shopReceiptFile = null;
     const input = document.getElementById("shop-receipt-file"); if (input) input.value = "";
     document.getElementById("shop-receipt-preview-wrap")?.classList.add("hidden");
-    const img = document.getElementById("shop-receipt-preview"); if (img) img.removeAttribute("src");
+    const img = document.getElementById("shop-receipt-preview");
+    if (img) { img.onload = null; img.onerror = null; img.removeAttribute("src"); img.classList.add("hidden"); }
+    if (shopReceiptPreviewUrl) { URL.revokeObjectURL(shopReceiptPreviewUrl); shopReceiptPreviewUrl = ""; }
+    const name = document.getElementById("shop-receipt-file-name"); if (name) name.textContent = "هنوز فایلی انتخاب نشده است";
 }
 
 document.getElementById("shop-pay-new")?.addEventListener("click", () => showGamePage("subscription"));
@@ -6969,19 +6986,35 @@ document.querySelectorAll('input[name="shop-receipt-method"]').forEach(input => 
     document.getElementById("shop-receipt-image-wrap")?.classList.toggle("hidden", !isImage);
     document.getElementById("shop-receipt-text-wrap")?.classList.toggle("hidden", isImage);
 }));
-document.getElementById("shop-receipt-file")?.addEventListener("change", async event => {
+document.getElementById("shop-receipt-file")?.addEventListener("change", event => {
     const file = event.target.files?.[0]; if (!file) return;
-    try {
-        showToast("در حال آماده‌سازی تصویر رسید…", "info");
-        shopReceiptDataUrl = await compressShopReceipt(file);
-        const img = document.getElementById("shop-receipt-preview"); if (img) img.src = shopReceiptDataUrl;
-        document.getElementById("shop-receipt-preview-wrap")?.classList.remove("hidden");
-        showToast("تصویر رسید آماده ارسال است.", "success");
-    } catch (error) {
-        resetShopReceiptImage(); showToast(error?.message || "خواندن تصویر ناموفق بود.", "error");
+    shopReceiptFile = file;
+    const name = document.getElementById("shop-receipt-file-name");
+    if (name) name.textContent = `${file.name || "فایل رسید"} · ${(file.size / (1024 * 1024)).toLocaleString("fa-IR", { maximumFractionDigits: 2 })} مگابایت`;
+    const wrap = document.getElementById("shop-receipt-preview-wrap");
+    const img = document.getElementById("shop-receipt-preview");
+    if (shopReceiptPreviewUrl) URL.revokeObjectURL(shopReceiptPreviewUrl);
+    shopReceiptPreviewUrl = URL.createObjectURL(file);
+    if (img) {
+        img.classList.add("hidden");
+        img.onload = () => img.classList.remove("hidden");
+        img.onerror = () => img.classList.add("hidden");
+        img.src = shopReceiptPreviewUrl;
     }
+    wrap?.classList.remove("hidden");
 });
 document.getElementById("shop-receipt-remove")?.addEventListener("click", resetShopReceiptImage);
+document.getElementById("shop-history-refresh")?.addEventListener("click", refreshShopBanner);
+document.getElementById("shop-history-list")?.addEventListener("click", async event => {
+    const row = event.target.closest("[data-shop-history-order]"); if (!row) return;
+    row.disabled = true;
+    try {
+        const r = await apiGet("/api/shop/order", { order_id: row.dataset.shopHistoryOrder });
+        if (r?.success && r.order) showShopOrder(r.order);
+        else showToast(r?.message || "دریافت سفارش ناموفق بود.", "error");
+    } catch (_) { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+    finally { row.disabled = false; }
+});
 
 // تنظیمات کارت پرداخت فقط در بخش مدیریت قابل تغییر است.
 async function loadAdminShopConfig() {
@@ -7073,6 +7106,7 @@ function renderAdminShopOrder(order) {
     const id = String(order.id || "");
     const identity = [
         `<span>نام: <b>${escapeHtml(order.full_name || "ثبت نشده")}</b></span>`,
+        `<span>نام پرداخت‌کننده: <b>${escapeHtml(order.payer_name || "ثبت نشده")}</b></span>`,
         `<span>نام کاربری: <b>${order.username ? "@" + escapeHtml(order.username) : "ثبت نشده"}</b></span>`,
         `<span>شناسه حساب: <b dir="ltr">${escapeHtml(order.user_id || "—")}</b></span>`,
         `<span>دنیا: <b>${escapeHtml(order.world_name || "ثبت نشده")}</b></span>`,
