@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1936</title>
-<link rel="stylesheet" href="/style.css?v=20261016shop4">
+<link rel="stylesheet" href="/style.css?v=20261016archive1">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -149,10 +149,8 @@
 
 
     <div id="game-menu-panel" class="game-menu-panel hidden" role="menu" aria-label="منوی بازی">
-        <button type="button" class="game-menu-item" data-menu-page="home">🏠 <span>خانه</span></button>
-        <button type="button" class="game-menu-item" data-menu-page="map">🗺️ <span>نقشه</span></button>
-        <button type="button" class="game-menu-item" data-menu-page="communications">💬 <span>ارتباطات و اخبار</span></button>
         <button type="button" id="open-guide-menu" class="game-menu-item" role="menuitem">📖 <span>راهنمای بازی</span></button>
+        <button type="button" id="open-archive-menu" class="game-menu-item" role="menuitem">🗃️ <span>بایگانی</span></button>
     </div>
 
     <!-- نوار «در حال ورود به داشبورد» زیر هدر -->
@@ -364,6 +362,38 @@
         <div class="sub-back-bar"><button class="sub-back-button" data-back-to="home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button><span class="sb-title"><span class="sb-icon">🏆</span>رتبه‌بندی</span><button class="rk-help" id="rk-help-btn" aria-label="راهنمای رتبه‌بندی">؟</button><span class="sb-money">$0</span></div>
         <div class="rk-tabs" id="rk-tabs"></div>
         <div id="rankings-list" class="rankings-list"></div>
+    </main>
+
+    <!-- ==================== بایگانی دنیاها ==================== -->
+    <main id="archive-worlds" class="game-page hidden">
+        <div class="sub-back-bar">
+            <button type="button" class="sub-back-button" id="archive-worlds-back" aria-label="بازگشت به خانه"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+            <span class="sb-title"><span class="sb-icon">🗃️</span>بایگانی دنیاها</span>
+            <span class="sb-money">همه دنیاها</span>
+        </div>
+        <p class="archive-description">یک دنیا را انتخاب کن تا رتبه‌بندی همان دنیا و روش محاسبه امتیازها را ببینی.</p>
+        <div id="archive-world-list" class="archive-world-list"><div class="world-empty">در حال دریافت فهرست دنیاها…</div></div>
+    </main>
+
+    <!-- ==================== رتبه‌بندی دنیای بایگانی‌شده ==================== -->
+    <main id="archive-rankings" class="game-page hidden">
+        <div class="sub-back-bar">
+            <button type="button" class="sub-back-button" id="archive-ranking-back" aria-label="بازگشت به فهرست دنیاها"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+            <span class="sb-title"><span class="sb-icon">🏆</span><span id="archive-ranking-title">رتبه‌بندی دنیا</span></span>
+            <span class="sb-money">بایگانی</span>
+        </div>
+        <section class="archive-ranking-method">
+            <h3>رتبه‌بندی در حال حاضر چگونه محاسبه می‌شود؟</h3>
+            <p>رتبه کلی از چهار دسته تشکیل می‌شود: اقتصاد ۳۵٪، قدرت نظامی ۳۰٪، قلمرو ۲۰٪ و توسعه ۱۵٪. امتیاز هر دسته نسبت به بهترین کشور همان دسته سنجیده می‌شود و سپس امتیازها با همین وزن‌ها ترکیب می‌شوند.</p>
+            <div class="archive-weight-list">
+                <span><b>اقتصاد · ۳۵٪</b><small>درآمد خالص روزانه؛ هر ۱٬۰۰۰ دلار یک امتیاز</small></span>
+                <span><b>قدرت نظامی · ۳۰٪</b><small>قدرت حمله و دفاع یگان‌ها</small></span>
+                <span><b>قلمرو · ۲۰٪</b><small>منابع و تنگه‌های تحت کنترل، به‌علاوه کشورهای اشغال‌شده</small></span>
+                <span><b>توسعه · ۱۵٪</b><small>مجموع سطح ساختمان‌های زیرساخت و اقتصاد</small></span>
+            </div>
+        </section>
+        <div class="rk-tabs archive-rk-tabs" id="archive-rk-tabs"></div>
+        <div id="archive-rankings-list" class="rankings-list"><div class="world-empty">رتبه‌بندی در حال بارگذاری است…</div></div>
     </main>
 
 
@@ -1112,6 +1142,6 @@
 
 </section>
 
-<script src="/app.js?v=20261016shop4"></script>
+<script src="/app.js?v=20261016archive1"></script>
 </body>
 </html>
