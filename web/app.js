@@ -187,6 +187,7 @@ function showGamePage(id) {
     document.querySelectorAll(".game-page").forEach(p => p.classList.add("hidden"));
     const t = document.getElementById(id);
     if (t) { t.classList.remove("hidden"); t.scrollTop = 0; if (id === "admin") document.getElementById("admin-scroll")?.scrollTo(0,0); }
+    if (id === "subscription") renderSubscription();
     if (player?.country) updateSeasonGateBanner();
     const header = document.querySelector("#game .game-header");
     if (header) header.style.transform = "translate3d(0, 0, 0)";
@@ -6663,3 +6664,51 @@ document.getElementById("map-home-btn")?.addEventListener("click", () => {
     mapRotation = [-cap[0], -cap[1]];
     redrawMap();
 });
+
+/* ==================== فروشگاه اشتراک (بخش ۱ و ۲) ==================== */
+const SHOP_PRODUCTS = {
+    charge: { name: "بسته ویژه شارژ", price: 100000 },
+    vip: { name: "اشتراک VIP", price: 210000 }
+};
+const toFaDigits = s => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
+const shopPrice = n => toFaDigits(Number(n).toLocaleString("en-US").replace(/,/g, "٬")) + " تومان";
+
+function renderSubscription() {
+    // وضعیت‌ها از سرور می‌آیند (charge_pack_purchased / vip_until)؛ تا آماده‌شدن سرور، حالت پیش‌فرض نمایش داده می‌شود.
+    const bought = !!player?.charge_pack_purchased;
+    const cBtn = document.getElementById("shop-charge-open"), cBadge = document.getElementById("shop-charge-badge");
+    const cNote = document.getElementById("shop-charge-note"), cBuy = document.getElementById("shop-charge-buy");
+    if (cBtn) {
+        cBadge.textContent = bought ? "خریداری‌شده" : "یک‌بار خرید";
+        cBadge.classList.toggle("done", bought);
+        cNote.textContent = bought ? "این بسته قبلاً برای حساب شما خریداری شده است." : "هر حساب کاربری فقط یک بار می‌تواند این بسته را بخرد.";
+        if (cBuy) cBuy.disabled = bought;
+    }
+    const vBadge = document.getElementById("shop-vip-badge"), vNote = document.getElementById("shop-vip-note");
+    const until = player?.vip_until ? new Date(player.vip_until) : null;
+    const active = !!player?.vip && (!until || until > new Date());
+    if (vBadge) {
+        if (active) {
+            vBadge.textContent = "VIP فعال"; vBadge.classList.add("done");
+            if (until) {
+                const days = Math.max(0, Math.ceil((until - new Date()) / 86400000));
+                vNote.textContent = `${toFaDigits(days)} روز باقی‌مانده · پایان: ${until.toLocaleDateString("fa-IR")} ${until.toLocaleTimeString("fa-IR", {hour:"2-digit", minute:"2-digit"})}`;
+            } else vNote.textContent = "اشتراک VIP روی حساب شما فعال است.";
+        } else {
+            vBadge.textContent = "۳۰ روز اعتبار"; vBadge.classList.remove("done");
+            vNote.textContent = "اعتبار ۳۰ روز از زمان فعال‌سازی موفق اشتراک.";
+        }
+    }
+}
+
+function openShopPay(key) {
+    const prod = SHOP_PRODUCTS[key]; if (!prod) return;
+    if (key === "charge" && player?.charge_pack_purchased) { showToast("این بسته قبلاً برای حساب شما خریداری شده است.", "error"); return; }
+    document.getElementById("shop-pay-name").textContent = prod.name;
+    document.getElementById("shop-pay-amount").textContent = shopPrice(prod.price);
+    showGamePage("shop-pay");
+}
+document.getElementById("shop-charge-open")?.addEventListener("click", () => showGamePage("shop-charge-detail"));
+document.getElementById("shop-vip-open")?.addEventListener("click", () => showGamePage("shop-vip-detail"));
+document.getElementById("shop-charge-buy")?.addEventListener("click", () => openShopPay("charge"));
+document.getElementById("shop-vip-buy")?.addEventListener("click", () => openShopPay("vip"));
