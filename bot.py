@@ -2274,6 +2274,7 @@ async def war_cb(cb: types.CallbackQuery):
     if cb.from_user.id != ADMIN_ID:
         await cb.answer("دسترسی ندارید."); return
     response = None
+    keep_message = False
     with _tg_outbox_scope():
         async with WORLD_SWITCH_LOCK:
             previous = str(active_world_id)
@@ -2288,16 +2289,11 @@ async def war_cb(cb: types.CallbackQuery):
                         response = ("درخواست قبلاً بررسی شده یا منقضی است.", True)
                         break
                     if action == "approve":
-                        w["status"] = "battle"
-                        w["approved_at"] = utcnow().isoformat()
-                        w["negotiation_ends"] = None
-                        active_wars[war_id] = w
-                        message = f"اعلان جنگ {COUNTRIES[w['attacker']]['name']} به {COUNTRIES[w['defender']]['name']} تأیید شد و جنگ اکنون آغاز شده است. دلیل: {w.get('reason', 'ثبت نشده')}"
-                        push_news("آغاز جنگ", message, "warning", countries=[w["attacker"], w["defender"]])
-                        push_war("war_started", message, [w["attacker"], w["defender"]])
-                        await notify_world_players(message)
-                        response = ("✅ درخواست تأیید شد و جنگ آغاز شد.", False)
-                    elif action == "reject":
+                        # دلیل رسمی مدیر لازم است و از دکمهٔ تلگرام نوشته نمی‌شود؛ پیام و دکمه‌ها دست‌نخورده می‌مانند.
+                        response = ("برای تأیید باید دلیل رسمی خودتان را بنویسید؛ از «بررسی جنگ‌ها» در پنل مدیریت تأیید کنید.", True)
+                        keep_message = True
+                        break
+                    if action == "reject":
                         w["status"] = "rejected"
                         message = f"درخواست اعلان جنگ {COUNTRIES[w['attacker']]['name']} علیه {COUNTRIES[w['defender']]['name']} رد شد."
                         push_news("درخواست جنگ رد شد", message, countries=[w["attacker"], w["defender"]])
@@ -2315,7 +2311,7 @@ async def war_cb(cb: types.CallbackQuery):
                 save_state()
     text, alert = response
     try:
-        await cb.message.edit_text(text)
+        if not keep_message: await cb.message.edit_text(text)
     except Exception:
         pass
     await cb.answer(text, show_alert=alert)
@@ -2704,9 +2700,9 @@ async def declare_war(request):
     await notify_admin(
         f"⚔️ درخواست اعلان جنگ جدید در دنیای {worlds_registry.get(str(active_world_id), {}).get('name', active_world_id)}\n"
         f"{COUNTRIES[attacker]['name']} → {COUNTRIES[target]['name']}\n"
-        f"دلیل: {reason}\nبرای بررسی و تصمیم نهایی به بخش «بررسی جنگ‌ها» در پنل مدیریت بروید. پس از تأیید، جنگ بلافاصله شروع می‌شود.")
+        f"دلیل بازیکن: {reason}\nبرای خواندن دلیل، نوشتن دلیل رسمی خودتان و تأیید یا رد، به بخش «بررسی جنگ‌ها» در پنل مدیریت بروید. پس از تأیید ۲۴ ساعت فاز مذاکره شروع می‌شود و بعد از آن جنگ آغاز می‌شود.")
     save_state()
-    return web.json_response({"success": True, "message": "درخواست اعلان جنگ برای بررسی مدیر ارسال شد؛ در صورت تأیید، جنگ بلافاصله آغاز می‌شود."})
+    return web.json_response({"success": True, "message": "درخواست اعلان جنگ برای بررسی مدیر ارسال شد؛ در صورت تأیید، ۲۴ ساعت فاز مذاکره شروع می‌شود و سپس جنگ آغاز می‌شود."})
 
 async def get_wars(request):
     uid = get_auth_user_id(request)
@@ -2714,13 +2710,52 @@ async def get_wars(request):
     if uid not in players: players[uid] = create_player(uid)
     cid = players[uid].get("country")
     # درخواست تأییدنشده فقط برای فرستنده و مدیر دیده می‌شود؛ اعلان عمومی پس از تأیید آغاز می‌شود.
-    pend = [dict(w) for w in war_declarations.values()
+    def _public_war(w):
+        row = dict(w)
+        if int(w.get("attacker_user", -1)) != int(uid): row.pop("reason", None)   # دلیل خام فقط برای فرستنده؛ دلیل رسمی مدیر برای همه
+        return row
+    pend = [_public_war(w) for w in war_declarations.values()
             if w.get("status") == "negotiation" or
             (w.get("status") == "pending_admin" and int(w.get("attacker_user", -1)) == int(uid))]
-    active = [dict(w) for w in active_wars.values()]
+    active = [_public_war(w) for w in active_wars.values()]
     mine = [r for r in war_reports if r.get("attacker") == cid or r.get("defender") == cid][-10:]
     return web.json_response({"pending": pend, "active": active, "reports": mine,
                               "occupied": occupied_countries})
+
+async def war_peace(request):
+    """صلح: هر دو کشور درگیر باید دکمهٔ صلح را بزنند؛ همان لحظه جنگ تمام می‌شود."""
+    uid = get_auth_user_id(request)
+    if not uid: return web.json_response({"success": False, "error": "unauthorized"}, status=401)
+    data = await read_json(request)
+    wid = str(data.get("war_id", "")); action = str(data.get("action", "offer"))
+    p = players.get(uid); cid = (p or {}).get("country")
+    w = war_declarations.get(wid)
+    if not cid or p.get("is_eliminated"): return _bad("برای صلح باید در این دنیا کشور داشته باشید.")
+    if not w or w.get("resolved") or w.get("status") not in ("negotiation", "battle"):
+        return _bad("این جنگ فعال نیست.")
+    if cid not in (w.get("attacker"), w.get("defender")):
+        return _bad("فقط دو کشور درگیر می‌توانند صلح کنند.", 403)
+    other = w["defender"] if cid == w["attacker"] else w["attacker"]
+    votes = [c for c in (w.get("peace_votes") or []) if c in (w["attacker"], w["defender"])]
+    names = COUNTRIES[cid]["name"], COUNTRIES[other]["name"]
+    if action == "cancel":
+        if cid in votes: votes.remove(cid)
+        w["peace_votes"] = votes; save_state()
+        return web.json_response({"success": True, "message": "پیشنهاد صلح شما لغو شد.", "peace_votes": votes})
+    if cid not in votes: votes.append(cid)
+    w["peace_votes"] = votes
+    if w["attacker"] in votes and w["defender"] in votes:
+        w["status"] = "peace"; w["resolved"] = True; w["peace_at"] = utcnow().isoformat(); w["negotiation_ends"] = None
+        active_wars.pop(wid, None)
+        msg = f"🕊️ صلح میان {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} برقرار شد و جنگ پایان یافت."
+        push_news("صلح", msg, "info", countries=[w["attacker"], w["defender"]])
+        push_war("peace", msg, [w["attacker"], w["defender"]])
+        await notify_world_players(msg)
+        save_state()
+        return web.json_response({"success": True, "peace": True, "message": msg, "peace_votes": votes})
+    notify_country(other, f"🕊️ {names[0]} پیشنهاد صلح داد. برای پذیرش، در بخش جنگ دکمهٔ «صلح» را بزنید.")
+    save_state()
+    return web.json_response({"success": True, "peace": False, "message": f"پیشنهاد صلح ثبت شد؛ منتظر پذیرش {names[1]} هستیم.", "peace_votes": votes})
 
 async def check_wars_tick():
     """جنگ‌ها فقط در بازهٔ فعال بازی به‌روزرسانی می‌شوند."""
@@ -2733,11 +2768,17 @@ async def check_wars_tick():
         return
     for wid, w in list(war_declarations.items()):
         if w.get("status") == "negotiation":
+            ends = parse_dt(w.get("negotiation_ends"))
+            if ends and ends > _now_t:
+                continue      # هنوز در فاز مذاکره است؛ جنگ فعال نیست.
             w["status"] = "battle"
-            w["approved_at"] = w.get("created_at") or utcnow().isoformat()
+            w["approved_at"] = w.get("approved_at") or w.get("created_at") or utcnow().isoformat()
             w["negotiation_ends"] = None
+            w["battle_started_at"] = utcnow().isoformat()
             active_wars[wid] = w
-            msg = f"اعلان جنگ قدیمی بین {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} به جنگ فعال تبدیل شد."
+            msg = (f"⚔️ مهلت مذاکرهٔ {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} تمام شد؛ جنگ اکنون آغاز شد."
+                   if w.get("admin_reason") else
+                   f"اعلان جنگ قدیمی بین {COUNTRIES[w['attacker']]['name']} و {COUNTRIES[w['defender']]['name']} به جنگ فعال تبدیل شد.")
             push_news("آغاز جنگ", msg, "warning", countries=[w["attacker"], w["defender"]])
             push_war("war_started", msg, [w["attacker"], w["defender"]])
             await notify_world_players(msg)
@@ -2772,13 +2813,19 @@ async def admin_review_war(request):
     attacker_name = COUNTRIES.get(w.get("attacker"), {}).get("name", w.get("attacker"))
     defender_name = COUNTRIES.get(w.get("defender"), {}).get("name", w.get("defender"))
     if action == "approve":
-        w["status"] = "battle"
-        w["approved_at"] = utcnow().isoformat()
-        w["negotiation_ends"] = None
-        active_wars[w["id"]] = w
-        msg = f"⚔️ اعلان جنگ {attacker_name} علیه {defender_name} تأیید شد و جنگ اکنون آغاز شده است."
-        push_news("آغاز جنگ", msg, "warning", countries=[w["attacker"], w["defender"]])
-        push_war("war_started", msg, [w["attacker"], w["defender"]])
+        admin_reason = str(data.get("admin_reason", "")).strip()[:1000]
+        if not admin_reason:
+            return web.json_response({"success": False, "message": "دلیل رسمی خودتان را بنویسید؛ این دلیل برای همهٔ بازیکنان ارسال می‌شود."}, status=400)
+        now_ = utcnow()
+        w["status"] = "negotiation"
+        w["admin_reason"] = admin_reason
+        w["approved_at"] = now_.isoformat()
+        w["negotiation_ends"] = (now_ + timedelta(hours=NEGOTIATION_HOURS)).isoformat()
+        msg = (f"⚔️ {attacker_name} به {defender_name} اعلان جنگ کرد.\n"
+               f"📜 دلیل: {admin_reason}\n"
+               f"🤝 هر دو کشور {NEGOTIATION_HOURS} ساعت وقت دارند وارد فاز مذاکره شوند؛ پس از آن جنگ آغاز می‌شود.")
+        push_news("اعلان جنگ", msg, "warning", countries=[w["attacker"], w["defender"]])
+        push_war("war_declared", msg, [w["attacker"], w["defender"]])
         await notify_world_players(msg)
     elif action == "reject":
         w["status"] = "rejected"
@@ -6389,7 +6436,7 @@ async def create_web_app():
     for path, h in [
         ("/api/select-country", select_country), ("/api/upgrade-infra", upgrade_infra),
         ("/api/upgrade-economy", upgrade_economy), ("/api/train-unit", train_unit),
-        ("/api/war/declare", declare_war),
+        ("/api/war/declare", declare_war), ("/api/war/peace", war_peace),
         ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/recall", recall_forces),
         ("/api/satellite/launch", sat_launch), ("/api/satellite/scan-site", sat_scan_site),
         ("/api/satellite/scan-country", sat_scan_country),
