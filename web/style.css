@@ -3402,3 +3402,12 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 #army .fq-row + .fq-row { margin-top: 6px; padding-top: 6px; }
 #army .fq-stats { margin-top: 3px; gap: 4px 12px; }
 #army .base-card { padding: 8px 12px !important; gap: 6px !important; }
+
+
+/* دارایی‌های کشور در پنل اطلاعات نقشه */
+.map-info-holdings { margin-top: 10px; padding: 10px 11px; border-radius: 14px; background: rgba(160,112,224,.07); border: 1px solid rgba(160,112,224,.2); display: flex; flex-direction: column; gap: 9px; max-height: 38vh; overflow-y: auto; }
+.map-info-holdings .holding-title { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 800; color: #C7A4EF; margin-bottom: 5px; }
+.map-info-holdings .holding-title span { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: rgba(160,112,224,.2); color: #E3D3F8; }
+.map-info-holdings .holding-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.map-info-holdings .holding-chip { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: rgba(28,13,45,.6); border: 1px solid rgba(160,112,224,.18); color: #E6DDF3; line-height: 1.6; }
+.map-info-holdings .holding-empty { font-size: 11.5px; color: #9B8DB3; line-height: 1.7; }
