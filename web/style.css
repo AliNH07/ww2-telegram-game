@@ -724,6 +724,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .dot-own            { background: #2ecc71; }
 .dot-other          { background: #9fd8ff; }
 .dot-taken          { background: #ff9f1a; }
+.dot-occupied       { background: #7851a9; }
 .dot-inactive       { background: #2a2e35; border: 1px solid #6b7480; }
 .dot-nogame         { background: #6e7683; border: 1px solid #6b7480; }
 .dot-site, .dot-strait, .dot-oil { border: 1px solid #e8eef6; background: #9fd8ff; }
@@ -3732,3 +3733,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .sm-help.hidden{display:none}
 .sm-help ol{margin:6px 0 0;padding:0 18px 0 0}
 .sm-help li{margin:3px 0}
+
+.sm-body{max-height:50vh}
+.sm-help{max-height:32vh}
+.sm-count.done{color:#6bd68a}
