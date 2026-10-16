@@ -3689,3 +3689,46 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .sg-total{border-top:1px dashed rgba(255,255,255,.2);margin-top:4px;padding-top:6px}
 .sg-power{font-weight:700;color:#ffd166}
 .sg-empty{opacity:.8;font-size:.88em}
+
+/* قوانین بازی */
+.rules-modal{z-index:10050}
+.rules-list{margin:10px 0;padding:0 22px 0 0;text-align:right;max-height:52vh;overflow:auto;line-height:1.9}
+.rules-list li{margin:6px 0;white-space:pre-line}
+.rules-check{display:flex;align-items:center;gap:8px;justify-content:center;margin:12px 0;cursor:pointer;font-weight:700}
+.rules-check input{width:20px;height:20px}
+.guide-btn:disabled{opacity:.45;cursor:not-allowed}
+.admin-rules-count{display:flex;align-items:center;gap:10px;margin:10px 0}
+.admin-rules-count input{width:90px}
+.admin-rules-fields{display:flex;flex-direction:column;gap:10px;margin:10px 0}
+.admin-rule-row{display:flex;gap:8px;align-items:flex-start}
+.admin-rule-row b{min-width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;margin-top:4px}
+.admin-rule-row textarea{flex:1;min-height:60px}
+
+/* مدیریت تنگه‌ها */
+.sm-body{text-align:right;max-height:64vh;overflow:auto}
+.sm-empty{padding:22px 8px;text-align:center;opacity:.85;font-weight:700}
+.sm-card{margin:10px 0;padding:10px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.sm-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:700}
+.sm-chip{font-size:.8em;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.12)}
+.sm-sub{font-size:.82em;opacity:.8;margin:4px 0 8px}
+.sm-sec{margin:10px 0 4px;font-weight:700;font-size:.9em}
+.sm-row{display:flex;justify-content:space-between;gap:8px;padding:4px 0;font-size:.9em}
+.sm-count{font-variant-numeric:tabular-nums;font-weight:700;color:#ffd166}
+.sm-count.done{color:#6bd68a}
+.sm-seg{display:flex;gap:6px;margin:6px 0}
+.sm-seg button{flex:1;padding:7px 4px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:inherit}
+.sm-seg button.active{background:rgba(255,209,102,.22);border-color:#ffd166}
+.sm-toll{display:flex;gap:6px;margin:6px 0}
+.sm-toll input{flex:1;min-width:0}
+.sm-toll.hidden{display:none}
+.sm-select{width:100%;margin:4px 0}
+.sm-exc{display:flex;justify-content:space-between;align-items:center;font-size:.85em;padding:3px 0}
+.sm-exc button{font-size:.8em}
+
+.sm-title{display:flex;align-items:center;justify-content:center;gap:8px}
+.sm-help-btn{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:inherit;font-weight:700;line-height:1;cursor:pointer;padding:0}
+.sm-help-btn[aria-expanded="true"]{background:rgba(255,209,102,.3);border-color:#ffd166}
+.sm-help{text-align:right;margin:8px 0;padding:10px 12px;border-radius:12px;background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.35);font-size:.88em;line-height:1.9;max-height:44vh;overflow:auto}
+.sm-help.hidden{display:none}
+.sm-help ol{margin:6px 0 0;padding:0 18px 0 0}
+.sm-help li{margin:3px 0}
