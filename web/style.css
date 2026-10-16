@@ -3558,3 +3558,64 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .admin-shop-config-form .admin-primary-btn{grid-column:1/-1;margin:0}
 .admin-shop-config-form .admin-editor-note{grid-column:1/-1;margin:0;line-height:1.8}
 @media(max-width:520px){.admin-shop-config-form{grid-template-columns:1fr}.shop-receipt-options{grid-template-columns:1fr 1fr}.shop-card-value strong{font-size:12px}}
+
+/* ===== تغییرات محدود فروشگاه و مدیریت سفارش‌های فروشگاه ===== */
+#subscription .shop-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}
+#subscription .shop-card{min-width:0;min-height:0;height:100%;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:3px;padding:13px 11px;border-radius:14px;text-align:right;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+#subscription .shop-card h2{font-size:13px;line-height:1.8;margin:0 0 2px;min-height:2.5em}
+#subscription .shop-card .shop-price{justify-content:flex-start;gap:5px;margin:0 0 3px;line-height:1.4}
+#subscription .shop-card .shop-price strong{font-size:19px;line-height:1.4}
+#subscription .shop-card .shop-price span{font-size:10px}
+#subscription .shop-card .shop-note{font-size:9px;line-height:1.8;margin:0 0 7px;min-height:3.5em;color:#B8ADC9}
+#subscription .shop-card .shop-btn{margin-top:auto;padding:8px 6px;border-radius:9px;font-size:10px;line-height:1.7}
+#subscription .shop-card.shop-charge{background:linear-gradient(145deg,rgba(80,48,120,.72),rgba(23,13,35,.96))}
+#subscription .shop-card.shop-vip{background:linear-gradient(145deg,rgba(101,72,20,.48),rgba(23,13,35,.96))}
+.shop-support-note{font-size:10px;line-height:1.9;color:#C7B5DD;border:1px solid rgba(201,168,246,.17);background:rgba(201,168,246,.055);border-radius:10px;padding:9px 10px;margin:0}
+#admin .admin-shop-menu-button{width:42px;height:42px;flex:0 0 42px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:rgba(160,112,224,.1);border:1px solid rgba(160,112,224,.24);color:#D9BDF7;font:inherit;font-size:22px;line-height:1}
+#admin .admin-shop-menu-button[aria-expanded="true"]{background:rgba(160,112,224,.2);border-color:rgba(160,112,224,.5)}
+#admin .admin-shop-menu{position:absolute;left:8px;top:calc(100% - 1px);z-index:100;display:grid;gap:5px;width:min(255px,calc(100vw - 34px));padding:8px;border-radius:13px;border:1px solid rgba(201,168,246,.28);background:rgba(24,12,38,.98);box-shadow:0 14px 34px rgba(0,0,0,.46);backdrop-filter:blur(16px)}
+#admin .admin-shop-menu.hidden{display:none!important}
+#admin .admin-shop-menu button{display:flex;align-items:center;gap:9px;width:100%;padding:12px 11px;border-radius:9px;background:rgba(201,168,246,.07);color:#E8DDF5;text-align:right;font:inherit;font-size:11px;font-weight:800}
+#admin .admin-shop-menu button:active{background:rgba(201,168,246,.16)}
+#admin .admin-shop-subview{padding:0 1px 32px;min-width:0}
+#admin .admin-shop-subview-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 13px;padding:8px 0 12px;border-bottom:1px solid rgba(201,168,246,.12)}
+#admin .admin-shop-back{width:100%;text-align:right;padding:9px 11px;border-radius:9px;background:rgba(160,112,224,.08);border:1px solid rgba(160,112,224,.18);color:#CDB0F2;font:inherit;font-size:10px;font-weight:800}
+#admin .admin-shop-subview-head h2{width:100%;font-size:15px;line-height:1.8;color:#F1E8FC}
+#admin .admin-shop-subview-head p{font-size:10px;line-height:1.9;color:#AFA1C3}
+#admin .admin-shop-orders-title{flex:1;min-width:0}
+#admin .admin-shop-orders-title h2{width:auto}
+#admin .admin-shop-orders-title p{margin-top:3px}
+#admin .admin-shop-order-group{margin:12px 0;padding:12px;border:1px solid rgba(201,168,246,.16);border-radius:14px;background:rgba(25,13,39,.52)}
+#admin .admin-shop-order-group.pending{border-color:rgba(255,200,87,.22)}
+#admin .admin-shop-order-group.approved{border-color:rgba(74,222,128,.2)}
+#admin .admin-shop-order-group.rejected{border-color:rgba(248,113,113,.2)}
+#admin .admin-shop-order-group-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+#admin .admin-shop-order-group-head h3{font-size:12px;color:#EEE4FA}
+#admin .admin-shop-order-group-head span{min-width:26px;text-align:center;border-radius:99px;padding:3px 8px;font-size:10px;background:rgba(201,168,246,.1);color:#DDC7FA}
+#admin .admin-shop-order-list{display:grid;gap:9px}
+#admin .admin-shop-order-card{display:grid;gap:9px;padding:11px;border-radius:12px;border:1px solid rgba(201,168,246,.13);background:rgba(0,0,0,.15);min-width:0}
+#admin .admin-shop-order-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+#admin .admin-shop-order-head>div{min-width:0;display:grid;gap:3px}
+#admin .admin-shop-order-head strong{font-size:11px;line-height:1.8;color:#E7D9F6;overflow-wrap:anywhere}
+#admin .admin-shop-order-head small,#admin .admin-shop-order-meta{font-size:9px;line-height:1.9;color:#AFA2C1;overflow-wrap:anywhere}
+#admin .admin-shop-order-status{padding:4px 7px;border-radius:7px;font-size:8px;white-space:nowrap;background:rgba(255,200,87,.1);color:#FFD479}
+#admin .admin-shop-order-status.approved{background:rgba(74,222,128,.1);color:#91E5AC}
+#admin .admin-shop-order-status.rejected{background:rgba(248,113,113,.1);color:#FFB2B2}
+#admin .admin-shop-order-meta{display:grid;gap:2px;padding:8px;border-radius:9px;background:rgba(201,168,246,.035)}
+#admin .admin-shop-order-meta b{color:#E5D9F3;font-weight:800}
+#admin .admin-shop-receipt-detail{padding:9px 10px;border-radius:9px;border:1px solid rgba(201,168,246,.1);background:rgba(201,168,246,.035);font-size:10px;line-height:1.9;color:#D7CBE5;white-space:pre-wrap;overflow-wrap:anywhere}
+#admin .admin-shop-order-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+#admin .admin-shop-order-actions button{padding:9px 7px;border-radius:9px;font:inherit;font-size:10px;font-weight:900}
+#admin .admin-shop-approve{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.22);color:#9CEAB2}
+#admin .admin-shop-reject{background:rgba(248,113,113,.09);border:1px solid rgba(248,113,113,.2);color:#FFB5B5}
+#admin .admin-shop-message-form{display:grid;gap:7px}
+#admin .admin-shop-message-form textarea{width:100%;min-width:0;padding:10px;border-radius:9px;border:1px solid rgba(201,168,246,.2);background:#160c23;color:#F4F6F9;font:inherit;font-size:11px;line-height:1.8;resize:vertical}
+#admin .admin-shop-message-form button{justify-self:stretch;padding:9px;border-radius:9px;border:1px solid rgba(201,168,246,.24);background:rgba(201,168,246,.1);color:#E7D6FC;font:inherit;font-size:10px;font-weight:900}
+#admin .admin-shop-empty{padding:14px 10px;text-align:center;border-radius:10px;background:rgba(255,255,255,.025);font-size:10px;line-height:1.9;color:#9F91B4}
+@media(max-width:350px){#subscription .shop-card{padding:10px 8px}#subscription .shop-card h2{font-size:12px}#subscription .shop-card .shop-price strong{font-size:17px}}
+#subscription .shop-card{padding:10px 10px;gap:2px}
+#subscription .shop-card h2{font-size:12px;line-height:1.55;min-height:0;margin-bottom:1px}
+#subscription .shop-card .shop-price{margin:0 0 2px}
+#subscription .shop-card .shop-price strong{font-size:18px}
+#subscription .shop-card .shop-note{font-size:9px;line-height:1.55;min-height:0;margin:0 0 5px}
+#subscription .shop-card .shop-btn{padding:6px 5px;font-size:9px;line-height:1.5}
