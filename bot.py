@@ -2551,9 +2551,17 @@ async def get_army_units(request):
 # =========================================================
 # API War
 # =========================================================
+def _world_recipients(exclude_uid=None):
+    """فقط بازیکنانی که در همین دنیا کشور دارند و حذف نشده‌اند گیرندهٔ پیام می‌شوند.
+    بازیکن ریست‌شده یا کسی که فقط بازی را باز کرده (بدون انتخاب کشور) هیچ پیامی از این دنیا نمی‌گیرد."""
+    return [int(uid) for uid, pl in list(players.items())
+            if isinstance(pl, dict) and pl.get("country") and not pl.get("is_eliminated")
+            and (exclude_uid is None or str(uid) != str(exclude_uid))]
+
+
 async def notify_world_players(message):
     """Broadcast an in-game world event to each Telegram user registered in this world."""
-    text = str(message)[:3500]
+    text = (_world_tag() + str(message))[:3500]
     items = [(int(uid), text, None) for uid, p in list(players.items())
              if p.get("country") and not p.get("is_eliminated")]
     await _tg_dispatch(items)
@@ -3453,10 +3461,20 @@ def announce(kind, title, text, countries=()):
     """اعلان همزمان در اخبار جنگ و اعلان‌ها/اخبار عمومی (بدون ذکر تعداد نیرو)."""
     push_war(kind, text, list(countries)); push_news(title, text, countries=list(countries))
 
+def _world_tag():
+    """وقتی بیش از یک دنیا وجود دارد، نام دنیا ابتدای پیام‌های تلگرام می‌آید تا دنیاها قاطی نشوند."""
+    try:
+        if len(worlds_registry) > 1:
+            return f"🌍 {_world_meta().get('name', f'دنیای {active_world_id}')}\n"
+    except Exception:
+        pass
+    return ""
+
 def notify_country(cid, text):
     """پیام خصوصی تلگرام به بازیکنِ آن کشور (علاوه بر اعلان‌های درون بازی)."""
     uid_, _ = get_player_by_country(cid)
     if not uid_: return
+    text = _world_tag() + str(text)
     async def _send():
         try: await bot.send_message(uid_, text)
         except Exception as e: logging.warning("notify failed: %s", e)
@@ -4522,14 +4540,14 @@ async def _broadcast_announcement_notification(cid, author_uid=None, recipients=
     if cid not in COUNTRIES:
         return
     country_name = COUNTRIES[cid]["name"]
-    text = (f"📢 بیانیهٔ جدید\nکشور «{country_name}» بیانیه‌ای منتشر کرد.\n"
+    text = (f"{_world_tag()}📢 بیانیهٔ جدید\nکشور «{country_name}» بیانیه‌ای منتشر کرد.\n"
             "متن بیانیه فقط در بخش «ارتباطات ← بیانیه‌ها» قابل مشاهده است.")
     # ارسال مستقیم (نه از صف _tg_send): این تابع به‌صورت تسک پس‌زمینه اجرا می‌شود و صف
     # درخواست تا آن لحظه خالی شده است، پس پیام‌ها از طریق صف هرگز ارسال نمی‌شدند.
     # recipients باید هنگام انتشار و در دنیای همان بیانیه ساخته شده باشد؛ این تسک بعداً اجرا می‌شود
     # و ممکن است دنیای فعال تا آن موقع عوض شده باشد.
     if recipients is None:
-        recipients = [uid for uid in list(players.keys()) if author_uid is None or str(uid) != str(author_uid)]
+        recipients = _world_recipients(author_uid)
     items = [(int(uid), text, None) for uid in recipients]
     try:
         sent, failed = await _flush_tg_outbox(items)
@@ -4540,10 +4558,11 @@ async def _broadcast_announcement_notification(cid, author_uid=None, recipients=
 async def _broadcast_strait_notification(text, uids=None):
     """Send public strait-policy changes to every registered player; the bot middleware adds the game button."""
     semaphore = asyncio.Semaphore(8)
+    tag = _world_tag()   # همین‌جا و در دنیای فعال گرفته می‌شود
     async def send_to(uid):
         async with semaphore:
             try:
-                await bot.send_message(int(uid), f"⚓ خبر تنگه\n{text}\n\nبرای دیدن موقعیت و تنظیمات، نقشهٔ بازی را باز کنید.")
+                await bot.send_message(int(uid), f"{tag}⚓ خبر تنگه\n{text}\n\nبرای دیدن موقعیت و تنظیمات، نقشهٔ بازی را باز کنید.")
             except Exception as e:
                 logging.warning("strait notification failed for %s: %s", uid, e)
     targets = list(uids) if uids is not None else list(players.keys())
@@ -4643,7 +4662,7 @@ async def create_announcement(request):
     save_state()
     try:
         # گیرندگان همین‌جا و فقط از بازیکنان همین دنیا ثبت می‌شوند.
-        ann_recipients = [u_ for u_ in list(players.keys()) if str(u_) != str(uid)]
+        ann_recipients = _world_recipients(uid)
         asyncio.get_running_loop().create_task(_broadcast_announcement_notification(cid, uid, ann_recipients))
     except RuntimeError:
         logging.warning("announcement notification skipped: no active event loop")
@@ -6193,8 +6212,8 @@ async def admin_broadcast(request):
     push_news(title, body, "info")
     log_admin_action("ارسال خبر عمومی", None, f"{title}: {body[:250]}")
     save_state()
-    recipients = [int(uid) for uid in list(players.keys())]
-    text = f"📣 {title}\n\n{body}"
+    recipients = _world_recipients()
+    text = f"{_world_tag()}📣 {title}\n\n{body}"
     async def _send_all(resp):
         sent, failed = await _flush_tg_outbox([(u, text, None) for u in recipients], delay=0.035)
         return web.json_response({"success": True, "message": "خبر در بازی ثبت شد.", "sent": sent, "failed": failed})
