@@ -1835,7 +1835,8 @@ _atexit.register(_db_flush)
 # =========================================================
 # فروشگاه اشتراک: سفارش‌ها (سطح حساب کاربری، مستقل از دنیا و کشور)
 # =========================================================
-SHOP_ORDER_TTL_SECONDS = 15 * 60   # مهلت ارسال رسید؛ فقط زمان سرور معتبر است
+SHOP_ORDER_TTL_SECONDS = 30 * 60   # مهلت ارسال رسید؛ فقط زمان سرور معتبر است
+SHOP_RECEIPT_MAX_BYTES = 49_000_000  # سقف عملی سرویس ابری تلگرام برای ارسال فایل به مدیر
 SHOP_PRODUCTS = {
     "charge": {"name": "شارژ حساب ۱۰ میلیون دلار", "price": 100_000, "charge_units": 10_000_000, "one_time": True},
     "vip": {"name": "اشتراک VIP", "price": 210_000, "vip_days": 30},
@@ -1942,7 +1943,8 @@ def _shop_admin_public(order):
         "amount": int(order.get("amount") or 0), "status": str(order.get("status") or ""),
         "created_at": order.get("created_at"), "expires_at": order.get("expires_at"),
         "receipt_sent_at": order.get("receipt_sent_at"), "receipt_type": order.get("receipt_type"),
-        "receipt_text": str(order.get("receipt_text") or "")[:1500],
+        "receipt_text": str(order.get("receipt_text") or "")[:3000],
+        "payer_name": str(order.get("payer_name") or "")[:120],
         "username": str(order.get("username") or ""), "full_name": str(order.get("full_name") or ""),
         "world_id": str(order.get("world_id") or ""), "world_name": str(order.get("world_name") or ""),
         "country_id": str(order.get("country_id") or ""), "country_name": str(order.get("country_name") or ""),
@@ -2079,6 +2081,19 @@ async def shop_get_order(request):
         return web.json_response({"success": True, "order": _shop_public(o, now) if o else None})
 
 
+async def shop_get_orders(request):
+    """Return the full order history for the authenticated player, newest first."""
+    uid = get_auth_user_id(request)
+    if not uid:
+        return web.json_response({"success": False, "error": "unauthorized", "message": "ابتدا وارد حساب خود شوید."}, status=401)
+    async with WORLD_SWITCH_LOCK:
+        now = utcnow()
+        if _shop_expire_due(now): save_state()
+        rows = sorted((row for row in shop_orders.values() if int(row.get("uid") or -1) == int(uid)),
+                      key=lambda row: str(row.get("created_at") or ""), reverse=True)
+        return web.json_response({"success": True, "orders": [_shop_public(row, now) for row in rows]})
+
+
 async def shop_create_order(request):
     global shop_seq
     uid = get_auth_user_id(request)
@@ -2148,12 +2163,13 @@ def _shop_receipt_admin_message(order):
     country = order.get("country_name") or "ثبت نشده"
     receipt_kind = "تصویر رسید" if order.get("receipt_type") == "image" else "رسید متنی"
     text = (
-        "🧾 سفارش جدید برای بررسی پرداخت\n\n"
+        "سفارش جدید برای بررسی پرداخت\n\n"
         f"شماره سفارش: {order.get('id')}\n"
         f"محصول: {order.get('product_name')}\n"
         f"مبلغ: {int(order.get('amount') or 0):,} تومان\n"
         f"شناسه کاربر: {order.get('uid')}\n"
-        f"نام: {user_name}\nنام کاربری: {username}\n"
+        f"نام حساب: {user_name}\nنام کاربری: {username}\n"
+        f"نام و نام خانوادگی پرداخت‌کننده: {str(order.get('payer_name') or 'ثبت نشده')}\n"
         f"دنیا: {world}\nکشور: {country}\n"
         f"روش رسید: {receipt_kind}\n"
         f"زمان سفارش: {order.get('created_at')}\n"
@@ -2179,41 +2195,69 @@ async def shop_submit_receipt(request):
     uid = get_auth_user_id(request)
     if not uid:
         return web.json_response({"success": False, "error": "unauthorized", "message": "ابتدا وارد حساب خود شوید."}, status=401)
-    body = await read_json(request)
+
+    # تصویر از طریق multipart ارسال می‌شود تا فرمت اصلی حفظ شود و دادهٔ base64
+    # ذخیرهٔ بازی/پایگاه داده را بی‌جهت بزرگ نکند.
+    body = {}
+    image_bytes = None
+    image_name = "receipt-image"
+    image_mime = "application/octet-stream"
+    if request.content_type.startswith("multipart/form-data"):
+        try:
+            reader = await request.multipart()
+            while True:
+                part = await reader.next()
+                if part is None: break
+                if part.name == "receipt_image":
+                    image_name = os.path.basename(str(part.filename or "receipt-image").replace("\\", "/"))[:150] or "receipt-image"
+                    image_mime = str(part.headers.get("Content-Type") or "application/octet-stream")[:120]
+                    chunks, total_bytes = [], 0
+                    while True:
+                        chunk = await part.read_chunk(size=1024 * 1024)
+                        if not chunk: break
+                        total_bytes += len(chunk)
+                        if total_bytes > SHOP_RECEIPT_MAX_BYTES:
+                            return web.json_response({"success": False, "error": "image_too_large", "message": "حداکثر اندازهٔ قابل ارسال برای فایل رسید در تلگرام حدود ۴۹ مگابایت است."}, status=413)
+                        chunks.append(chunk)
+                    image_bytes = b"".join(chunks)
+                else:
+                    body[part.name] = await part.text()
+        except Exception:
+            return web.json_response({"success": False, "error": "bad_multipart", "message": "خواندن فایل رسید ناموفق بود؛ دوباره انتخاب و ارسال کنید."}, status=400)
+    else:
+        body = await read_json(request)
+
     oid = str(body.get("order_id") or "")
     kind = str(body.get("receipt_type") or "")
     if kind not in ("image", "text"):
         return web.json_response({"success": False, "error": "bad_receipt_type", "message": "روش ارسال رسید معتبر نیست."}, status=400)
 
-    image_bytes = None
-    image_name = "receipt.jpg"
-    image_mime = "image/jpeg"
+    payer_name = re.sub(r"\s+", " ", str(body.get("payer_name") or "").strip())[:120]
+    if len(payer_name.split()) < 2:
+        return web.json_response({"success": False, "error": "missing_payer_name", "message": "نام و نام خانوادگی پرداخت‌کننده را کامل وارد کنید."}, status=400)
+
     receipt_text = ""
     if kind == "image":
-        raw_image = str(body.get("receipt_image") or "")
-        if not raw_image.startswith("data:image/") or "," not in raw_image:
-            return web.json_response({"success": False, "error": "missing_image", "message": "ابتدا تصویر رسید را انتخاب کنید."}, status=400)
-        header, encoded = raw_image.split(",", 1)
-        mime = header[5:].split(";", 1)[0].lower()
-        if mime not in ("image/jpeg", "image/png", "image/webp"):
-            return web.json_response({"success": False, "error": "bad_image_type", "message": "فرمت تصویر باید JPG، PNG یا WebP باشد."}, status=400)
-        try: image_bytes = base64.b64decode(encoded, validate=True)
-        except Exception:
-            return web.json_response({"success": False, "error": "bad_image", "message": "تصویر رسید معتبر نیست."}, status=400)
-        if not image_bytes or len(image_bytes) > 1_100_000:
-            return web.json_response({"success": False, "error": "image_too_large", "message": "حجم تصویر رسید باید کمتر از ۱٫۱ مگابایت باشد."}, status=413)
-        image_mime = mime
-        image_name = "receipt.png" if mime == "image/png" else ("receipt.webp" if mime == "image/webp" else "receipt.jpg")
+        if image_bytes is None:
+            raw_image = str(body.get("receipt_image") or "")
+            if not raw_image.startswith("data:image/") or "," not in raw_image:
+                return web.json_response({"success": False, "error": "missing_image", "message": "ابتدا تصویر رسید را انتخاب کنید."}, status=400)
+            header, encoded = raw_image.split(",", 1)
+            image_mime = header[5:].split(";", 1)[0].lower() or "application/octet-stream"
+            try: image_bytes = base64.b64decode(encoded, validate=True)
+            except Exception:
+                return web.json_response({"success": False, "error": "bad_image", "message": "فایل رسید معتبر نیست."}, status=400)
+            ext = ".jpg" if image_mime == "image/jpeg" else ".png" if image_mime == "image/png" else ".img"
+            image_name = str(body.get("receipt_filename") or ("receipt" + ext))[:150]
+        if not image_bytes:
+            return web.json_response({"success": False, "error": "empty_image", "message": "فایل انتخاب‌شده خالی است."}, status=400)
+        # محدودیت عملی سرویس ابری تلگرام برای ارسال فایل؛ کلاینت روی نوع فایل یا ابعاد محدودیت جداگانه ندارد.
+        if len(image_bytes) > SHOP_RECEIPT_MAX_BYTES:
+            return web.json_response({"success": False, "error": "image_too_large", "message": "حداکثر اندازهٔ قابل ارسال برای فایل رسید در تلگرام حدود ۴۹ مگابایت است."}, status=413)
     else:
-        trace = str(body.get("trace_number") or "").strip()[:120]
-        paid_raw = str(body.get("paid_amount") or "").strip().translate(SHOP_DIGIT_TRANSLATION).replace(",", "").replace("٬", "").replace("،", "")
-        note = str(body.get("receipt_note") or "").strip()[:1000]
-        try: paid_amount = int(paid_raw)
-        except (TypeError, ValueError): paid_amount = 0
-        if not trace:
-            return web.json_response({"success": False, "error": "missing_trace", "message": "شماره پیگیری رسید را وارد کنید."}, status=400)
-        receipt_text = f"شماره پیگیری: {trace}\nمبلغ پرداختی: {paid_amount:,} تومان"
-        if note: receipt_text += "\nتوضیحات: " + note
+        receipt_text = str(body.get("receipt_text") or body.get("receipt_note") or "").strip()[:3000]
+        if not receipt_text:
+            return web.json_response({"success": False, "error": "empty_receipt_text", "message": "متن رسید یا توضیحات پرداخت را وارد کنید."}, status=400)
 
     async with WORLD_SWITCH_LOCK:
         now = utcnow()
@@ -2226,15 +2270,14 @@ async def shop_submit_receipt(request):
                                       "order": _shop_public(order, now)}, status=409)
         if now >= (parse_dt(order.get("expires_at")) or now):
             order["status"] = "expired"; order["expired_at"] = now.isoformat(); save_state()
-            return web.json_response({"success": False, "error": "order_expired", "message": "مهلت پرداخت تمام شده است.",
+            return web.json_response({"success": False, "error": "order_expired", "message": "مهلت ارسال رسید تمام شده است.",
                                       "order": _shop_public(order, now)}, status=409)
-        if kind == "text" and paid_amount != int(order.get("amount") or 0):
-            return web.json_response({"success": False, "error": "amount_mismatch", "message": "مبلغ رسید باید با مبلغ سفارش برابر باشد."}, status=400)
         order["receipt_type"] = kind
         order["receipt_text"] = receipt_text if kind == "text" else ""
-        order["receipt_image"] = base64.b64encode(image_bytes).decode("ascii") if image_bytes is not None else ""
-        order["receipt_mime"] = image_mime if image_bytes is not None else ""
-        order["receipt_filename"] = image_name if image_bytes is not None else ""
+        order["payer_name"] = payer_name
+        order["receipt_mime"] = image_mime if kind == "image" else ""
+        order["receipt_filename"] = image_name if kind == "image" else ""
+        order["receipt_size"] = len(image_bytes) if kind == "image" else 0
         order["receipt_sent_at"] = now.isoformat()
         order["status"] = "pending_review"
         order.pop("notification_error", None)
@@ -2244,40 +2287,36 @@ async def shop_submit_receipt(request):
     admin_text = _shop_receipt_admin_message(snapshot)
     keyboard = _shop_review_keyboard(snapshot["id"])
     try:
-        if snapshot.get("receipt_type") == "image" and snapshot.get("receipt_image"):
-            payload = base64.b64decode(snapshot["receipt_image"])
-            await bot.send_photo(chat_id=ADMIN_ID, photo=BufferedInputFile(payload, filename=snapshot.get("receipt_filename") or "receipt.jpg"),
-                                 caption=admin_text[:1000], reply_markup=keyboard)
+        if snapshot.get("receipt_type") == "image" and image_bytes is not None:
+            await bot.send_document(chat_id=ADMIN_ID,
+                document=BufferedInputFile(image_bytes, filename=snapshot.get("receipt_filename") or image_name or "receipt-image"),
+                caption=admin_text[:1000], reply_markup=keyboard)
         else:
             await bot.send_message(chat_id=ADMIN_ID, text=admin_text[:3900], reply_markup=keyboard)
     except Exception as exc:
         logging.warning("shop order admin notification failed for %s: %s", oid, exc)
         async with WORLD_SWITCH_LOCK:
             current = shop_orders.get(oid)
-            # اگر مدیر در پیام دریافتی سفارش را بررسی کرده باشد، وضعیت نهایی را بازنویسی نکن.
             if current and current.get("status") == "pending_review" and current.get("receipt_sent_at") == snapshot.get("receipt_sent_at"):
                 current["status"] = "awaiting_payment"
                 current["notification_error"] = str(exc)[:300]
+                current.pop("receipt_text", None)
+                current.pop("payer_name", None)
+                current.pop("receipt_filename", None)
+                current.pop("receipt_mime", None)
+                current.pop("receipt_size", None)
+                current.pop("receipt_sent_at", None)
                 save_state()
         current_order = shop_orders.get(oid)
         return web.json_response({"success": False, "error": "admin_notification_failed",
                                   "message": "ارسال رسید برای مدیر انجام نشد. اتصال ربات را بررسی کنید و دوباره تلاش کنید.",
                                   "order": _shop_public(current_order) if current_order else None}, status=502)
 
-    # پس از تحویل موفق تصویر به تلگرام مدیر، نسخهٔ base64 از پایگاه وضعیت حذف می‌شود تا ذخیرهٔ بازی بی‌جهت بزرگ نشود.
-    if snapshot.get("receipt_type") == "image":
-        async with WORLD_SWITCH_LOCK:
-            current = shop_orders.get(oid)
-            if current and current.get("status") == "pending_review" and current.get("receipt_sent_at") == snapshot.get("receipt_sent_at"):
-                current.pop("receipt_image", None)
-                current["receipt_delivered_to_admin"] = True
-                save_state()
     try:
-        await bot.send_message(chat_id=int(uid), text=f"✅ رسید سفارش {oid} دریافت شد و برای بررسی مدیر ارسال شد. نتیجه پس از بررسی اعلام می‌شود.")
+        await bot.send_message(chat_id=int(uid), text=f"رسید سفارش {oid} دریافت شد و برای بررسی مدیر ارسال شد. نتیجه پس از بررسی اعلام می‌شود.")
     except Exception:
         pass
     return web.json_response({"success": True, "message": "رسید برای بررسی مدیر ارسال شد.", "order": _shop_public(snapshot)})
-
 
 async def admin_shop_orders_get(request):
     uid = get_auth_user_id(request)
@@ -7212,6 +7251,7 @@ async def create_web_app():
     app.router.add_post("/api/admin/worlds/rename", admin_rename_world)
     app.router.add_post("/api/admin/broadcast-global", admin_broadcast_global)
     app.router.add_get("/api/shop/order", shop_get_order)
+    app.router.add_get("/api/shop/orders", shop_get_orders)
     app.router.add_post("/api/shop/order", shop_create_order)
     app.router.add_post("/api/shop/submit", shop_submit_receipt)
     app.router.add_post("/api/shop/cancel", shop_cancel_order)
