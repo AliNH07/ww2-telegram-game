@@ -2784,8 +2784,8 @@ async function loadWarData() {
                 const peaceNote = !canPeace ? "" : iVoted ? `<p class="war-peace-note">✅ پیشنهاد صلح شما ثبت شد؛ منتظر پذیرش طرف مقابل هستیم.</p>`
                     : otherVoted ? `<p class="war-peace-note">🕊️ طرف مقابل پیشنهاد صلح داده است؛ با زدن دکمه صلح برقرار می‌شود.</p>` : "";
                 const peaceBtn = !canPeace ? "" : iVoted
-                    ? `<button type="button" class="war-peace-btn is-cancel" data-peace="cancel" data-war-id="${escapeHtml(w.id)}">لغو پیشنهاد صلح</button>`
-                    : `<button type="button" class="war-peace-btn" data-peace="offer" data-war-id="${escapeHtml(w.id)}">🕊️ صلح</button>`;
+                    ? `<button type="button" class="war-peace-btn is-cancel is-active" data-peace="cancel" data-war-id="${escapeHtml(w.id)}">لغو پیشنهاد صلح</button>`
+                    : `<button type="button" class="war-peace-btn${otherVoted ? " is-active" : ""}" data-peace="offer" data-war-id="${escapeHtml(w.id)}">🕊️ صلح</button>`;
                 div.innerHTML = `
                     <div class="war-live-strip">${w.status === "battle" ? "🔴 در جنگ — نیروها را روی نقشه اعزام کن" : w.status === "negotiation" ? "🤝 فاز مذاکره" : "وضعیت جنگ"}</div>
                     <h4>${COUNTRY_NAMES[w.attacker]} ← ${COUNTRY_NAMES[w.defender]}</h4>
