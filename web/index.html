@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>FRONT-LINE 1936</title>
-<link rel="stylesheet" href="/style.css?v=20261016map1">
+<link rel="stylesheet" href="/style.css?v=20261016shop2">
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -881,8 +881,36 @@
                 <strong id="shop-pay-countdown" dir="ltr">۱۵:۰۰</strong>
             </div>
             <p class="shop-desc shop-pay-msg hidden" id="shop-pay-msg"></p>
+            <p class="shop-desc" id="shop-pay-next">مبلغ سفارش را به کارت مقصد واریز کنید و سپس رسید را در همین صفحه بفرستید.</p>
+            <section class="shop-receipt-area" id="shop-receipt-area">
+              <div class="shop-payment-card" id="shop-payment-card">
+                <div class="shop-payment-card-title"><span>💳 اطلاعات کارت مقصد</span><small>انتقال وجه دستی</small></div>
+                <div class="shop-card-value"><span>شماره کارت</span><strong id="shop-destination-card" dir="ltr">مدیر هنوز کارت را تنظیم نکرده است</strong></div>
+                <div class="shop-card-value"><span>نام صاحب کارت</span><strong id="shop-destination-holder">—</strong></div>
+                <button type="button" class="shop-copy-card" id="shop-copy-card" disabled>⧉ کپی شماره کارت</button>
+                <p class="shop-config-warning hidden" id="shop-card-config-warning">اطلاعات کارت هنوز توسط مدیر تنظیم نشده است؛ فعلاً وجهی واریز نکنید.</p>
+              </div>
+              <h3>ارسال رسید پرداخت</h3>
+              <div class="shop-receipt-options" role="radiogroup" aria-label="روش ارسال رسید">
+                <label><input type="radio" name="shop-receipt-method" value="image" checked><span>🖼️ تصویر رسید</span></label>
+                <label><input type="radio" name="shop-receipt-method" value="text"><span>✍️ اطلاعات متنی</span></label>
+              </div>
+              <div id="shop-receipt-image-wrap" class="shop-receipt-field">
+                <label for="shop-receipt-file" class="shop-upload-label">انتخاب تصویر رسید بانکی</label>
+                <input id="shop-receipt-file" type="file" accept="image/jpeg,image/png,image/webp">
+                <div class="shop-receipt-preview hidden" id="shop-receipt-preview-wrap"><img id="shop-receipt-preview" alt="پیش‌نمایش رسید"><button type="button" id="shop-receipt-remove">حذف تصویر</button></div>
+                <small>فرمت‌های JPG، PNG و WebP. تصویر برای ارسال به مدیر بهینه می‌شود.</small>
+              </div>
+              <div id="shop-receipt-text-wrap" class="shop-receipt-field hidden">
+                <label>شماره پیگیری<input id="shop-receipt-trace" type="text" maxlength="120" placeholder="شماره پیگیری بانکی"></label>
+                <label>مبلغ پرداختی (تومان)<input id="shop-receipt-paid-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="مبلغ دقیق سفارش"></label>
+                <label>توضیحات اختیاری<textarea id="shop-receipt-note" rows="3" maxlength="1000" placeholder="توضیحات تکمیلی، در صورت نیاز"></textarea></label>
+              </div>
+              <p class="shop-receipt-disclaimer">ارسال رسید به معنی تأیید پرداخت نیست. مدیر باید پرداخت را بررسی و تأیید کند.</p>
+              <button type="button" class="shop-btn" id="shop-pay-submit">ارسال رسید برای بررسی</button>
+              <button type="button" class="shop-btn shop-cancel-order" id="shop-pay-cancel">لغو سفارش</button>
+            </section>
             <button type="button" class="shop-btn ghost hidden" id="shop-pay-new">بازگشت به اشتراک و ثبت سفارش جدید</button>
-            <p class="shop-desc" id="shop-pay-next">اطلاعات کارت و ارسال رسید در مرحلهٔ بعد اضافه می‌شود.</p>
         </section>
     </main>
 
@@ -896,6 +924,15 @@
         <div id="admin-scroll" class="admin-scroll">
         <section class="admin-global" id="admin-global">
           <div class="admin-global-heading"><h2>اطلاعات کلی بازی</h2><span id="admin-last-refresh">به‌روزرسانی خودکار هر ۱۰ ثانیه</span></div>
+          <section class="admin-shop-config" id="admin-shop-config">
+            <div class="admin-section-head"><div><span class="admin-section-kicker">SHOP PAYMENT SETTINGS</span><h3>💳 تنظیمات کارت پرداخت فروشگاه</h3><p>اطلاعات مقصد پرداختی که کاربران در صفحهٔ اشتراک می‌بینند. شماره کارت ساختگی نمایش داده نمی‌شود.</p></div></div>
+            <form id="admin-shop-config-form" class="admin-shop-config-form">
+              <label>شماره کارت ۱۶ رقمی<input id="admin-shop-card-number" type="text" inputmode="numeric" autocomplete="off" maxlength="23" placeholder="شماره کارت مقصد" dir="ltr"></label>
+              <label>نام کامل صاحب کارت<input id="admin-shop-cardholder" type="text" maxlength="100" autocomplete="off" placeholder="نام و نام خانوادگی"></label>
+              <button type="submit" class="admin-primary-btn" id="admin-shop-config-save">ذخیره اطلاعات کارت</button>
+              <p class="admin-editor-note" id="admin-shop-config-status" role="status">برای فعال شدن پرداخت، هر دو فیلد را کامل کن.</p>
+            </form>
+          </section>
           <div class="admin-global-grid" id="admin-global-stats"><div class="admin-empty">در حال دریافت آمار همه دنیاها…</div></div>
           <button type="button" id="admin-open-broadcast" class="admin-broadcast-entry"><span>📣 ارسال سراسری پیام</span><span>←</span></button>
           <section class="admin-global-block">
@@ -1062,6 +1099,6 @@
 
 </section>
 
-<script src="/app.js?v=20261016map1"></script>
+<script src="/app.js?v=20261016shop2"></script>
 </body>
 </html>
