@@ -85,6 +85,36 @@
                 <div class="country-facts"><span>🏝️ جزیره‌ای</span><span>⚓ ۳ راه دریایی</span></div>
             </div>
         </button>
+        <button class="country-card" data-country-card data-country="saudi">
+            <img class="country-photo" src="/images/countries/saudi.jpg" alt="عربستان">
+            <div class="country-info"><h2>عربستان</h2><span>Saudi Arabia</span>
+                <div class="country-facts"><span>🧭 ۷ کشور همسایه</span><span>⚓ ۲ راه دریایی</span></div>
+            </div>
+        </button>
+        <button class="country-card" data-country-card data-country="iran">
+            <img class="country-photo" src="/images/countries/iran.jpg" alt="ایران">
+            <div class="country-info"><h2>ایران</h2><span>Iran</span>
+                <div class="country-facts"><span>🧭 ۵ کشور همسایه</span><span>⚓ ۲ راه دریایی</span></div>
+            </div>
+        </button>
+        <button class="country-card" data-country-card data-country="turkey">
+            <img class="country-photo" src="/images/countries/turkey.jpg" alt="ترکیه">
+            <div class="country-info"><h2>ترکیه</h2><span>Turkey</span>
+                <div class="country-facts"><span>🧭 ۶ کشور همسایه</span><span>⚓ ۳ راه دریایی</span></div>
+            </div>
+        </button>
+        <button class="country-card" data-country-card data-country="venezuela">
+            <img class="country-photo" src="/images/countries/venezuela.jpg" alt="ونزوئلا">
+            <div class="country-info"><h2>ونزوئلا</h2><span>Venezuela</span>
+                <div class="country-facts"><span>🧭 ۳ کشور همسایه</span><span>⚓ ۱ راه دریایی</span></div>
+            </div>
+        </button>
+        <button class="country-card" data-country-card data-country="egypt">
+            <img class="country-photo" src="/images/countries/egypt.jpg" alt="مصر">
+            <div class="country-info"><h2>مصر</h2><span>Egypt</span>
+                <div class="country-facts"><span>🧭 ۳ کشور همسایه</span><span>⚓ ۲ راه دریایی</span></div>
+            </div>
+        </button>
     </div>
 </section>
 
@@ -820,7 +850,7 @@
                     <label>آهن<div class="admin-edit-control"><input id="admin-edit-steel" type="number" min="0" step="1" inputmode="numeric"><button type="button" data-admin-save="steel">ثبت</button></div></label>
                     <label>اورانیوم<div class="admin-edit-control"><input id="admin-edit-uranium" type="number" min="0" step="1" inputmode="numeric"><button type="button" data-admin-save="uranium">ثبت</button></div></label>
                     <label>نفت<div class="admin-edit-control"><input id="admin-edit-oil" type="number" min="0" step="1" inputmode="numeric"><button type="button" data-admin-save="oil">ثبت</button></div></label>
-                    <label>کشور<div class="admin-edit-control"><select id="admin-edit-country"><option value="">بدون کشور</option><option value="germany">آلمان</option><option value="britain">بریتانیا</option><option value="ussr">شوروی</option><option value="usa">آمریکا</option><option value="france">فرانسه</option><option value="italy">ایتالیا</option><option value="china">چین</option><option value="japan">ژاپن</option></select><button type="button" data-admin-save="country">ثبت</button></div></label>
+                    <label>کشور<div class="admin-edit-control"><select id="admin-edit-country"><option value="">بدون کشور</option><option value="germany">آلمان</option><option value="britain">بریتانیا</option><option value="ussr">شوروی</option><option value="usa">آمریکا</option><option value="france">فرانسه</option><option value="italy">ایتالیا</option><option value="china">چین</option><option value="japan">ژاپن</option><option value="saudi">عربستان</option><option value="iran">ایران</option><option value="turkey">ترکیه</option><option value="venezuela">ونزوئلا</option><option value="egypt">مصر</option></select><button type="button" data-admin-save="country">ثبت</button></div></label>
                 </div>
                 <div class="admin-quick-adjust">
                     <div class="admin-editor-section-title"><b>افزایش یا کسر سریع</b><span>به‌جای جایگزینی موجودی</span></div>
@@ -836,7 +866,7 @@
             <div class="admin-section-head"><div><span class="admin-section-kicker">ECONOMY TOOLS</span><h3>ابزار اقتصادی گروهی</h3><p>می‌توانی به همه یا کشور مشخصی منابع بدهی یا از موجودی‌شان کم کنی.</p></div></div>
             <form id="admin-bulk-adjust-form" class="admin-bulk-form">
                 <label>دامنهٔ اجرا<select id="admin-bulk-scope"><option value="all">همهٔ بازیکنان</option><option value="country">فقط یک کشور</option></select></label>
-                <label id="admin-bulk-country-wrap" class="hidden">کشور<select id="admin-bulk-country"><option value="germany">آلمان</option><option value="britain">بریتانیا</option><option value="ussr">شوروی</option><option value="usa">آمریکا</option><option value="france">فرانسه</option><option value="italy">ایتالیا</option><option value="china">چین</option><option value="japan">ژاپن</option></select></label>
+                <label id="admin-bulk-country-wrap" class="hidden">کشور<select id="admin-bulk-country"><option value="germany">آلمان</option><option value="britain">بریتانیا</option><option value="ussr">شوروی</option><option value="usa">آمریکا</option><option value="france">فرانسه</option><option value="italy">ایتالیا</option><option value="china">چین</option><option value="japan">ژاپن</option><option value="saudi">عربستان</option><option value="iran">ایران</option><option value="turkey">ترکیه</option><option value="venezuela">ونزوئلا</option><option value="egypt">مصر</option></select></label>
                 <label>منبع<select id="admin-bulk-field"><option value="money">خزانه</option><option value="manpower">نیروی انسانی</option><option value="food">غذا</option><option value="steel">آهن</option><option value="uranium">اورانیوم</option><option value="oil">نفت</option></select></label>
                 <label>عملیات<select id="admin-bulk-operation"><option value="add">افزودن</option><option value="subtract">کسر کردن</option></select></label>
                 <label>مقدار برای هر بازیکن<input id="admin-bulk-amount" type="number" min="1" step="1" required placeholder="مقدار را وارد کن"></label>
