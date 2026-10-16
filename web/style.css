@@ -3507,3 +3507,15 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .shop-facts b{color:#f4f6f9}
 .shop-list-ul{text-align:right;font-size:12px;line-height:2.1;padding-inline-start:20px;margin:0 0 4px}
 .shop-detail .shop-btn{margin-top:16px}
+.shop-pay-status{display:inline-block;font-size:11px;font-weight:800;padding:4px 12px;border-radius:99px;background:rgba(255,200,87,.15);color:#FFD479;margin-bottom:6px}
+.shop-pay-status[data-status="approved"]{background:rgba(74,222,128,.15);color:#8ce7b0}
+.shop-pay-status[data-status="rejected"],.shop-pay-status[data-status="cancelled"],.shop-pay-status[data-status="expired"]{background:rgba(255,107,107,.15);color:#f3b0b0}
+.shop-facts b[dir="ltr"]{unicode-bidi:plaintext;font-variant-numeric:tabular-nums}
+.shop-timer{display:flex;flex-direction:column;align-items:center;gap:4px;margin:12px 0;padding:14px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid rgba(255,200,87,.35);font-size:12px}
+.shop-timer strong{font-size:34px;line-height:1.1;color:#FFD479;font-variant-numeric:tabular-nums;letter-spacing:1px}
+.shop-timer.ended{border-color:rgba(255,107,107,.45)}
+.shop-timer.ended strong{color:#f3b0b0}
+.shop-pay-msg{color:#f3b0b0;font-weight:700}
+.shop-active{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin-bottom:14px;padding:12px 14px;border-radius:14px;border:1px solid rgba(255,200,87,.5);background:rgba(255,200,87,.1);color:#FFD479;font:inherit;font-size:12px;font-weight:700;text-align:right;cursor:pointer}
+.shop-active.hidden{display:none}
+@media (max-width:380px){.shop-timer strong{font-size:28px}.shop-facts div{flex-direction:column;align-items:flex-start;gap:2px}}
