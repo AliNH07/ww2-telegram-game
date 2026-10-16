@@ -562,7 +562,7 @@ for _uid, _sec in UNIT_BUILD_SECONDS.items():
     ARMY_UNITS[_uid]["build_seconds"] = _sec
 assert all(u.get("build_seconds", 0) > 0 for u in ARMY_UNITS.values()), "every army unit needs build_seconds"
 
-REMOVED_MAP_SITES = ("food_safrica",)
+REMOVED_MAP_SITES = ("food_safrica", "food_ukraine")
 
 MAP_RESOURCES = {
     # همهٔ سکوها و معدن‌ها در دریا هستند (روی خشکی کشور فعال نمی‌افتند) — zone: sea
@@ -583,7 +583,7 @@ MAP_RESOURCES = {
     "oil_india": {"type": "oil", "zone": "sea", "name": "سکوی هند", "lon": 70.5, "lat": 19.5, "production": 3_500_000},
     "oil_medeast": {"type": "oil", "zone": "sea", "name": "سکوی مصر", "lon": 29.5, "lat": 33.0, "production": 2_500_000},
     # ---------- آهن ----------
-    "steel_ruhr": {"type": "steel", "zone": "sea", "name": "معدن آهن هلند", "lon": 3.0, "lat": 53.5, "production": 4_000_000},
+    "steel_ruhr": {"type": "steel", "zone": "sea", "name": "معدن آهن هلند (دریای نروژ)", "lon": 1.5, "lat": 66.5, "production": 4_000_000},
     "steel_brazil": {"type": "steel", "zone": "sea", "name": "معدن آهن برزیل", "lon": -33.0, "lat": -8.0, "production": 3_500_000},
     "steel_mesabi": {"type": "steel", "zone": "sea", "name": "معدن آهن کانادا (گرند بنکس)", "lon": -51.0, "lat": 44.0, "production": 3_000_000},
     "steel_anshan": {"type": "steel", "zone": "sea", "name": "معدن آهن چین", "lon": 123.5, "lat": 35.5, "production": 3_500_000},
@@ -603,7 +603,7 @@ MAP_RESOURCES = {
     "uranium_pacific": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم اقیانوس آرام", "lon": -150.0, "lat": 0.0, "production": 2_200_000},
     "uranium_baltic": {"type": "uranium", "zone": "sea", "name": "معدن اورانیوم لیتوانی", "lon": 19.5, "lat": 55.5, "production": 2_000_000},
     # ---------- غذا (آبزیان) ----------
-    "food_ukraine": {"type": "food", "zone": "sea", "name": "ماهیگیری رومانی (دریای سیاه)", "lon": 31.0, "lat": 43.5, "production": 2_350_000},
+    "steel_bulgaria": {"type": "steel", "zone": "sea", "name": "معدن آهن بلغارستان (دریای سیاه)", "lon": 31.0, "lat": 43.5, "production": 3_000_000},
     "food_india": {"type": "food", "zone": "sea", "name": "ماهیگیری هند (خلیج بنگال)", "lon": 88.0, "lat": 14.0, "production": 2_350_000},
     "food_peru": {"type": "food", "zone": "sea", "name": "ماهیگیری پرو", "lon": -80.0, "lat": -12.5, "production": 2_350_000},
     "food_japansea": {"type": "food", "zone": "sea", "name": "ماهیگیری ژاپن", "lon": 135.0, "lat": 40.0, "production": 2_350_000},
@@ -3143,7 +3143,7 @@ SEA_SITE_CHAIN_CUTS = [("sea:red", "sea:arabian"), ("sea:eastmed", "bosporus"), 
 # مقصدهایی که فقط از یک دروازهٔ مشخص قابل‌دسترسی‌اند (آخرین گره پیش از خط مستقیم کوتاه تا سکو).
 SITE_SEA_GATEWAY = {
     "oil_gulf": "sea:gulf", "oil_ghawar": "sea:gulf",
-    "food_ukraine": "bosporus",
+    "steel_bulgaria": "bosporus",
 }
 # نکته: دریای خزر عمداً بررسی نمی‌شود (تصمیم مالک بازی: سکوهای خزر فعلاً رها شده‌اند).
 COUNTRY_SEA_LANES = {
