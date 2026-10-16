@@ -2037,25 +2037,30 @@ function openTrainSheet(uid_) {
     const ov = document.createElement("div");
     ov.id = "infra-sheet"; ov.className = "modal-overlay";
     ov.innerHTML = `
-        <div class="ic-sheet">
-            <div class="is-head">
-                <div class="ic-hex"><span>${GROUP_ICONS[u.group] || "🪖"}</span></div>
-                <div class="is-titles">
-                    <div class="is-name">${u.name}</div>
-                    <div class="is-sub">حمله ${u.attack} · دفاع ${Math.round(u.defense * (player.def_mult?.[u.group] ?? 1))} · ظرفیت آزاد ${formatNumber(capLeft)}</div>
+        <div class="ic-sheet tr-sheet">
+            <div class="tr-head">
+                <div class="tr-icon">${GROUP_ICONS[u.group] || "🪖"}</div>
+                <div class="tr-titles">
+                    <div class="tr-name">${u.name}</div>
+                    <div class="tr-pills">
+                        <span>⚔️ حمله <b>${formatNumber(u.attack)}</b></span>
+                        <span>🛡️ دفاع <b>${formatNumber(Math.round(u.defense * (player.def_mult?.[u.group] ?? 1)))}</b></span>
+                        <span>📦 ظرفیت آزاد <b>${formatNumber(capLeft)}</b></span>
+                    </div>
                 </div>
                 <button class="is-close" aria-label="بستن">✕</button>
             </div>
-            <div class="tr-qty">
-                <button class="tr-step" data-d="-1">−</button>
-                <input class="tr-input" type="number" inputmode="numeric" min="1" value="1">
-                <button class="tr-step" data-d="1">+</button>
-                <button class="tr-max">حداکثر</button>
+            <div class="tr-qty-card">
+                <div class="tr-qty">
+                    <button class="tr-step" data-d="-1" aria-label="کم کن">−</button>
+                    <input class="tr-input" type="number" inputmode="numeric" min="1" value="1" aria-label="تعداد">
+                    <button class="tr-step" data-d="1" aria-label="زیاد کن">+</button>
+                </div>
+                <div class="tr-quick"><button data-n="1">۱</button><button data-n="10">۱۰</button><button data-n="50">۵۰</button><button class="tr-max">حداکثر</button></div>
             </div>
-            <div class="tr-quick"><button data-n="1">۱</button><button data-n="10">۱۰</button></div>
-            <div class="is-rows" id="tr-rows"></div>
-            <div class="is-price" id="tr-price"></div>
-            <div class="modal-actions">
+            <div class="tr-grid" id="tr-rows"></div>
+            <div class="tr-total" id="tr-price"></div>
+            <div class="tr-actions">
                 <button class="modal-cancel">انصراف</button>
                 <button class="modal-ok" id="tr-ok">تولید</button>
             </div>
@@ -2064,44 +2069,43 @@ function openTrainSheet(uid_) {
     const inp = ov.querySelector(".tr-input"), okBtn = ov.querySelector("#tr-ok");
     let sheetRequestId = newRequestId();
     const getN = () => Math.max(0, Math.floor(Number(inp.value) || 0));
+    const tile = (label, value, sub = "", bad = false, wide = false) =>
+        `<div class="tr-tile${bad ? " is-bad" : ""}${wide ? " wide" : ""}"><span class="tr-tile-k">${label}</span><b class="tr-tile-v">${value}</b>${sub}</div>`;
     const update = () => {
-        const n = getN(), rows = [];
-        rows.push(`<div class="is-row"><span>تعداد فعلی</span><b>${formatNumber(player.units?.[uid_] ?? 0)}</b></div>`);
-        if (u.build_seconds) {
-            rows.push(`<div class="is-row"><span>⏱ زمان ساخت هر واحد</span><b>${fmtDurationFa(u.build_seconds)}</b></div>`);
-            if (n > 0) rows.push(`<div class="is-row"><span>⏳ زمان تکمیل کل سفارش</span><b>${fmtDurationFa(u.build_seconds * n)}</b></div>`);
-        }
+        const n = getN(), tiles = [];
         const qLen = (player.factory_queues?.[u.group] || []).length, qMax = factoryLimit(u.group);
-        rows.push(`<div class="is-row ${qLen >= qMax ? "is-bad" : ""}"><span>🏭 سفارش‌های صف ${GROUP_TITLES[u.group] || ""}</span><b>${formatNumber(qLen)} از ${formatNumber(qMax)}</b></div>`);
-        if (u.transport_capacity) rows.push(`<div class="is-row"><span>🚚 ظرفیت حمل (تانک/پیاده در دریا)</span><b>${formatNumber(u.transport_capacity)}</b></div>`);
-        if (u.aircraft_capacity) rows.push(`<div class="is-row"><span>🛬 ظرفیت هواپیما در دریا</span><b>${formatNumber(u.aircraft_capacity)}</b></div>`);
-        if (u.refuel_capacity) rows.push(`<div class="is-row"><span>⛽ ظرفیت سوخت‌رسانی در خشکی</span><b>${formatNumber(u.refuel_capacity)}</b></div>`);
-        const row = (label, need, have, money, extra = "") => {
-            const bad = need > have;
-            rows.push(`<div class="is-row ${bad ? "is-bad" : ""}"><span>${label}</span><b>${money ? formatMoney(need) : formatNumber(need)} <small>(موجود: ${money ? formatMoney(have) : formatNumber(have)})</small>${extra}</b></div>`);
-            return bad;
-        };
+        const money = player.money ?? 0;
         let bad = false;
-        bad = row("💰 هزینه", cost * n, player.money ?? 0, true) || bad;
-        bad = row("👥 نیروی انسانی", u.manpower * n, Math.floor(player.manpower ?? 0), false) || bad;
-        // هر منبع فقط یک بار نمایش داده می‌شود: هزینهٔ ساخت + (اگر دارد) مصرف روزانه در همان ردیف
+        if (u.build_seconds) tiles.push(tile("⏱ زمان ساخت هر واحد", fmtDurationFa(u.build_seconds)));
+        tiles.push(tile(`🏭 صف ${GROUP_TITLES[u.group] || ""}`, `${formatNumber(qLen)} از ${formatNumber(qMax)}`, "", qLen >= qMax));
+        if (u.transport_capacity) tiles.push(tile("🚚 ظرفیت حمل در دریا", formatNumber(u.transport_capacity), `<small class="tr-tile-s">تانک و پیاده</small>`));
+        if (u.aircraft_capacity) tiles.push(tile("🛬 ظرفیت هواپیما در دریا", formatNumber(u.aircraft_capacity)));
+        if (u.refuel_capacity) tiles.push(tile("⛽ سوخت‌رسانی در خشکی", formatNumber(u.refuel_capacity)));
+        const need = (label, needed, have, extra = "") => {
+            const isBad = needed > have; if (isBad) bad = true;
+            tiles.push(tile(label, formatNumber(needed), `<small class="tr-tile-s">موجود: ${formatNumber(have)}</small>${extra}`, isBad));
+        };
+        need("👥 نیروی انسانی", u.manpower * n, Math.floor(player.manpower ?? 0));
+        // هر منبع فقط یک کاشی دارد: هزینهٔ ساخت + (اگر دارد) مصرف روزانه در همان کاشی
         Object.entries(u.resources || {}).forEach(([k, a]) => {
             const d = u.daily?.[k];
-            const extra = d ? `<small class="is-daily"> · 🔁 مصرف روزانه ${formatNumber(d * n)} (هر عدد ${formatNumber(d)})</small>` : "";
-            bad = row(`${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}`, a * n, Math.floor(player.resources?.[k] ?? 0), false, extra) || bad;
+            need(`${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}`, a * n, Math.floor(player.resources?.[k] ?? 0),
+                d ? `<small class="tr-tile-d">🔁 روزانه ${formatNumber(d * n)}</small>` : "");
         });
         Object.entries(u.daily || {}).filter(([k]) => !(u.resources || {})[k]).forEach(([k, d]) =>
-            rows.push(`<div class="is-row"><span>🔁 مصرف روزانه · ${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}</span><b>${formatNumber(d * n)} <small>(هر عدد ${formatNumber(d)})</small></b></div>`));
+            tiles.push(tile(`🔁 مصرف روزانه · ${RESOURCE_ICONS[k] || ""} ${RESOURCE_NAMES[k] || k}`, formatNumber(d * n), `<small class="tr-tile-s">هر عدد ${formatNumber(d)}</small>`)));
         if (qLen >= qMax) bad = true;
-        if (n > capLeft) { bad = true; rows.push(`<div class="is-row is-bad"><span>📦 ظرفیت آزاد</span><b>${formatNumber(capLeft)}</b></div>`); }
-        ov.querySelector("#tr-rows").innerHTML = rows.join("");
-        ov.querySelector("#tr-price").className = "is-price" + (bad ? " is-bad" : "");
-        ov.querySelector("#tr-price").innerHTML = `<span>قیمت ${formatNumber(n)} عدد</span><b>${formatMoney(cost * n)}</b>`;
+        if (n > capLeft) { bad = true; tiles.push(tile("📦 ظرفیت آزاد کافی نیست", formatNumber(capLeft), "", true, true)); }
+        const total = cost * n, noMoney = total > money; if (noMoney) bad = true;
+        ov.querySelector("#tr-rows").innerHTML = tiles.join("");
+        const priceBox = ov.querySelector("#tr-price");
+        priceBox.className = "tr-total" + (noMoney ? " is-bad" : "");
+        priceBox.innerHTML = `<div><span>هزینهٔ کل ${formatNumber(n)} عدد</span><small>${noMoney ? "پول کافی نیست · " : ""}موجودی: ${formatMoney(money)}</small></div><b>${formatMoney(total)}</b>`;
         okBtn.disabled = bad || n < 1;
         okBtn.textContent = n < 1 ? "تعداد را وارد کنید" : qLen >= qMax ? "صف کارخانه پر است" : bad ? "امکان تولید نیست" : `ثبت سفارش ${formatNumber(n)} عدد`;
     };
     ov.querySelectorAll(".tr-step").forEach(b => b.onclick = () => { inp.value = Math.max(1, getN() + Number(b.dataset.d)); update(); });
-    ov.querySelectorAll(".tr-quick button").forEach(b => b.onclick = () => { inp.value = b.dataset.n; update(); });
+    ov.querySelectorAll(".tr-quick button[data-n]").forEach(b => b.onclick = () => { inp.value = b.dataset.n; update(); });
     ov.querySelector(".tr-max").onclick = () => { inp.value = Math.max(1, trainLimits(u)); update(); };
     inp.addEventListener("input", update);
     ov.addEventListener("click", e => { if (e.target === ov) closeInfraSheet(); });
