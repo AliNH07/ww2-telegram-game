@@ -6296,6 +6296,35 @@ async def admin_bulk_adjust(request):
     save_state()
     return web.json_response({"success": True, "message": "تغییر گروهی انجام شد.", "changed": changed, "skipped": skipped})
 
+async def admin_broadcast_global(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    title = str(data.get("title", "")).strip()[:100]
+    body = str(data.get("text", "")).strip()[:1200]
+    scope = str(data.get("scope", "all"))
+    if not title or not body:
+        return web.json_response({"success": False, "message": "عنوان و متن پیام الزامی است."}, status=400)
+    if scope == "world":
+        wid = str(data.get("world_id", "")).strip()
+        if wid not in worlds_registry:
+            return web.json_response({"success": False, "message": "دنیای انتخاب‌شده وجود ندارد."}, status=404)
+        targets = [wid]
+    else:
+        targets = sorted(worlds_registry.keys(), key=lambda x: int(x))
+    recipients, tag = [], ""
+    for wid in targets:
+        async with _in_world(wid):
+            push_news(title, body, "info")
+            log_admin_action("ارسال پیام سراسری", None, f"world={wid}; {title}: {body[:200]}")
+            if scope == "world": tag = _world_tag()
+            recipients.extend(_world_recipients())
+            save_state()
+    unique = list(dict.fromkeys(recipients))
+    text = f"{tag}📣 {title}\n\n{body}"
+    sent, failed = await _flush_tg_outbox([(u, text, None) for u in unique], delay=0.035)
+    return web.json_response({"success": True, "message": "پیام ارسال شد.", "sent": sent, "failed": failed, "worlds": len(targets)})
+
 async def admin_broadcast(request):
     denied = _admin_denied(request)
     if denied: return denied
@@ -6409,7 +6438,7 @@ async def send_un_message(request):
     cid = p.get("country")
     if not cid or p.get("is_eliminated"):
         return _bad("برای ارسال پیام باید در این دنیا کشور داشته باشید.")
-    mine = [m for m in un_messages if m.get("user_id") == uid]
+    mine = [m for m in un_messages if m.get("user_id") == uid and m.get("from") != "admin"]
     if mine:
         last = parse_dt(mine[-1].get("at"))
         if last and (utcnow() - last).total_seconds() < 3:
@@ -6433,23 +6462,52 @@ async def send_un_message(request):
 async def get_un_mine(request):
     uid = get_auth_user_id(request)
     if not uid: return web.json_response({"error": "unauthorized"}, status=401)
-    rows = [{"id": m.get("id"), "text": m.get("text", ""), "at": m.get("at")}
-            for m in un_messages if m.get("user_id") == uid][-50:]
+    cid = _me(uid).get("country")
+    rows = [{"id": m.get("id"), "text": m.get("text", ""), "at": m.get("at"),
+             "from": "admin" if m.get("from") == "admin" else "me"}
+            for m in un_messages
+            if (m.get("from") != "admin" and m.get("user_id") == uid)
+            or (m.get("from") == "admin" and cid and m.get("country") == cid)][-50:]
     return web.json_response({"messages": rows})
 
 async def admin_un_messages(request):
+    """پیام‌های سازمان ملل فقط برای دنیای انتخاب‌شده (world_scoped)."""
     denied = _admin_denied(request)
     if denied: return denied
-    async with WORLD_SWITCH_LOCK:
-        _persist_active_world_memory()
-        rows = []
-        for wid, meta in worlds_registry.items():
-            state = world_states.get(str(wid)) or {}
-            for m in state.get("un_messages") or []:
-                if isinstance(m, dict):
-                    rows.append({**m, "world_id": int(wid), "world_name": meta.get("name", f"دنیای {wid}")})
-    rows.sort(key=lambda m: m.get("at") or "", reverse=True)
-    return web.json_response({"success": True, "messages": rows[:300], "total": len(rows)})
+    wname = _world_meta().get("name", f"دنیای {active_world_id}")
+    rows = []
+    for m in un_messages:
+        if isinstance(m, dict):
+            rows.append({**m, "from": "admin" if m.get("from") == "admin" else "player",
+                         "world_id": int(active_world_id), "world_name": wname})
+    rows.sort(key=lambda m: m.get("at") or "")
+    return web.json_response({"success": True, "messages": rows[-400:], "total": len(rows)})
+
+async def admin_un_reply(request):
+    denied = _admin_denied(request)
+    if denied: return denied
+    data = await read_json(request)
+    cid = str(data.get("country") or "").strip()
+    text = str(data.get("text") or "").strip()[:UN_MESSAGE_LIMIT]
+    if cid not in COUNTRIES: return _bad("کشور نامعتبر است.")
+    if not text: return _bad("متن پیام را بنویس.")
+    recipients = [int(u) for u, pl in list(players.items())
+                  if isinstance(pl, dict) and pl.get("country") == cid and not pl.get("is_eliminated")]
+    if not recipients: return _bad("این کشور در این دنیا بازیکن فعال ندارد.", 404)
+    world_name = _world_meta().get("name", f"دنیای {active_world_id}")
+    msg = {"id": str(uuid.uuid4()), "world_id": int(active_world_id), "world_name": world_name,
+           "country": cid, "country_name": COUNTRIES[cid]["name"], "from": "admin",
+           "user_id": 0, "user_name": "سازمان ملل", "username": "", "text": text,
+           "at": utcnow().isoformat()}
+    un_messages.append(msg)
+    del un_messages[:-UN_MESSAGE_KEEP]
+    log_admin_action("پاسخ سازمان ملل", None, f"world={active_world_id}; country={cid}; {text[:200]}")
+    out = f"{_world_tag()}🌐 پیام سازمان ملل\n\n{text}"
+    async def _deliver(resp):
+        await _flush_tg_outbox([(u, out, None) for u in recipients], delay=0.035)
+        return resp
+    _after_lock(_deliver)
+    return web.json_response({"success": True, "message": "پیام برای کشور ارسال شد.", "item": msg})
 
 WEB_DIR = os.path.join("web")
 
@@ -6468,7 +6526,6 @@ async def create_web_app():
 
     app.router.add_get("/api/worlds", get_worlds)
     app.router.add_get("/api/admin/global", admin_global)
-    app.router.add_get("/api/admin/un-messages", admin_un_messages)
     for path, h in [
         ("/api/player", get_player), ("/api/countries", get_countries),
         ("/api/army-units", get_army_units),
@@ -6478,7 +6535,7 @@ async def create_web_app():
         ("/api/diplomacy", get_diplomacy), ("/api/loans", get_loans), ("/api/stats", get_stats), ("/api/news", get_news), ("/api/rankings", get_rankings),
         ("/api/war/forces", get_forces), ("/api/map/transits", get_map_transits), ("/api/war/log", get_war_log), ("/api/satellite/scans", sat_get_scans),
         ("/api/admin/overview", admin_overview),
-        ("/api/admin/wars", admin_wars), ("/api/admin/communications", admin_communications), ("/api/un/mine", get_un_mine), ("/health", health)]:
+        ("/api/admin/wars", admin_wars), ("/api/admin/communications", admin_communications), ("/api/admin/un-messages", admin_un_messages), ("/api/un/mine", get_un_mine), ("/health", health)]:
         app.router.add_get(path, h if path == "/health" else world_scoped(h))
 
     for path, h in [
@@ -6505,12 +6562,13 @@ async def create_web_app():
         ("/api/border/settings", set_border_settings), ("/api/admin/player/update", admin_update_player),
         ("/api/admin/player/adjust", admin_player_adjust), ("/api/admin/player/message", admin_player_message),
         ("/api/admin/bulk-adjust", admin_bulk_adjust), ("/api/admin/broadcast", admin_broadcast),
-        ("/api/admin/war/review", admin_review_war),
+        ("/api/admin/war/review", admin_review_war), ("/api/admin/un/reply", admin_un_reply),
         ("/api/admin/player/reset", admin_reset_player), ("/api/un/send", send_un_message), ("/api/guide/seen", mark_guide_seen)]:
         app.router.add_post(path, world_scoped(h))
     app.router.add_post("/api/admin/worlds/create", admin_create_world)
     app.router.add_post("/api/admin/worlds/delete", admin_delete_world)
     app.router.add_post("/api/admin/worlds/rename", admin_rename_world)
+    app.router.add_post("/api/admin/broadcast-global", admin_broadcast_global)
     app.router.add_post("/api/admin/world/start", world_scoped(admin_start_world))
     app.router.add_post("/api/admin/world/registration", world_scoped(admin_set_world_registration))
 
