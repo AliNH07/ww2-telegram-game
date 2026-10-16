@@ -2718,8 +2718,8 @@ async function askWarReason(target) {
         const ov = document.createElement("div"); ov.className = "modal-overlay war-reason-overlay";
         ov.innerHTML = `<section class="modal-box war-reason-dialog" role="dialog" aria-modal="true" aria-labelledby="war-reason-title">
             <div class="ann-modal-head"><div><span class="ann-modal-kicker">درخواست رسمی</span><h2 class="modal-title" id="war-reason-title">اعلان جنگ به ${escapeHtml(COUNTRY_NAMES[target] || target)}</h2></div><button type="button" class="ann-modal-close" aria-label="بستن">×</button></div>
-            <p>دلیل اعلان جنگ شما به کشور انتخابی چیست؟ این دلیل برای بررسی به سازمان ملل ارسال می‌شود و پس از تأیید به بازیکنان نمایش داده خواهد شد.</p>
-            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید مدیر، جنگ بلافاصله آغاز می‌شود؛ نیروها را از روی نقشه اعزام کن.</small>
+            <p>دلیل اعلان جنگ شما به کشور انتخابی چیست؟ این دلیل فقط برای مدیر ارسال می‌شود؛ مدیر دلیل رسمی خودش را برای همهٔ بازیکنان اعلام می‌کند.</p>
+            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید مدیر، ۲۴ ساعت فاز مذاکره شروع می‌شود و بعد از آن جنگ آغاز می‌شود؛ سپس نیروها را از روی نقشه اعزام کن.</small>
             <div class="ann-modal-actions"><button type="button" class="modal-cancel" data-war-reason-cancel>انصراف</button><button type="button" class="ann-publish-button" data-war-reason-submit>ارسال به سازمان ملل</button></div>
         </section>`;
         document.body.appendChild(ov); const input = ov.querySelector("#war-reason-input");
@@ -2764,13 +2764,35 @@ async function loadWarData() {
             all.forEach(w => {
                 const div = document.createElement("div");
                 div.className = "war-active-card";
+                const leftMs = w.negotiation_ends ? new Date(w.negotiation_ends).getTime() - Date.now() : 0;
+                const leftText = leftMs > 0 ? `${formatNumber(Math.floor(leftMs / 3600000))} ساعت و ${formatNumber(Math.floor((leftMs % 3600000) / 60000))} دقیقه` : "کمتر از یک دقیقه";
                 let statusText = w.status === "pending_admin" ? "در انتظار تأیید مدیر" :
+                                 w.status === "negotiation" ? `🤝 فاز مذاکره — جنگ تا ${leftText} دیگر آغاز می‌شود` :
                                  w.status === "battle" ? "🔴 در جنگ؛ حرکت نیروها روی نقشه فعال است" : w.status;
+                const involved = [w.attacker, w.defender].includes(selectedCountry);
+                const votes = w.peace_votes || [];
+                const iVoted = votes.includes(selectedCountry);
+                const otherVoted = votes.some(c => c !== selectedCountry);
+                const canPeace = involved && ["negotiation", "battle"].includes(w.status);
+                const peaceNote = !canPeace ? "" : iVoted ? `<p class="war-peace-note">✅ پیشنهاد صلح شما ثبت شد؛ منتظر پذیرش طرف مقابل هستیم.</p>`
+                    : otherVoted ? `<p class="war-peace-note">🕊️ طرف مقابل پیشنهاد صلح داده است؛ با زدن دکمه صلح برقرار می‌شود.</p>` : "";
+                const peaceBtn = !canPeace ? "" : iVoted
+                    ? `<button type="button" class="war-peace-btn is-cancel" data-peace="cancel" data-war-id="${escapeHtml(w.id)}">لغو پیشنهاد صلح</button>`
+                    : `<button type="button" class="war-peace-btn" data-peace="offer" data-war-id="${escapeHtml(w.id)}">🕊️ صلح</button>`;
                 div.innerHTML = `
-                    <div class="war-live-strip">${w.status === "battle" ? "🔴 در جنگ — نیروها را روی نقشه اعزام کن" : "وضعیت جنگ"}</div>
+                    <div class="war-live-strip">${w.status === "battle" ? "🔴 در جنگ — نیروها را روی نقشه اعزام کن" : w.status === "negotiation" ? "🤝 فاز مذاکره" : "وضعیت جنگ"}</div>
                     <h4>${COUNTRY_NAMES[w.attacker]} → ${COUNTRY_NAMES[w.defender]}</h4>
                     <p>${statusText}${w.penalty ? ` — جریمهٔ ثبت‌شده: ${formatMoney(w.penalty)}` : ""}</p>
-                    ${w.reason ? `<p class="war-reason-display"><b>دلیل:</b> ${escapeHtml(w.reason)}</p>` : ""}`;
+                    ${w.admin_reason ? `<p class="war-reason-display"><b>دلیل اعلان جنگ:</b> ${escapeHtml(w.admin_reason)}</p>` : (w.reason ? `<p class="war-reason-display"><b>دلیل:</b> ${escapeHtml(w.reason)}</p>` : "")}
+                    ${peaceNote}${peaceBtn}`;
+                div.querySelector("[data-peace]")?.addEventListener("click", async (ev) => {
+                    const btn = ev.currentTarget; btn.disabled = true;
+                    try {
+                        const r = await apiPost("/api/war/peace", { war_id: btn.dataset.warId, action: btn.dataset.peace });
+                        showToast(r.message || (r.success ? "ثبت شد." : "خطا"), r.success ? "success" : "error");
+                    } catch (e) { showToast("خطای شبکه.", "error"); }
+                    loadWarData();
+                });
                 act.appendChild(div);
             });
         }
@@ -2788,7 +2810,7 @@ async function loadWarLog() {
     renderWarNews(); renderWarHistory();
 }
 
-const WAR_EVENT_ICONS = { declare: "⚔️", occupy: "🚩", capture: "🚩", repel: "🛡️", release: "🏳️", send: "🧭", return: "🏠", turnback: "↩️" };
+const WAR_EVENT_ICONS = { peace: "🕊️", war_declared: "⚔️", war_started: "🔴", declare: "⚔️", occupy: "🚩", capture: "🚩", repel: "🛡️", release: "🏳️", send: "🧭", return: "🏠", turnback: "↩️" };
 
 function renderWarNews() {
     const box = document.getElementById("war-news-list");
@@ -3152,19 +3174,26 @@ async function loadAdminPanel() {
 }
 function renderAdminWars() {
     const root = document.getElementById("admin-war-list"); if (!root) return;
-    const pending = (adminWarsCache || []).filter(w => ["pending_admin", "battle", "rejected", "resolved"].includes(w.status));
+    const pending = (adminWarsCache || []).filter(w => ["pending_admin", "negotiation", "battle", "peace", "rejected", "resolved"].includes(w.status));
     if (!pending.length) { root.innerHTML = `<div class="admin-empty">درخواست جنگی برای این دنیا ثبت نشده است.</div>`; return; }
     root.innerHTML = pending.map(w => {
-        const status = w.status === "pending_admin" ? "در انتظار بررسی مدیر" : w.status === "battle" ? "جنگ آغاز شده" : w.status === "resolved" ? "مختومه" : "رد شده";
-        const end = "";
-        return `<article class="admin-war-card"><div class="admin-war-card-head"><div><b>${escapeHtml(w.attacker_name || COUNTRY_NAMES[w.attacker] || w.attacker)} ← ${escapeHtml(w.defender_name || COUNTRY_NAMES[w.defender] || w.defender)}</b><small>${escapeHtml(status)} · ${escapeHtml(w.created_at ? new Date(w.created_at).toLocaleString("fa-IR") : "")}</small></div><span class="admin-war-status">${escapeHtml(w.status)}</span></div><details class="admin-war-detail"><summary>👁️ بازکردن جزئیات و دلیل اعلان جنگ</summary><div class="admin-war-reason"><b>دلیل اعلان جنگ</b><p>${escapeHtml(w.reason || "دلیلی ثبت نشده است.")}</p></div>${end ? `<small class="admin-war-meta">${escapeHtml(end)}</small>` : ""}</details>${w.status === "pending_admin" ? `<div class="admin-war-actions"><button type="button" data-war-review="approve" data-war-id="${escapeHtml(w.id)}">✅ تأیید و آغاز فوری جنگ</button><button type="button" data-war-review="reject" data-war-id="${escapeHtml(w.id)}">✕ رد درخواست</button></div>` : ""}</article>`;
+        const status = w.status === "pending_admin" ? "در انتظار بررسی مدیر" : w.status === "negotiation" ? "فاز مذاکره (۲۴ ساعته)" : w.status === "battle" ? "جنگ آغاز شده" : w.status === "peace" ? "صلح برقرار شد" : w.status === "resolved" ? "مختومه" : "رد شده";
+        const end = w.status === "negotiation" && w.negotiation_ends ? `پایان مذاکره و شروع جنگ: ${new Date(w.negotiation_ends).toLocaleString("fa-IR")}` : "";
+        const officialReason = w.admin_reason ? `<div class="admin-war-reason"><b>دلیل رسمی شما (ارسال‌شده برای همه)</b><p>${escapeHtml(w.admin_reason)}</p></div>` : "";
+        return `<article class="admin-war-card"><div class="admin-war-card-head"><div><b>${escapeHtml(w.attacker_name || COUNTRY_NAMES[w.attacker] || w.attacker)} ← ${escapeHtml(w.defender_name || COUNTRY_NAMES[w.defender] || w.defender)}</b><small>${escapeHtml(status)} · ${escapeHtml(w.created_at ? new Date(w.created_at).toLocaleString("fa-IR") : "")}</small></div><span class="admin-war-status">${escapeHtml(w.status)}</span></div><details class="admin-war-detail"><summary>👁️ بازکردن جزئیات و دلیل اعلان جنگ</summary><div class="admin-war-reason"><b>دلیل بازیکن</b><p>${escapeHtml(w.reason || "دلیلی ثبت نشده است.")}</p></div>${officialReason}${end ? `<small class="admin-war-meta">${escapeHtml(end)}</small>` : ""}</details>${w.status === "pending_admin" ? `<label class="admin-war-official"><b>✍️ دلیل رسمی شما (برای همهٔ بازیکنان ارسال می‌شود)</b><textarea class="admin-war-official-input" data-war-reason-for="${escapeHtml(w.id)}" maxlength="1000" placeholder="دلیل اعلان جنگ را اینجا بنویسید…"></textarea></label><div class="admin-war-actions"><button type="button" data-war-review="approve" data-war-id="${escapeHtml(w.id)}">✅ تأیید و شروع مهلت ۲۴ ساعته</button><button type="button" data-war-review="reject" data-war-id="${escapeHtml(w.id)}">✕ رد درخواست</button></div>` : ""}</article>`;
     }).join("");
     root.querySelectorAll("[data-war-review]").forEach(button => button.addEventListener("click", async () => {
         const action = button.dataset.warReview, warId = button.dataset.warId;
-        if (action === "approve" && !confirm("درخواست را تأیید می‌کنی؟ جنگ بلافاصله آغاز می‌شود و همهٔ کاربران این دنیا مطلع می‌شوند.")) return;
+        let adminReason = "";
+        if (action === "approve") {
+            const box = root.querySelector(`[data-war-reason-for="${CSS.escape(warId)}"]`);
+            adminReason = (box?.value || "").trim();
+            if (!adminReason) { showToast("اول دلیل رسمی خودتان را بنویسید.", "error"); box?.focus(); return; }
+            if (!confirm("تأیید می‌کنی؟ به همهٔ بازیکنان پیام می‌رود که این کشور به آن کشور اعلان جنگ کرد (با دلیل تو) و ۲۴ ساعت فرصت مذاکره دارند؛ بعد از آن جنگ شروع می‌شود.")) return;
+        }
         button.disabled = true;
         try {
-            const result = await apiPost("/api/admin/war/review", { war_id: warId, action });
+            const result = await apiPost("/api/admin/war/review", { war_id: warId, action, admin_reason: adminReason });
             showToast(result.message || (result.success ? "بررسی انجام شد." : "خطا"), result.success ? "success" : "error");
             if (result.success) await loadAdminPanel(); else button.disabled = false;
         } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); button.disabled = false; }
