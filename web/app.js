@@ -350,12 +350,19 @@ function buildResourceDetail(key) {
     d.querySelectorAll(".rd-more").forEach(b => b.addEventListener("click", () => { const k = b.dataset.more; resourceDetailMore[k] = !resourceDetailMore[k]; renderResourceBars(); }));
     return d;
 }
+let worldAtlasPromise = null;
 async function loadWorldAtlas() {
     if (worldData) return worldData;
-    const r = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
-    worldData = await r.json();
-    return worldData;
+    if (!worldAtlasPromise) {
+        worldAtlasPromise = fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
+            .then(r => r.json())
+            .then(d => { worldData = d; return d; })
+            .catch(e => { worldAtlasPromise = null; throw e; });
+    }
+    return worldAtlasPromise;
 }
+// داده‌ی کره از قبل و در زمان بیکاری دانلود می‌شود تا با باز کردن نقشه آماده باشد
+window.addEventListener("load", () => setTimeout(() => { loadWorldAtlas().catch(() => {}); }, 1200));
 
 async function fetchAvailableWorlds() {
     const data = await apiGet("/api/worlds");
@@ -5275,13 +5282,33 @@ let mapInitialized = false, mapInitializing = false;
 let mapAbort = null;
 let mapSites = [];
 let mapSitesSvg = null, mapRoutesSvg = null;
+let mapSiteCache = null, mapSitesSig = "", mapRoutesSig = "";
 let mapTransits = [], mapRouteSkew = 0, mapRoutesVisible = true;
 try { mapRoutesVisible = localStorage.getItem("mapRoutes") !== "off"; } catch (e) {}
 let mapCanvas = null, mapCtx = null, mapDpr = 1, mapW = 320, mapH = 300;
 let mapFeatures = [], mapGroups = [], mapWaterItems = [], mapGraticule = null, mapRaf = 0;
 let mapBorders = null, mapCoast = null, mapLand = null, mapCoastPts = null;
 
+const mapYield = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+function setMapLoading(state) {
+    const box = document.querySelector(".map-box");
+    const msg = document.getElementById("map-loading");
+    if (box) box.classList.toggle("is-loading", state === true || state === "error");
+    if (!msg) return;
+    msg.classList.toggle("hidden", !state);
+    msg.classList.toggle("is-error", state === "error");
+    const t = msg.querySelector(".map-loading-text");
+    if (t) t.textContent = state === "error" ? "بارگذاری نقشه ناموفق بود؛ دوباره وارد صفحه نقشه شوید." : "در حال بارگذاری نقشه…";
+}
 async function initWorldMap() {
+    if (!document.querySelector(".map-box") || !document.getElementById("map-globe")) return;
+    const firstBuild = !mapInitialized && !mapInitializing;
+    if (firstBuild) setMapLoading(true);
+    try { await _initWorldMapInner(); }
+    catch (e) { console.error(e); mapInitializing = false; }
+    finally { if (firstBuild) setMapLoading(mapInitialized ? false : "error"); }
+}
+async function _initWorldMapInner() {
     const box = document.querySelector(".map-box");
     const svgEl = document.getElementById("map-globe");
     if (!box || !svgEl) return;
@@ -5289,6 +5316,10 @@ async function initWorldMap() {
     if (mapInitialized) { updateMapColors(); redrawMap(); refreshMapSites(); loadMapRoutes(); return; }
     if (mapInitializing) return;
     mapInitializing = true;
+
+    // سکوها هم‌زمان با ساخت کره دریافت می‌شوند (نه بعد از آن)
+    const sitesRawP = apiGet("/api/map-sites").catch(() => []);
+    await mapYield();   // اجازه می‌دهیم متن «در حال بارگذاری» قبل از کار سنگین نمایش داده شود
 
     const w = box.clientWidth || 320;
     const h = box.clientHeight || 300;
@@ -5314,7 +5345,7 @@ async function initWorldMap() {
 
     mapGraticule = d3.geoGraticule10();
     mapProjection = d3.geoOrthographic().scale(mapSize).translate([w / 2, h / 2])
-        .rotate(mapRotation).clipAngle(90);
+        .rotate(mapRotation).clipAngle(90).precision(1.5);
     mapPath = d3.geoPath(mapProjection, mapCtx);
 
     const keyById = {};
@@ -5386,14 +5417,17 @@ async function initWorldMap() {
     const labelG = mapSvg.append("g").attr("class", "map-country-labels");
     mapFeatures.forEach(m => {
         if (!m.name) return;
-        const node = labelG.append("text").attr("class", "map-country-label")
+        m.label = labelG.append("text").attr("class", "map-country-label")
             .attr("text-anchor", "middle").attr("dominant-baseline", "central")
             .attr("font-size", 10).text(m.name).node();
+    });
+    // اندازه‌گیری همهٔ متن‌ها بعد از ساخت آن‌ها (یک‌بار چیدمان، نه یک‌بار برای هر اسم)
+    mapFeatures.forEach(m => {
+        if (!m.label) return;
         let tw = 0;
-        try { tw = node.getComputedTextLength(); } catch (e) {}
+        try { tw = m.label.getComputedTextLength(); } catch (e) {}
         m.tw = tw > 0 ? tw / 10 : m.name.length * 0.5;   // عرض متن به‌ازای هر ۱px فونت
-        node.style.display = "none";
-        m.label = node;
+        m.label.style.display = "none";
     });
 
     // برچسب مستعمره‌ها: اسم مستعمره + «مستعمره کشور مادر»
@@ -5457,12 +5491,18 @@ async function initWorldMap() {
     document.getElementById("map-info-close").onclick = () => {
         document.getElementById("map-info-panel").classList.add("hidden");
     };
-    mapInitialized = true; mapInitializing = false;
 
-    // سکوها بعد از نمایش کره لود می‌شوند تا نقشه زودتر دیده شود
-    await loadMapSites();
+    // نقشه فقط وقتی نمایش داده می‌شود که کره، سکوها، معادن و مسیرها همه آماده باشند
+    try {
+        const rawSites = await sitesRawP;
+        mapSites = Array.isArray(rawSites) ? rawSites : [];
+        spreadSitesFromLand(mapSites);
+    } catch (e) { mapSites = []; }
     renderMapSites();
-    loadMapRoutes();
+    mapSitesSig = JSON.stringify(mapSites) + "|" + selectedCountry;
+    await loadMapRoutes();
+    updateMapSitePositions();
+    mapInitialized = true; mapInitializing = false;
     redrawMap();
 }
 
@@ -5479,6 +5519,10 @@ async function loadMapRoutes() {
             if (Array.isArray(t.path)) t.path = t.path.map(remapSiteLL);
         });
     } catch (e) { mapTransits = []; }
+    const sig = mapTransits.map(t => [t.id, t.leg, t.battle ? 1 : 0, t.start, t.arrive, t.whole_path ? 1 : 0].join(":")).join("|") + "|" + selectedCountry + "|" + mapRoutesVisible;
+    const same = sig === mapRoutesSig && (!mapRoutesVisible || mapRoutesSvg.selectAll(".map-route").size() === mapTransits.length);
+    if (same) { updateMapRoutes(); return; }
+    mapRoutesSig = sig;
     renderMapRoutes();
 }
 function renderMapRoutes() {
@@ -5544,7 +5588,8 @@ setInterval(() => {
 async function refreshMapSites() {
     if (!mapSitesSvg) return;
     await loadMapSites();
-    renderMapSites();
+    const sig = JSON.stringify(mapSites) + "|" + selectedCountry;
+    if (sig !== mapSitesSig) { mapSitesSig = sig; renderMapSites(); }
     updateMapSitePositions();
     loadMapRoutes();
 }
@@ -5656,6 +5701,7 @@ const MAP_PORTS = {
 };
 function renderMapSites() {
     if (!mapSitesSvg) return;
+    mapSiteCache = null;
     mapSitesSvg.selectAll("*").remove();
     const marks = [];
     Object.keys(MAP_CAPITALS).forEach(c => {
@@ -5680,6 +5726,8 @@ function renderMapSites() {
     g.each(function (d) {
         const s = d3.select(this);
         if (d.kind === "strait") {
+            // درخشش تنگه‌های آزاد بدون filter (filter در هر فریم چرخش کره را کند می‌کرد)
+            if (!d.owner) s.append("circle").attr("class", "site-glow").attr("r", 8.5).attr("fill", "rgba(255,214,10,0.30)").style("pointer-events", "none");
             s.append("circle").attr("class", "site-shape").attr("r", 4.8);
             // اگر تنگه برای کشور من بسته است، علامت بزرگ ممنوع روی آن نشان داده می‌شود
             const rule = d.country_rules && d.country_rules[selectedCountry];
@@ -5709,19 +5757,22 @@ function updateMapSitePositions() {
     const kBig = Math.max(0.18, Math.min(1.2, 0.32 * Math.pow(zoom, 0.7)));   // نفت و تنگه
     const kSmall = kBig;                                                       // معدن و ماهیگیری هم‌اندازهٔ سکو
     const kMark = Math.max(0.5, Math.min(1.1, 0.7 * Math.pow(zoom, 0.5)));
-    mapSitesSvg.selectAll(".map-mark").each(function (d) {
+    if (!mapSiteCache) mapSiteCache = { marks: mapSitesSvg.selectAll(".map-mark").nodes(), sites: mapSitesSvg.selectAll(".map-site").nodes() };
+    const setShown = (node, on) => { const v = on ? "" : "none"; if (node.style.display !== v) node.style.display = v; };
+    const kMarkS = kMark.toFixed(2), kBigS = kBig.toFixed(2), kSmallS = kSmall.toFixed(2);
+    for (const node of mapSiteCache.marks) {
+        const d = node.__data__;
         const p = viewCos(d.lon, d.lat, rot) > 0.02 ? mapProjection([d.lon, d.lat]) : null;
-        if (p) { this.setAttribute("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)}) scale(${kMark.toFixed(2)})`); this.style.display = ""; }
-        else this.style.display = "none";
-    });
-    mapSitesSvg.selectAll(".map-site").each(function (d) {
-        const k = ((d.kind === "strait" || d.type === "oil") ? kBig : kSmall).toFixed(2);
+        if (p) { node.setAttribute("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)}) scale(${kMarkS})`); setShown(node, true); }
+        else setShown(node, false);
+    }
+    for (const node of mapSiteCache.sites) {
+        const d = node.__data__;
+        const k = (d.kind === "strait" || d.type === "oil") ? kBigS : kSmallS;
         const p = viewCos(d.lon, d.lat, rot) > 0.02 ? mapProjection([d.lon, d.lat]) : null;
-        if (p) {
-            this.setAttribute("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)}) scale(${k})`);
-            this.style.display = "";
-        } else this.style.display = "none";
-    });
+        if (p) { node.setAttribute("transform", `translate(${p[0].toFixed(1)},${p[1].toFixed(1)}) scale(${k})`); setShown(node, true); }
+        else setShown(node, false);
+    }
 }
 
 function zoomMap(f) {
@@ -5870,9 +5921,8 @@ function drawMapNow() {
         const bz = Math.max(1, Math.min(4, mapProjection.scale() / (mapSize || 1)));
         const bw = Math.min(2.4, 0.9 + bz * 0.22);
         ctx.lineCap = "round"; ctx.lineJoin = "round";
-        ctx.beginPath(); mapPath(mapBorders); if (mapCustomBorders) mapPath(mapCustomBorders);
+        ctx.beginPath(); mapPath(mapBorders); if (mapCustomBorders) mapPath(mapCustomBorders);   // مسیر فقط یک‌بار ساخته می‌شود
         ctx.lineWidth = bw + 1.2; ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.stroke();
-        ctx.beginPath(); mapPath(mapBorders); if (mapCustomBorders) mapPath(mapCustomBorders);
         ctx.lineWidth = bw; ctx.strokeStyle = "#000"; ctx.stroke();
     }
     if (mapCoast) {
