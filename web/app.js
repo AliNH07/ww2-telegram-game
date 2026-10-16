@@ -2725,8 +2725,8 @@ async function askWarReason(target) {
         const ov = document.createElement("div"); ov.className = "modal-overlay war-reason-overlay";
         ov.innerHTML = `<section class="modal-box war-reason-dialog" role="dialog" aria-modal="true" aria-labelledby="war-reason-title">
             <div class="ann-modal-head"><div><span class="ann-modal-kicker">درخواست رسمی</span><h2 class="modal-title" id="war-reason-title">اعلان جنگ به ${escapeHtml(COUNTRY_NAMES[target] || target)}</h2></div><button type="button" class="ann-modal-close" aria-label="بستن">×</button></div>
-            <p>دلیل اعلان جنگ شما به کشور انتخابی چیست؟ این دلیل فقط برای مدیر ارسال می‌شود؛ مدیر دلیل رسمی خودش را برای همهٔ بازیکنان اعلام می‌کند.</p>
-            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید مدیر، ۲۴ ساعت فاز مذاکره شروع می‌شود و بعد از آن جنگ آغاز می‌شود؛ سپس نیروها را از روی نقشه اعزام کن.</small>
+            <p>دلیل اعلان جنگ شما به کشور انتخابی چیست؟ این دلیل فقط برای سازمان ملل ارسال می‌شود؛ سازمان ملل دلیل رسمی خودش را برای همهٔ بازیکنان اعلام می‌کند.</p>
+            <textarea id="war-reason-input" maxlength="1800" placeholder="دلیل خود را کامل و روشن بنویسید…"></textarea><small class="war-reason-foot">پس از تأیید سازمان ملل، ۲۴ ساعت فاز مذاکره شروع می‌شود و بعد از آن جنگ آغاز می‌شود؛ سپس نیروها را از روی نقشه اعزام کن.</small>
             <div class="ann-modal-actions"><button type="button" class="modal-cancel" data-war-reason-cancel>انصراف</button><button type="button" class="ann-publish-button" data-war-reason-submit>ارسال به سازمان ملل</button></div>
         </section>`;
         document.body.appendChild(ov); const input = ov.querySelector("#war-reason-input");
@@ -2773,7 +2773,7 @@ async function loadWarData() {
                 div.className = "war-active-card";
                 const leftMs = w.negotiation_ends ? new Date(w.negotiation_ends).getTime() - Date.now() : 0;
                 const leftText = leftMs > 0 ? `${formatNumber(Math.floor(leftMs / 3600000))} ساعت و ${formatNumber(Math.floor((leftMs % 3600000) / 60000))} دقیقه` : "کمتر از یک دقیقه";
-                let statusText = w.status === "pending_admin" ? "در انتظار تأیید مدیر" :
+                let statusText = w.status === "pending_admin" ? "در انتظار تأیید سازمان ملل" :
                                  w.status === "negotiation" ? `🤝 فاز مذاکره — جنگ تا ${leftText} دیگر آغاز می‌شود` :
                                  w.status === "battle" ? "🔴 در جنگ؛ حرکت نیروها روی نقشه فعال است" : w.status;
                 const involved = [w.attacker, w.defender].includes(selectedCountry);
@@ -2788,7 +2788,7 @@ async function loadWarData() {
                     : `<button type="button" class="war-peace-btn" data-peace="offer" data-war-id="${escapeHtml(w.id)}">🕊️ صلح</button>`;
                 div.innerHTML = `
                     <div class="war-live-strip">${w.status === "battle" ? "🔴 در جنگ — نیروها را روی نقشه اعزام کن" : w.status === "negotiation" ? "🤝 فاز مذاکره" : "وضعیت جنگ"}</div>
-                    <h4>${COUNTRY_NAMES[w.attacker]} → ${COUNTRY_NAMES[w.defender]}</h4>
+                    <h4>${COUNTRY_NAMES[w.attacker]} ← ${COUNTRY_NAMES[w.defender]}</h4>
                     <p>${statusText}${w.penalty ? ` — جریمهٔ ثبت‌شده: ${formatMoney(w.penalty)}` : ""}</p>
                     ${w.admin_reason ? `<p class="war-reason-display"><b>دلیل اعلان جنگ:</b> ${escapeHtml(w.admin_reason)}</p>` : (w.reason ? `<p class="war-reason-display"><b>دلیل:</b> ${escapeHtml(w.reason)}</p>` : "")}
                     ${peaceNote}${peaceBtn}`;
