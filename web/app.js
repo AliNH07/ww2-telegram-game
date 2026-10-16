@@ -186,7 +186,7 @@ function showOnly(id) {
 function showGamePage(id) {
     document.querySelectorAll(".game-page").forEach(p => p.classList.add("hidden"));
     const t = document.getElementById(id);
-    if (t) { t.classList.remove("hidden"); t.scrollTop = 0; }
+    if (t) { t.classList.remove("hidden"); t.scrollTop = 0; if (id === "admin") document.getElementById("admin-scroll")?.scrollTo(0,0); }
     if (player?.country) updateSeasonGateBanner();
     const header = document.querySelector("#game .game-header");
     if (header) header.style.transform = "translate3d(0, 0, 0)";
@@ -3249,9 +3249,29 @@ function renderAdminGlobal() {
     if (list) renderAdminWorldPicker();
     renderAdminNavigation();
 }
+let adminOpenWorldId = null;
 function renderAdminWorldPicker() {
     const root = document.getElementById("admin-world-picker"); if (!root) return;
-    root.innerHTML = (adminWorldsCache || []).map(w => `<button type="button" class="admin-pick-world" data-pick-world="${Number(w.id)}"><span>🌐 <b>${escapeHtml(w.name || `دنیای ${w.id}`)}</b><small>${w.game_finished ? "پایان‌یافته" : w.game_started ? `روز ${w.day} از ۳۱` : "شروع نشده"} · ${adminFormatNumber(w.total_players)} بازیکن · ${adminFormatNumber(w.countries_taken)} کشور</small></span><span>←</span></button>`).join("") || '<div class="admin-empty">دنیایی ثبت نشده است.</div>';
+    const ae = document.activeElement;
+    if (ae && ae.tagName === "INPUT" && root.contains(ae)) return; // وسط تایپ نام، رفرش خودکار فرم را پاک نکند
+    const worlds = adminWorldsCache || [];
+    if (!worlds.length) { root.innerHTML = '<div class="admin-empty">دنیایی ثبت نشده است.</div>'; return; }
+    root.innerHTML = worlds.map(w => {
+        const id = String(w.id), open = String(adminOpenWorldId) === id;
+        const name = w.name || `دنیای ${w.id}`;
+        const started = Boolean(w.game_started_at), finished = Boolean(w.game_finished), regOpen = Boolean(w.registration_open);
+        const total = Number(w.total_countries || 11);
+        const dayTxt = finished ? `پایان‌یافته · برنده: ${escapeHtml(w.winner?.name || "—")}` : started ? `روز ${adminFormatNumber(w.day)} از ۳۱ · فصل ${escapeHtml(w.season || "")}` : "فصل شروع نشده";
+        const info = `<small class="admin-pick-info"><span>📅 ${dayTxt}</span><span>📝 ثبت‌نام: ${regOpen ? "باز" : "بسته"}</span><span>🌍 ${adminFormatNumber(w.countries_taken)} کشور از ${adminFormatNumber(total)} کشور گرفته شده · ${adminFormatNumber(w.total_players)} بازیکن</span></small>`;
+        const panel = open ? `<div class="admin-world-panel">
+            <button type="button" class="admin-wp-enter" data-wp="enter" data-id="${id}">ورود به ${escapeHtml(name)} →</button>
+            <div class="admin-wp-rename"><input type="text" maxlength="50" value="${escapeHtml(name)}" data-wp-name="${id}" aria-label="نام دنیا"><button type="button" data-wp="rename" data-id="${id}">✏️ ویرایش نام</button></div>
+            ${!started && !finished ? `<button type="button" data-wp="start" data-id="${id}">▶ شروع فصل</button>` : ""}
+            ${!finished ? `<button type="button" data-wp="registration" data-id="${id}" data-open="${regOpen ? "0" : "1"}">${regOpen ? "🔒 بستن ثبت‌نام" : "🔓 باز کردن ثبت‌نام"}</button>` : ""}
+            <button type="button" class="admin-wp-delete" data-wp="delete" data-id="${id}">🗑 حذف دنیا</button>
+        </div>` : "";
+        return `<div class="admin-world-item ${open ? "open" : ""}"><button type="button" class="admin-pick-world" data-pick-world="${id}" aria-expanded="${open}"><span><b>🌐 ${escapeHtml(name)}</b>${info}</span><span class="admin-pick-chevron">${open ? "⌃" : "⌄"}</span></button>${panel}</div>`;
+    }).join("");
 }
 function renderAdminCommunications() {
     const root = document.getElementById("admin-pm-list"); if (!root) return;
@@ -3267,9 +3287,54 @@ document.getElementById("admin-add-world-btn")?.addEventListener("click", () => 
     if (opened) document.getElementById("admin-new-world-name")?.focus();
 });
 document.getElementById("admin-world-picker")?.addEventListener("click", async e => {
-    const btn = e.target.closest("[data-pick-world]"); if (!btn) return;
-    await switchAdminWorld(btn.dataset.pickWorld);
-    document.querySelector('[data-admin-tab="players"]')?.click();
+    const pick = e.target.closest("[data-pick-world]");
+    if (pick) {
+        const id = String(pick.dataset.pickWorld);
+        adminOpenWorldId = String(adminOpenWorldId) === id ? null : id;
+        renderAdminWorldPicker();
+        return;
+    }
+    const btn = e.target.closest("[data-wp]"); if (!btn) return;
+    const act = btn.dataset.wp, wid = String(btn.dataset.id);
+    const w = (adminWorldsCache || []).find(x => String(x.id) === wid);
+    const done = async () => { await fetchAvailableWorlds(); await loadAdminPanel(); };
+    if (act === "enter") {
+        btn.disabled = true;
+        try { await switchAdminWorld(wid); document.querySelector('[data-admin-tab="players"]')?.click(); }
+        catch { showToast("تغییر دنیا ناموفق بود.", "error"); }
+        finally { btn.disabled = false; }
+        return;
+    }
+    btn.disabled = true;
+    try {
+        if (act === "rename") {
+            const name = (document.querySelector(`[data-wp-name="${CSS.escape(wid)}"]`)?.value || "").trim();
+            if (!name) { showToast("نام دنیا را وارد کن.", "error"); btn.disabled = false; return; }
+            const r = await apiPost("/api/admin/worlds/rename", { world_id: wid, name });
+            showToast(r.message || (r.success ? "نام تغییر کرد." : "تغییر نام انجام نشد."), r.success ? "success" : "error");
+            if (r.success) { document.activeElement?.blur?.(); await done(); }
+        } else if (act === "start") {
+            if (!confirm(`فصل «${w?.name || wid}» همین حالا آغاز شود؟ ثبت‌نام بسته می‌شود و زمان ۳۱ روزه برای همه یکسان خواهد بود.`)) { btn.disabled = false; return; }
+            const r = await apiPost("/api/admin/world/start", {}, { world_id: wid });
+            showToast(r.message || (r.success ? "فصل شروع شد." : "شروع فصل انجام نشد."), r.success ? "success" : "error");
+            if (r.success) await done();
+        } else if (act === "registration") {
+            const r = await apiPost("/api/admin/world/registration", { open: btn.dataset.open === "1" }, { world_id: wid });
+            showToast(r.message || (r.success ? "وضعیت ثبت‌نام تغییر کرد." : "عملیات انجام نشد."), r.success ? "success" : "error");
+            if (r.success) await done();
+        } else if (act === "delete") {
+            if (!confirm(`دنیای «${w?.name || wid}» با همهٔ بازیکنان و اطلاعاتش برای همیشه حذف شود؟ این کار برگشت‌پذیر نیست.`)) { btn.disabled = false; return; }
+            const r = await apiPost("/api/admin/worlds/delete", { world_id: wid });
+            showToast(r.message || (r.success ? "دنیا حذف شد." : "حذف انجام نشد."), r.success ? "success" : "error");
+            if (r.success) {
+                adminOpenWorldId = null;
+                await fetchAvailableWorlds();
+                if (String(selectedWorldId) === wid) { const next = (availableWorlds || [])[0]; if (next) selectedWorldId = String(next.id); }
+                await loadAdminPanel();
+            }
+        }
+    } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
+    finally { btn.disabled = false; }
 });
 document.getElementById("admin-back-worlds")?.addEventListener("click", () => {
     adminCurrentDetailWorld = null;
@@ -3278,7 +3343,7 @@ document.getElementById("admin-back-worlds")?.addEventListener("click", () => {
     renderAdminNavigation();
     document.getElementById("admin-world-picker")?.classList.remove("hidden");
     renderAdminWorldPicker();
-    document.getElementById("admin")?.scrollTo(0,0);
+    document.getElementById("admin-scroll")?.scrollTo(0,0);
 });
 function renderAdminWorldSwitcher() {
     const root = document.getElementById("admin-world-switcher"); if (!root) return;
@@ -3291,80 +3356,6 @@ function renderAdminWorldSwitcher() {
         button.disabled = true;
         try { await switchAdminWorld(button.dataset.switchWorld); }
         catch { showToast("تغییر دنیا ناموفق بود.", "error"); }
-        finally { button.disabled = false; }
-    }));
-}
-
-function renderAdminWorlds() {
-    const root = document.getElementById("admin-world-list"); if (!root) return;
-    if (!adminWorldsCache?.length) { root.innerHTML = `<div class="admin-empty">هنوز دنیایی ثبت نشده است.</div>`; return; }
-    root.innerHTML = adminWorldsCache.map(w => {
-        const status = w.game_finished ? `پایان‌یافته · برنده: ${escapeHtml(w.winner?.name || "—")}`
-            : w.game_started ? `روز ${w.day} از ۳۱ · فصل ${escapeHtml(w.season || "")}`
-            : "هنوز شروع نشده";
-        const started = Boolean(w.game_started_at);
-        const finished = Boolean(w.game_finished);
-        const registrationOpen = Boolean(w.registration_open);
-        return `<article class="admin-world-card ${String(w.id) === String(selectedWorldId) ? "current" : ""}">
-            <div><b>🌍 ${escapeHtml(w.name || `دنیای ${w.id}`)}</b>
-                <small>شناسه: ${w.id} · ${formatNumber(w.players || 0)} بازیکن · ${formatNumber(w.countries_taken || 0)} کشور گرفته‌شده</small>
-                <small>${w.created_at ? `ساخته‌شده: ${escapeHtml(new Date(w.created_at).toLocaleString("fa-IR"))}` : "دنیای اصلی"}</small>
-                <small class="admin-world-status">وضعیت: ${status} · ثبت‌نام ${registrationOpen ? "باز" : "بسته"}${w.game_ends_at ? ` · پایان: ${escapeHtml(new Date(w.game_ends_at).toLocaleString("fa-IR"))}` : ""}</small>
-            </div>
-            <div class="admin-world-actions">
-                <button type="button" class="admin-world-delete" data-world-delete="${w.id}">🗑 حذف دنیا</button>
-                <button type="button" data-enter-world="${w.id}">${String(w.id) === String(selectedWorldId) ? "دنیای فعلی" : "مدیریت این دنیا"}</button>
-                ${!started && !finished ? `<button type="button" data-world-start="${w.id}">▶ شروع فصل ۳۱روزه</button>` : ""}
-                ${!finished ? `<button type="button" data-world-registration="${w.id}" data-open="${registrationOpen ? "0" : "1"}">${registrationOpen ? "🔒 بستن ثبت‌نام" : "🔓 بازگشایی ثبت‌نام"}</button>` : ""}
-            </div>
-        </article>`;
-    }).join("");
-    root.querySelectorAll("[data-enter-world]").forEach(button => button.addEventListener("click", async () => {
-        button.disabled = true;
-        try {
-            await switchAdminWorld(button.dataset.enterWorld);
-            document.querySelector('[data-admin-tab="players"]')?.click();
-        } catch { showToast("تغییر دنیا ناموفق بود.", "error"); }
-        finally { button.disabled = false; }
-    }));
-    root.querySelectorAll("[data-world-delete]").forEach(button => button.addEventListener("click", async () => {
-        const wid = String(button.dataset.worldDelete);
-        const w = (adminWorldsCache || []).find(x => String(x.id) === wid);
-        if (!confirm(`دنیای «${w?.name || wid}» با همهٔ بازیکنان و اطلاعاتش برای همیشه حذف شود؟ این کار برگشت‌پذیر نیست.`)) return;
-        button.disabled = true;
-        try {
-            const result = await apiPost("/api/admin/worlds/delete", { world_id: wid });
-            showToast(result.message || (result.success ? "دنیا حذف شد." : "حذف انجام نشد."), result.success ? "success" : "error");
-            if (result.success) {
-                await fetchAvailableWorlds();
-                if (String(selectedWorldId) === wid) {
-                    const next = (availableWorlds || [])[0];
-                    if (next) selectedWorldId = String(next.id);
-                }
-                await loadAdminPanel();
-            }
-        } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
-        finally { button.disabled = false; }
-    }));
-    root.querySelectorAll("[data-world-start]").forEach(button => button.addEventListener("click", async () => {
-        const wid = String(button.dataset.worldStart);
-        if (!confirm(`فصل دنیای ${wid} همین حالا آغاز شود؟ ثبت‌نام بسته می‌شود و زمان ۳۱ روزه برای همه یکسان خواهد بود.`)) return;
-        button.disabled = true;
-        try {
-            const result = await apiPost("/api/admin/world/start", {}, { world_id: wid });
-            showToast(result.message || (result.success ? "فصل شروع شد." : "شروع فصل انجام نشد."), result.success ? "success" : "error");
-            if (result.success) { await fetchAvailableWorlds(); await loadAdminPanel(); }
-        } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
-        finally { button.disabled = false; }
-    }));
-    root.querySelectorAll("[data-world-registration]").forEach(button => button.addEventListener("click", async () => {
-        const wid = String(button.dataset.worldRegistration), open = button.dataset.open === "1";
-        button.disabled = true;
-        try {
-            const result = await apiPost("/api/admin/world/registration", { open }, { world_id: wid });
-            showToast(result.message || (result.success ? "وضعیت ثبت‌نام تغییر کرد." : "عملیات انجام نشد."), result.success ? "success" : "error");
-            if (result.success) { await fetchAvailableWorlds(); await loadAdminPanel(); }
-        } catch { showToast("ارتباط با سرور برقرار نشد.", "error"); }
         finally { button.disabled = false; }
     }));
 }
@@ -3431,7 +3422,6 @@ function renderAdminOverview() {
         audit.innerHTML = actions.length ? actions.map(a => `<article class="admin-audit-row"><span class="admin-audit-icon">${a.target_user_id ? "👤" : "⚙️"}</span><div class="admin-audit-copy"><b>${escapeHtml(a.action || "عملیات مدیریت")}</b><p>${escapeHtml(a.detail || "")}</p><small>${a.target_user_id ? `آیدی بازیکن: ${a.target_user_id} · ` : ""}${escapeHtml(a.at ? new Date(a.at).toLocaleString("fa-IR") : "")}</small></div></article>`).join("") : `<div class="admin-empty">هنوز عملیات مدیریتی ثبت نشده است.</div>`;
     }
     renderAdminWars();
-    renderAdminWorlds();
     renderAdminWorldSwitcher();
     const worldLabel = el("admin-current-world");
     if (worldLabel) {
