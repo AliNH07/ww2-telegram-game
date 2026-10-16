@@ -3651,3 +3651,25 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .shop-receipt-preview{align-items:center;flex-wrap:wrap}
 .shop-receipt-preview img{max-width:100%;max-height:280px}
 @media(max-width:520px){#subscription .shop-list{grid-template-columns:minmax(0,1fr)!important}.shop-history-row strong{font-size:10px}.shop-upload-box{min-height:100px}}
+
+
+/* ==================== بایگانی دنیاها و رتبه‌بندی ==================== */
+.archive-description{color:#A598BB;font-size:12px;line-height:1.9;margin:0 2px 14px;text-align:right}
+.archive-world-list{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.archive-world-card{width:100%;display:flex;align-items:center;gap:12px;min-width:0;padding:14px;border-radius:16px;background:linear-gradient(135deg,rgba(41,24,61,.93),rgba(28,13,45,.93));border:1px solid rgba(160,112,224,.2);color:#f4f6f9;text-align:right;cursor:pointer;transition:transform .18s ease,border-color .18s ease}
+.archive-world-card:active{transform:scale(.99)}
+.archive-world-icon{width:44px;height:44px;display:grid;place-items:center;border-radius:13px;background:rgba(160,112,224,.12);font-size:24px;flex:0 0 auto}
+.archive-world-copy{display:grid;gap:4px;min-width:0;flex:1}
+.archive-world-copy b{font-size:13px}
+.archive-world-copy small{font-size:10px;color:#A598BB;line-height:1.7}
+.archive-world-arrow{font-size:10px;color:#C9A8F6;white-space:nowrap}
+.archive-ranking-method{padding:14px;margin:0 0 13px;border:1px solid rgba(160,112,224,.2);border-radius:15px;background:rgba(29,18,41,.76)}
+.archive-ranking-method h3{font-size:13px;color:#E8D9FA;margin-bottom:7px}
+.archive-ranking-method>p{font-size:11px;color:#B7A9C9;line-height:1.9;margin-bottom:10px}
+.archive-weight-list{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.archive-weight-list span{display:grid;gap:3px;padding:9px 10px;border-radius:10px;background:rgba(160,112,224,.07)}
+.archive-weight-list b{font-size:11px;color:#D5BDF4}
+.archive-weight-list small{font-size:10px;line-height:1.7;color:#A598BB}
+.archive-rk-tabs{margin-bottom:12px}
+.archive-rank-score{font-size:10px;color:#B9A3D5;margin-right:auto;white-space:nowrap}
+@media(min-width:650px){.archive-weight-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
