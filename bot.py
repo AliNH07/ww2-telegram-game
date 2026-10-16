@@ -3759,13 +3759,19 @@ async def get_forces(request):
         for t in transits:
             if t["owner"] == cid or t.get("kind") != "go": continue
             final = t.get("to") if (t.get("arrival_battle") or {}).get("phase") == "site" else (t.get("route_final_dst") or t.get("to"))
-            if not isinstance(final, str) or final in ("home", "mid") or final.startswith(("country:", "sea:")): continue
-            if not site_meta(final) or site_owner(final) != cid: continue
+            if not isinstance(final, str) or final in ("home", "mid") or final.startswith("sea:"): continue
+            if final.startswith("country:"):
+                tc = final.split(":", 1)[1]
+                if occupied_countries.get(tc, tc) != cid: continue
+                final_name = f"بندر {cname(tc)}"
+            else:
+                if not site_meta(final) or site_owner(final) != cid: continue
+                final_name = loc_label(final)
             in_battle = bool(t.get("route_battle") or t.get("arrival_battle"))
             rtot = parse_dt(t.get("route_total_arrive"))
             eta_arrive = t["arrive"] if (in_battle or not rtot or rtot <= utcnow()) else t.get("route_total_arrive")
             incoming.append({"id": t["id"], "country": t["owner"], "country_name": cname(t["owner"]),
-                             "to": final, "to_name": loc_label(final), "battle": in_battle,
+                             "to": final, "to_name": final_name, "battle": in_battle,
                              "start": t.get("trip_start") or t["start"], "arrive": t["arrive"],
                              "eta_arrive": eta_arrive})
     return web.json_response({"home": {k: n for k, n in p["units"].items() if n > 0}, "sites": sites,
@@ -4209,6 +4215,15 @@ def announce(kind, title, text, countries=()):
     """اعلان همزمان در اخبار جنگ و اعلان‌ها/اخبار عمومی (بدون ذکر تعداد نیرو)."""
     push_war(kind, text, list(countries)); push_news(title, text, countries=list(countries))
 
+def battle_inbox(text, countries):
+    """نتیجه/آغاز نبرد فقط برای کشورهای درگیر (اعلان درون‌بازی)؛ نه در اخبار و نه در خبرهای جنگ عمومی. تلگرام جداگانه با notify_country می‌رود."""
+    seen = set()
+    for c in countries or []:
+        if not c or c in seen: continue
+        seen.add(c)
+        _, pl = get_player_by_country(c)
+        if pl: push_activity_notice(pl, text)
+
 def _world_tag():
     """وقتی بیش از یک دنیا وجود دارد، نام دنیا ابتدای پیام‌های تلگرام می‌آید تا دنیاها قاطی نشوند."""
     try:
@@ -4360,6 +4375,8 @@ def _resolve_strait_passage(t, player):
             if owner_player:
                 owner_player["money"] = owner_player.get("money", 0) + toll
             push_news("پرداخت عوارض تنگه", f"{cname(cid)} برای عبور از {loc_label(sid)} مبلغ {toll:,}$ به {cname(owner)} پرداخت کرد.")
+            notify_country(owner, f"💰 {cname(cid)} برای عبور از {loc_label(sid)} مبلغ {toll:,}$ عوارض پرداخت کرد و به خزانهٔ شما واریز شد.")
+            notify_country(cid, f"💸 عوارض عبور از {loc_label(sid)} به مبلغ {toll:,}$ به {cname(owner)} پرداخت شد.")
     _continue_strait_passage(t, units)
 
 def _unit_group_subset(units, group):
@@ -4427,8 +4444,6 @@ def _site_battle_report(cid, owner, f, duration, result_line, public_msg, news_t
     """یک پیام برای هر دو بازیکن: نتیجه + مدت + تلفات دو طرف (بدون تعداد باقی‌مانده)؛ اخبار عمومی بدون هیچ عددی."""
     a_name, d_name = cname(cid), cname(owner)
     won = f["attacker_wins"]
-    push_war(war_kind, public_msg, [cid, owner])
-    push_news(news_title, public_msg, countries=[cid, owner])
     push_history(hist_kind, hist_title, cid, owner, "attacker" if won else "defender",
                  f"مدت نبرد {_fmt_duration(duration)}؛ تلفات مهاجم {f['attacker_lost']}؛ تلفات مدافع {f['defender_lost']}")
     lines = [result_line]
@@ -4436,6 +4451,7 @@ def _site_battle_report(cid, owner, f, duration, result_line, public_msg, news_t
     lines.append(f"تلفات {a_name}: {f['attacker_lost']:,} یگان | تلفات {d_name}: {f['defender_lost']:,} یگان")
     if f["empty"]: lines.append("ℹ️ مدافعی در این موضع مستقر نبود.")
     body = "\n".join(lines)
+    battle_inbox(("✅ " if won else "❌ ") + body, [cid]); battle_inbox(("⚠️ " if won else "🛡️ ") + body, [owner])
     notify_country(cid, ("✅ " if won else "❌ ") + body)
     notify_country(owner, ("⚠️ " if won else "🛡️ ") + body)
 
@@ -4461,8 +4477,8 @@ def _start_site_battle(t, now):
     t["start"] = now.isoformat(); t["arrive"] = t["arrival_battle"]["ends_at"]
     site_name = loc_label(dst)
     public = f"⚔️ نبرد بر سر {site_name} میان {cname(cid)} و {cname(owner)} آغاز شد."
-    announce("site_battle_started", f"آغاز نبرد در {site_name}", public, [cid, owner])
     private = f"{public}\n⏱ مدت نبرد حدود {_fmt_duration(seconds)} است؛ نتیجه همراه با تلفات اعلام می‌شود."
+    battle_inbox(private, [cid, owner])
     notify_country(cid, private); notify_country(owner, private)
 
 def _battle_label(t):
@@ -4495,8 +4511,8 @@ def _start_ground_march(t, cid, target, ground, now):
     is_colony = target in occupied_countries and occupied_countries.get(target) != target
     target_label = f"مستعمرهٔ {cname(target)}" if is_colony else cname(target)
     defender_country = occupied_countries.get(target, target)
-    msg = f"⚓ بندر {target_label} پس از نبرد دریایی در اختیار ناوگان {cname(cid)} قرار گرفت. کشتی‌های باقی‌مانده در بندر می‌مانند؛ {units_count(ground):,} نیروی زمینی با ناو ترابری از بندر به سمت مرکز {target_label} حرکت کرد و حدود {seconds} ثانیه دیگر به آن می‌رسد."
-    announce("ground_march_started", f"حرکت زمینی از بندر {target_label}", msg, [cid, target, defender_country])
+    msg = f"⚓ بندر {target_label} پس از نبرد دریایی در اختیار ناوگان {cname(cid)} قرار گرفت. نیروی زمینی با ناو ترابری از بندر به سمت مرکز {target_label} حرکت کرد و حدود {seconds} ثانیه دیگر به آن می‌رسد."
+    battle_inbox(msg, [cid, target, defender_country])
     notify_country(cid, msg); notify_country(defender_country, msg)
     return True
 
@@ -4519,7 +4535,7 @@ def _start_ground_battle(t, now):
     target_label = f"مستعمرهٔ {cname(target)}" if is_colony else f"پایتخت {cname(target)}"
     defender_country = occupied_countries.get(target, target)
     msg = f"🪖 نیروهای زمینی {cname(cid)} به {target_label} رسیدند؛ نبرد زمینی آغاز شد. نتیجه در ۳۰ تا ۶۰ ثانیهٔ آینده همراه با تلفات و مدت نبرد اعلام می‌شود."
-    announce("land_battle_started", f"آغاز نبرد زمینی در {target_label}", msg, [cid, target, defender_country])
+    battle_inbox(msg, [cid, target, defender_country])
     notify_country(cid, msg); notify_country(defender_country, msg)
 
 
@@ -4587,9 +4603,9 @@ def resolve_ground_arrival_battle(t):
         previous = site_forces.get(front_id, {}).get("units", {})
         _add_units(previous, survivors)
         site_forces[front_id] = {"owner": cid, "units": previous}
-        result = (f"🏆 نبرد زمینی در {target_label} پس از {duration} ثانیه به پیروزی {cname(cid)} رسید؛ "
-                  f"مهاجم {force_before-units_count(survivors):,} یگان از دست داد و {units_count(survivors):,} باقی ماند؛ "
-                  f"مدافع {defender_before-defender_after:,} یگان از دست داد. قدرت حمله {int(atk)} در برابر دفاع {int(dfn)}.")
+        a_lost, d_lost = force_before - units_count(survivors), defender_before - defender_after
+        result = (f"🏆 نبرد زمینی در {target_label} پس از {duration} ثانیه به پیروزی {cname(cid)} رسید.\n"
+                  f"تلفات {cname(cid)}: {a_lost:,} یگان | تلفات {cname(defender_country)}: {d_lost:,} یگان")
         winner = "attacker"
         if is_colony:
             occupy_colony(cid, target, defender_country)
@@ -4607,13 +4623,13 @@ def resolve_ground_arrival_battle(t):
             defender_after = units_count(_unit_group_subset(defender.get("units", {}), "land"))
         returned = {k: int(n * 0.20) for k, n in force.items() if int(n * 0.20) > 0}
         _add_units(attacker["units"], returned)
-        result = (f"🛡️ نبرد زمینی در {target_label} پس از {duration} ثانیه به پیروزی مدافعان رسید؛ "
-                  f"مهاجم {force_before-units_count(returned):,} یگان از دست داد و {units_count(returned):,} به خانه بازگشت؛ "
-                  f"مدافع {defender_before-defender_after:,} یگان از دست داد. قدرت حمله {int(atk)} در برابر دفاع {int(dfn)}.")
+        a_lost, d_lost = force_before - units_count(returned), defender_before - defender_after
+        result = (f"🛡️ نبرد زمینی در {target_label} پس از {duration} ثانیه به پیروزی مدافعان رسید.\n"
+                  f"تلفات {cname(cid)}: {a_lost:,} یگان | تلفات {cname(defender_country)}: {d_lost:,} یگان")
         winner = "defender"
     push_history("invasion", f"نبرد زمینی در {target_label}", cid, target, winner,
-                 f"حمله {int(atk)} در برابر دفاع {int(dfn)}؛ مدت {duration} ثانیه")
-    announce("invasion_result", f"نتیجهٔ نبرد زمینی در {target_label}", result, [cid, target, defender_country])
+                 f"مدت {duration} ثانیه؛ تلفات مهاجم {a_lost}؛ تلفات مدافع {d_lost}")
+    battle_inbox(result, [cid, target, defender_country])
     notify_country(cid, result); notify_country(defender_country, result)
     save_state()
 
@@ -4650,11 +4666,10 @@ def resolve_country_arrival(t, cid, p, target):
         else:
             for k, n in defender_fleet.items(): defender["units"][k] = max(0, int(n * 0.85))
             defender_after = units_count(_unit_group_subset(defender.get("units", {}), "naval"))
-        end_msg = (f"⚓ نبرد {target_label} پس از {duration} ثانیه به پیروزی مدافعان انجامید؛ "
-                   f"عملیات آبی‌ـ‌خاکی {cname(cid)} شکست خورد و {attacker_lost:,} یگان مهاجم از دست رفت؛ "
-                   f"مدافع {defender_before-defender_after:,} یگان از دست داد.")
-        push_history("port", f"نبرد {target_label}", cid, target, "defender", f"حمله {int(fleet_atk)} در برابر دفاع {int(fleet_def)}؛ مدت {duration} ثانیه")
-        announce("port_battle_result", f"نتیجهٔ نبرد {target_label}", end_msg, [cid, target, defender_country])
+        end_msg = (f"⚓ نبرد {target_label} پس از {duration} ثانیه به پیروزی مدافعان انجامید.\n"
+                   f"تلفات {cname(cid)}: {attacker_lost:,} یگان | تلفات {cname(defender_country)}: {defender_before-defender_after:,} یگان")
+        push_history("port", f"نبرد {target_label}", cid, target, "defender", f"مدت {duration} ثانیه؛ تلفات مهاجم {attacker_lost}؛ تلفات مدافع {defender_before-defender_after}")
+        battle_inbox(end_msg, [cid, target, defender_country])
         notify_country(cid, end_msg); notify_country(defender_country, end_msg); save_state(); return False
 
     fleet_before = units_count(fleet)
@@ -4674,11 +4689,10 @@ def resolve_country_arrival(t, cid, p, target):
             defender_after = units_count(_unit_group_subset(defender.get("units", {}), "naval"))
     else:
         defender_after = 0
-    port_msg = (f"✅ نبرد دریایی در {target_label} پس از {duration} ثانیه به پیروزی {cname(cid)} رسید؛ "
-                f"ناوگان مهاجم {fleet_before-units_count(fleet_survivors):,} یگان از دست داد و {units_count(fleet_survivors):,} باقی ماند؛ "
-                f"مدافع {defender_before-defender_after:,} یگان از دست داد؛ کشتی‌های باقی‌ماندهٔ مهاجم در بندر می‌مانند.")
-    push_history("port", f"نبرد {target_label}", cid, target, "attacker", f"حمله {int(fleet_atk)} در برابر دفاع {int(fleet_def)}؛ مدت {duration} ثانیه")
-    announce("port_battle_result", f"نتیجهٔ نبرد {target_label}", port_msg, [cid, target, defender_country])
+    port_msg = (f"✅ نبرد دریایی در {target_label} پس از {duration} ثانیه به پیروزی {cname(cid)} رسید.\n"
+                f"تلفات {cname(cid)}: {fleet_before-units_count(fleet_survivors):,} یگان | تلفات {cname(defender_country)}: {defender_before-defender_after:,} یگان")
+    push_history("port", f"نبرد {target_label}", cid, target, "attacker", f"مدت {duration} ثانیه؛ تلفات مهاجم {fleet_before-units_count(fleet_survivors)}؛ تلفات مدافع {defender_before-defender_after}")
+    battle_inbox(port_msg, [cid, target, defender_country])
     notify_country(cid, port_msg); notify_country(defender_country, port_msg)
     if not any(ground.values()):
         save_state(); return False
@@ -4778,7 +4792,7 @@ def _start_route_battle(a, b, now, position):
         t["start"] = start; t["arrive"] = end
     elapsed_msg = (f"⚓ دو ناوگان دشمن در دریا به هم رسیدند؛ نبرد دریایی آغاز شد و حدود {seconds} ثانیه طول می‌کشد. محل برخورد روی نقشه قرمز است."
                    if sea_battle else f"⚔️ دو نیروی دشمن در مسیر به هم رسیدند؛ نبرد آغاز شد و حدود {seconds} ثانیه طول می‌کشد. محل برخورد روی نقشه قرمز است.")
-    announce("route_battle_started", "آغاز نبرد دریایی در مسیر" if sea_battle else "آغاز نبرد در مسیر", elapsed_msg, [a["owner"], b["owner"]])
+    battle_inbox(elapsed_msg, [a["owner"], b["owner"]])
     notify_country(a["owner"], elapsed_msg); notify_country(b["owner"], elapsed_msg)
 
 def _check_transit_encounters(now):
@@ -4857,12 +4871,11 @@ def _finish_route_battle(battle_id, now):
             winner["arrive"] = (now + timedelta(seconds=seconds)).isoformat()
     title = "نبرد دریایی در مسیر" if battle_front == "naval" else "نبرد در مسیر"
     final_target = winner.get("route_final_dst") or winner.get("to")
-    msg = (f"🏆 {title} پس از {elapsed} ثانیه پایان یافت؛ {cname(winner_country)} پیروز شد. "
-           f"نیروی پیروز {winner_before-units_count(winner.get('units', {})):,} یگان از دست داد و {units_count(winner.get('units', {})):,} باقی ماند؛ "
-           f"نیروی {cname(loser_country)} تمام {loser_before:,} یگان اعزام‌شده را از دست داد و از مسیر خارج شد. "
-           f"نیروی پیروز به‌سمت {loc_label(final_target)} ادامه می‌دهد.")
-    push_history("naval_route" if battle_front == "naval" else "route", title, winner_country, loser_country, "attacker", f"قدرت پیروزی {int(wp)}؛ مدت {elapsed} ثانیه")
-    announce("route_battle_result", f"نتیجهٔ {title}", msg, [winner_country, loser_country])
+    w_lost = winner_before - units_count(winner.get('units', {}))
+    msg = (f"🏆 {title} پس از {elapsed} ثانیه پایان یافت؛ {cname(winner_country)} پیروز شد.\n"
+           f"تلفات {cname(winner_country)}: {w_lost:,} یگان | تلفات {cname(loser_country)}: {loser_before:,} یگان")
+    push_history("naval_route" if battle_front == "naval" else "route", title, winner_country, loser_country, "attacker", f"مدت {elapsed} ثانیه؛ تلفات برنده {w_lost}؛ تلفات بازنده {loser_before}")
+    battle_inbox(msg, [winner_country, loser_country])
     notify_country(winner_country, msg); notify_country(loser_country, msg)
     save_state()
 
@@ -4878,7 +4891,7 @@ def _start_arrival_battle(t, now):
     t["from_ll"] = list(pos or (0, 0)); t["to_ll"] = list(pos or (0, 0))
     t["from"] = "mid"; t["start"] = now.isoformat(); t["arrive"] = t["arrival_battle"]["ends_at"]
     msg = f"⚓ نیروی {cname(cid)} به بندر {target_label} رسید؛ نبرد بندر آغاز شد و نتیجه بین ۳۰ تا ۶۰ ثانیهٔ آینده اعلام می‌شود."
-    announce("port_battle_started", f"آغاز نبرد در بندر {target_label}", msg, [cid, target, defender_country])
+    battle_inbox(msg, [cid, target, defender_country])
     notify_country(cid, msg); notify_country(defender_country, msg)
 
 def process_transits():
@@ -4954,6 +4967,35 @@ def _route_strait_blockers(cid, route_nodes):
         if owner and owner != cid and strait_policy(sid, cid).get("closed") and have_treaty(cid, owner, "non_aggression"):
             return f"{loc_label(sid)} بسته است و به‌دلیل پیمان عدم تجاوز با {cname(owner)} نمی‌توانید از آن عبور کنید."
     return None
+
+async def route_preview(request):
+    """پیش‌نمایش مسیر اعزام: تنگه‌های سر راه، عوارض هرکدام و تنگه‌های بسته (نبرد در مسیر). چیزی کم یا ثبت نمی‌شود."""
+    uid = get_auth_user_id(request)
+    if not uid: return _bad("unauthorized", 401)
+    data = await read_json(request)
+    src = data.get("from"); dst = data.get("to")
+    p = _me(uid); cid = p.get("country")
+    if not cid or p.get("is_eliminated"): return _bad("کشوری ندارید.")
+    if not src or not dst or src == dst: return web.json_response({"success": True, "straits": [], "toll_total": 0, "money": p.get("money", 0)})
+    units = {}
+    for k, v in (data.get("units") or {}).items():
+        try: n = int(v)
+        except (TypeError, ValueError): continue
+        if k in ARMY_UNITS and n > 0: units[k] = n
+    target_country = dst.split(":", 1)[1] if isinstance(dst, str) and dst.startswith("country:") else None
+    plan = plan_sea_voyage(cid, src, dst, target_country) if (units and has_naval_units(units)) else None
+    rows = []; toll_total = 0
+    for sid in (plan["nodes"] if plan else []):
+        if sid not in STRAITS_DATA: continue
+        owner = site_owner(sid)
+        if not owner or owner == cid: continue
+        pol = strait_policy(sid, cid)
+        toll = max(0, int(pol.get("toll", 0)))
+        closed = bool(pol.get("closed"))
+        if not closed: toll_total += toll
+        rows.append({"id": sid, "name": STRAITS_DATA[sid]["name"], "owner": owner, "owner_name": cname(owner),
+                     "toll": toll, "closed": closed})
+    return web.json_response({"success": True, "straits": rows, "toll_total": toll_total, "money": p.get("money", 0)})
 
 async def dispatch_forces(request):
     uid = get_auth_user_id(request)
@@ -5061,6 +5103,9 @@ async def dispatch_forces(request):
     # هشدار به صاحب موضع (سکو، تنگه، معدن، ماهیگیری): بدون ذکر تعداد و نوع نیرو
     if dst != "home" and not target_country and owner and owner != cid:
         notify_country(owner, f"🚨 هشدار: {cname(cid)} به {loc_label(dst)} نیرو فرستاده است و حدود {eta} دیگر به آنجا می‌رسد.")
+    if dst != "home" and target_country and target_owner and target_owner != cid:
+        warn = f"🚨 هشدار: {cname(cid)} نیرو به سمت {cname(target_country)} فرستاده است و حدود {eta} دیگر به بندر می‌رسد."
+        battle_inbox(warn, [target_owner]); notify_country(target_owner, warn)
     if minutes <= 0:
         process_transits()
     save_state()
@@ -7223,7 +7268,7 @@ async def create_web_app():
         ("/api/select-country", select_country), ("/api/upgrade-infra", upgrade_infra),
         ("/api/upgrade-economy", upgrade_economy), ("/api/train-unit", train_unit),
         ("/api/war/declare", declare_war), ("/api/war/peace", war_peace),
-        ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/recall", recall_forces),
+        ("/api/map/capture", capture_site), ("/api/war/dispatch", dispatch_forces), ("/api/war/route-preview", route_preview), ("/api/war/recall", recall_forces),
         ("/api/satellite/launch", sat_launch), ("/api/satellite/scan-site", sat_scan_site),
         ("/api/satellite/scan-country", sat_scan_country),
         ("/api/activity-notices/ack", ack_activity_notices),
